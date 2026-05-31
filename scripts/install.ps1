@@ -16,14 +16,6 @@ Write-Host ""
 
 # --- Configuration ---
 $SYNPIN_HOME = Join-Path $env:USERPROFILE ".synpin"
-$SOURCE_DIR = Split-Path $PSScriptRoot -Parent
-
-# --- Verify source ---
-if (-not (Test-Path "$SOURCE_DIR\core\pyproject.toml")) {
-    Write-Host "ERROR: Not a SynPin repository." -ForegroundColor Red
-    Write-Host "  Run this script from the cloned SynPin directory." -ForegroundColor Red
-    exit 1
-}
 
 # --- Helper Functions ---
 function Test-Command($cmd) {
@@ -42,11 +34,6 @@ function Test-PythonVersion {
     return $false
 }
 
-function Run-Silent($command) {
-    & $command.Split(" ")[0] @($command.Split(" ")[1..100]) 2>&1 | Out-Null
-    return $LASTEXITCODE
-}
-
 # --- Step 1: Check Dependencies ---
 Write-Host "[1/5] Checking dependencies..." -ForegroundColor Yellow
 
@@ -63,7 +50,7 @@ Write-Host "  OK: $pythonVersion" -ForegroundColor Green
 if (-not (Test-Command "uv")) {
     Write-Host "  WARNING: uv not found. Installing..." -ForegroundColor Yellow
     powershell -c "irm https://astral.sh/uv/install.ps1 | iex" *> $null
-    $env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
+    $env:PATH = "$env:USERPROFILE/.local/bin;$env:PATH"
 }
 Write-Host "  OK: uv installed" -ForegroundColor Green
 
@@ -100,30 +87,43 @@ if (Test-Path $SYNPIN_HOME) {
 New-Item -ItemType Directory -Path $SYNPIN_HOME -Force | Out-Null
 Write-Host "  OK: Created $SYNPIN_HOME" -ForegroundColor Green
 
-# --- Step 3: Copy Repository ---
+# --- Step 3: Clone Repository ---
 Write-Host ""
-Write-Host "[3/5] Copying SynPin to $SYNPIN_HOME..." -ForegroundColor Yellow
+Write-Host "[3/5] Cloning SynPin..." -ForegroundColor Yellow
 
-$exclude = @("node_modules", ".git", ".venv", "__pycache__", "dist", "data", "logs")
-Get-ChildItem -Path $SOURCE_DIR -Directory | Where-Object { $_.Name -notin $exclude } | ForEach-Object {
-    Copy-Item -Path $_.FullName -Destination "$SYNPIN_HOME\$($_.Name)" -Recurse -Force
+$repoDir = Join-Path $SYNPIN_HOME "repo"
+if (Test-Path (Join-Path $repoDir ".git")) {
+    Push-Location $repoDir
+    git pull --ff-only 2>&1 | Out-Null
+    Pop-Location
+    Write-Host "  OK: Repository updated" -ForegroundColor Green
+} else {
+    if (Test-Path $repoDir) {
+        Remove-Item -Recurse -Force $repoDir
+    }
+    $oldEA = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    git clone --depth 1 https://github.com/FraN-arti/SynPin.git $repoDir 2>&1 | Out-Null
+    $gitExit = $LASTEXITCODE
+    $ErrorActionPreference = $oldEA
+    if ($gitExit -ne 0) {
+        Write-Host "  ERROR: Failed to clone repository." -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "  OK: Repository cloned" -ForegroundColor Green
 }
-Get-ChildItem -Path $SOURCE_DIR -File | ForEach-Object {
-    Copy-Item -Path $_.FullName -Destination "$SYNPIN_HOME\$($_.Name)" -Force
-}
-
-Write-Host "  OK: Copied" -ForegroundColor Green
 
 # --- Step 4: Install Core Dependencies ---
 Write-Host ""
 Write-Host "[4/5] Installing Python dependencies..." -ForegroundColor Yellow
 
+$CORE_DIR = Join-Path $repoDir "core"
 $oldEA = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
-uv sync --project "$SYNPIN_HOME\core" --no-dev 2>&1 | Out-Null
+uv sync --project $CORE_DIR --no-dev 2>&1 | Out-Null
 $uvExit = $LASTEXITCODE
-# Install the synpin package itself
-& "uv" pip install -e "$SYNPIN_HOME\core" --python "$SYNPIN_HOME\core\.venv\Scripts\python.exe" 2>&1 | Out-Null
+$venvPython = Join-Path $CORE_DIR ".venv/Scripts/python.exe"
+& "uv" pip install -e $CORE_DIR --python $venvPython 2>&1 | Out-Null
 $ErrorActionPreference = $oldEA
 
 if ($uvExit -ne 0) {
@@ -136,7 +136,8 @@ Write-Host "  OK: Core dependencies installed" -ForegroundColor Green
 Write-Host ""
 Write-Host "[5/5] Building Web UI..." -ForegroundColor Yellow
 
-Push-Location "$SYNPIN_HOME\web"
+$WEB_DIR = Join-Path $repoDir "web"
+Push-Location $WEB_DIR
 $oldEA = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 npm ci --silent 2>&1 | Out-Null
@@ -155,7 +156,7 @@ Write-Host "  OK: Web UI built" -ForegroundColor Green
 Write-Host ""
 Write-Host "Installing synpin CLI..." -ForegroundColor Yellow
 
-$binDir = Join-Path $env:USERPROFILE ".local\bin"
+$binDir = Join-Path $env:USERPROFILE ".local/bin"
 if (-not (Test-Path $binDir)) {
     New-Item -ItemType Directory -Path $binDir -Force | Out-Null
 }
@@ -167,22 +168,22 @@ if ($currentPath -notlike "*$binDir*") {
 }
 
 # Create synpin.bat
-$batContent = @"
-@echo off
-set SYNPIN_HOME=$SYNPIN_HOME
-set PATH=%SYNPIN_HOME%\core\.venv\Scripts;%PATH%
-python -m synpin %*
-"@
-$batContent | Out-File -FilePath "$binDir\synpin.bat" -Encoding ascii
+$repoRel = "repo"
+$batLines = @(
+    "@echo off",
+    "set SYNPIN_HOME=$SYNPIN_HOME",
+    "set PATH=%SYNPIN_HOME%\$repoRel\core\.venv\Scripts;%PATH%",
+    "python -m synpin %*"
+)
+$batLines -join "`r`n" | Out-File -FilePath "$binDir/synpin.bat" -Encoding ascii
 
 # Create synpin.ps1
-$ps1Content = @'
-$env:SYNPIN_HOME = "SYNPIN_HOME_PLACEHOLDER"
-$env:PATH = "$env:SYNPIN_HOME\core\.venv\Scripts;" + $env:PATH
-python -m synpin @args
-'@
-$ps1Content = $ps1Content -replace "SYNPIN_HOME_PLACEHOLDER", $SYNPIN_HOME
-$ps1Content | Out-File -FilePath "$binDir\synpin.ps1" -Encoding utf8
+$ps1Lines = @(
+    "`$env:SYNPIN_HOME = `"$SYNPIN_HOME`"",
+    "`$env:PATH = `"`$env:SYNPIN_HOME\$repoRel\core\.venv\Scripts;`" + `$env:PATH",
+    "python -m synpin @args"
+)
+$ps1Lines -join "`r`n" | Out-File -FilePath "$binDir/synpin.ps1" -Encoding utf8
 
 Write-Host "  OK: CLI installed to $binDir" -ForegroundColor Green
 
@@ -197,5 +198,5 @@ Write-Host "    1. Restart your terminal (for PATH update)" -ForegroundColor Whi
 Write-Host "    2. Run: synpin setup" -ForegroundColor White
 Write-Host "    3. Run: synpin start" -ForegroundColor White
 Write-Host ""
-Write-Host "  To uninstall: Remove-Item -Recurse `$env:USERPROFILE\.synpin" -ForegroundColor DarkGray
+Write-Host "  To uninstall: Remove-Item -Recurse `$env:USERPROFILE/.synpin" -ForegroundColor DarkGray
 Write-Host ""

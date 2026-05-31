@@ -127,6 +127,148 @@ def cmd_setup(args):
     print(f"\n✅  Config saved to {config_file}")
 
 
+def cmd_update(args):
+    """Update SynPin from GitHub and rebuild if needed."""
+    import subprocess
+    import shutil
+
+    synpin_home = Path.home() / ".synpin"
+    repo_dir = synpin_home / "repo"
+
+    if not repo_dir.exists():
+        print("ERROR: SynPin not installed. Run install.ps1 first.")
+        return
+
+    print("Checking for updates...")
+    print()
+
+    # Step 1: Git pull
+    result = subprocess.run(
+        ["git", "pull"],
+        cwd=str(repo_dir),
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        print(f"ERROR: git pull failed:\n{result.stderr}")
+        return
+
+    if "Already up to date" in result.stdout:
+        print("Already up to date. Nothing to do.")
+        return
+
+    print("Updates downloaded!")
+    print()
+
+    # Step 2: Check what changed
+    core_changed = False
+    web_changed = False
+
+    # Check changed files
+    result = subprocess.run(
+        ["git", "diff", "--name-only", "HEAD@{1}", "HEAD"],
+        cwd=str(repo_dir),
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode == 0:
+        changed_files = result.stdout.strip().split("\n")
+        for f in changed_files:
+            if f.startswith("core/"):
+                core_changed = True
+            if f.startswith("web/"):
+                web_changed = True
+
+    # Step 3: Rebuild as needed
+    venv_python = synpin_home / "core" / ".venv" / "Scripts" / "python.exe"
+
+    if core_changed:
+        print("Core changed - updating Python dependencies...")
+        # Copy updated core files
+        src_core = repo_dir / "core"
+        dst_core = synpin_home / "core"
+        if src_core.exists():
+            # Copy core directory (excluding .venv)
+            for item in src_core.iterdir():
+                if item.name == ".venv":
+                    continue
+                dst = dst_core / item.name
+                if dst.exists():
+                    if dst.is_dir():
+                        shutil.rmtree(dst)
+                    else:
+                        dst.unlink()
+                if item.is_dir():
+                    shutil.copytree(item, dst)
+                else:
+                    shutil.copy2(item, dst)
+
+        # Reinstall package
+        print("  Installing package...")
+        subprocess.run(
+            ["uv", "pip", "install", "-e", str(synpin_home / "core"),
+             "--python", str(venv_python)],
+            capture_output=True,
+        )
+        print("  OK: Core updated")
+        print()
+
+    if web_changed:
+        print("Web changed - rebuilding UI...")
+        # Copy updated web source
+        src_web = repo_dir / "web"
+        dst_web = synpin_home / "web"
+        # Copy source files (not node_modules, dist)
+        for item in src_web.iterdir():
+            if item.name in ("node_modules", "dist"):
+                continue
+            dst = dst_web / item.name
+            if dst.exists():
+                if dst.is_dir():
+                    shutil.rmtree(dst)
+                else:
+                    dst.unlink()
+            if item.is_dir():
+                shutil.copytree(item, dst)
+            else:
+                shutil.copy2(item, dst)
+
+        # Rebuild
+        print("  Building...")
+        subprocess.run(
+            ["npm", "run", "build"],
+            cwd=str(dst_web),
+            capture_output=True,
+        )
+        print("  OK: Web rebuilt")
+        print()
+
+    if not core_changed and not web_changed:
+        # Just copy changed files (wiki, docs, etc.)
+        print("Copying updated files...")
+        for item in repo_dir.iterdir():
+            if item.name in (".git", "node_modules", ".venv"):
+                continue
+            dst = synpin_home / item.name
+            if item.is_dir():
+                if dst.exists():
+                    shutil.rmtree(dst)
+                shutil.copytree(item, dst)
+            else:
+                shutil.copy2(item, dst)
+        print("  OK: Files updated")
+        print()
+
+    print("========================================")
+    print("  Update complete!")
+    print("========================================")
+    print()
+    print("  Restart with: synpin start")
+    print()
+
+
 def cmd_logs(args):
     """Show server logs."""
     log_dir = Path.home() / ".synpin" / "logs"
@@ -150,6 +292,7 @@ def main():
         "version": cmd_version,
         "config": cmd_config,
         "setup": cmd_setup,
+        "update": cmd_update,
         "logs": cmd_logs,
     }
 
@@ -163,6 +306,7 @@ def main():
         print("  config    Show/edit configuration")
         print("  logs      Show server logs")
         print("  setup     Initial setup wizard")
+        print("  update    Update from GitHub and rebuild")
         print("  version   Show version")
         print()
         return

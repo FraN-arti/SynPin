@@ -161,12 +161,12 @@ $conflictingPaths = $env:PATH -split ";" | Where-Object { $_ -and $_ -notlike "*
 foreach ($p in $conflictingPaths) {
     $exePath = Join-Path $p "synpin.exe"
     if (Test-Path $exePath) {
-        Write-Host "  WARNING: Found conflicting synpin.exe at $exePath — removing" -ForegroundColor Yellow
+        Write-Host "  WARNING: Found conflicting synpin.exe at $exePath - removing" -ForegroundColor Yellow
         Remove-Item -Force $exePath
     }
 }
 
-$binDir = Join-Path $env:USERPROFILE ".local/bin"
+$binDir = Join-Path $env:USERPROFILE ".local" "bin"
 if (-not (Test-Path $binDir)) {
     New-Item -ItemType Directory -Path $binDir -Force | Out-Null
 }
@@ -178,21 +178,20 @@ if ($currentPath -notlike "*$binDir*") {
 }
 
 # Create synpin.bat
-$repoRel = "repo"
-$batLines = @(
-    "@echo off",
-    "setlocal",
-    "set SYNPIN_PYTHON=$SYNPIN_HOME\$repoRel\core\.venv\Scripts\python.exe",
-    "if exist ""%SYNPIN_PYTHON%"" (",
-    "    ""%SYNPIN_PYTHON%"" -m synpin %*",
-    ") else (",
-    "    echo ERROR: SynPin venv not found.",
-    "    echo Run install.ps1 to reinstall.",
-    "    pause",
-    ")",
-    "endlocal"
+$batContent = @"
+@echo off
+setlocal
+set SYNPIN_PYTHON=$SYNPIN_HOME\$repoRel\core\.venv\Scripts\python.exe
+if exist "%SYNPIN_PYTHON%" (
+    "%SYNPIN_PYTHON%" -m synpin %*
+) else (
+    echo ERROR: SynPin venv not found.
+    echo Run install.ps1 to reinstall.
+    pause
 )
-$batLines -join "`r`n" | Out-File -FilePath "$binDir/synpin.bat" -Encoding ascii
+endlocal
+"@
+$batContent | Out-File -FilePath "$binDir/synpin.bat" -Encoding ascii
 
 # Create synpin.ps1
 $ps1Content = @"

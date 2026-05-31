@@ -116,6 +116,9 @@ Write-Host "[4/5] Installing Python dependencies..." -ForegroundColor Yellow
 
 $ErrorActionPreference = "Continue"
 cmd /c "uv sync --project $SYNPIN_HOME\core --no-dev" 2>&1 | Out-Null
+Push-Location "$SYNPIN_HOME\core"
+cmd /c "$SYNPIN_HOME\core\.venv\Scripts\python.exe -m pip install -e ." 2>&1 | Out-Null
+Pop-Location
 $ErrorActionPreference = "Stop"
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  ERROR: Failed to install Python dependencies." -ForegroundColor Red

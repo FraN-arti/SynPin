@@ -23,7 +23,7 @@ synpin start    # Запустить сервер
 ## Разработка
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/FraN-arti/SynPin.git
 cd synpin
 
 # Зависимости

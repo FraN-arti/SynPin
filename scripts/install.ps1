@@ -11,8 +11,8 @@ Write-Host ""
 
 # --- Configuration ---
 $SYNPIN_HOME = Join-Path $env:USERPROFILE ".synpin"
-$REPO_URL = "https://github.com/<user>/synpin.git"
-$BRANCH = "main"
+$REPO_URL = "https://github.com/FraN-arti/SynPin.git"
+$BRANCH = "master"
 
 # --- Helper Functions ---
 function Test-Command($cmd) {
@@ -96,7 +96,7 @@ if (Test-Command "git") {
     }
 } else {
     Write-Host "  ⚠️  git not found. Using direct download..." -ForegroundColor Yellow
-    $zipUrl = "https://github.com/<user>/synpin/archive/refs/heads/$BRANCH.zip"
+    $zipUrl = "https://github.com/FraN-arti/SynPin/archive/refs/heads/$BRANCH.zip"
     $zipPath = "$env:TEMP\synpin.zip"
     Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath
     Expand-Archive -Path $zipPath -DestinationPath $SYNPIN_HOME -Force

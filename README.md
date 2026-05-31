@@ -6,7 +6,7 @@ Python-ядро (FastAPI) + React Web UI.
 ## Установка
 
 ```powershell
-iex (irm https://raw.githubusercontent.com/<user>/synpin/main/scripts/install.ps1)
+iex (irm https://raw.githubusercontent.com/FraN-arti/SynPin/main/scripts/install.ps1)
 ```
 
 ## Использование
@@ -24,7 +24,7 @@ synpin version    # Версия
 ## Разработка
 
 ```bash
-git clone https://github.com/<user>/synpin.git
+git clone https://github.com/FraN-arti/SynPin.git
 cd synpin
 dev.bat           # Запуск dev-сервера (hot-reload)
 dev.bat stop      # Остановка

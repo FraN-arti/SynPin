@@ -1,0 +1,32 @@
+# Python core for SynPin - Multi-Agent Framework
+[project]
+name = "synpin-core"
+version = "0.1.0"
+description = "SynPin multi-agent orchestration engine"
+requires-python = ">=3.11"
+
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "pydantic>=2.0",
+    "httpx>=0.28",
+    "chromadb>=0.5",
+    "pyyaml>=6.0",
+    "rich>=13.0",
+    "watchdog>=5.0",
+    "colorama>=0.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.8",
+    "mypy>=1.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[project.scripts]
+synpin = "synpin.__main__:main"

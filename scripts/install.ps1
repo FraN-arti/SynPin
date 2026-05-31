@@ -178,6 +178,7 @@ if ($currentPath -notlike "*$binDir*") {
 }
 
 # Create synpin.bat
+$repoRel = "repo"
 $batContent = @"
 @echo off
 setlocal

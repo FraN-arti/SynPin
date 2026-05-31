@@ -156,6 +156,16 @@ Write-Host "  OK: Web UI built" -ForegroundColor Green
 Write-Host ""
 Write-Host "Installing synpin CLI..." -ForegroundColor Yellow
 
+# Clean up conflicting synpin.exe from other venvs in PATH
+$conflictingPaths = $env:PATH -split ";" | Where-Object { $_ -and $_ -notlike "*\.local\bin*" }
+foreach ($p in $conflictingPaths) {
+    $exePath = Join-Path $p "synpin.exe"
+    if (Test-Path $exePath) {
+        Write-Host "  WARNING: Found conflicting synpin.exe at $exePath — removing" -ForegroundColor Yellow
+        Remove-Item -Force $exePath
+    }
+}
+
 $binDir = Join-Path $env:USERPROFILE ".local/bin"
 if (-not (Test-Path $binDir)) {
     New-Item -ItemType Directory -Path $binDir -Force | Out-Null

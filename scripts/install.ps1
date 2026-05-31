@@ -166,7 +166,7 @@ foreach ($p in $conflictingPaths) {
     }
 }
 
-$binDir = Join-Path $env:USERPROFILE ".local" "bin"
+$binDir = Join-Path $env:USERPROFILE ".local\bin"
 if (-not (Test-Path $binDir)) {
     New-Item -ItemType Directory -Path $binDir -Force | Out-Null
 }

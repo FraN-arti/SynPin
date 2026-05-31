@@ -185,17 +185,17 @@ $batLines = @(
 $batLines -join "`r`n" | Out-File -FilePath "$binDir/synpin.bat" -Encoding ascii
 
 # Create synpin.ps1
-$ps1Lines = @(
-    '$env:SYNPIN_HOME = "' + $SYNPIN_HOME + '"',
-    '$synpinPython = Join-Path $env:SYNPIN_HOME "' + $repoRel + '\core\.venv\Scripts\python.exe"',
-    'if (Test-Path $synpinPython) {',
-    '    & $synpinPython -m synpin @args',
-    '} else {',
-    '    Write-Host "ERROR: SynPin venv not found." -ForegroundColor Red',
-    '    Write-Host "Run install.ps1 to reinstall." -ForegroundColor Red',
-    '}',
-)
-$ps1Lines -join "`r`n" | Out-File -FilePath "$binDir/synpin.ps1" -Encoding utf8
+$ps1Content = @"
+`$env:SYNPIN_HOME = "$SYNPIN_HOME"
+`$synpinPython = Join-Path `$env:SYNPIN_HOME "$repoRel\core\.venv\Scripts\python.exe"
+if (Test-Path `$synpinPython) {
+    & `$synpinPython -m synpin @args
+} else {
+    Write-Host "ERROR: SynPin venv not found." -ForegroundColor Red
+    Write-Host "Run install.ps1 to reinstall." -ForegroundColor Red
+}
+"@
+$ps1Content | Out-File -FilePath "$binDir/synpin.ps1" -Encoding utf8
 
 Write-Host "  OK: CLI installed to $binDir" -ForegroundColor Green
 

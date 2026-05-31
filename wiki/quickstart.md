@@ -42,9 +42,9 @@ dev.bat stop
 ```
   🚀 SynPin v0.1.0 — Development Mode
 
-  Core:  http://0.0.0.0:8000/api
-  Web:   http://localhost:5173
-  Docs:  http://0.0.0.0:8000/docs
+  Core:  http://0.0.0.0:2088/api
+  Web:   http://localhost:2099
+  Docs:  http://0.0.0.0:2088/docs
 ```
 
 ## CLI команды
@@ -63,11 +63,11 @@ dev.bat stop
 
 ```bash
 # Health check
-curl http://127.0.0.1:8000/api/health
+curl http://127.0.0.1:2088/api/health
 # → {"status": "ok", "version": "0.1.0"}
 
 # Swagger docs
-# → http://127.0.0.1:8000/docs
+# → http://127.0.0.1:2088/docs
 ```
 
 ---

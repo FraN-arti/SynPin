@@ -34,8 +34,8 @@ CORE_DIR = ROOT / "core"
 WEB_DIR = ROOT / "web"
 
 CORE_HOST = "0.0.0.0"
-CORE_PORT = 8000
-WEB_PORT = 5173
+CORE_PORT = 2088
+WEB_PORT = 2099
 
 processes: list[subprocess.Popen] = []
 shutdown_event = threading.Event()

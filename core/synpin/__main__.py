@@ -20,7 +20,7 @@ def cmd_start(args):
     import uvicorn
 
     host = os.environ.get("SYNPIN_HOST", "0.0.0.0")
-    port = int(os.environ.get("SYNPIN_PORT", "8000"))
+    port = int(os.environ.get("SYNPIN_PORT", "2088"))
 
     print(f"🚀 SynPin v0.1.0")
     print(f"   API:  http://{host}:{port}/api")
@@ -58,7 +58,7 @@ def cmd_status(args):
     """Show server status."""
     import urllib.request
 
-    port = int(os.environ.get("SYNPIN_PORT", "8000"))
+    port = int(os.environ.get("SYNPIN_PORT", "2088"))
     try:
         urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=2)
         print(f"✅  SynPin is running on port {port}")

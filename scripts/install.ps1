@@ -1,5 +1,5 @@
 # SynPin Installation Script
-# For private repositories — run from a cloned repo directory.
+# For private repositories - run from a cloned repo directory.
 #
 # Usage:
 #   git clone https://github.com/FraN-arti/SynPin.git
@@ -9,19 +9,19 @@
 $ErrorActionPreference = "Stop"
 
 Write-Host ""
-Write-Host "╔══════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║  🚀 SynPin v0.1.0 — Installation         ║" -ForegroundColor Cyan
-Write-Host "╚══════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "  SynPin v0.1.0 - Installation" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
 # --- Configuration ---
 $SYNPIN_HOME = Join-Path $env:USERPROFILE ".synpin"
-$SOURCE_DIR = Split-Path $PSScriptRoot -Parent  # Parent of scripts/ = repo root
+$SOURCE_DIR = Split-Path $PSScriptRoot -Parent
 
 # --- Verify source ---
 if (-not (Test-Path "$SOURCE_DIR\core\pyproject.toml")) {
-    Write-Host "❌ Not a SynPin repository." -ForegroundColor Red
-    Write-Host "   Run this script from the cloned SynPin directory." -ForegroundColor Red
+    Write-Host "ERROR: Not a SynPin repository." -ForegroundColor Red
+    Write-Host "  Run this script from the cloned SynPin directory." -ForegroundColor Red
     exit 1
 }
 
@@ -47,43 +47,43 @@ Write-Host "[1/5] Checking dependencies..." -ForegroundColor Yellow
 
 # Python
 if (-not (Test-PythonVersion)) {
-    Write-Host "  ❌ Python 3.11+ not found." -ForegroundColor Red
-    Write-Host "     Install: https://www.python.org/downloads/" -ForegroundColor Red
+    Write-Host "  ERROR: Python 3.11+ not found." -ForegroundColor Red
+    Write-Host "  Install: https://www.python.org/downloads/" -ForegroundColor Red
     exit 1
 }
 $pythonVersion = python --version 2>&1
-Write-Host "  ✅ $pythonVersion" -ForegroundColor Green
+Write-Host "  OK: $pythonVersion" -ForegroundColor Green
 
 # uv
 if (-not (Test-Command "uv")) {
-    Write-Host "  ⚠️  uv not found. Installing..." -ForegroundColor Yellow
+    Write-Host "  WARNING: uv not found. Installing..." -ForegroundColor Yellow
     powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
     $env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
 }
-Write-Host "  ✅ uv installed" -ForegroundColor Green
+Write-Host "  OK: uv installed" -ForegroundColor Green
 
 # Node.js
 if (-not (Test-Command "node")) {
-    Write-Host "  ❌ Node.js not found." -ForegroundColor Red
-    Write-Host "     Install: https://nodejs.org/" -ForegroundColor Red
+    Write-Host "  ERROR: Node.js not found." -ForegroundColor Red
+    Write-Host "  Install: https://nodejs.org/" -ForegroundColor Red
     exit 1
 }
 $nodeVersion = node --version
-Write-Host "  ✅ Node.js $nodeVersion" -ForegroundColor Green
+Write-Host "  OK: Node.js $nodeVersion" -ForegroundColor Green
 
 # npm
 if (-not (Test-Command "npm")) {
-    Write-Host "  ❌ npm not found (included with Node.js)." -ForegroundColor Red
+    Write-Host "  ERROR: npm not found (included with Node.js)." -ForegroundColor Red
     exit 1
 }
-Write-Host "  ✅ npm found" -ForegroundColor Green
+Write-Host "  OK: npm found" -ForegroundColor Green
 
 # --- Step 2: Create SynPin Home ---
 Write-Host ""
 Write-Host "[2/5] Setting up $SYNPIN_HOME..." -ForegroundColor Yellow
 
 if (Test-Path $SYNPIN_HOME) {
-    Write-Host "  ⚠️  $SYNPIN_HOME already exists." -ForegroundColor Yellow
+    Write-Host "  WARNING: $SYNPIN_HOME already exists." -ForegroundColor Yellow
     $overwrite = Read-Host "  Overwrite? (y/N)"
     if ($overwrite -ne "y") {
         Write-Host "  Installation cancelled." -ForegroundColor Yellow
@@ -93,7 +93,7 @@ if (Test-Path $SYNPIN_HOME) {
 }
 
 New-Item -ItemType Directory -Path $SYNPIN_HOME -Force | Out-Null
-Write-Host "  ✅ Created $SYNPIN_HOME" -ForegroundColor Green
+Write-Host "  OK: Created $SYNPIN_HOME" -ForegroundColor Green
 
 # --- Step 3: Copy Repository ---
 Write-Host ""
@@ -108,7 +108,7 @@ Get-ChildItem -Path $SOURCE_DIR -File | ForEach-Object {
     Copy-Item -Path $_.FullName -Destination "$SYNPIN_HOME\$($_.Name)" -Force
 }
 
-Write-Host "  ✅ Copied" -ForegroundColor Green
+Write-Host "  OK: Copied" -ForegroundColor Green
 
 # --- Step 4: Install Core Dependencies ---
 Write-Host ""
@@ -116,10 +116,10 @@ Write-Host "[4/5] Installing Python dependencies..." -ForegroundColor Yellow
 
 uv sync --project "$SYNPIN_HOME\core" --no-dev 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "  ❌ Failed to install Python dependencies." -ForegroundColor Red
+    Write-Host "  ERROR: Failed to install Python dependencies." -ForegroundColor Red
     exit 1
 }
-Write-Host "  ✅ Core dependencies installed" -ForegroundColor Green
+Write-Host "  OK: Core dependencies installed" -ForegroundColor Green
 
 # --- Step 5: Build Web UI ---
 Write-Host ""
@@ -129,17 +129,17 @@ Push-Location "$SYNPIN_HOME\web"
 npm ci --silent 2>&1 | Out-Null
 npm run build 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "  ❌ Failed to build Web UI." -ForegroundColor Red
+    Write-Host "  ERROR: Failed to build Web UI." -ForegroundColor Red
     Pop-Location
     exit 1
 }
 Pop-Location
 
-Write-Host "  ✅ Web UI built" -ForegroundColor Green
+Write-Host "  OK: Web UI built" -ForegroundColor Green
 
 # --- Install CLI ---
 Write-Host ""
-Write-Host "🔧 Installing synpin CLI..." -ForegroundColor Yellow
+Write-Host "Installing synpin CLI..." -ForegroundColor Yellow
 
 # Create wrapper script in PATH
 $binDir = Join-Path $env:USERPROFILE ".local\bin"
@@ -155,29 +155,25 @@ if ($currentPath -notlike "*$binDir*") {
 }
 
 # Create synpin.bat
-$synpinBat = @"
-@echo off
-set SYNPIN_HOME=$SYNPIN_HOME
-set PATH=%SYNPIN_HOME%\core\.venv\Scripts;%PATH%
-python -m synpin %*
-"@
+$synpinBat = '@echo off' + "`n" +
+    "set SYNPIN_HOME=$SYNPIN_HOME" + "`n" +
+    'set PATH=%SYNPIN_HOME%\core\.venv\Scripts;%PATH%' + "`n" +
+    "python -m synpin %*"
 $synpinBat | Out-File -FilePath "$binDir\synpin.bat" -Encoding ascii
 
 # Create synpin.ps1
-$synpinPs1 = @"
-`$env:SYNPIN_HOME = "$SYNPIN_HOME"
-`$env:PATH = "$SYNPIN_HOME\core\.venv\Scripts;" + `$env:PATH
-python -m synpin @args
-"@
+$synpinPs1 = '$env:SYNPIN_HOME = "' + $SYNPIN_HOME + '"' + "`n" +
+    '$env:PATH = "' + $SYNPIN_HOME + '\core\.venv\Scripts;" + $env:PATH' + "`n" +
+    "python -m synpin @args"
 $synpinPs1 | Out-File -FilePath "$binDir\synpin.ps1" -Encoding utf8
 
-Write-Host "  ✅ CLI installed to $binDir" -ForegroundColor Green
+Write-Host "  OK: CLI installed to $binDir" -ForegroundColor Green
 
 # --- Done ---
 Write-Host ""
-Write-Host "╔══════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║  ✅  SynPin installed successfully!      ║" -ForegroundColor Cyan
-Write-Host "╚══════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "  SynPin installed successfully!" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  Next steps:" -ForegroundColor White
 Write-Host "    1. Restart your terminal (for PATH update)" -ForegroundColor White

@@ -114,7 +114,9 @@ Write-Host "  OK: Copied" -ForegroundColor Green
 Write-Host ""
 Write-Host "[4/5] Installing Python dependencies..." -ForegroundColor Yellow
 
-uv sync --project "$SYNPIN_HOME\core" --no-dev *> $null
+$ErrorActionPreference = "Continue"
+cmd /c "uv sync --project $SYNPIN_HOME\core --no-dev" 2>&1 | Out-Null
+$ErrorActionPreference = "Stop"
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  ERROR: Failed to install Python dependencies." -ForegroundColor Red
     exit 1
@@ -126,8 +128,10 @@ Write-Host ""
 Write-Host "[5/5] Building Web UI..." -ForegroundColor Yellow
 
 Push-Location "$SYNPIN_HOME\web"
-npm ci --silent *> $null
-npm run build *> $null
+$ErrorActionPreference = "Continue"
+cmd /c "npm ci --silent" 2>&1 | Out-Null
+cmd /c "npm run build" 2>&1 | Out-Null
+$ErrorActionPreference = "Stop"
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  ERROR: Failed to build Web UI." -ForegroundColor Red
     Pop-Location

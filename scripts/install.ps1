@@ -171,17 +171,29 @@ if ($currentPath -notlike "*$binDir*") {
 $repoRel = "repo"
 $batLines = @(
     "@echo off",
-    "set SYNPIN_HOME=$SYNPIN_HOME",
-    "set PATH=%SYNPIN_HOME%\$repoRel\core\.venv\Scripts;%PATH%",
-    "python -m synpin %*"
+    "setlocal",
+    "set SYNPIN_PYTHON=$SYNPIN_HOME\$repoRel\core\.venv\Scripts\python.exe",
+    "if exist ""%SYNPIN_PYTHON%"" (",
+    "    ""%SYNPIN_PYTHON%"" -m synpin %*",
+    ") else (",
+    "    echo ERROR: SynPin venv not found.",
+    "    echo Run install.ps1 to reinstall.",
+    "    pause",
+    ")",
+    "endlocal"
 )
 $batLines -join "`r`n" | Out-File -FilePath "$binDir/synpin.bat" -Encoding ascii
 
 # Create synpin.ps1
 $ps1Lines = @(
-    "`$env:SYNPIN_HOME = `"$SYNPIN_HOME`"",
-    "`$env:PATH = `"`$env:SYNPIN_HOME\$repoRel\core\.venv\Scripts;`" + `$env:PATH",
-    "python -m synpin @args"
+    '$env:SYNPIN_HOME = "' + $SYNPIN_HOME + '"',
+    '$synpinPython = Join-Path $env:SYNPIN_HOME "' + $repoRel + '\core\.venv\Scripts\python.exe"',
+    'if (Test-Path $synpinPython) {',
+    '    & $synpinPython -m synpin @args',
+    '} else {',
+    '    Write-Host "ERROR: SynPin venv not found." -ForegroundColor Red',
+    '    Write-Host "Run install.ps1 to reinstall." -ForegroundColor Red',
+    '}',
 )
 $ps1Lines -join "`r`n" | Out-File -FilePath "$binDir/synpin.ps1" -Encoding utf8
 

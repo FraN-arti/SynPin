@@ -122,6 +122,8 @@ $oldEA = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 uv sync --project "$SYNPIN_HOME\core" --no-dev 2>&1 | Out-Null
 $uvExit = $LASTEXITCODE
+# Install the synpin package itself
+& "uv" pip install -e "$SYNPIN_HOME\core" --python "$SYNPIN_HOME\core\.venv\Scripts\python.exe" 2>&1 | Out-Null
 $ErrorActionPreference = $oldEA
 
 if ($uvExit -ne 0) {

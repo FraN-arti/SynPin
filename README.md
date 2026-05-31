@@ -1,6 +1,6 @@
 <div align="center">
 
-# SynPin
+![SynPin](synpin.png)
 
 **Agent-Driven Organization Platform**
 

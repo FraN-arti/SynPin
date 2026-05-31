@@ -15,14 +15,10 @@ goto :end
 
 :stop
 echo.
-echo   Stopping SynPin...
+echo   Stopping SynPin Dev...
 echo.
-for /f "tokens=2" %%a in ('tasklist /FI "IMAGENAME eq python.exe" /FO LIST ^| findstr /I "PID"') do (
-    taskkill /F /PID %%a /T 2>nul
-)
-for /f "tokens=2" %%a in ('tasklist /FI "IMAGENAME eq node.exe" /FO LIST ^| findstr /I "PID"') do (
-    taskkill /F /PID %%a /T 2>nul
-)
+:: Kill by window title (set in :run)
+taskkill /F /FI "WINDOWTITLE eq SynPin Dev*" /T 2>nul
 echo   Done.
 echo.
 timeout /t 1 >nul

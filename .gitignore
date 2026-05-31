@@ -9,6 +9,7 @@ build/
 # Node
 node_modules/
 web/dist/
+web/*.tsbuildinfo
 
 # IDE
 .vscode/

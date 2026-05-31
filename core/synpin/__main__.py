@@ -67,28 +67,28 @@ def cmd_stop(args):
                 else:
                     os.kill(pid, 9)
                 print("✅  SynPin stopped")
-                pid_file.unlink()
+                pid_file.unlink(missing_ok=True)
                 return
         except Exception:
             pass
 
-    # Fallback: find process on port 2088
+    # Fallback: find process on port
     port = int(os.environ.get("SYNPIN_PORT", "2088"))
     if os.name == "nt":
         result = subprocess.run(
             ["netstat", "-ano"],
-            capture_output=True, text=True
+            capture_output=True, text=True, errors="replace"
         )
-        for line in result.stdout.splitlines():
-            if f":{port}" in line and "LISTENING" in line:
-                parts = line.split()
-                if parts:
-                    pid = parts[-1]
-                    subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True)
-                    print("✅  SynPin stopped")
-                    if pid_file.exists():
-                        pid_file.unlink()
-                    return
+        if result.stdout:
+            for line in result.stdout.splitlines():
+                if f":{port}" in line and "LISTENING" in line:
+                    parts = line.split()
+                    if parts:
+                        pid = parts[-1]
+                        subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True)
+                        print("✅  SynPin stopped")
+                        pid_file.unlink(missing_ok=True)
+                        return
     else:
         subprocess.run(["fuser", "-k", f"{port}/tcp"], capture_output=True)
 
@@ -128,8 +128,6 @@ def cmd_config(args):
 
 def cmd_setup(args):
     """Initial setup wizard."""
-    from pathlib import Path
-
     config_dir = Path.home() / ".synpin"
     config_dir.mkdir(parents=True, exist_ok=True)
 

@@ -14,7 +14,6 @@ dependencies = [
     "pyyaml>=6.0",
     "rich>=13.0",
     "watchdog>=5.0",
-    "colorama>=0.4",
 ]
 
 [project.optional-dependencies]
@@ -22,6 +21,7 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.8",
     "mypy>=1.0",
+    "colorama>=0.4",
 ]
 
 [tool.ruff]

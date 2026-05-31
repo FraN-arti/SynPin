@@ -112,9 +112,9 @@ def cmd_setup(args):
         model = "default"
 
     # Ask for port
-    port = input("Server port [8000]: ").strip()
+    port = input("Server port [2088]: ").strip()
     if not port:
-        port = "8000"
+        port = "2088"
 
     import yaml
     config = {

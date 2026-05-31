@@ -70,34 +70,42 @@ if (-not (Test-Command "npm")) {
 }
 Write-Host "  OK: npm found" -ForegroundColor Green
 
-# --- Step 2: Create SynPin Home ---
+# --- Step 2: Setup or Update ---
 Write-Host ""
-Write-Host "[2/5] Setting up $SYNPIN_HOME..." -ForegroundColor Yellow
-
 if (Test-Path $SYNPIN_HOME) {
-    Write-Host "  WARNING: $SYNPIN_HOME already exists." -ForegroundColor Yellow
-    $overwrite = Read-Host "  Overwrite? (y/N)"
-    if ($overwrite -ne "y") {
-        Write-Host "  Installation cancelled." -ForegroundColor Yellow
-        exit 0
-    }
-    Remove-Item -Recurse -Force $SYNPIN_HOME
-}
+    Write-Host "[2/5] SynPin already installed — updating..." -ForegroundColor Yellow
 
-New-Item -ItemType Directory -Path $SYNPIN_HOME -Force | Out-Null
-Write-Host "  OK: Created $SYNPIN_HOME" -ForegroundColor Green
+    $repoDir = Join-Path $SYNPIN_HOME "repo"
+    if (Test-Path (Join-Path $repoDir ".git")) {
+        Push-Location $repoDir
+        git pull --ff-only 2>&1 | Out-Null
+        Pop-Location
+        Write-Host "  OK: Repository updated" -ForegroundColor Green
+    } else {
+        Write-Host "  WARNING: No .git found — reinstalling from scratch" -ForegroundColor Yellow
+        Remove-Item -Recurse -Force $SYNPIN_HOME
+        New-Item -ItemType Directory -Path $SYNPIN_HOME -Force | Out-Null
+        # Fall through to clone below
+        $repoDir = $null
+    }
+
+    if ($repoDir -and (Test-Path $repoDir)) {
+        # Skip to install steps 4-5
+        goto InstallCore
+    }
+} else {
+    Write-Host "[2/5] Setting up $SYNPIN_HOME..." -ForegroundColor Yellow
+    New-Item -ItemType Directory -Path $SYNPIN_HOME -Force | Out-Null
+    Write-Host "  OK: Created $SYNPIN_HOME" -ForegroundColor Green
+}
 
 # --- Step 3: Clone Repository ---
 Write-Host ""
-Write-Host "[3/5] Cloning SynPin..." -ForegroundColor Yellow
-
-$repoDir = Join-Path $SYNPIN_HOME "repo"
-if (Test-Path (Join-Path $repoDir ".git")) {
-    Push-Location $repoDir
-    git pull --ff-only 2>&1 | Out-Null
-    Pop-Location
-    Write-Host "  OK: Repository updated" -ForegroundColor Green
-} else {
+# --- Step 3: Clone or Update Repository ---
+Write-Host ""
+if (-not $repoDir -or -not (Test-Path (Join-Path $repoDir ".git"))) {
+    Write-Host "[3/5] Cloning SynPin..." -ForegroundColor Yellow
+    $repoDir = Join-Path $SYNPIN_HOME "repo"
     if (Test-Path $repoDir) {
         Remove-Item -Recurse -Force $repoDir
     }
@@ -111,8 +119,11 @@ if (Test-Path (Join-Path $repoDir ".git")) {
         exit 1
     }
     Write-Host "  OK: Repository cloned" -ForegroundColor Green
+} else {
+    Write-Host "[3/5] Repository exists — skipping clone" -ForegroundColor Yellow
 }
 
+:InstallCore
 # --- Step 4: Install Core Dependencies ---
 Write-Host ""
 Write-Host "[4/5] Installing Python dependencies..." -ForegroundColor Yellow

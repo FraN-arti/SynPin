@@ -19,12 +19,35 @@ def cmd_start(args):
     """Start SynPin production server."""
     import uvicorn
     import json
+    import subprocess
+    import time
 
     host = os.environ.get("SYNPIN_HOST", "0.0.0.0")
     port = int(os.environ.get("SYNPIN_PORT", "2088"))
 
-    # Save PID file
+    # Check if port is already in use — if so, stop it first
     pid_file = Path.home() / ".synpin" / "synpin.pid"
+    if os.name == "nt":
+        result = subprocess.run(
+            ["netstat", "-ano"],
+            capture_output=True, text=True, errors="replace"
+        )
+        if result.stdout:
+            for line in result.stdout.splitlines():
+                if f":{port}" in line and "LISTENING" in line:
+                    parts = line.split()
+                    if parts:
+                        old_pid = parts[-1]
+                        print(f"⚠️   Port {port} is in use (PID {old_pid}) — stopping...")
+                        subprocess.run(["taskkill", "/F", "/PID", old_pid], capture_output=True)
+                        time.sleep(1)
+                        break
+
+    # Clean stale PID file
+    if pid_file.exists():
+        pid_file.unlink()
+
+    # Save new PID file
     pid_file.parent.mkdir(parents=True, exist_ok=True)
     pid_file.write_text(json.dumps({"pid": os.getpid(), "port": port}))
 

@@ -18,9 +18,15 @@ from pathlib import Path
 def cmd_start(args):
     """Start SynPin production server."""
     import uvicorn
+    import json
 
     host = os.environ.get("SYNPIN_HOST", "0.0.0.0")
     port = int(os.environ.get("SYNPIN_PORT", "2088"))
+
+    # Save PID file
+    pid_file = Path.home() / ".synpin" / "synpin.pid"
+    pid_file.parent.mkdir(parents=True, exist_ok=True)
+    pid_file.write_text(json.dumps({"pid": os.getpid(), "port": port}))
 
     print(f"🚀 SynPin v0.1.0")
     print(f"   API:  http://{host}:{port}/api")
@@ -28,30 +34,65 @@ def cmd_start(args):
     print(f"   Docs: http://{host}:{port}/docs")
     print()
 
-    uvicorn.run(
-        "synpin.api.server:app",
-        host=host,
-        port=port,
-        reload=False,
-    )
+    try:
+        uvicorn.run(
+            "synpin.api.server:app",
+            host=host,
+            port=port,
+            reload=False,
+        )
+    finally:
+        # Clean up PID file on exit
+        if pid_file.exists():
+            pid_file.unlink()
 
 
 def cmd_stop(args):
     """Stop running SynPin instance."""
     import subprocess
+    import json
 
     print("⏳  Stopping SynPin...")
 
-    # Find and kill synpin uvicorn processes
-    if os.name == "nt":
-        subprocess.run(
-            ["taskkill", "/F", "/IM", "python.exe", "/FI", "WINDOWTITLE eq SynPin*"],
-            capture_output=True,
-        )
-    else:
-        subprocess.run(["pkill", "-f", "synpin"], capture_output=True)
+    pid_file = Path.home() / ".synpin" / "synpin.pid"
 
-    print("✅  SynPin stopped")
+    # Try PID file first
+    if pid_file.exists():
+        try:
+            data = json.loads(pid_file.read_text())
+            pid = data.get("pid")
+            if pid:
+                if os.name == "nt":
+                    subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
+                else:
+                    os.kill(pid, 9)
+                print("✅  SynPin stopped")
+                pid_file.unlink()
+                return
+        except Exception:
+            pass
+
+    # Fallback: find process on port 2088
+    port = int(os.environ.get("SYNPIN_PORT", "2088"))
+    if os.name == "nt":
+        result = subprocess.run(
+            ["netstat", "-ano"],
+            capture_output=True, text=True
+        )
+        for line in result.stdout.splitlines():
+            if f":{port}" in line and "LISTENING" in line:
+                parts = line.split()
+                if parts:
+                    pid = parts[-1]
+                    subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True)
+                    print("✅  SynPin stopped")
+                    if pid_file.exists():
+                        pid_file.unlink()
+                    return
+    else:
+        subprocess.run(["fuser", "-k", f"{port}/tcp"], capture_output=True)
+
+    print("✅  SynPin stopped (was not running)")
 
 
 def cmd_status(args):

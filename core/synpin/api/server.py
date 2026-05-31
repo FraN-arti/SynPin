@@ -18,7 +18,10 @@ def health():
 
 
 # Serve React SPA (built static files)
-STATIC_DIR = Path(__file__).resolve().parents[2] / "web" / "dist"
+# In production: ~/.synpin/web/dist/
+# In dev: D:\synpin\web\dist\ (after vite build)
+_CORE_DIR = Path(__file__).resolve().parents[2]
+STATIC_DIR = _CORE_DIR.parent / "web" / "dist"
 
 if STATIC_DIR.exists():
     app.mount("/assets", StaticFiles(directory=str(STATIC_DIR / "assets")), name="assets")

@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 
 app = FastAPI(
     title="SynPin",
-    description="Multi-Agent Framework API",
+    description="Agent-Driven Organization Platform",
     version="0.1.0",
 )
 

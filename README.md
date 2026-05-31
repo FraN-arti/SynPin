@@ -1,9 +1,32 @@
-# SynPin — Multi-Agent Framework
+<div align="center">
 
-🚀 Open-source агентский фреймворк с разделённой архитектурой:
-Python-ядро (FastAPI) + React Web UI.
+# SynPin
 
-## Установка
+**Agent-Driven Organization Platform**
+
+[Docs](wiki/quickstart.md) · [Setup](wiki/quickstart.md#установка) · [License](LICENSE)
+
+</div>
+
+---
+
+## What is SynPin?
+
+SynPin is not just a framework — it's an **organization where every agent can be both a worker and a director**.
+
+Any agent can:
+- Execute tasks as a **worker** (search, code, analyze)
+- Join the **board of directors** to make strategic decisions
+- Lead a team and delegate work
+- Learn from experience and improve over time
+
+Think of it as a company that runs itself — where AI agents collaborate, discuss, and execute tasks at any level of complexity.
+
+---
+
+## Quick Start
+
+### Install
 
 ```powershell
 git clone https://github.com/FraN-arti/SynPin.git
@@ -11,44 +34,74 @@ cd SynPin
 .\scripts\install.ps1
 ```
 
-## Использование
+### Run
 
-```bash
-synpin start      # Запустить сервер
-synpin stop       # Остановить
-synpin status     # Статус сервера
-synpin config     # Показать конфигурацию
-synpin setup      # Мастер настройки
-synpin logs       # Логи сервера
-synpin version    # Версия
+```powershell
+synpin start
 ```
 
-## Разработка
+Open `http://localhost:2088` — your organization is ready.
+
+---
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `synpin start` | Start the server |
+| `synpin stop` | Stop the server |
+| `synpin status` | Check server status |
+| `synpin update` | Update from GitHub + rebuild |
+| `synpin setup` | Initial configuration wizard |
+| `synpin version` | Show version |
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│              Web Dashboard (React)               │
+│         Monitor · Chat · Configure              │
+└─────────────────────┬───────────────────────────┘
+                      │ HTTP / WebSocket
+                      ▼
+┌─────────────────────────────────────────────────┐
+│              Core API (FastAPI)                  │
+│         /api/agents · /api/tasks · /api/chat    │
+└─────────────────────┬───────────────────────────┘
+                      │
+          ┌───────────┴───────────┐
+          ▼                       ▼
+┌──────────────────┐    ┌──────────────────────┐
+│   Board of       │    │   Worker Agents      │
+│   Directors      │    │   Search · Code      │
+│   (strategy)     │    │   Analyze · Execute  │
+└────────┬─────────┘    └──────────┬───────────┘
+         │                         │
+         ▼                         ▼
+┌─────────────────────────────────────────────────┐
+│              Memory System                       │
+│         ChromaDB · Shared Knowledge             │
+│         Per-Agent History · Error Log           │
+└─────────────────────────────────────────────────┘
+```
+
+---
+
+## Development
 
 ```bash
 git clone https://github.com/FraN-arti/SynPin.git
-cd synpin
-dev.bat           # Запуск dev-сервера (hot-reload)
-dev.bat stop      # Остановка
+cd SynPin
+dev.bat           # Start dev server (hot-reload)
+dev.bat stop      # Stop
 ```
 
-## Структура
+---
 
-```
-synpin/
-├── core/              # Python-ядро (FastAPI)
-│   ├── synpin/        # Пакет: agents, memory, tools, router, engine
-│   ├── api/           # REST API endpoints
-│   ├── dev_server.py  # Dev supervisor (hot-reload)
-│   └── pyproject.toml
-├── web/               # React 19 + Vite 6 + Tailwind 4
-├── wiki/              # Документация проекта
-├── dev.bat            # Эмуляция CLI для разработки
-└── install.ps1        # Скрипт установки
-```
+<div align="center">
 
-## Стек
+**Start small. Grow gradually.**
 
-- **Core:** Python 3.11+, FastAPI, uvicorn, ChromaDB
-- **Web:** TypeScript 5.7, React 19, Vite 6, Tailwind 4
-- **Embeddings:** nomic-embed-text-v1.5 (LM Studio)
+</div>

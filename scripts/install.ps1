@@ -75,7 +75,7 @@ Write-Host ""
 $needClone = $true
 
 if (Test-Path $SYNPIN_HOME) {
-    Write-Host "[2/5] SynPin already installed — updating..." -ForegroundColor Yellow
+    Write-Host "[2/5] SynPin already installed - updating..." -ForegroundColor Yellow
 
     $repoDir = Join-Path $SYNPIN_HOME "repo"
     if (Test-Path (Join-Path $repoDir ".git")) {
@@ -85,7 +85,7 @@ if (Test-Path $SYNPIN_HOME) {
         Write-Host "  OK: Repository updated" -ForegroundColor Green
         $needClone = $false
     } else {
-        Write-Host "  WARNING: No .git found — reinstalling from scratch" -ForegroundColor Yellow
+        Write-Host "  WARNING: No .git found - reinstalling from scratch" -ForegroundColor Yellow
         Remove-Item -Recurse -Force $SYNPIN_HOME
         New-Item -ItemType Directory -Path $SYNPIN_HOME -Force | Out-Null
     }
@@ -114,7 +114,7 @@ if ($needClone) {
     }
     Write-Host "  OK: Repository cloned" -ForegroundColor Green
 } else {
-    Write-Host "[3/5] Repository exists — skipping clone" -ForegroundColor Yellow
+    Write-Host "[3/5] Repository exists - skipping clone" -ForegroundColor Yellow
 }
 # --- Step 4: Install Core Dependencies ---
 Write-Host ""

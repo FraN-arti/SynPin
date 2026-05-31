@@ -12,7 +12,7 @@ Write-Host ""
 # --- Configuration ---
 $SYNPIN_HOME = Join-Path $env:USERPROFILE ".synpin"
 $REPO_URL = "https://github.com/FraN-arti/SynPin.git"
-$BRANCH = "master"
+$BRANCH = "main"
 
 # --- Helper Functions ---
 function Test-Command($cmd) {

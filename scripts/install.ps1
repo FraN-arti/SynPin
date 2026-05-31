@@ -57,7 +57,7 @@ Write-Host "  OK: $pythonVersion" -ForegroundColor Green
 # uv
 if (-not (Test-Command "uv")) {
     Write-Host "  WARNING: uv not found. Installing..." -ForegroundColor Yellow
-    powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+    powershell -c "irm https://astral.sh/uv/install.ps1 | iex" *> $null
     $env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
 }
 Write-Host "  OK: uv installed" -ForegroundColor Green
@@ -114,7 +114,7 @@ Write-Host "  OK: Copied" -ForegroundColor Green
 Write-Host ""
 Write-Host "[4/5] Installing Python dependencies..." -ForegroundColor Yellow
 
-uv sync --project "$SYNPIN_HOME\core" --no-dev 2>&1 | Out-Null
+uv sync --project "$SYNPIN_HOME\core" --no-dev *> $null
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  ERROR: Failed to install Python dependencies." -ForegroundColor Red
     exit 1
@@ -126,8 +126,8 @@ Write-Host ""
 Write-Host "[5/5] Building Web UI..." -ForegroundColor Yellow
 
 Push-Location "$SYNPIN_HOME\web"
-npm ci --silent 2>&1 | Out-Null
-npm run build 2>&1 | Out-Null
+npm ci --silent *> $null
+npm run build *> $null
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  ERROR: Failed to build Web UI." -ForegroundColor Red
     Pop-Location

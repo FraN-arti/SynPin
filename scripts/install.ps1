@@ -42,6 +42,11 @@ function Test-PythonVersion {
     return $false
 }
 
+function Run-Silent($command) {
+    & $command.Split(" ")[0] @($command.Split(" ")[1..100]) 2>&1 | Out-Null
+    return $LASTEXITCODE
+}
+
 # --- Step 1: Check Dependencies ---
 Write-Host "[1/5] Checking dependencies..." -ForegroundColor Yellow
 
@@ -99,7 +104,6 @@ Write-Host "  OK: Created $SYNPIN_HOME" -ForegroundColor Green
 Write-Host ""
 Write-Host "[3/5] Copying SynPin to $SYNPIN_HOME..." -ForegroundColor Yellow
 
-# Copy core, web (without node_modules), wiki, scripts
 $exclude = @("node_modules", ".git", ".venv", "__pycache__", "dist", "data", "logs")
 Get-ChildItem -Path $SOURCE_DIR -Directory | Where-Object { $_.Name -notin $exclude } | ForEach-Object {
     Copy-Item -Path $_.FullName -Destination "$SYNPIN_HOME\$($_.Name)" -Recurse -Force
@@ -114,13 +118,13 @@ Write-Host "  OK: Copied" -ForegroundColor Green
 Write-Host ""
 Write-Host "[4/5] Installing Python dependencies..." -ForegroundColor Yellow
 
+$oldEA = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
-cmd /c "uv sync --project $SYNPIN_HOME\core --no-dev" 2>&1 | Out-Null
-Push-Location "$SYNPIN_HOME\core"
-cmd /c "$SYNPIN_HOME\core\.venv\Scripts\python.exe -m pip install -e ." 2>&1 | Out-Null
-Pop-Location
-$ErrorActionPreference = "Stop"
-if ($LASTEXITCODE -ne 0) {
+uv sync --project "$SYNPIN_HOME\core" --no-dev 2>&1 | Out-Null
+$uvExit = $LASTEXITCODE
+$ErrorActionPreference = $oldEA
+
+if ($uvExit -ne 0) {
     Write-Host "  ERROR: Failed to install Python dependencies." -ForegroundColor Red
     exit 1
 }
@@ -131,30 +135,29 @@ Write-Host ""
 Write-Host "[5/5] Building Web UI..." -ForegroundColor Yellow
 
 Push-Location "$SYNPIN_HOME\web"
+$oldEA = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
-cmd /c "npm ci --silent" 2>&1 | Out-Null
-cmd /c "npm run build" 2>&1 | Out-Null
-$ErrorActionPreference = "Stop"
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "  ERROR: Failed to build Web UI." -ForegroundColor Red
-    Pop-Location
-    exit 1
-}
+npm ci --silent 2>&1 | Out-Null
+npm run build 2>&1 | Out-Null
+$npmExit = $LASTEXITCODE
+$ErrorActionPreference = $oldEA
 Pop-Location
 
+if ($npmExit -ne 0) {
+    Write-Host "  ERROR: Failed to build Web UI." -ForegroundColor Red
+    exit 1
+}
 Write-Host "  OK: Web UI built" -ForegroundColor Green
 
 # --- Install CLI ---
 Write-Host ""
 Write-Host "Installing synpin CLI..." -ForegroundColor Yellow
 
-# Create wrapper script in PATH
 $binDir = Join-Path $env:USERPROFILE ".local\bin"
 if (-not (Test-Path $binDir)) {
     New-Item -ItemType Directory -Path $binDir -Force | Out-Null
 }
 
-# Add to PATH permanently if not already
 $currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
 if ($currentPath -notlike "*$binDir*") {
     [Environment]::SetEnvironmentVariable("PATH", "$currentPath;$binDir", "User")
@@ -162,17 +165,22 @@ if ($currentPath -notlike "*$binDir*") {
 }
 
 # Create synpin.bat
-$synpinBat = '@echo off' + "`n" +
-    "set SYNPIN_HOME=$SYNPIN_HOME" + "`n" +
-    'set PATH=%SYNPIN_HOME%\core\.venv\Scripts;%PATH%' + "`n" +
-    "python -m synpin %*"
-$synpinBat | Out-File -FilePath "$binDir\synpin.bat" -Encoding ascii
+$batContent = @"
+@echo off
+set SYNPIN_HOME=$SYNPIN_HOME
+set PATH=%SYNPIN_HOME%\core\.venv\Scripts;%PATH%
+python -m synpin %*
+"@
+$batContent | Out-File -FilePath "$binDir\synpin.bat" -Encoding ascii
 
 # Create synpin.ps1
-$synpinPs1 = '$env:SYNPIN_HOME = "' + $SYNPIN_HOME + '"' + "`n" +
-    '$env:PATH = "' + $SYNPIN_HOME + '\core\.venv\Scripts;" + $env:PATH' + "`n" +
-    "python -m synpin @args"
-$synpinPs1 | Out-File -FilePath "$binDir\synpin.ps1" -Encoding utf8
+$ps1Content = @'
+$env:SYNPIN_HOME = "SYNPIN_HOME_PLACEHOLDER"
+$env:PATH = "$env:SYNPIN_HOME\core\.venv\Scripts;" + $env:PATH
+python -m synpin @args
+'@
+$ps1Content = $ps1Content -replace "SYNPIN_HOME_PLACEHOLDER", $SYNPIN_HOME
+$ps1Content | Out-File -FilePath "$binDir\synpin.ps1" -Encoding utf8
 
 Write-Host "  OK: CLI installed to $binDir" -ForegroundColor Green
 

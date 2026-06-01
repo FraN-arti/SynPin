@@ -295,9 +295,9 @@ def cmd_update(args):
         print("  Building...")
         import platform
         if platform.system() == "Windows":
-            # Windows: use shell=True to find npm
+            # Windows: use npx to find vite
             result = subprocess.run(
-                "npm run build",
+                "npx vite build",
                 cwd=str(dst_web),
                 capture_output=True,
                 text=True,
@@ -305,7 +305,7 @@ def cmd_update(args):
             )
         else:
             result = subprocess.run(
-                ["npm", "run", "build"],
+                ["npx", "vite", "build"],
                 cwd=str(dst_web),
                 capture_output=True,
                 text=True,

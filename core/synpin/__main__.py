@@ -280,12 +280,16 @@ def cmd_update(args):
 
         # Rebuild
         print("  Building...")
-        subprocess.run(
+        result = subprocess.run(
             ["npm", "run", "build"],
             cwd=str(dst_web),
             capture_output=True,
+            text=True,
         )
-        print("  OK: Web rebuilt")
+        if result.returncode != 0:
+            print(f"  ERROR: Build failed:\n{result.stderr}")
+        else:
+            print("  OK: Web rebuilt")
         print()
 
     if not core_changed and not web_changed:

@@ -104,6 +104,7 @@ def start_core(port: int) -> subprocess.Popen:
     """Start FastAPI core server."""
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
+    env["SYNPIN_DEV"] = "1"  # Disable static files in dev mode
 
     cmd = [
         sys.executable, "-u", "-m", "uvicorn",

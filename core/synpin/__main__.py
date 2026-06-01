@@ -227,9 +227,9 @@ def cmd_update(args):
     core_changed = False
     web_changed = False
 
-    # Check changed files
+    # ORIG_HEAD is the commit before git pull
     result = subprocess.run(
-        ["git", "diff", "--name-only", "HEAD@{1}", "HEAD"],
+        ["git", "diff", "--name-only", "ORIG_HEAD", "HEAD"],
         cwd=str(repo_dir),
         capture_output=True,
         text=True,

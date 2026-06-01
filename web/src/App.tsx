@@ -45,12 +45,6 @@ function App() {
     }, 1500)
   }
 
-  const suggestions = [
-    { icon: '💡', text: 'Спроектируй архитектуру API' },
-    { icon: '🔍', text: 'Покажи мои ошибки в памяти' },
-    { icon: '🧪', text: 'Напиши тесты для модуля auth' },
-  ]
-
   return (
     <div className="flex h-screen bg-gray-950 text-gray-100">
       {/* Sidebar */}
@@ -94,22 +88,7 @@ function App() {
             <div className="w-12 h-12 rounded-xl bg-violet-600 flex items-center justify-center font-bold text-xl mb-4">
               S
             </div>
-            <h1 className="text-2xl font-semibold mb-2">Чем могу помочь?</h1>
-            <p className="text-gray-400 mb-8 text-center max-w-md">
-              SynPin — мульти-модальный агентский фреймворк. Задай задачу или выбери ниже:
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl w-full">
-              {suggestions.map((s) => (
-                <button
-                  key={s.text}
-                  onClick={() => setInput(s.text)}
-                  className="p-4 rounded-xl bg-gray-900 border border-gray-800 hover:border-gray-600 text-left transition-colors"
-                >
-                  <div className="text-xl mb-2">{s.icon}</div>
-                  <div className="text-sm">{s.text}</div>
-                </button>
-              ))}
-            </div>
+            <h1 className="text-2xl font-semibold mb-8">Чем могу помочь?</h1>
           </div>
         ) : (
           // Messages

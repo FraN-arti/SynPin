@@ -88,7 +88,8 @@ function App() {
             <div className="w-12 h-12 rounded-xl bg-violet-600 flex items-center justify-center font-bold text-xl mb-4">
               S
             </div>
-            <h1 className="text-2xl font-semibold mb-8">Чем могу помочь?</h1>
+            <h1 className="text-2xl font-semibold mb-8 text-violet-400">Чем могу помочь?</h1>
+            <p className="text-gray-500 text-sm mt-2">v0.1.1 — update test</p>
           </div>
         ) : (
           // Messages

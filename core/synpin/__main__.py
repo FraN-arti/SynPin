@@ -251,6 +251,7 @@ def cmd_update(args):
         # Copy updated core files
         src_core = repo_dir / "core"
         dst_core = synpin_home / "core"
+        dst_core.mkdir(parents=True, exist_ok=True)  # Create if not exists
         if src_core.exists():
             # Copy core directory (excluding .venv)
             for item in src_core.iterdir():

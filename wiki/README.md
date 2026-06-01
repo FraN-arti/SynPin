@@ -9,6 +9,7 @@
 - [⚙️ Конфигурация](configuration.md)
 - [🧠 Память и сессии](memory-sessions.md)
 - [🏢 Каналы и иерархия](channels-hierarchy.md)
+- [📋 Kanban-доска](kanban-board.md)
 - [🧠 Memory System](memory-system.md)
 - [💬 Group Chat Engine](group-chat.md)
 - [🎭 Agent Roles](agent-roles.md)

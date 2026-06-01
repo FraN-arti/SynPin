@@ -83,13 +83,35 @@ function App() {
       {/* Main Chat Area */}
       <main className="flex-1 flex flex-col">
         {messages.length === 0 ? (
-          // Empty state
+          // Empty state - centered with input below
           <div className="flex-1 flex flex-col items-center justify-center px-4">
             <div className="w-12 h-12 rounded-xl bg-violet-600 flex items-center justify-center font-bold text-xl mb-4">
               S
             </div>
-            <h1 className="text-2xl font-semibold mb-8 text-violet-400">Чем могу помочь?</h1>
-            <p className="text-gray-500 text-sm mt-2">v0.1.1 — update test</p>
+            <h1 className="text-2xl font-semibold mb-2 text-violet-400">Чем могу помочь?</h1>
+            <p className="text-gray-500 text-sm mb-8">v0.1.1 — update test</p>
+            
+            {/* Input centered below heading */}
+            <form onSubmit={handleSubmit} className="w-full max-w-2xl">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Спроси что-нибудь..."
+                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 pr-12 text-sm placeholder-gray-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors"
+                />
+                <button
+                  type="submit"
+                  disabled={!input.trim() || isTyping}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:bg-gray-700 disabled:text-gray-500 flex items-center justify-center transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </form>
           </div>
         ) : (
           // Messages
@@ -140,32 +162,34 @@ function App() {
           </div>
         )}
 
-        {/* Input */}
-        <div className="border-t border-gray-800 p-4">
-          <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
-            <div className="relative">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Спроси что-нибудь..."
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 pr-12 text-sm placeholder-gray-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors"
-              />
-              <button
-                type="submit"
-                disabled={!input.trim() || isTyping}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:bg-gray-700 disabled:text-gray-500 flex items-center justify-center transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
-                </svg>
-              </button>
-            </div>
-            <p className="text-xs text-gray-600 mt-2 text-center">
-              SynPin может ошибаться. Проверяй важную информацию.
-            </p>
-          </form>
-        </div>
+        {/* Input at bottom when messages exist */}
+        {messages.length > 0 && (
+          <div className="border-t border-gray-800 p-4">
+            <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Спроси что-нибудь..."
+                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 pr-12 text-sm placeholder-gray-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors"
+                />
+                <button
+                  type="submit"
+                  disabled={!input.trim() || isTyping}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:bg-gray-700 disabled:text-gray-500 flex items-center justify-center transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-xs text-gray-600 mt-2 text-center">
+                SynPin может ошибаться. Проверяй важную информацию.
+              </p>
+            </form>
+          </div>
+        )}
       </main>
     </div>
   )

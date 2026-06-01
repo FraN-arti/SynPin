@@ -251,22 +251,12 @@ def cmd_update(args):
         # Copy updated core files
         src_core = repo_dir / "core"
         dst_core = synpin_home / "core"
-        dst_core.mkdir(parents=True, exist_ok=True)  # Create if not exists
         if src_core.exists():
             # Copy core directory (excluding .venv)
-            for item in src_core.iterdir():
-                if item.name == ".venv":
-                    continue
-                dst = dst_core / item.name
-                if dst.exists():
-                    if dst.is_dir():
-                        shutil.rmtree(dst)
-                    else:
-                        dst.unlink()
-                if item.is_dir():
-                    shutil.copytree(item, dst)
-                else:
-                    shutil.copy2(item, dst)
+            # Use copytree with ignore pattern for .venv
+            def ignore_venv(dir, contents):
+                return [".venv"] if ".venv" in contents else []
+            shutil.copytree(src_core, dst_core, dirs_exist_ok=True, ignore=ignore_venv)
 
         # Reinstall package
         print("  Installing package...")
@@ -283,21 +273,10 @@ def cmd_update(args):
         # Copy updated web source
         src_web = repo_dir / "web"
         dst_web = synpin_home / "web"
-        dst_web.mkdir(parents=True, exist_ok=True)  # Create if not exists
-        # Copy source files (not node_modules, dist)
-        for item in src_web.iterdir():
-            if item.name in ("node_modules", "dist"):
-                continue
-            dst = dst_web / item.name
-            if dst.exists():
-                if dst.is_dir():
-                    shutil.rmtree(dst)
-                else:
-                    dst.unlink()
-            if item.is_dir():
-                shutil.copytree(item, dst)
-            else:
-                shutil.copy2(item, dst)
+        if src_web.exists():
+            def ignore_web(dir, contents):
+                return [d for d in ["node_modules", "dist"] if d in contents]
+            shutil.copytree(src_web, dst_web, dirs_exist_ok=True, ignore=ignore_web)
 
         # Rebuild
         print("  Building...")

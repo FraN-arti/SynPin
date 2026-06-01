@@ -8,6 +8,7 @@
 - [🏗️ Архитектура](architecture.md)
 - [⚙️ Конфигурация](configuration.md)
 - [🧠 Память и сессии](memory-sessions.md)
+- [🏢 Каналы и иерархия](channels-hierarchy.md)
 - [🧠 Memory System](memory-system.md)
 - [💬 Group Chat Engine](group-chat.md)
 - [🎭 Agent Roles](agent-roles.md)

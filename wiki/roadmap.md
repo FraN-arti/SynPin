@@ -4,12 +4,13 @@
 
 - [x] Имя: **SynPin**
 - [x] Структура проекта: `core/` + `web/`
-- [x] Python core: FastAPI, pydantic, chromadb
+- [x] Python core: FastAPI, uvicorn, pydantic, chromadb
 - [x] React UI: React 19, Vite 6, TypeScript 5.7, Tailwind 4
 - [x] Dev-супервизор: `core/dev_server.py` — единый запуск
-- [x] CLI: `synpin start/stop/status/setup/logs`
-- [x] Install script: `scripts/install.ps1` — one-liner установка
-- [x] Wiki: философия, архитектура, стек
+- [x] CLI: `synpin start/stop/status/setup/logs/version/update`
+- [x] Install script: `scripts/install.ps1` — установка + авто-update
+- [x] Конфигурация: `~/.synpin/config/` (settings, providers, memory, agents, tools)
+- [x] Wiki: философия, архитектура, конфигурация
 
 ## Фаза 1: Ядро (MVP)
 

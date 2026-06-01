@@ -6,6 +6,7 @@
 
 - [🎯 Философия](philosophy.md)
 - [🏗️ Архитектура](architecture.md)
+- [⚙️ Конфигурация](configuration.md)
 - [🧠 Memory System](memory-system.md)
 - [💬 Group Chat Engine](group-chat.md)
 - [🎭 Agent Roles](agent-roles.md)

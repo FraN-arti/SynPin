@@ -46,7 +46,7 @@ function App() {
     }, 1500)
   }
 
-  const InputField = ({ bottom = false }: { bottom?: boolean }) => (
+  const renderInput = (bottom = false) => (
     <form onSubmit={handleSubmit} className={`input-container ${bottom ? '' : ''}`}>
       <div className="input-form">
         <input
@@ -111,7 +111,7 @@ function App() {
             <div className="empty-logo">S</div>
             <h1 className="empty-title">Чем могу помочь?</h1>
             <p className="empty-version">v0.1.1 — update test</p>
-            <InputField />
+            {renderInput()}
           </div>
         ) : (
           // Messages
@@ -144,7 +144,7 @@ function App() {
 
             {/* Bottom Input */}
             <div className="bottom-input">
-              <InputField bottom />
+              {renderInput(true)}
               <p className="disclaimer">
                 SynPin может ошибаться. Проверяй важную информацию.
               </p>

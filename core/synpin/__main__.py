@@ -280,12 +280,23 @@ def cmd_update(args):
 
         # Rebuild
         print("  Building...")
-        result = subprocess.run(
-            ["npm", "run", "build"],
-            cwd=str(dst_web),
-            capture_output=True,
-            text=True,
-        )
+        import platform
+        if platform.system() == "Windows":
+            # Windows: use shell=True to find npm
+            result = subprocess.run(
+                "npm run build",
+                cwd=str(dst_web),
+                capture_output=True,
+                text=True,
+                shell=True,
+            )
+        else:
+            result = subprocess.run(
+                ["npm", "run", "build"],
+                cwd=str(dst_web),
+                capture_output=True,
+                text=True,
+            )
         if result.returncode != 0:
             print(f"  ERROR: Build failed:\n{result.stderr}")
         else:

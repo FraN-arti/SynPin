@@ -282,6 +282,7 @@ def cmd_update(args):
         # Copy updated web source
         src_web = repo_dir / "web"
         dst_web = synpin_home / "web"
+        dst_web.mkdir(parents=True, exist_ok=True)  # Create if not exists
         # Copy source files (not node_modules, dist)
         for item in src_web.iterdir():
             if item.name in ("node_modules", "dist"):

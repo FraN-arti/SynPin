@@ -214,9 +214,8 @@ Transparent. Readable by humans. Easy to backup.
 ├── agents/
 │   ├── architect/
 │   │   ├── MEMORY.md        # long-term memory
-│   │   ├── USER.md          # user preferences
-│   │   ├── personality.yaml # who they are
-│   │   ├── skills.yaml      # what they can do
+│   │   ├── personality.yaml # identity + user prefs
+│   │   ├── skills.yaml      # connected skills
 │   │   └── sessions/        # session history
 │   └── developer/
 │       └── ...

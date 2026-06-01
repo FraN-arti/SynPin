@@ -227,9 +227,22 @@ def cmd_update(args):
     core_changed = False
     web_changed = False
 
-    # ORIG_HEAD is the commit before git pull
+    # ORIG_HEAD is the commit before git pull (set by git pull)
     result = subprocess.run(
-        ["git", "diff", "--name-only", "ORIG_HEAD", "HEAD"],
+        ["git", "rev-parse", "--verify", "ORIG_HEAD"],
+        cwd=str(repo_dir),
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        old_head = result.stdout.strip()
+    else:
+        # Fallback: try HEAD@{1} (reflog)
+        old_head = "HEAD@{1}"
+
+    # Check changed files
+    result = subprocess.run(
+        ["git", "diff", "--name-only", old_head, "HEAD"],
         cwd=str(repo_dir),
         capture_output=True,
         text=True,

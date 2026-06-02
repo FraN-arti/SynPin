@@ -1431,6 +1431,237 @@ body {
   padding-top: 12px;
 }
 
+/* === Providers Page === */
+.providers-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.providers-top-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.providers-add-btn {
+  flex: 1;
+  padding: 12px 20px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.providers-add-btn.anthropic {
+  background: linear-gradient(135deg, #d97706, #ea580c);
+  color: var(--white);
+}
+
+.providers-add-btn.anthropic:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
+}
+
+.providers-add-btn.openai {
+  background: var(--white);
+  color: var(--black);
+}
+
+.providers-add-btn.openai:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15);
+}
+
+.providers-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.providers-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-400);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--gray-800);
+}
+
+/* Connected providers grid */
+.connected-providers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.connected-provider-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--gray-900);
+  border: 1px solid var(--gray-800);
+  border-radius: var(--radius);
+  padding: 12px;
+  gap: 8px;
+  transition: all 0.15s ease;
+}
+
+.connected-provider-card:hover {
+  border-color: var(--gray-700);
+}
+
+.cp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cp-icon {
+  font-size: 18px;
+}
+
+.cp-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 4px rgba(16, 185, 129, 0.5);
+}
+
+.cp-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cp-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--white);
+}
+
+.cp-model {
+  font-size: 11px;
+  color: var(--gray-500);
+}
+
+.cp-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.cp-badge {
+  font-size: 10px;
+  color: var(--orange);
+  background: rgba(249, 115, 22, 0.1);
+  padding: 1px 6px;
+  border-radius: 2px;
+}
+
+.cp-disconnect-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--gray-600);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.cp-disconnect-btn:hover {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+/* Search bar */
+.providers-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--gray-900);
+  border: 1px solid var(--gray-800);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+}
+
+.providers-search-bar svg {
+  color: var(--gray-500);
+  flex-shrink: 0;
+}
+
+.providers-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--white);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+}
+
+.providers-search-input::placeholder {
+  color: var(--gray-600);
+}
+
+/* Provider catalog grid */
+.provider-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.provider-catalog-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 10px;
+  background: var(--gray-900);
+  border: 1px solid var(--gray-800);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.provider-catalog-card:hover {
+  border-color: var(--orange);
+  background: rgba(249, 115, 22, 0.05);
+  transform: translateY(-2px);
+}
+
+.pc-icon {
+  font-size: 24px;
+}
+
+.pc-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--white);
+}
+
+.pc-models {
+  font-size: 10px;
+  color: var(--gray-500);
+  line-height: 1.3;
+}
+
+.modal-subtitle {
+  font-size: 13px;
+  color: var(--gray-500);
+  margin: 0 0 16px 0;
+}
+
 /* === Modal === */
 .modal-overlay {
   position: fixed;

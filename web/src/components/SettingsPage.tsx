@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { PROVIDER_CATALOG, PROVIDERS_BY_CATEGORY, type ProviderInfo } from '../lib/providers'
 
 interface SettingsPageProps {
   onBack: () => void
@@ -46,7 +47,8 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
       {activeModal && (
         <div className="modal-overlay" onClick={() => setActiveModal(null)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
-            {activeModal === 'add-provider' && <AddProviderModal onClose={() => setActiveModal(null)} />}
+            {activeModal === 'add-provider-openai' && <AddProviderModal type="openai" onClose={() => setActiveModal(null)} />}
+            {activeModal === 'add-provider-anthropic' && <AddProviderModal type="anthropic" onClose={() => setActiveModal(null)} />}
             {activeModal === 'add-channel' && <AddChannelModal onClose={() => setActiveModal(null)} />}
           </div>
         </div>
@@ -83,7 +85,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
         <div className="settings-body" key={activeTab}>
           {activeTab === 'general' && <GeneralSection />}
           {activeTab === 'agents' && <AgentsSection />}
-          {activeTab === 'providers' && <ProvidersSection onAddProvider={() => setActiveModal('add-provider')} />}
+          {activeTab === 'providers' && <ProvidersSection onAddProvider={(type) => setActiveModal(`add-provider-${type}`)} />}
           {activeTab === 'memory' && <MemorySection />}
           {activeTab === 'channels' && <ChannelsSection onAddChannel={() => setActiveModal('add-channel')} />}
         </div>
@@ -331,59 +333,136 @@ function AgentsSection() {
 
 // ─── Providers Section ───────────────────────────────────────
 
-const sampleProviders = [
-  { id: '9router', name: '9Router', type: 'openai-compatible', baseUrl: 'http://localhost:20128/v1', model: 'general-agent', isDefault: true, connected: true },
-  { id: 'openai', name: 'OpenAI', type: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o', isDefault: false, connected: false },
-  { id: 'anthropic', name: 'Anthropic', type: 'anthropic', baseUrl: 'https://api.anthropic.com', model: 'claude-sonnet-4', isDefault: false, connected: false },
-]
+interface ConnectedProvider {
+  id: string
+  providerId: string  // catalog ID
+  name: string
+  type: string
+  baseUrl: string
+  model: string
+  apiKey: string
+  isDefault: boolean
+}
 
-function ProvidersSection({ onAddProvider }: { onAddProvider: () => void }) {
-  const [providers] = useState(sampleProviders)
+function ProvidersSection({ onAddProvider }: { onAddProvider: (type: 'openai' | 'anthropic') => void }) {
+  const [connected, setConnected] = useState<ConnectedProvider[]>([
+    { id: 'conn-1', providerId: '9router', name: '9Router', type: 'openai-compatible', baseUrl: 'http://localhost:20128/v1', model: 'general-agent', apiKey: 'sk-***', isDefault: true },
+  ])
+
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const filteredCatalog = PROVIDER_CATALOG.filter(p =>
+    !connected.some(c => c.providerId === p.id) &&
+    (p.name.toLowerCase().includes(searchQuery.toLowerCase()) || !searchQuery)
+  )
+
+  const groupedCatalog = {
+    oauth: filteredCatalog.filter(p => p.category === 'oauth'),
+    freeTier: filteredCatalog.filter(p => p.category === 'free-tier'),
+    apiKey: filteredCatalog.filter(p => p.category === 'api-key'),
+  }
+
+  const handleConnect = (provider: ProviderInfo) => {
+    const newConn: ConnectedProvider = {
+      id: `conn-${Date.now()}`,
+      providerId: provider.id,
+      name: provider.name,
+      type: provider.type,
+      baseUrl: provider.baseUrl,
+      model: provider.defaultModels[0],
+      apiKey: '',
+      isDefault: connected.length === 0,
+    }
+    setConnected([...connected, newConn])
+  }
+
+  const handleDisconnect = (connId: string) => {
+    setConnected(connected.filter(c => c.id !== connId))
+  }
 
   return (
-    <div className="settings-sections">
-      <div className="section-header-row">
-        <span className="section-count">{providers.filter(p => p.connected).length} подключено</span>
-        <button className="settings-btn-primary" onClick={onAddProvider}>+ Добавить провайдер</button>
+    <div className="providers-page">
+      {/* Top buttons */}
+      <div className="providers-top-actions">
+        <button className="providers-add-btn anthropic" onClick={() => onAddProvider('anthropic')}>
+          + Add Anthropic Compatible
+        </button>
+        <button className="providers-add-btn openai" onClick={() => onAddProvider('openai')}>
+          + Add OpenAI Compatible
+        </button>
       </div>
-      {providers.map(provider => (
-        <div key={provider.id} className={`settings-card provider-card ${!provider.connected ? 'disconnected' : ''}`}>
-          <div className="provider-header">
-            <div className="provider-identity">
-              <span className={`provider-status ${provider.connected ? 'connected' : 'disconnected'}`} />
-              <span className="provider-name">{provider.name}</span>
-              <span className="provider-type">{provider.type}</span>
-            </div>
-            {provider.isDefault && <span className="provider-badge">Default</span>}
+
+      {/* Connected providers */}
+      {connected.length > 0 && (
+        <section className="providers-section">
+          <h2 className="providers-section-title">Подключённые провайдеры</h2>
+          <div className="connected-providers-grid">
+            {connected.map(conn => (
+              <div key={conn.id} className="connected-provider-card">
+                <div className="cp-header">
+                  <span className="cp-icon">{PROVIDER_CATALOG.find(p => p.id === conn.providerId)?.icon || '🔌'}</span>
+                  <span className="cp-status-dot" />
+                </div>
+                <div className="cp-info">
+                  <span className="cp-name">{conn.name}</span>
+                  <span className="cp-model">{conn.model}</span>
+                </div>
+                <div className="cp-actions">
+                  {conn.isDefault && <span className="cp-badge">Default</span>}
+                  <button className="cp-disconnect-btn" onClick={() => handleDisconnect(conn.id)} title="Отключить">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
-          {provider.connected ? (
-            <div className="provider-details">
-              <div className="settings-field">
-                <label>Base URL</label>
-                <input type="text" className="settings-input" defaultValue={provider.baseUrl} />
-              </div>
-              <div className="settings-field">
-                <label>Модель</label>
-                <input type="text" className="settings-input" defaultValue={provider.model} />
-              </div>
-              <div className="settings-field">
-                <label>API Key</label>
-                <input type="password" className="settings-input" defaultValue="sk-••••••••" />
-              </div>
-              <div className="provider-actions">
-                <button className="settings-btn-secondary">Сохранить</button>
-                {!provider.isDefault && <button className="settings-btn-danger">Отключить</button>}
-              </div>
-            </div>
-          ) : (
-            <div className="provider-connect">
-              <p>Нажмите для подключения</p>
-              <button className="settings-btn-primary" onClick={onAddProvider}>Подключить</button>
-            </div>
-          )}
-        </div>
-      ))}
+        </section>
+      )}
+
+      {/* Search */}
+      <div className="providers-search-bar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+        </svg>
+        <input
+          type="text"
+          className="providers-search-input"
+          placeholder="Поиск провайдеров..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+        />
+      </div>
+
+      {/* Provider catalog sections */}
+      {groupedCatalog.oauth.length > 0 && (
+        <ProviderGridSection title="OAuth Providers" providers={groupedCatalog.oauth} onConnect={handleConnect} />
+      )}
+      {groupedCatalog.freeTier.length > 0 && (
+        <ProviderGridSection title="Free Tier Providers" providers={groupedCatalog.freeTier} onConnect={handleConnect} />
+      )}
+      {groupedCatalog.apiKey.length > 0 && (
+        <ProviderGridSection title="API Key Providers" providers={groupedCatalog.apiKey} onConnect={handleConnect} />
+      )}
     </div>
+  )
+}
+
+function ProviderGridSection({ title, providers, onConnect }: { title: string; providers: ProviderInfo[]; onConnect: (p: ProviderInfo) => void }) {
+  return (
+    <section className="providers-section">
+      <h2 className="providers-section-title">{title}</h2>
+      <div className="provider-catalog-grid">
+        {providers.map(provider => (
+          <button key={provider.id} className="provider-catalog-card" onClick={() => onConnect(provider)}>
+            <span className="pc-icon">{provider.icon}</span>
+            <span className="pc-name">{provider.name}</span>
+            <span className="pc-models">{provider.defaultModels.slice(0, 2).join(', ')}</span>
+          </button>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -515,34 +594,33 @@ function ChannelsSection({ onAddChannel }: { onAddChannel: () => void }) {
 
 // ─── Modals ──────────────────────────────────────────────────
 
-function AddProviderModal({ onClose }: { onClose: () => void }) {
+function AddProviderModal({ type, onClose }: { type: 'openai' | 'anthropic'; onClose: () => void }) {
+  const isAnthropic = type === 'anthropic'
+
   return (
     <div className="modal-inner">
-      <h2 className="modal-title">Добавить провайдер</h2>
+      <h2 className="modal-title">
+        {isAnthropic ? 'Add Anthropic Compatible' : 'Add OpenAI Compatible'}
+      </h2>
+      <p className="modal-subtitle">
+        {isAnthropic
+          ? 'Подключите провайдер, совместимый с Anthropic API'
+          : 'Подключите провайдер, совместимый с OpenAI API'}
+      </p>
       <div className="modal-body">
         <div className="settings-field">
           <label>Название</label>
           <input type="text" className="settings-input" placeholder="My Provider" />
         </div>
         <div className="settings-field">
-          <label>Тип</label>
-          <CustomDropdown
-            value="openai"
-            onChange={() => {}}
-            options={[
-              { value: 'openai', label: 'OpenAI' },
-              { value: 'openai-compatible', label: 'OpenAI Compatible' },
-              { value: 'anthropic', label: 'Anthropic' },
-            ]}
-          />
-        </div>
-        <div className="settings-field">
           <label>Base URL</label>
-          <input type="text" className="settings-input" placeholder="https://api.openai.com/v1" />
+          <input type="text" className="settings-input"
+            placeholder={isAnthropic ? 'https://api.anthropic.com' : 'https://api.openai.com/v1'} />
         </div>
         <div className="settings-field">
           <label>Модель</label>
-          <input type="text" className="settings-input" placeholder="gpt-4o" />
+          <input type="text" className="settings-input"
+            placeholder={isAnthropic ? 'claude-sonnet-4' : 'gpt-4o'} />
         </div>
         <div className="settings-field">
           <label>API Key</label>

@@ -6,12 +6,12 @@ interface SettingsPageProps {
 
 type Tab = 'general' | 'agents' | 'providers' | 'memory' | 'channels'
 
-const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'general', label: 'Основное', icon: '⚙️' },
-  { id: 'agents', label: 'Агенты', icon: '🤖' },
-  { id: 'providers', label: 'Провайдеры', icon: '🔌' },
-  { id: 'memory', label: 'Память', icon: '🧠' },
-  { id: 'channels', label: 'Каналы', icon: '📡' },
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'general', label: 'Основное' },
+  { id: 'agents', label: 'Агенты' },
+  { id: 'providers', label: 'Провайдеры' },
+  { id: 'memory', label: 'Память' },
+  { id: 'channels', label: 'Каналы' },
 ]
 
 const SECTION_INFO: Record<Tab, { title: string; description: string }> = {
@@ -74,14 +74,13 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
               className={`settings-nav-tab ${activeTab === tab.id ? 'active' : ''}`}
               onClick={() => handleTabChange(tab.id)}
             >
-              <span className="nav-tab-icon">{tab.icon}</span>
-              <span className="nav-tab-label">{tab.label}</span>
+              {tab.label}
             </button>
           ))}
         </nav>
 
-        {/* Tab content */}
-        <div className="settings-body">
+        {/* Tab content with fade animation */}
+        <div className="settings-body" key={activeTab}>
           {activeTab === 'general' && <GeneralSection />}
           {activeTab === 'agents' && <AgentsSection />}
           {activeTab === 'providers' && <ProvidersSection onAddProvider={() => setActiveModal('add-provider')} />}

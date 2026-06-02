@@ -18,6 +18,8 @@ class ChatRequest(BaseModel):
     message: str
     model: str | None = None
     provider: str | None = None
+    agent_name: str | None = None  # Display name for UI (e.g. "Архитектор")
+    system_prompt: str | None = None  # Merged system prompt with tone, style, traits
     temperature: float = 0.7
     max_tokens: int | None = None
     history: list[dict[str, str]] = []  # [{role, content}, ...]
@@ -29,12 +31,18 @@ async def stream_response(
     model: str,
     temperature: float,
     max_tokens: int | None,
+    system_prompt: str | None = None,
+    agent_name: str | None = None,
 ):
     """SSE stream generator."""
     provider = registry.get(provider_name)
     if not provider:
         yield f"data: {json.dumps({'error': f'Provider not found: {provider_name}'})}\n\n"
         return
+
+    # Prepend system prompt if provided
+    if system_prompt:
+        messages = [ChatMessage(role="system", content=system_prompt)] + messages
 
     usage = None
     try:
@@ -59,8 +67,10 @@ async def stream_response(
     except Exception as e:
         yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
-    # Final done event with model and usage
+    # Final done event with model, agent_name, and usage
     done_data = {"type": "done", "model": model}
+    if agent_name:
+        done_data["agent_name"] = agent_name
     if usage:
         done_data["usage"] = usage
     yield f"data: {json.dumps(done_data)}\n\n"
@@ -80,7 +90,7 @@ async def chat_stream(req: ChatRequest):
     provider_name = req.provider
 
     return StreamingResponse(
-        stream_response(provider_name, messages, model, req.temperature, req.max_tokens),
+        stream_response(provider_name, messages, model, req.temperature, req.max_tokens, req.system_prompt, req.agent_name),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

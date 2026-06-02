@@ -5,7 +5,7 @@ interface SettingsPageProps {
   onBack: () => void
 }
 
-type Tab = 'general' | 'agents' | 'providers' | 'memory' | 'channels'
+type Tab = 'general' | 'agents' | 'providers' | 'memory' | 'channels' | 'skills'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'general', label: 'Основное' },
@@ -13,6 +13,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'providers', label: 'Провайдеры' },
   { id: 'memory', label: 'Память' },
   { id: 'channels', label: 'Каналы' },
+  { id: 'skills', label: 'Скиллы' },
 ]
 
 const SECTION_INFO: Record<Tab, { title: string; description: string }> = {
@@ -21,6 +22,7 @@ const SECTION_INFO: Record<Tab, { title: string; description: string }> = {
   providers: { title: 'Провайдеры', description: 'Подключённые провайдеры и доступные для подключения' },
   memory: { title: 'Память', description: 'Архитектура памяти: агентская, командная, системная' },
   channels: { title: 'Каналы связи', description: 'Feishu, WhatsApp, Telegram — мультимодальная связь с системой' },
+  skills: { title: 'Скиллы', description: 'База скиллов системы — подходы, шаблоны, процедуры' },
 }
 
 export function SettingsPage({ onBack }: SettingsPageProps) {
@@ -50,8 +52,8 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
       {activeModal && (
         <div className="modal-overlay" onClick={() => setActiveModal(null)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
-            {activeModal === 'add-provider-openai' && <AddProviderModal type="openai" onClose={() => setActiveModal(null)} />}
-            {activeModal === 'add-provider-anthropic' && <AddProviderModal type="anthropic" onClose={() => setActiveModal(null)} />}
+            {activeModal === 'add-provider-openai' && <AddProviderModal type="openai" onClose={() => setActiveModal(null)} onSaved={() => { setActiveModal(null); providersRef.current?.refresh() }} />}
+            {activeModal === 'add-provider-anthropic' && <AddProviderModal type="anthropic" onClose={() => setActiveModal(null)} onSaved={() => { setActiveModal(null); providersRef.current?.refresh() }} />}
             {activeModal === 'add-channel' && <AddChannelModal onClose={() => setActiveModal(null)} />}
           </div>
         </div>
@@ -73,13 +75,26 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
       {/* Edit provider modal — at root level, outside .settings-page */}
       {editingProvider && (() => {
         const catalogEntry = PROVIDER_CATALOG.find(p => providerKey(p) === editingProvider.name)
-        if (!catalogEntry) return null
+        if (catalogEntry) {
+          return (
+            <div className="modal-overlay" onClick={() => setEditingProvider(null)}>
+              <div className="modal-content modal-lg" onClick={e => e.stopPropagation()}>
+                <AddFromCatalogModal
+                  provider={catalogEntry}
+                  editProvider={editingProvider}
+                  onClose={() => setEditingProvider(null)}
+                  onSaved={() => { setEditingProvider(null); providersRef.current?.refresh() }}
+                />
+              </div>
+            </div>
+          )
+        }
+        // Custom provider — not in catalog
         return (
           <div className="modal-overlay" onClick={() => setEditingProvider(null)}>
             <div className="modal-content modal-lg" onClick={e => e.stopPropagation()}>
-              <AddFromCatalogModal
-                provider={catalogEntry}
-                editProvider={editingProvider}
+              <EditCustomProviderModal
+                provider={editingProvider}
                 onClose={() => setEditingProvider(null)}
                 onSaved={() => { setEditingProvider(null); providersRef.current?.refresh() }}
               />
@@ -122,6 +137,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
           {activeTab === 'providers' && <ProvidersSection ref={providersRef} onAddProvider={(type) => setActiveModal(`add-provider-${type}`)} onAddFromCatalog={(p) => setAddingProvider(p)} onEditProvider={(p) => setEditingProvider(p)} />}
           {activeTab === 'memory' && <MemorySection />}
           {activeTab === 'channels' && <ChannelsSection onAddChannel={() => setActiveModal('add-channel')} />}
+          {activeTab === 'skills' && <SkillsSection />}
         </div>
       </div>
     </>
@@ -311,59 +327,771 @@ function Toggle({ label, defaultChecked, onChange }: { label: string; defaultChe
 
 // ─── Agents Section ──────────────────────────────────────────
 
-const sampleAgents = [
-  { id: 'architect', name: 'Архитектор', role: 'head', department: 'dev', model: 'general-agent', enabled: true, traits: 'analytical, thinks before answering' },
-  { id: 'developer', name: 'Разработчик', role: 'worker', department: 'dev', model: 'general-agent', enabled: true, traits: 'pragmatic, writes clean code' },
-  { id: 'qa-engineer', name: 'QA Инженер', role: 'worker', department: 'qa', model: 'general-agent', enabled: true, traits: 'meticulous, finds edge cases' },
-]
+interface AgentData {
+  slug: string
+  agentid: string
+  name: string
+  role: string
+  department: string
+  model: string
+  provider: string | null
+  skills: string[]
+  enabled: boolean
+  description: string
+  tone: string
+  style: string
+  traits: string[]
+  system_prompt: string
+  max_iterations: number
+  temperature: number
+  max_tokens: number
+  memory: Record<string, unknown>
+  is_external?: boolean
+}
+
+interface ExternalAgentData {
+  slug: string
+  agentid: string
+  name: string
+  type: string
+  description: string
+  enabled: boolean
+  role: string
+  role_name: string
+  department: string
+  department_name: string
+  available: boolean
+  models: string[]
+  chat_url: string
+  icon_letter: string
+  color: string
+  is_external: true
+}
 
 function AgentsSection() {
-  const [agents] = useState(sampleAgents)
-  const roleLabels: Record<string, string> = { worker: 'Работник', head: 'Руководитель', director: 'Директор' }
-  const roleColors: Record<string, string> = { worker: '#6b7280', head: '#f59e0b', director: '#ef4444' }
+  const [agents, setAgents] = useState<AgentData[]>([])
+  const [providers, setProviders] = useState<{name: string; models: string[]}[]>([])
+  const [hoveredAgent, setHoveredAgent] = useState<string | null>(null)
+  const [roles, setRoles] = useState<{rolesid: string; name: string; description: string; color: string}[]>([])
+  const [departments, setDepartments] = useState<{departmentsid: string; name: string; description: string; color: string}[]>([])
+  const [newRole, setNewRole] = useState({ name: '', description: '', color: '#f59e0b' })
+  const [newDept, setNewDept] = useState({ name: '', description: '', color: '#3b82f6' })
+  const [externalAgents, setExternalAgents] = useState<ExternalAgentData[]>([])
+  const [externalDetected, setExternalDetected] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [createForm, setCreateForm] = useState({
+    name: '', role: '', department: '', model: '',
+    description: '', system_prompt: '', temperature: 0.7,
+  })
+  const [creating, setCreating] = useState(false)
+  const [formTouched, setFormTouched] = useState(false)
+
+  // Build lookup maps from roles/departments
+  const roleMap: Record<string, {name: string; color: string}> = {}
+  for (const r of roles) roleMap[r.rolesid] = { name: r.name, color: r.color }
+  const deptMap: Record<string, {name: string; color: string}> = {}
+  for (const d of departments) deptMap[d.departmentsid] = { name: d.name, color: d.color }
+
+  const handleAddRole = async () => {
+    if (!newRole.name.trim()) return
+    const rolesid = newRole.name.trim().toLowerCase().replace(/\s+/g, '-')
+    const updated = [...roles, { rolesid, ...newRole }]
+    const res = await fetch('http://localhost:2088/api/roles', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roles: updated }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      setRoles(data.roles)
+    }
+    setNewRole({ name: '', description: '', color: '#f59e0b' })
+  }
+
+  const handleAddDept = async () => {
+    if (!newDept.name.trim()) return
+    const departmentsid = newDept.name.trim().toLowerCase().replace(/\s+/g, '-')
+    const updated = [...departments, { departmentsid, ...newDept }]
+    const res = await fetch('http://localhost:2088/api/departments', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ departments: updated }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      setDepartments(data.departments)
+    }
+    setNewDept({ name: '', description: '', color: '#3b82f6' })
+  }
+
+  const handleRemoveRole = async (rolesid: string) => {
+    const updated = roles.filter(r => r.rolesid !== rolesid)
+    const res = await fetch('http://localhost:2088/api/roles', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roles: updated }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      setRoles(data.roles)
+    }
+  }
+
+  const handleRoleColorChange = async (rolesid: string, newColor: string) => {
+    const updated = roles.map(r => r.rolesid === rolesid ? { ...r, color: newColor } : r)
+    try {
+      const res = await fetch('http://localhost:2088/api/roles', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roles: updated }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setRoles(data.roles)
+      }
+    } catch (e) { console.error('[roles] color change error:', e) }
+  }
+
+  const handleDeptColorChange = async (departmentsid: string, newColor: string) => {
+    const updated = departments.map(d => d.departmentsid === departmentsid ? { ...d, color: newColor } : d)
+    try {
+      const res = await fetch('http://localhost:2088/api/departments', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ departments: updated }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setDepartments(data.departments)
+      }
+    } catch (e) { console.error('[departments] color change error:', e) }
+  }
+
+  const handleRemoveDept = async (departmentsid: string) => {
+    const updated = departments.filter(d => d.departmentsid !== departmentsid)
+    const res = await fetch('http://localhost:2088/api/departments', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ departments: updated }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      setDepartments(data.departments)
+    }
+  }
+
+  const handleAgentRoleChange = async (agent: AgentData, newRole: string) => {
+    try {
+      const res = await fetch(`http://localhost:2088/api/agents/${agent.slug}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole }),
+      })
+      if (res.ok) fetchAgents()
+    } catch (e) { console.error('[agents] role change error:', e) }
+  }
+
+  const handleAgentDeptChange = async (agent: AgentData, newDept: string) => {
+    try {
+      const res = await fetch(`http://localhost:2088/api/agents/${agent.slug}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ department: newDept }),
+      })
+      if (res.ok) fetchAgents()
+    } catch (e) { console.error('[agents] dept change error:', e) }
+  }
+
+  const fetchAgents = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:2088/api/agents')
+      if (res.ok) {
+        const data = await res.json()
+        setAgents(data.agents || [])
+      }
+    } catch (e) {
+      console.error('[agents] fetch error:', e)
+    }
+  }, [])
+
+  const fetchProviders = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:2088/api/providers')
+      if (res.ok) {
+        const data = await res.json()
+        setProviders(data.providers || [])
+      }
+    } catch (e) {
+      console.error('[agents] providers fetch error:', e)
+    }
+  }, [])
+
+  const fetchRoles = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:2088/api/roles')
+      if (res.ok) {
+        const data = await res.json()
+        setRoles(data.roles || [])
+      }
+    } catch (e) {
+      console.error('[roles] fetch error:', e)
+    }
+  }, [])
+
+  const fetchDepartments = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:2088/api/departments')
+      if (res.ok) {
+        const data = await res.json()
+        setDepartments(data.departments || [])
+      }
+    } catch (e) {
+      console.error('[departments] fetch error:', e)
+    }
+  }, [])
+
+  const detectExternalAgents = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:2088/api/external-agents/detect')
+      if (res.ok) {
+        const data = await res.json()
+        setExternalAgents(data.agents || [])
+        setExternalDetected(true)
+      }
+    } catch (e) {
+      console.error('[external-agents] detect error:', e)
+      setExternalDetected(true)
+    }
+  }, [])
+
+  const handleExternalToggle = async (agent: ExternalAgentData) => {
+    try {
+      const res = await fetch(`http://localhost:2088/api/external-agents/${agent.slug}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !agent.enabled }),
+      })
+      if (res.ok) {
+        detectExternalAgents()
+      }
+    } catch (e) {
+      console.error('[external-agents] toggle error:', e)
+    }
+  }
+
+  const handleExternalRoleChange = async (agent: ExternalAgentData, newRole: string) => {
+    try {
+      const res = await fetch(`http://localhost:2088/api/external-agents/${agent.slug}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole }),
+      })
+      if (res.ok) {
+        detectExternalAgents()
+      }
+    } catch (e) {
+      console.error('[external-agents] role change error:', e)
+    }
+  }
+
+  const handleExternalDeptChange = async (agent: ExternalAgentData, newDept: string) => {
+    try {
+      const res = await fetch(`http://localhost:2088/api/external-agents/${agent.slug}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ department: newDept }),
+      })
+      if (res.ok) {
+        detectExternalAgents()
+      }
+    } catch (e) {
+      console.error('[external-agents] dept change error:', e)
+    }
+  }
+
+  useEffect(() => {
+    fetchAgents()
+    fetchProviders()
+    fetchRoles()
+    fetchDepartments()
+    detectExternalAgents()
+  }, [fetchAgents, fetchProviders, fetchRoles, fetchDepartments, detectExternalAgents])
+
+  const handleToggle = async (agent: AgentData) => {
+    try {
+      const res = await fetch(`http://localhost:2088/api/agents/${agent.slug}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !agent.enabled }),
+      })
+      if (res.ok) {
+        fetchAgents()
+      }
+    } catch (e) {
+      console.error('[agents] toggle error:', e)
+    }
+  }
+
+  const handleModelChange = async (agent: AgentData, newModel: string) => {
+    try {
+      const res = await fetch(`http://localhost:2088/api/agents/${agent.slug}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: newModel }),
+      })
+      if (res.ok) {
+        fetchAgents()
+      }
+    } catch (e) {
+      console.error('[agents] model change error:', e)
+    }
+  }
+
+  const handleAgentFieldChange = async (agent: AgentData, field: string, value: unknown) => {
+    try {
+      const res = await fetch(`http://localhost:2088/api/agents/${agent.slug}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value }),
+      })
+      if (res.ok) {
+        fetchAgents()
+      }
+    } catch (e) {
+      console.error('[agents] field change error:', e)
+    }
+  }
+
+  const handleCreateAgent = async () => {
+    setFormTouched(true)
+    if (!createForm.name.trim()) return
+    setCreating(true)
+    try {
+      const res = await fetch('http://localhost:2088/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(createForm),
+      })
+      if (res.ok) {
+        setShowCreateModal(false)
+        setCreateForm({ name: '', role: '', department: '', model: '', description: '', system_prompt: '', temperature: 0.7 })
+        setFormTouched(false)
+        fetchAgents()
+      }
+    } catch (e) {
+      console.error('[agents] create error:', e)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleDeleteAgent = async (slug: string) => {
+    if (!confirm('Удалить агента?')) return
+    try {
+      const res = await fetch(`http://localhost:2088/api/agents/${slug}`, { method: 'DELETE' })
+      if (res.ok) {
+        setHoveredAgent(null)
+        fetchAgents()
+      }
+    } catch (e) {
+      console.error('[agents] delete error:', e)
+    }
+  }
+
+  // Build provider/model options
+  const modelOptions: string[] = []
+  for (const p of providers) {
+    if (p.models.length === 0) {
+      modelOptions.push(`${p.name}/(no models)`)
+    } else {
+      for (const m of p.models) {
+        modelOptions.push(`${p.name}/${m}`)
+      }
+    }
+  }
 
   return (
-    <div className="settings-sections">
-      <div className="section-header-row">
-        <span className="section-count">{agents.length} агентов</span>
-        <button className="settings-btn-primary">+ Добавить агента</button>
+    <div>
+      {/* Create Agent button */}
+      <div className="create-agent-bar">
+        <button className="create-agent-btn" onClick={() => setShowCreateModal(true)}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Создать агента
+        </button>
       </div>
-      {agents.map(agent => (
-        <div key={agent.id} className={`settings-card agent-card ${!agent.enabled ? 'disabled' : ''}`}>
-          <div className="agent-header">
-            <div className="agent-identity">
-              <span className="agent-avatar">{agent.name[0]}</span>
-              <div>
-                <span className="agent-name">{agent.name}</span>
-                <span className="agent-role" style={{ color: roleColors[agent.role] }}>
-                  {roleLabels[agent.role]} · {agent.department}
-                </span>
+
+      {/* Create Agent modal */}
+      {showCreateModal && (
+        <div className="modal-overlay" onClick={() => { setShowCreateModal(false); setFormTouched(false) }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <div className="modal-header">
+              <h2>Новый агент</h2>
+              <button className="modal-close" onClick={() => { setShowCreateModal(false); setFormTouched(false) }}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="settings-field">
+                <label>Имя *</label>
+                <input className={`settings-input ${formTouched && !createForm.name.trim() ? 'field-error' : ''}`}
+                  placeholder="Например: Маркетолог"
+                  value={createForm.name} onChange={e => setCreateForm({ ...createForm, name: e.target.value })} />
+                {formTouched && !createForm.name.trim() && (
+                  <span className="field-error-text">Обязательное поле</span>
+                )}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="settings-field">
+                  <label>Роль</label>
+                  <select className="settings-input" style={{ cursor: 'pointer' }}
+                    value={createForm.role} onChange={e => setCreateForm({ ...createForm, role: e.target.value })}>
+                    <option value="">— не указана —</option>
+                    {roles.map(r => <option key={r.rolesid} value={r.rolesid}>{r.name}</option>)}
+                  </select>
+                </div>
+                <div className="settings-field">
+                  <label>Департамент</label>
+                  <select className="settings-input" style={{ cursor: 'pointer' }}
+                    value={createForm.department} onChange={e => setCreateForm({ ...createForm, department: e.target.value })}>
+                    <option value="">— не указан —</option>
+                    {departments.map(d => <option key={d.departmentsid} value={d.departmentsid}>{d.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="settings-field">
+                <label>Модель</label>
+                <select className="settings-input" style={{ cursor: 'pointer' }}
+                  value={createForm.model} onChange={e => setCreateForm({ ...createForm, model: e.target.value })}>
+                  <option value="">— выбрать позже —</option>
+                  {modelOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+              </div>
+              <div className="settings-field">
+                <label>Описание</label>
+                <input className="settings-input" placeholder="Кратко о роли агента..."
+                  value={createForm.description} onChange={e => setCreateForm({ ...createForm, description: e.target.value })} />
+              </div>
+              <div className="settings-field">
+                <label>System Prompt</label>
+                <textarea className="settings-input" rows={4} placeholder="Инструкции для агента..."
+                  value={createForm.system_prompt} onChange={e => setCreateForm({ ...createForm, system_prompt: e.target.value })} />
               </div>
             </div>
-            <label className="settings-toggle">
-              <input type="checkbox" defaultChecked={agent.enabled} />
-              <span>Активен</span>
-            </label>
-          </div>
-          <div className="agent-details">
-            <div className="settings-field">
-              <label>Модель</label>
-              <input type="text" className="settings-input" defaultValue={agent.model} />
-            </div>
-            <div className="settings-field">
-              <label>Характер</label>
-              <input type="text" className="settings-input" defaultValue={agent.traits} />
-            </div>
-            <div className="settings-field">
-              <label>Системный промпт</label>
-              <textarea className="settings-textarea" rows={3} defaultValue="Custom system prompt..." />
+            <div className="modal-footer">
+              <button className="settings-btn-secondary" onClick={() => { setShowCreateModal(false); setFormTouched(false) }}>Отмена</button>
+              <button className={`settings-btn-primary ${formTouched && !createForm.name.trim() ? 'btn-warn' : ''}`}
+                disabled={creating}
+                onClick={handleCreateAgent}>
+                {creating ? 'Создание...' : 'Создать'}
+              </button>
             </div>
           </div>
         </div>
-      ))}
+      )}
+
+      {/* Roles & Departments section */}
+      <div className="roles-depts-section">
+        <div className="roles-depts-grid">
+          {/* Roles column */}
+          <div className="roles-depts-column">
+            <h3 className="roles-depts-title">Роли</h3>
+            <p className="roles-depts-hint">Определяют уровень ответственности агента в команде. Используются для формирования системного промта и организации чатов.</p>
+            <div className="roles-depts-list">
+              {roles.map(role => (
+                <div key={role.rolesid} className="roles-depts-item">
+                  <label className="roles-depts-color clickable" style={{ background: role.color }} title="Изменить цвет">
+                    <input type="color" value={role.color} onChange={e => handleRoleColorChange(role.rolesid, e.target.value)} />
+                  </label>
+                  <div className="roles-depts-info">
+                    <span className="roles-depts-name" style={{ color: role.color }}>{role.name}</span>
+                    <span className="roles-depts-desc">{role.description}</span>
+                  </div>
+                  <button className="roles-depts-remove" onClick={() => handleRemoveRole(role.rolesid)} title="Удалить">×</button>
+                </div>
+              ))}
+            </div>
+            <div className="roles-depts-add">
+              <input className="settings-input roles-depts-input" placeholder="Название роли..."
+                value={newRole.name} onChange={e => setNewRole({ ...newRole, name: e.target.value })} />
+              <input className="settings-input roles-depts-input roles-depts-input-sm" placeholder="Описание..."
+                value={newRole.description} onChange={e => setNewRole({ ...newRole, description: e.target.value })} />
+              <input type="color" className="roles-depts-color-picker" value={newRole.color}
+                onChange={e => setNewRole({ ...newRole, color: e.target.value })} />
+              <button className="roles-depts-add-btn" onClick={handleAddRole} title="Добавить роль">+</button>
+            </div>
+          </div>
+
+          {/* Departments column */}
+          <div className="roles-depts-column">
+            <h3 className="roles-depts-title">Департаменты</h3>
+            <p className="roles-depts-hint">Определяют область специализации агента. Влияют на контекст системного промта и распределение задач.</p>
+            <div className="roles-depts-list">
+              {departments.map(dept => (
+                <div key={dept.departmentsid} className="roles-depts-item">
+                  <label className="roles-depts-color clickable" style={{ background: dept.color }} title="Изменить цвет">
+                    <input type="color" value={dept.color} onChange={e => handleDeptColorChange(dept.departmentsid, e.target.value)} />
+                  </label>
+                  <div className="roles-depts-info">
+                    <span className="roles-depts-name" style={{ color: dept.color }}>{dept.name}</span>
+                    <span className="roles-depts-desc">{dept.description}</span>
+                  </div>
+                  <button className="roles-depts-remove" onClick={() => handleRemoveDept(dept.departmentsid)} title="Удалить">×</button>
+                </div>
+              ))}
+            </div>
+            <div className="roles-depts-add">
+              <input className="settings-input roles-depts-input" placeholder="Название департамента..."
+                value={newDept.name} onChange={e => setNewDept({ ...newDept, name: e.target.value })} />
+              <input className="settings-input roles-depts-input roles-depts-input-sm" placeholder="Описание..."
+                value={newDept.description} onChange={e => setNewDept({ ...newDept, description: e.target.value })} />
+              <input type="color" className="roles-depts-color-picker" value={newDept.color}
+                onChange={e => setNewDept({ ...newDept, color: e.target.value })} />
+              <button className="roles-depts-add-btn" onClick={handleAddDept} title="Добавить департамент">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Divider */}
+      <div className="roles-depts-divider" />
+
+      {/* External Agents section */}
+      {externalDetected && externalAgents.length > 0 && (
+        <section className="agents-role-section">
+          <h2 className="agents-role-title">
+            <span className="agents-role-dot" style={{ background: '#6b7280' }} />
+            External Agents
+          </h2>
+          <div className="settings-grid">
+            {externalAgents.map(agent => (
+              <div key={agent.slug} className="agent-card-wrapper"
+                onMouseEnter={() => setHoveredAgent(agent.slug)}
+                onMouseLeave={() => setHoveredAgent(null)}>
+                <section className={`settings-card agent-card external-agent ${!agent.enabled ? 'disabled' : ''}`}>
+                  <div className="agent-header">
+                    <div className="agent-identity">
+                      <span className="agent-avatar external" style={{ background: agent.color }}>{agent.icon_letter}</span>
+                      <div>
+                        <span className="agent-name">
+                          {agent.name}
+                          <span className="agent-badge extern">extern</span>
+                        </span>
+                        <span className="agent-role" style={{ color: roleMap[agent.role]?.color || '#6b7280' }}>
+                          {deptMap[agent.department]?.name || agent.department}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="agent-status-icon">
+                      {!agent.available ? (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M15 9l-6 6M9 9l6 6" /></svg>
+                      ) : agent.enabled ? (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-6" /></svg>
+                      ) : (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M15 9l-6 6M9 9l6 6" /></svg>
+                      )}
+                    </div>
+                  </div>
+                  <div className="agent-model-text">
+                    <span className="agent-model-label">ТИП</span>
+                    <span className="agent-model-value">{agent.type}</span>
+                  </div>
+                  <div className="agent-model-text">
+                    <span className="agent-model-label">ОПИСАНИЕ</span>
+                    <span className="agent-model-value" style={{ fontSize: '11px', opacity: 0.7 }}>{agent.description}</span>
+                  </div>
+                </section>
+                {hoveredAgent === agent.slug && (
+                  <div className="agent-expanded-overlay">
+                    <div className="agent-expanded-content">
+                      <div className="agent-expanded-header">
+                        <span className="agent-expanded-avatar external" style={{ background: agent.color }}>{agent.icon_letter}</span>
+                        <div>
+                          <span className="agent-expanded-name">
+                            {agent.name}
+                            <span className="agent-badge extern">extern</span>
+                          </span>
+                          <span className="agent-expanded-role" style={{ color: roleMap[agent.role]?.color || '#6b7280' }}>
+                            {roleMap[agent.role]?.name || agent.role} · {deptMap[agent.department]?.name || agent.department}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="agent-expanded-body">
+                        <div className="expanded-field">
+                          <label>Agent ID</label>
+                          <span className="agentid-display">{agent.agentid}</span>
+                        </div>
+                        <div className="expanded-field">
+                          <label>Роль</label>
+                          <select className="settings-input" value={agent.role} onChange={e => handleExternalRoleChange(agent, e.target.value)} style={{ cursor: 'pointer' }}>
+                            {roles.map(r => (<option key={r.rolesid} value={r.rolesid}>{r.name}</option>))}
+                          </select>
+                        </div>
+                        <div className="expanded-field">
+                          <label>Департамент</label>
+                          <select className="settings-input" value={agent.department} onChange={e => handleExternalDeptChange(agent, e.target.value)} style={{ cursor: 'pointer' }}>
+                            {departments.map(d => (<option key={d.departmentsid} value={d.departmentsid}>{d.name}</option>))}
+                          </select>
+                        </div>
+                        {agent.models.length > 0 && (
+                          <div className="expanded-field">
+                            <label>Модели</label>
+                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                              {agent.models.map(model => (
+                                <span key={model} className="model-chip" style={{ fontSize: '11px', padding: '1px 8px' }}>{model}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <div className="expanded-toggle-row">
+                          <label className="settings-toggle">
+                            <input type="checkbox" checked={agent.enabled} onChange={() => handleExternalToggle(agent)} />
+                            <span>Активен</span>
+                          </label>
+                        </div>
+                        {!agent.available && (
+                          <div className="external-unavailable">
+                            ⚠️ Сервис недоступен. Убедитесь что Hermes Gateway запущен.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Agents grouped by role */}
+      {(() => {
+        const grouped: Record<string, AgentData[]> = {}
+        for (const agent of agents) {
+          const key = agent.role || '_unassigned'
+          if (!grouped[key]) grouped[key] = []
+          grouped[key].push(agent)
+        }
+        const roleOrder = roles.map(r => r.rolesid)
+        const allKeys = [...roleOrder.filter(k => grouped[k]), ...Object.keys(grouped).filter(k => !roleOrder.includes(k))]
+        return allKeys.map(roleId => (
+          <section key={roleId} className="agents-role-section">
+            <h2 className="agents-role-title">
+              <span className="agents-role-dot" style={{ background: roleMap[roleId]?.color || '#6b7280' }} />
+              {roleMap[roleId]?.name || roleId}
+            </h2>
+            <div className="settings-grid">
+              {(grouped[roleId] || []).map(agent => (
+                <div key={agent.slug} className="agent-card-wrapper"
+                  onMouseEnter={() => setHoveredAgent(agent.slug)}
+                  onMouseLeave={() => setHoveredAgent(null)}>
+                  <section className={`settings-card agent-card ${!agent.enabled ? 'disabled' : ''}`}>
+                    <div className="agent-header">
+                      <div className="agent-identity">
+                        <span className="agent-avatar">{agent.name[0]}</span>
+                        <div>
+                          <span className="agent-name">{agent.name}</span>
+                          <span className="agent-role" style={{ color: roleMap[agent.role]?.color || '#6b7280' }}>
+                            {deptMap[agent.department]?.name || agent.department}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="agent-status-icon">
+                        {agent.enabled ? (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M8 12l3 3 5-6" /></svg>
+                        ) : (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M15 9l-6 6M9 9l6 6" /></svg>
+                        )}
+                      </div>
+                    </div>
+                    <div className="agent-model-text">
+                      <span className="agent-model-label">МОДЕЛЬ</span>
+                      <span className="agent-model-value">{agent.model || '—'}</span>
+                    </div>
+                    {agent.skills.length > 0 && (
+                      <div className="agent-skills-compact">
+                        {agent.skills.slice(0, 3).map(skill => (
+                          <span key={skill} className="model-chip" style={{ fontSize: '10px', padding: '1px 6px' }}>{skill}</span>
+                        ))}
+                        {agent.skills.length > 3 && (
+                          <span className="model-chip" style={{ fontSize: '10px', padding: '1px 6px', opacity: 0.6 }}>+{agent.skills.length - 3}</span>
+                        )}
+                      </div>
+                    )}
+                  </section>
+                  {hoveredAgent === agent.slug && (
+                    <div className="agent-expanded-overlay">
+                      <div className="agent-expanded-content">
+                        <div className="agent-expanded-header">
+                          <span className="agent-expanded-avatar">{agent.name[0]}</span>
+                          <div>
+                            <span className="agent-expanded-name">{agent.name}</span>
+                            <span className="agent-expanded-role" style={{ color: roleMap[agent.role]?.color || '#6b7280' }}>
+                              {roleMap[agent.role]?.name || agent.role} · {deptMap[agent.department]?.name || agent.department}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="agent-expanded-body">
+                          <div className="expanded-field">
+                            <label>Agent ID</label>
+                            <span className="agentid-display">{agent.agentid}</span>
+                          </div>
+                          <div className="expanded-field">
+                            <label>Роль</label>
+                            <select className="settings-input" value={agent.role} onChange={e => handleAgentRoleChange(agent, e.target.value)} style={{ cursor: 'pointer' }}>
+                              {roles.map(r => (<option key={r.rolesid} value={r.rolesid}>{r.name}</option>))}
+                            </select>
+                          </div>
+                          <div className="expanded-field">
+                            <label>Департамент</label>
+                            <select className="settings-input" value={agent.department} onChange={e => handleAgentDeptChange(agent, e.target.value)} style={{ cursor: 'pointer' }}>
+                              {departments.map(d => (<option key={d.departmentsid} value={d.departmentsid}>{d.name}</option>))}
+                            </select>
+                          </div>
+                          <div className="expanded-field">
+                            <label>Модель</label>
+                            <select className="settings-input" value={agent.model} onChange={e => handleModelChange(agent, e.target.value)} style={{ cursor: 'pointer' }}>
+                              <option value="">— выбрать —</option>
+                              {modelOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}
+                            </select>
+                          </div>
+                          {agent.provider && (
+                            <div className="expanded-field"><label>Провайдер</label><span>{agent.provider}</span></div>
+                          )}
+                          {agent.skills.length > 0 && (
+                            <div className="expanded-field">
+                              <label>Скиллы</label>
+                              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                {agent.skills.map(skill => (
+                                  <span key={skill} className="model-chip" style={{ fontSize: '11px', padding: '1px 8px' }}>{skill}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          <div className="expanded-field">
+                            <label>System Prompt</label>
+                            <textarea className="settings-input expanded-textarea" rows={4}
+                              defaultValue={agent.system_prompt}
+                              onBlur={e => { if (e.target.value !== agent.system_prompt) handleAgentFieldChange(agent, 'system_prompt', e.target.value) }} />
+                          </div>
+                          {agent.description && (
+                            <div className="expanded-field"><label>Описание</label><span className="expanded-description">{agent.description}</span></div>
+                          )}
+                          <div className="expanded-toggle-row">
+                            <label className="settings-toggle">
+                              <input type="checkbox" checked={agent.enabled} onChange={() => handleToggle(agent)} />
+                              <span>Активен</span>
+                            </label>
+                            <button className="expanded-delete-btn" onClick={() => handleDeleteAgent(agent.slug)} title="Удалить агента">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        ))
+      })()}
     </div>
   )
 }
+
 
 // ─── Providers Section ───────────────────────────────────────
 
@@ -1008,7 +1736,7 @@ function ChannelsSection({ onAddChannel }: { onAddChannel: () => void }) {
 
 // ─── Modals ──────────────────────────────────────────────────
 
-function AddProviderModal({ type, onClose }: { type: 'openai' | 'anthropic'; onClose: () => void }) {
+function AddProviderModal({ type, onClose, onSaved }: { type: 'openai' | 'anthropic'; onClose: () => void; onSaved: () => void }) {
   const isAnthropic = type === 'anthropic'
   const [name, setName] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
@@ -1039,7 +1767,7 @@ function AddProviderModal({ type, onClose }: { type: 'openai' | 'anthropic'; onC
         body: JSON.stringify(body),
       })
       if (res.ok) {
-        onClose()
+        onSaved()
       } else {
         const data = await res.json().catch(() => ({}))
         setError(data.detail || 'Ошибка сохранения')
@@ -1081,6 +1809,85 @@ function AddProviderModal({ type, onClose }: { type: 'openai' | 'anthropic'; onC
         </div>
         <div className="settings-field">
           <label>API Key</label>
+          <input type="password" className="settings-input" placeholder="sk-..."
+            value={apiKey} onChange={e => setApiKey(e.target.value)} />
+        </div>
+        {error && <div className="modal-error">{error}</div>}
+      </div>
+      <div className="modal-footer">
+        <button className="settings-btn-secondary" onClick={onClose}>Отмена</button>
+        <button className="settings-btn-primary" onClick={handleSave} disabled={saving}>
+          {saving ? 'Сохранение...' : 'Сохранить'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function EditCustomProviderModal({ provider, onClose, onSaved }: { provider: ApiProvider; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(provider.name)
+  const [baseUrl, setBaseUrl] = useState(provider.base_url)
+  const [model, setModel] = useState(provider.models.join(', '))
+  const [apiKey, setApiKey] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      setError('Название обязательно')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const models = model.split(',').map(m => m.trim()).filter(Boolean)
+      const body: Record<string, unknown> = {
+        name: name,
+        type: provider.type,
+        base_url: baseUrl,
+        api_key: apiKey || undefined,
+        models,
+      }
+      const res = await fetch(`http://localhost:2088/api/providers/${encodeURIComponent(provider.name)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (res.ok) {
+        onSaved()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setError(data.detail || 'Ошибка сохранения')
+      }
+    } catch (e) {
+      setError('Не удалось подключиться к серверу')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="modal-inner">
+      <h2 className="modal-title">Редактировать провайдер</h2>
+      <p className="modal-subtitle">{provider.type}</p>
+      <div className="modal-body">
+        <div className="settings-field">
+          <label>Название</label>
+          <input type="text" className="settings-input" value={name}
+            onChange={e => setName(e.target.value)} />
+        </div>
+        <div className="settings-field">
+          <label>Base URL</label>
+          <input type="text" className="settings-input" value={baseUrl}
+            onChange={e => setBaseUrl(e.target.value)} />
+        </div>
+        <div className="settings-field">
+          <label>Модели (через запятую)</label>
+          <input type="text" className="settings-input" value={model}
+            onChange={e => setModel(e.target.value)} />
+        </div>
+        <div className="settings-field">
+          <label>API Key (оставь пустым без изменений)</label>
           <input type="password" className="settings-input" placeholder="sk-..."
             value={apiKey} onChange={e => setApiKey(e.target.value)} />
         </div>
@@ -1157,6 +1964,24 @@ function AddChannelModal({ onClose }: { onClose: () => void }) {
         <button className="settings-btn-secondary" onClick={onClose}>Отмена</button>
         <button className="settings-btn-primary" onClick={onClose}>Сохранить</button>
       </div>
+    </div>
+  )
+}
+
+// ─── Skills Section ──────────────────────────────────────────
+
+function SkillsSection() {
+  return (
+    <div className="settings-sections">
+      <section className="settings-card">
+        <h2 className="settings-card-title">🧠 Скиллы системы</h2>
+        <p style={{ color: 'var(--gray-500)', fontSize: '14px', lineHeight: '1.6' }}>
+          База скиллов — подходы, шаблоны и процедуры, которые система использует для решения задач.
+        </p>
+        <div style={{ marginTop: '16px', padding: '12px', background: 'var(--gray-900)', borderRadius: '8px', border: '1px solid var(--gray-800)' }}>
+          <span style={{ color: 'var(--gray-400)', fontSize: '13px' }}>🚧 В разработке — здесь будет список скиллов с возможностью добавления, редактирования и привязки к агентам</span>
+        </div>
+      </section>
     </div>
   )
 }

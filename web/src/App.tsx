@@ -6,7 +6,28 @@ import { EmojiPicker } from './components/EmojiPicker'
 import { SettingsPage } from './components/SettingsPage'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:2088'
-const DEFAULT_MODEL = 'general-agent'
+
+interface AgentConfig {
+  slug: string
+  agentid: string
+  name: string
+  role: string
+  role_name: string
+  department: string
+  department_name: string
+  model: string
+  provider: string | null
+  system_prompt: string
+  description: string
+  tone: string
+  style: string
+  traits: string[]
+  temperature: number
+  max_tokens: number
+  enabled: boolean
+  is_external?: boolean
+  type?: string
+}
 
 interface Message {
   id: string
@@ -14,6 +35,7 @@ interface Message {
   content: string
   timestamp: Date
   model?: string
+  agent_name?: string
   usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number }
 }
 
@@ -29,6 +51,9 @@ function App() {
   const [sidebarReady, setSidebarReady] = useState(false)
   const [logoVisible, setLogoVisible] = useState(false)
   const [revealedMeta, setRevealedMeta] = useState<Set<string>>(new Set())
+  const [activeAgent, setActiveAgent] = useState<AgentConfig | null>(null)
+  const [availableAgents, setAvailableAgents] = useState<AgentConfig[]>([])
+  const [agentSelectorOpen, setAgentSelectorOpen] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -65,6 +90,34 @@ function App() {
       setSidebarReady(true)
       return () => clearTimeout(logoTimer)
     }
+  }, [])
+
+  // Load available agents (both SynPin and external)
+  useEffect(() => {
+    const loadAgents = async () => {
+      try {
+        // Load SynPin agents
+        const agentsRes = await fetch(`${API_BASE}/api/agents`)
+        const agentsData = await agentsRes.json()
+        const synpinAgents = (agentsData.agents || []).map((a: AgentConfig) => ({ ...a, is_external: false }))
+
+        // Load external agents
+        const extRes = await fetch(`${API_BASE}/api/external-agents`)
+        const extData = await extRes.json()
+        const extAgents = (extData.agents || []).filter((a: AgentConfig) => a.enabled)
+
+        const allAgents = [...synpinAgents, ...extAgents]
+        setAvailableAgents(allAgents)
+
+        // Set default active agent (first enabled one)
+        if (allAgents.length > 0 && !activeAgent) {
+          setActiveAgent(allAgents[0])
+        }
+      } catch (e) {
+        console.error('[agents] load error:', e)
+      }
+    }
+    loadAgents()
   }, [])
 
   useEffect(() => {
@@ -112,13 +165,51 @@ function App() {
       // Build history including the new user message
       const history = [...messages.map(m => ({ role: m.role, content: m.content })), { role: 'user' as const, content: userInput }]
 
-      const response = await fetch(`${API_BASE}/api/chat/stream`, {
+      // Build merged system prompt from agent config
+      let systemPrompt: string | undefined
+      let agentName: string | undefined
+      let model = 'general-agent'
+      let temperature = 0.7
+      let maxTokens: number | undefined
+      let chatEndpoint = `${API_BASE}/api/chat/stream`
+
+      if (activeAgent) {
+        agentName = activeAgent.name
+        temperature = activeAgent.temperature || 0.7
+        maxTokens = activeAgent.max_tokens
+
+        // Route to Hermes endpoint if external agent
+        if (activeAgent.is_external && activeAgent.type === 'hermes') {
+          chatEndpoint = `${API_BASE}/api/chat/hermes/stream`
+          // Hermes uses its own system prompt handling
+        } else {
+          // SynPin agent — build system prompt
+          model = activeAgent.model
+          const parts: string[] = []
+          if (activeAgent.name) parts.push(`Имя: ${activeAgent.name}`)
+          if (activeAgent.description) parts.push(activeAgent.description)
+          if (activeAgent.role_name) parts.push(`Роль: ${activeAgent.role_name}`)
+          if (activeAgent.department_name) parts.push(`Департамент: ${activeAgent.department_name}`)
+          if (activeAgent.system_prompt) parts.push(activeAgent.system_prompt)
+          if (activeAgent.tone) parts.push(`Тон общения: ${activeAgent.tone}`)
+          if (activeAgent.style) parts.push(`Стиль ответов: ${activeAgent.style}`)
+          if (activeAgent.traits && activeAgent.traits.length > 0) parts.push(`Характеристики: ${activeAgent.traits.join(', ')}`)
+          if (parts.length > 0) systemPrompt = parts.join('\n\n')
+        }
+      }
+
+      const response = await fetch(chatEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userInput,
-          model: 'general-agent',
+          model,
+          provider: activeAgent?.provider || undefined,
           history,
+          system_prompt: systemPrompt,
+          agent_name: agentName,
+          temperature,
+          max_tokens: maxTokens,
         }),
       })
 
@@ -162,9 +253,10 @@ function App() {
           } else if (parsed.type === 'done') {
             const usage = parsed.usage as { prompt_tokens: number; completion_tokens: number; total_tokens: number } | undefined
             const model = parsed.model as string | undefined
+            const agentName = parsed.agent_name as string | undefined
             setMessages(prev =>
               prev.map(m => m.id === assistantId
-                ? { ...m, model: model || DEFAULT_MODEL, usage: usage || undefined }
+                ? { ...m, model: model || 'assistant', agent_name: agentName, usage: usage || undefined }
                 : m
               )
             )
@@ -213,7 +305,13 @@ function App() {
             <span className="meta-dot"> · </span>
           </>
         )}
-        {msg.model && (
+        {msg.agent_name && (
+          <>
+            <span className="meta-badge gold">{msg.agent_name}</span>
+            <span className="meta-dot"> · </span>
+          </>
+        )}
+        {msg.model && msg.model !== msg.agent_name && (
           <>
             <span className="meta-badge">{msg.model}</span>
             <span className="meta-dot"> · </span>
@@ -283,6 +381,52 @@ function App() {
             <span className="new-chat-icon">+</span>
             Новый чат
           </button>
+
+          {/* Agent Selector */}
+          <div className="agent-selector">
+            <button
+              className="agent-selector-trigger"
+              onClick={() => setAgentSelectorOpen(!agentSelectorOpen)}
+            >
+              <span className="agent-selector-avatar" style={{ background: activeAgent?.is_external ? '#f97316' : '#6b7280' }}>
+                {activeAgent?.is_external ? 'H' : activeAgent?.name?.[0] || '?'}
+              </span>
+              <div className="agent-selector-info">
+                <span className="agent-selector-name">{activeAgent?.name || 'Выберите агента'}</span>
+                <span className="agent-selector-role">{activeAgent?.role_name || activeAgent?.type || ''}</span>
+              </div>
+              <svg className={`agent-selector-arrow ${agentSelectorOpen ? 'open' : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+
+            {agentSelectorOpen && (
+              <div className="agent-selector-dropdown">
+                {availableAgents.map(agent => (
+                  <button
+                    key={agent.slug}
+                    className={`agent-selector-item ${activeAgent?.slug === agent.slug ? 'active' : ''}`}
+                    onClick={() => {
+                      setActiveAgent(agent)
+                      setAgentSelectorOpen(false)
+                      setMessages([])
+                    }}
+                  >
+                    <span className="agent-selector-item-avatar" style={{ background: agent.is_external ? '#f97316' : '#6b7280' }}>
+                      {agent.is_external ? 'H' : agent.name[0]}
+                    </span>
+                    <div className="agent-selector-item-info">
+                      <span className="agent-selector-item-name">
+                        {agent.name}
+                        {agent.is_external && <span className="agent-badge extern">extern</span>}
+                      </span>
+                      <span className="agent-selector-item-role">{agent.role_name || agent.type}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <nav className="sidebar-nav">
             <div className="nav-section-title">Сегодня</div>

@@ -1,256 +1,204 @@
 # 🔌 Интеграция внешних агентов
 
-SynPin может подключать **внешние агентские системы** как полноценных агентов в организации.
+SynPin подключает **внешние агентские системы** как полноценных агентов в организации.
 
 ---
 
 ## Концепция
 
-Внешний агент — не просто LLM-провайдер. Это **полноценный агент** со своей:
-- Памятью
-- Навыками
-- Инструментами
-- Личностью
-
-SynPin даёт ему **роль** в организации. Агент сохраняет свою идентичность.
-
 ```
 ┌─────────────────────────────────────────────┐
 │           SynPin Organization                │
 │                                              │
-│  Board of Directors:                         │
-│    ├── architect (director)                  │
-│    └── hermes (director) ← внешний агент    │
-│                                              │
-│  Hermes получает:                            │
-│    ├── Роль от SynPin: director              │
-│    ├── Свою память из Hermes                 │
+│  Все агенты (в UI одним списком):            │
+│    ├── 85n1yo4x (Архитектор) — SynPin       │
+│    ├── 1f39sqld (Разработчик) — SynPin      │
+│    ├── ix13aox3 (QA Инженер) — SynPin       │
+│    └── hermes (Hermes) — внешний ←──────┐   │
+│                                          │   │
+│  Hermes Gateway (localhost:8642) ────────┘   │
+│    ├── Своя память и навыки                  │
 │    ├── Свои инструменты (terminal, file...)  │
-│    └── Доступ к чатам, канбану, форуму       │
+│    └── Доступ к чатам SynPin                 │
 └─────────────────────────────────────────────┘
 ```
+
+Внешний агент — не просто LLM-провайдер. Это **полноценный агент** со своей:
+- Памятью (MEMORY.md, сессии)
+- Навыками (skills)
+- Инструментами (terminal, file, browser...)
+- Личностью
+
+SynPin даёт ему **роль** в организации. Агент сохраняет свою идентичность.
 
 ---
 
 ## Поддерживаемые интеграции
 
-### 1. Hermes Agent (через ACP)
+### Hermes Agent (через HTTP API)
 
-**Протокол:** Agent Client Protocol (ACP) — JSON-RPC через stdio.
+**Протокол:** HTTP API server (порт 8642).
 
 ```yaml
-# ~/.synpin/config/providers.yaml
-providers:
+# ~/.synpin/config/external_agents.yaml
+agents:
   hermes:
-    type: "acp-agent"
-    command: "hermes acp --stdio"
-    agent_id: "hermes-main"
-    role: "director"
+    name: Hermes
+    type: hermes
+    agentid: a1b2c3d4
+    enabled: true
+    role: director
+    department: dev
+    description: 'AI ассистент с полным доступом к инструментам'
+    chat_url: "http://localhost:8642"
+    models:
+      - hermes-agent
 ```
 
-**Что получает:**
-- Память: `~/.hermes/data/MEMORY.md`, `USER.md`
-- Скиллы: `~/.hermes/skills/`
-- Инструменты: terminal, file, web, memory...
-- Личность: из personality.yaml в Hermes
+### Как это работает
 
-**Как работает:**
-```
-SynPin → запускает "hermes acp --stdio" → JSON-RPC → ответы с контекстом Hermes
+1. **Автодетект:** SynPin проверяет доступность `localhost:8642/health`
+2. **Регистрация:** Если Hermes доступен, он добавляется в список агентов
+3. **Чат:** Сообщения проксируются через `POST /api/chat/hermes/stream`
+4. **Метаданные:** В ответе — модель, токены, имя агента
+
+### API Endpoints
+
+| Метод | URL | Описание |
+|---|---|---|
+| `GET` | `/api/external-agents` | Список внешних агентов |
+| `GET` | `/api/external-agents/detect` | Автодетект Hermes |
+| `PUT` | `/api/external-agents/{slug}` | Обновить (включить/выключить, роль, департамент) |
+
+### Чат с Hermes
+
+```bash
+# Через SynPin proxy
+POST /api/chat/hermes/stream
+Content-Type: application/json
+
+{
+  "message": "Привет! Кто ты?",
+  "model": "hermes-agent",
+  "history": [],
+  "temperature": 0.7
+}
 ```
 
-**Статус:** 🟡 Требует разработки коннектора
+**Ответ:** SSE stream с чанками:
+
+```
+data: {"type": "chunk", "content": "Привет! "}
+data: {"type": "chunk", "content": "Я Hermes..."}
+data: {"type": "done", "model": "hermes-agent", "usage": {...}}
+```
 
 ---
 
-### 2. OpenClaw
+## Настройка Hermes
 
-**Протокол:** TBD (исследовать)
+### 1. Установка Hermes Agent
 
-```yaml
-providers:
-  openclaw:
-    type: "external-agent"
-    command: "openclaw agent --stdio"
-    role: "developer"
+```bash
+# Установка
+npm install -g @nousresearch/hermes-agent
+
+# Первичная настройка
+hermes setup
 ```
 
-**Что получает:**
-- Свои навыки и память из OpenClaw
-- Роль developer в SynPin
-- Доступ к канбану и чатам отдела
+### 2. Конфигурация gateway
 
-**Статус:** 🔴 Планируется
+```bash
+# Путь к .env
+C:\Users\<user>\AppData\Local\hermes\.env
+
+# Ключ API (нужен для работы)
+HERMES_API_KEY=sk-...
+```
+
+### 3. Запуск gateway
+
+```bash
+hermes gateway
+# Сервер стартует на :8642
+```
+
+### 4. Проверка доступности
+
+```bash
+curl http://localhost:8642/health
+# {"status": "ok", "version": "..."}
+
+curl http://localhost:8642/v1/models
+# {"data": [{"id": "hermes-agent", ...}]}
+```
 
 ---
 
-### 3. Windsurf / Cursor / Copilot
+## Управление внешними агентами
 
-**Протокол:** TBD (исследовать)
+### Через UI
 
-```yaml
-providers:
-  windsurf:
-    type: "external-agent"
-    command: "windsurf agent --stdio"
-    role: "developer"
+1. **Настройки → AI Агенты**
+2. Секция "External Agents" (появится если Hermes доступен)
+3. Карточка агента с:
+   - Статусом (доступен/недоступен)
+   - Типом (hermes)
+   - Описанием
+4. При наведении — expanded overlay:
+   - Agent ID
+   - Выбор роли (из roles.yaml)
+   - Выбор департамента (из departments.yaml)
+   - Модели
+   - Вкл/выкл
+
+### Через API
+
+```bash
+# Включить агента
+curl -X PUT http://localhost:2088/api/external-agents/hermes \
+  -H "Content-Type: application/json" \
+  -d '{"enabled": true}'
+
+# Сменить роль
+curl -X PUT http://localhost:2088/api/external-agents/hermes \
+  -H "Content-Type: application/json" \
+  -d '{"role": "t0wy3h5qcd9m"}'
 ```
-
-**Статус:** 🔴 Планируется
 
 ---
 
 ## Архитектура интеграции
 
-### Внешний агент vs Внутренний агент
-
-| | Внутренний агент | Внешний агент |
-|---|---|---|
-| **Память** | `~/.synpin/data/agents/` | Своя система (Hermes, OpenClaw...) |
-| **Скиллы** | `~/.synpin/skills/` | Свои скиллы + SynPin |
-| **Инструменты** | SynPin tools | Свои tools + SynPin tools |
-| **Личность** | personality.yaml в SynPin | Своя личность + роль от SynPin |
-| **Контекст** | Channel context | Channel context + свой контекст |
-
-### Коннектор
-
-```python
-# core/integrations/acp_connector.py
-
-class ACPConnector:
-    """Подключается к внешнему агенту через ACP."""
-    
-    def __init__(self, config: dict):
-        self.command = config["command"]
-        self.agent_id = config["agent_id"]
-        self.role = config["role"]
-        self.process = None
-    
-    async def connect(self):
-        """Запускает внешний агент как subprocess."""
-        self.process = await asyncio.create_subprocess_exec(
-            *shlex.split(self.command),
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=sys.stderr
-        )
-    
-    async def send_message(self, message: str, context: dict) -> str:
-        """Отправляет сообщение внешнему агенту."""
-        # JSON-RPC запрос
-        request = {
-            "jsonrpc": "2.0",
-            "method": "prompt",
-            "params": {
-                "message": message,
-                "context": context,  # роль, канал, задачи
-            },
-            "id": 1
-        }
-        # Отправка и получение ответа
-        ...
-    
-    async def disconnect(self):
-        """Завершает подключение."""
-        if self.process:
-            self.process.terminate()
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│   Frontend   │────▶│  SynPin API  │────▶│    Hermes    │
+│  (React/Vite)│     │  (FastAPI)   │     │  Gateway     │
+│              │     │              │     │  (:8642)     │
+│  Chat Page   │     │  /api/chat/  │     │  /v1/chat/   │
+│  Agent Select│     │  hermes/     │     │  completions │
+│              │     │  stream      │     │              │
+└──────────────┘     └──────────────┘     └──────────────┘
 ```
 
-### Регистрация внешнего агента
+### Поток сообщения
 
-```yaml
-# ~/.synpin/data/agents/hermes/personality.yaml
-
-name: "Гермес"
-codename: "hermes"
-source: "external"          #标记为 внешний агент
-integration: "acp"
-
-# Роль от SynPin
-role: "director"
-
-# Своя личность (дополнение к Hermes)
-character:
-  type: "прагматик"
-
-# Инструменты (двойные)
-tools:
-  hermes:                   # свои инструменты
-    - terminal
-    - file
-    - web
-    - memory
-  synpin:                   # инструменты SynPin
-    - read_file
-    - search_files
-    - synpin_chat
-    - synpin_kanban
-```
-
----
-
-## Поток интеграции
-
-```
-1. SynPin запускает внешний агент через коннектор
-   ↓
-2. Внешний агент загружает свою память и навыки
-   ↓
-3. SynPin передаёт роль, канал, контекст
-   ↓
-4. Агент работает как полноценный участник:
-   - Получает задачи
-   - Общается в канале
-   - Делегирует
-   - Пишет в свою память
-   ↓
-5. Результаты видны в SynPin (канбан, лента, форум)
-```
-
----
-
-## Преимущества
-
-| Преимущество | Описание |
-|---|---|
-| **Не изобретать велосипед** | Используем готовые агентские системы |
-| **Сохранение идентичности** | Агент не теряет свою память и навыки |
-| **Гибкость** | Разные агенты для разных ролей |
-| **Масштабируемость** | Подключаем сколько угодно внешних агентов |
-
----
-
-## Ограничения
-
-| Ограничение | Описание |
-|---|---|
-| **Зависимость** | Если внешний агент упал — агент в SynPin не работает |
-| **Синхронизация памяти** | Два хранилища (Hermes + SynPin) нужно синхронизировать |
-| **Конфликт инструментов** | Одинаковые инструменты в обеих системах |
-| **Безопасность** | Внешний агент имеет доступ к файловой системе |
-
----
-
-## Roadmap
-
-| Этап | Что | Статус |
-|---|---|---|
-| 1. Исследование ACP протокола | Изучить документацию Hermes | ✅ Готово |
-| 2. Коннектор к ACP | Написать ACPConnector | 🔴 TODO |
-| 3. Регистрация внешнего агента | personality.yaml + role | 🔴 TODO |
-| 4. Двойные инструменты | Hermes + SynPin tools | 🔴 TODO |
-| 5. Синхронизация памяти | Memory bridge | 🔴 TODO |
-| 6. Интеграция OpenClaw | Исследовать протокол | 🔴 Планируется |
-| 7. Интеграция Windsurf | Исследовать протокол | 🔴 Планируется |
+1. Пользователь пишет сообщение в чат
+2. Frontend определяет активного агента
+3. Если агент внешний → `POST /api/chat/hermes/stream`
+4. SynPin API проксирует запрос в Hermes Gateway
+5. Hermes обрабатывает и стримит ответ
+6. Frontend отображает ответ в реальном времени
 
 ---
 
 ## Связь с другими документами
 
-- [Агенты](agents.md) — личность, роли, директивы
-- [Инструменты](tools.md) — что умеют агенты
-- [Конфигурация](configuration.md) — провайдеры
+- [Агенты](agents.md) — структура агентов и API
+- [Конфигурация](configuration.md) — YAML-конфиги
+- [Каналы и иерархия](channels-hierarchy.md) — организация команды
 
 ---
 
-*Внешний агент — не инструмент. Это коллега из другой компании, который пришёл работать в твою организацию.*
+*Внешние агенты — это не замена, а расширение. SynPin даёт роль, агент — экспертизу.*

@@ -52,6 +52,18 @@ app.include_router(chat_router.router)
 from .providers_router import router as providers_router
 app.include_router(providers_router)
 
+# Agents config management API
+from .agents_router import router as agents_router
+app.include_router(agents_router)
+
+# External agents detection and management API
+from .external_agents_router import router as external_agents_router
+app.include_router(external_agents_router)
+
+# Hermes Agent chat proxy
+from .hermes_chat_router import router as hermes_chat_router
+app.include_router(hermes_chat_router)
+
 
 @app.get("/api/health")
 def health():

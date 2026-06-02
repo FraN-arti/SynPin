@@ -324,17 +324,65 @@ synpin session start --type retrospective  # начать retrospective
 
 ---
 
-## Расширенная память (опционально)
+## Поиск по памяти (FTS5 — по умолчанию)
 
-Когда администратор подключит — добавится поверх базовой:
+Поиск по сессиям, MEMORY.md, задачам и форуму реализован на **SQLite FTS5** — полнотекстовый поиск без LLM.
+
+### Почему FTS5
+
+| Параметр | Значение |
+|---|---|
+| Скорость | Мгновенно (4500× быстрее LLM-поиска) |
+| Зависимости | Нулевые — SQLite встроен в Python |
+| Формат | Один файл `.db` — portable |
+| Стоимость | Бесплатно, локально |
+
+### Что индексируется
+
+- Сессии агентов (`sessions/*.md`)
+- MEMORY.md всех агентов
+- Shared MEMORY.md
+- Канбан-задачи (`data/tasks/*.yaml`)
+- Форум-посты
+
+### Операторы поиска
+
+```
+python AND fastapi          # оба термина
+"exact phrase"              # точная фраза
+auth OR login               # любой термин
+deploy*                     # wildcard (deploy, deployment, deployed)
+python NOT java             # исключение
+```
+
+### Пример API
+
+```python
+from core.search import SearchIndex
+
+idx = SearchIndex(db_path="~/.synpin/data/search.db")
+
+# Индексация
+idx.index_session("architect", "2025-06-01_api-design.md", content)
+idx.index_memory("architect", memory_md_content)
+idx.index_task("TASK-001", "Реализовать auth", tags=["backend", "security"])
+
+# Поиск
+results = idx.search("auth middleware", limit=10)
+# → [{file, agent, score, snippet, type}, ...]
+```
+
+### Расширенная память (опционально)
+
+Поверх FTS5 можно подключить векторный поиск:
 
 | Тип | Описание |
 |---|---|
 | **ChromaDB** | Векторный поиск по памяти |
 | **Embedding** | Семантический поиск (`all-MiniLM-L6-v2` и др.) |
-| **Semantic search** | «Найди похожие ошибки» |
+| **Semantic search** | «Найди похожие ошибки» по смыслу, не по ключевым словам |
 
-Базовая память (Markdown) работает всегда. Расширенная — опция.
+Базовый поиск (FTS5) работает всегда. Векторный — опция.
 
 ---
 

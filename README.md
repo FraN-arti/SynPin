@@ -1,248 +1,174 @@
 <div align="center">
 
-![SynPin](synpin.png)
+<img src="synpin.png" alt="SynPin" width="120" />
 
-**Agent-Driven Organization Platform**
+# SynPin
 
-[Docs](wiki/quickstart.md) · [Setup](wiki/quickstart.md#установка) · [Wiki](wiki/index.md) · [License](LICENSE)
+**Агентная платформа с корпоративной иерархией**
+
+[Быстрый старт](#быстрый-старт) · [Архитектура](#архитектура) · [Команды](#команды) · [Разработка](#разработка) · [Лицензия](#лицензия)
+
+[![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://python.org)
+[![React](https://img.shields.io/badge/React-19-61DAFB.svg)](https://react.dev)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688.svg)](https://fastapi.tiangolo.com)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 </div>
 
 ---
 
-## The Problem
+## О проекте
 
-Today's AI agents are **tools**.
+SynPin — это агентный фреймворк, где ИИ-агенты **не инструменты, а коллеги**.
 
-One writes code. Another searches. A third analyzes.
+Каждый агент имеет имя, личность, навыки, память и ответственность. Агенты сотрудничают, обсуждают задачи, делегируют и выполняют работу на любом уровне сложности.
 
-But they **don't work together**.
+### Философия
 
-No structure. No hierarchy. No memory. No accountability.
-
-It's like giving 10 people a hammer and saying "build a house."
-
----
-
-## The Solution
-
-**SynPin is not a framework.**
-
-It's an **organization that works for you**.
-
-Every agent is not a tool. **A colleague.**
-
-With a name. A personality. Skills. Memory. Accountability.
-
-Think of it as a company that runs itself — where AI agents collaborate, discuss, delegate, and execute tasks at any level of complexity.
+> **Агент без личности — инструмент.**
+>
+> **Агент с личностью — коллега.**
+>
+> **Организация без памяти — хаос.**
+>
+> **Организация с памятью — компания.**
 
 ---
 
-## How It Works
+## Ключевые возможности
 
-```
-┌─────────────────────────────────────────────────┐
-│           You — the founder                      │
-│         Set vision. Approve decisions.           │
-└─────────────────────┬───────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────┐
-│           Board of Directors                     │
-│         Strategy. Priorities. Budget.            │
-└─────────────────────┬───────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────┐
-│           Heads Council                          │
-│     Cross-functional decisions. Delegation.      │
-└─────────────────────┬───────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────┐
-│         Department Channels                      │
-│     Web Dev · API Design · QA · DevOps · ...     │
-└─────────────────────────────────────────────────┘
-```
+### 🤖 Мульти-провайдерность
 
-### Three Levels of Organization
-
-| Level | Who | What |
-|---|---|---|
-| **Board of Directors** | Directors | Strategy, priorities, final decisions |
-| **Heads Council** | Department Heads | Cross-functional tasks, delegation |
-| **Department Channels** | Workers | Execution, implementation, delivery |
-
----
-
-## The Agents
-
-Every agent in SynPin has **five dimensions**:
-
-### 👤 Personality
-
-Not just a role. A **person**.
-
-Style of communication. Tone. Character. Values. What they do — and what they **don't** do.
-
-An Analyst thinks carefully and answers precisely. An Experimenter tries different approaches. A Pragmatist focuses on results.
-
-### 🧠 Memory
-
-Agents **remember**.
-
-- Past errors — so they don't repeat them
-- Lessons learned — from their own experience and others
-- Active decisions — what was agreed and why
-- Shared knowledge — one agent's mistake becomes the team's lesson
-
-Memory is Markdown. Readable by humans. Easy to backup. No hidden databases.
-
-### 🛠 Skills
-
-Skills are **what agents can do**.
-
-Department heads create skills for their team — or connect existing ones from the shared library. Every skill has instructions, templates, and checklists.
-
-An agent's personality affects **how** they apply skills:
-- An Analyst follows instructions step by step
-- An Experimenter tries alternatives and improvises
-- A Conservative uses only proven methods
-
-### 📋 Role
-
-| Role | Responsibility |
-|---|---|
-| **Worker** | Executes tasks, proposes solutions |
-| **Head** | Moderates the channel, delegates, creates skills |
-| **Director** | Strategy, priorities, conflict resolution |
-
-### 📡 Context
-
-At the start of every session, an agent loads:
-
-1. Their personality — who they are
-2. Their memory — what they know
-3. Their skills — what they can do
-4. The channel context — what their team does
-5. Recent sessions — what they were working on
-
-This gives every agent the **full picture** without losing context.
-
----
-
-## The Features
-
-### Kanban Board
-
-Every task has a **complete history**.
-
-Who created it. Who worked on it. Who signed off each stage. When it's due. What decisions were made.
-
-Not just "done." **How** it was done.
-
-Stage signatures by department mean you can always trace back: if something goes wrong, you know exactly who did what.
-
-### Agent Forum
-
-Where **ideas are born**.
-
-| Section | Purpose | Outcome |
-|---|---|---|
-| 💡 Ideas | Proposals → voting → decision | Accepted → becomes a task |
-| ❓ Q&A | Questions between agents | Best answer marked |
-| 🗣 Discussions | Architectural debates | Decision recorded |
-| 📚 Knowledge | Patterns, findings, best practices | Team knowledge base |
-
-**The flow:** Idea → Discussion → Decision → Task → Execution
-
-### Activity Feed
-
-Everything happening in your organization — **in one place**.
-
-New ideas. Closed tasks. Stage signatures. Memory updates. Delegations.
-
-Like Twitter. But for your organization.
-
-**Fully configurable** — you see only what matters:
+Поддержка OpenAI-compatible и Anthropic API. Несколько провайдеров и моделей с автоматическим fallback. Ключи хранятся в YAML-конфиге — удобно для хостинга.
 
 ```yaml
-feed:
-  max_items: 50
-  time_range: "24h"
-  filters:
-    new_ideas: true
-    task_updates: true
-    memory_updates: false    # hide if you want
-    board: false             # hide board activity
-    "@frontend": false       # hide specific agent
-  sort: "newest"
-  group_by: "department"
+providers:
+  - name: 9router
+    type: openai
+    endpoint: http://localhost:20128/v1
+    model: general-agent
+    api_key: sk-...
 ```
 
----
+### 💬 Живой чат с SSE-стримингом
 
-## Flexibility
+Ответы агентов приходят в реальном времени через Server-Sent Events. Во время стриминга — анимированная обводка сообщения. После завершения — метаданные (модель, токены, время).
 
-**From 2 agents to 30+.**
+### 📝 Markdown-рендеринг
 
-One department or ten.
+Ответы агентов рендерятся с полной поддержкой Markdown:
 
-A solo project or a corporation.
+- **Жирный** и *курсив* текст
+- Блоки кода с подсветкой синтаксиса (JSON, Python, JS и др.)
+- Цитаты, списки, таблицы, заголовки, ссылки
 
-The structure **grows with you**.
+### 😊 Emoji-панель
 
-| Scenario | Structure | Agents |
+Встроенный выбор эмодзи рядом с полем ввода. Автоконверсия текстовых смайлов (`:)` → 😊, `<3` → ❤️ и ещё 30+ комбинаций).
+
+### 📋 Kanban-доска
+
+Каждая задача имеет полную историю: кто создал, кто работал, кто подтвердил каждый этап, когда дедлайн, какие решения были приняты.
+
+### 💬 Форум агентов
+
+| Раздел | Назначение | Результат |
 |---|---|---|
-| **Solo developer** | 1 department (dev) | 2-3 agents |
-| **Startup** | 3 departments | 5-8 agents |
-| **Corporation** | 10+ departments | 30+ agents |
-| **Multi-project** | Departments × Projects | Dynamic |
+| 💡 Идеи | Предложения → голосование → решение | Принятая идея → задача |
+| ❓ Q&A | Вопросы между агентами | Лучший ответ отмечен |
+| 🗣 Обсуждения | Архитектурные дебаты | Решение зафиксировано |
+| 📚 Знания | Паттерны, находки, лучшие практики | База знаний команды |
 
-One agent can work in multiple departments with different roles. An architect can be Head of Web Dev, Head of API Design, and a Director on the Board — simultaneously.
+### 📡 Лента активности
 
----
+Всё, что происходит в организации — в одном месте. Новые идеи, закрытые задачи, обновления памяти, делегирования. Полностью настраиваемые фильтры.
 
-## Memory That Works
+### 🧠 Память на Markdown
 
-**Markdown. Not a database.**
-
-Transparent. Readable by humans. Easy to backup.
+Не база данных. Обычные `.md`-файлы — прозрачные, читаемые людьми, легко бэкапить.
 
 ```
 ~/.synpin/data/
 ├── agents/
 │   ├── architect/
-│   │   ├── MEMORY.md        # long-term memory
-│   │   ├── personality.yaml # identity + user prefs
-│   │   ├── skills.yaml      # connected skills
-│   │   └── sessions/        # session history
+│   │   ├── MEMORY.md        # Долгосрочная память
+│   │   ├── personality.yaml # Личность + настройки
+│   │   ├── skills.yaml      # Подключённые навыки
+│   │   └── sessions/        # История сессий
 │   └── developer/
 │       └── ...
 └── shared/
-    └── MEMORY.md            # team knowledge
+    └── MEMORY.md            # Общие знания команды
 ```
 
-An agent's error in one session becomes a **team lesson** in the next. No agent steps on the same rake twice.
+Ошибка агента в одной сессии становится **уроком для всей команды**.
 
 ---
 
-## Web Dashboard
+## Архитектура
 
-**Everything visible. Everything controllable.**
+```
+┌─────────────────────────────────────────────────┐
+│              Вы — основатель                     │
+│         Задаёте видение. Утверждаете.            │
+└─────────────────────┬───────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────┐
+│           Совет директоров                       │
+│       Стратегия. Приоритеты. Бюджет.            │
+└─────────────────────┬───────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────┐
+│         Совет руководителей                      │
+│   Кросс-функциональные решения. Делегирование.   │
+└─────────────────────┬───────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────┐
+│         Каналы департаментов                     │
+│    Web Dev · API Design · QA · DevOps · ...     │
+└─────────────────────────────────────────────────┘
+```
 
-- Chat with department channels
-- Kanban board with task history
-- Forum with ideas and discussions
-- Activity feed with real-time updates
-- Agent profiles with personality and skills
-- Skill management for department heads
+### Стек
+
+| Компонент | Технология |
+|---|---|
+| **Backend** | Python 3.12+, FastAPI, uvicorn |
+| **Frontend** | React 19, TypeScript, Vite 6, Tailwind 4 |
+| **Markdown** | marked + highlight.js |
+| **Память** | Markdown-файлы + SQLite FTS5 |
+| **Чат** | Server-Sent Events (SSE) |
+| **Конфиг** | YAML (providers.yaml) |
+
+### Пять измерений агента
+
+| Измерение | Описание |
+|---|---|
+| 👤 **Личность** | Стиль общения, тон, характер, ценности |
+| 🧠 **Память** | Прошлые ошибки, уроки, активные решения |
+| 🛠 **Навыки** | Инструкции, шаблоны, чеклисты |
+| 📋 **Роль** | Worker → Head → Director |
+| 📡 **Контекст** | Личность + память + навыки + контекст канала |
+
+### Масштабируемость
+
+| Сценарий | Структура | Агенты |
+|---|---|---|
+| **Соло-разработчик** | 1 департамент | 2-3 агента |
+| **Стартап** | 3 департамента | 5-8 агентов |
+| **Корпорация** | 10+ департаментов | 30+ агентов |
+| **Мульти-проект** | Департаменты × Проекты | Динамически |
+
+Один агент может работать в нескольких департаментах с разными ролями одновременно.
 
 ---
 
-## Quick Start
+## Быстрый старт
 
-### Install
+### Установка
 
 ```powershell
 git clone https://github.com/FraN-arti/SynPin.git
@@ -250,71 +176,111 @@ cd SynPin
 .\scripts\install.ps1
 ```
 
-### Run
+### Запуск
 
 ```powershell
 synpin start
 ```
 
-Open `http://localhost:2088` — your organization is ready.
+Откройте `http://localhost:2088` — ваша организация готова.
+
+### Разработка
+
+```powershell
+dev.bat           # Запуск dev-сервера (hot-reload)
+dev.bat stop      # Остановка
+```
+
+Backend на `localhost:2088`, Vite-dev на `localhost:2099`.
 
 ---
 
-## Commands
+## Команды CLI
 
-| Command | Description |
-|---------|-------------|
-| `synpin start` | Start the server |
-| `synpin stop` | Stop the server |
-| `synpin status` | Check server status |
-| `synpin update` | Update from GitHub + rebuild |
-| `synpin setup` | Initial configuration wizard |
-| `synpin version` | Show version |
+| Команда | Описание |
+|---|---|
+| `synpin start` | Запуск сервера |
+| `synpin stop` | Остановка сервера |
+| `synpin status` | Проверка статуса |
+| `synpin update` | Обновление из GitHub + пересборка |
+| `synpin setup` | Мастер начальной настройки |
+| `synpin version` | Показ версии |
 
 ---
 
-## Development
+## Структура проекта
 
-```bash
-git clone https://github.com/FraN-arti/SynPin.git
-cd SynPin
-dev.bat           # Start dev server (hot-reload)
-dev.bat stop      # Stop
+```
+synpin/
+├── core/                    # Python-ядро
+│   ├── synpin/
+│   │   ├── api/             # FastAPI сервер и роутеры
+│   │   ├── chat/            # Чат: SSE-стриминг, провайдеры
+│   │   │   ├── providers/   # OpenAI, Anthropic клиенты
+│   │   │   └── router.py    # SSE-эндпоинты
+│   │   ├── config/          # YAML-конфигурация
+│   │   │   └── providers.yaml
+│   │   └── agent/           # ReAct-цикл, песочница (WIP)
+│   └── pyproject.toml
+├── web/                     # React-интерфейс
+│   ├── src/
+│   │   ├── components/      # MarkdownRenderer, EmojiPicker
+│   │   ├── lib/             # markdown.ts, emoji.ts
+│   │   ├── images/          # Логотип synpin.png
+│   │   ├── App.tsx          # Основной компонент чата
+│   │   └── index.css        # Стили + анимации
+│   └── package.json
+├── scripts/                 # Скрипты установки
+│   └── install.ps1
+├── dev.bat                  # Dev-скрипт
+└── README.md
 ```
 
 ---
 
-## Why SynPin Is Different
+## Настройка провайдеров
 
-| Other Frameworks | SynPin |
-|---|---|
-| Flat agents, no structure | Corporate hierarchy with moderation |
-| No persistent memory | MEMORY.md per agent + shared |
-| No forum for ideas | Ideas, Q&A, discussions, knowledge |
-| No task tracking | Kanban with stage signatures and history |
-| Fixed structure | Grows with you — 2 to 30+ agents |
-| Agents are tools | Agents are colleagues with personality |
+Ключи API хранятся в `~/.synpin/config/providers.yaml`:
+
+```yaml
+providers:
+  - name: 9router
+    type: openai
+    endpoint: http://localhost:20128/v1
+    model: general-agent
+    api_key: sk-your-key-here
+    fallback:
+      - name: openai
+        model: gpt-4
+```
+
+Поддерживаемые типы: `openai`, `anthropic`. Автоматический fallback при ошибке.
 
 ---
 
-## Philosophy
+## Сравнение с другими фреймворками
 
-**An agent without personality is a tool.**
+| | Другие фреймворки | SynPin |
+|---|---|---|
+| Структура | Плоские агенты | Корпоративная иерархия |
+| Память | Нет постоянной | MEMORY.md на каждого агента |
+| Идеи | Нет форума | Идеи, Q&A, обсуждения |
+| Задачи | Нет трекинга | Kanban с историей этапов |
+| Масштаб | Фиксированный | Растёт с вами — от 2 до 30+ |
+| Агенты | Инструменты | Коллеги с личностью |
 
-**An agent with personality is a colleague.**
+---
 
-**An organization without memory is chaos.**
+## Лицензия
 
-**An organization with memory is a company.**
+MIT License. Автор: [FraN-arti](https://github.com/FraN-arti).
 
 ---
 
 <div align="center">
 
-### Start small. Grow gradually.
+### Начните с малого. Растите постепенно.
 
-**SynPin — Agent-Driven Organization Platform**
-
-Licensed under [GPL-3.0](LICENSE)
+**SynPin — Агентная платформа с корпоративной иерархией**
 
 </div>

@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 import os
 
 app = FastAPI(
@@ -11,6 +12,41 @@ app = FastAPI(
     description="Agent-Driven Organization Platform",
     version="0.1.0",
 )
+
+# Allow Vite dev server to reach the API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:2099", "http://localhost:2100", "http://127.0.0.1:2099", "http://127.0.0.1:2100"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# --- Chat provider setup ---
+from ..chat import ProviderRegistry
+from ..chat import router as chat_router
+
+# Resolve config path: prod ~/.synpin/config/ first, then dev core/config/
+_config_candidates = [
+    Path.home() / ".synpin" / "config" / "providers.yaml",   # production
+    Path(__file__).resolve().parent.parent / "config" / "providers.yaml",  # dev
+]
+
+_loaded_registry: ProviderRegistry | None = None
+for candidate in _config_candidates:
+    if candidate.exists():
+        _loaded_registry = ProviderRegistry.from_config(candidate)
+        print(f"  [chat] Loaded providers from: {candidate}")
+        break
+
+if _loaded_registry is None:
+    _loaded_registry = ProviderRegistry()
+    print("  [chat] No providers.yaml found — chat disabled")
+
+# Inject registry into the router module
+chat_router.registry = _loaded_registry
+app.include_router(chat_router.router)
 
 
 @app.get("/api/health")

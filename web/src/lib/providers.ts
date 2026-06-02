@@ -1,72 +1,98 @@
 // Provider catalog — all supported LLM providers
+// Auth methods synced from 9router (src/shared/constants/providers.js)
 
 export interface ProviderInfo {
   id: string
   name: string
+  key?: string  // YAML key (slug). If not set, derived from name
+  iconFile?: string  // PNG filename in /providers/ (without extension)
   type: 'openai' | 'openai-compatible' | 'anthropic'
-  icon: string
   category: 'oauth' | 'free-tier' | 'api-key'
+  authMethod: 'oauth' | 'apikey' | 'no-auth'  // how auth works
+  oauthDisabled?: boolean  // true = OAuth not yet implemented, show dimmed
   baseUrl: string
-  defaultModels: string[]
+  defaultModels?: string[]  // pre-filled models (empty for providers that fetch dynamically)
+  availableModels?: string[]  // models for clickable chips
   description?: string
+  apiKeyHint?: string  // placeholder hint for API key field (e.g. "sk-...")
+}
+
+/** Get the YAML key (slug) for a catalog provider */
+export function providerKey(p: ProviderInfo): string {
+  return p.key || p.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+}
+
+/** Get icon URL for a provider — returns path to /providers/{icon}.png or null */
+export function providerIconUrl(p: ProviderInfo): string | null {
+  const file = p.iconFile || providerKey(p)
+  return `/providers/${file}.png`
 }
 
 export const PROVIDER_CATALOG: ProviderInfo[] = [
-  // ─── OAuth Providers ──────────────────────────────────────
-  { id: 'claude-code', name: 'Claude Code', type: 'anthropic', icon: '🟣', category: 'oauth', baseUrl: 'https://api.anthropic.com', defaultModels: ['claude-sonnet-4', 'claude-opus-4'] },
-  { id: 'cursor', name: 'Cursor IDE', type: 'openai-compatible', icon: '⚡', category: 'oauth', baseUrl: 'https://api.cursor.sh', defaultModels: ['claude-3.5-sonnet', 'gpt-4o'] },
-  { id: 'github-copilot', name: 'GitHub Copilot', type: 'openai-compatible', icon: '🐙', category: 'oauth', baseUrl: 'https://api.githubcopilot.com', defaultModels: ['gpt-4o', 'claude-3.5-sonnet'] },
-  { id: 'cline', name: 'Cline', type: 'openai-compatible', icon: '🤖', category: 'oauth', baseUrl: 'https://api.openai.com', defaultModels: ['gpt-4o', 'claude-sonnet-4'] },
-  { id: 'kilo-code', name: 'Kilo Code', type: 'openai-compatible', icon: '🔷', category: 'oauth', baseUrl: 'https://api.openai.com', defaultModels: ['gpt-4o'] },
-  { id: 'openai-codex', name: 'OpenAI Codex', type: 'openai', icon: '🔵', category: 'oauth', baseUrl: 'https://api.openai.com', defaultModels: ['o1', 'o1-mini', 'gpt-4o'] },
-  { id: 'xAI-grok', name: 'xAI (Grok)', type: 'openai-compatible', icon: '✖️', category: 'oauth', baseUrl: 'https://api.x.ai/v1', defaultModels: ['grok-2', 'grok-2-vision'] },
-  { id: 'antigravity', name: 'Antigravity', type: 'openai-compatible', icon: '🪶', category: 'oauth', baseUrl: 'https://api.openai.com', defaultModels: ['gpt-4o'] },
+  // ─── Connected by default ─────────────────────────────────
+  { id: '9router', name: '9Router', key: '9router', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'http://localhost:20128/v1', defaultModels: ['general-agent'], apiKeyHint: '9router-...' },
 
-  // ─── Free Tier Providers ──────────────────────────────────
-  { id: 'kiro-ai', name: 'Kiro AI', type: 'openai-compatible', icon: '🌀', category: 'free-tier', baseUrl: 'https://api.kiro.dev', defaultModels: ['kiro-v1'] },
-  { id: 'gemini-cli', name: 'Gemini CLI', type: 'openai-compatible', icon: '💎', category: 'free-tier', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', defaultModels: ['gemini-2.0-flash', 'gemini-2.5-pro'] },
-  { id: 'qoder', name: 'Qoder', type: 'openai-compatible', icon: '🔶', category: 'free-tier', baseUrl: 'https://api.qoder.com', defaultModels: ['qoder-v1'] },
-  { id: 'opencode-free', name: 'OpenCode Free', type: 'openai-compatible', icon: '🆓', category: 'free-tier', baseUrl: 'https://api.opencode.ai', defaultModels: ['opencode-free'] },
-  { id: 'openrouter', name: 'OpenRouter', type: 'openai-compatible', icon: '🌐', category: 'free-tier', baseUrl: 'https://openrouter.ai/api/v1', defaultModels: ['openai/gpt-4o', 'anthropic/claude-sonnet-4', 'google/gemini-2.5-pro'] },
-  { id: 'nvidia-nim', name: 'NVIDIA NIM', type: 'openai-compatible', icon: '🟢', category: 'free-tier', baseUrl: 'https://integrate.api.nvidia.com/v1', defaultModels: ['meta/llama-3.1-405b', 'mistralai/mixtral-8x22b'] },
-  { id: 'ollama-cloud', name: 'Ollama Cloud', type: 'openai-compatible', icon: '🦙', category: 'free-tier', baseUrl: 'https://ollama.ai/api', defaultModels: ['llama3.1', 'mistral', 'codellama'] },
-  { id: 'vertex-ai', name: 'Vertex AI', type: 'openai-compatible', icon: '🔺', category: 'free-tier', baseUrl: 'https://aiplatform.googleapis.com/v1', defaultModels: ['gemini-2.5-pro', 'claude-sonnet-4'] },
-  { id: 'cloudflare', name: 'Cloudflare', type: 'openai-compatible', icon: '🟠', category: 'free-tier', baseUrl: 'https://api.cloudflare.com/client/v4/accounts', defaultModels: ['@cf/meta/llama-3.1-8b', '@cf/mistral/mistral-7b'] },
-  { id: 'byteplus', name: 'BytePlus ModelArk', type: 'openai-compatible', icon: '🔷', category: 'free-tier', baseUrl: 'https://api.byteplus.com', defaultModels: ['doubao-pro', 'doubao-lite'] },
+  // ─── OAuth Providers (NOT YET IMPLEMENTED — dimmed) ───────
+  // 9router uses OAuth PKCE flow with loopback server for these.
+  // We show them dimmed with "OAuth скоро" until the flow is built.
+  { id: 'claude-code', name: 'Claude Code', key: 'claude-code', iconFile: 'claude', type: 'anthropic', category: 'oauth', authMethod: 'oauth', oauthDisabled: true, baseUrl: 'https://api.anthropic.com', defaultModels: ['claude-sonnet-4', 'claude-opus-4'] },
+  { id: 'cursor', name: 'Cursor IDE', key: 'cursor', type: 'openai-compatible', category: 'oauth', authMethod: 'oauth', oauthDisabled: true, baseUrl: 'https://api.cursor.sh', defaultModels: ['claude-3.5-sonnet', 'gpt-4o'] },
+  { id: 'github-copilot', name: 'GitHub Copilot', key: 'github-copilot', iconFile: 'copilot', type: 'openai-compatible', category: 'oauth', authMethod: 'oauth', oauthDisabled: true, baseUrl: 'https://api.githubcopilot.com', defaultModels: ['gpt-4o', 'claude-3.5-sonnet'] },
+  { id: 'cline', name: 'Cline', key: 'cline', type: 'openai-compatible', category: 'oauth', authMethod: 'oauth', oauthDisabled: true, baseUrl: 'https://api.openai.com', defaultModels: ['gpt-4o', 'claude-sonnet-4'] },
+  { id: 'kilo-code', name: 'Kilo Code', key: 'kilo-code', iconFile: 'kilocode', type: 'openai-compatible', category: 'oauth', authMethod: 'oauth', oauthDisabled: true, baseUrl: 'https://api.openai.com', defaultModels: ['gpt-4o'] },
+  { id: 'openai-codex', name: 'OpenAI Codex', key: 'openai-codex', iconFile: 'codex', type: 'openai', category: 'oauth', authMethod: 'oauth', oauthDisabled: true, baseUrl: 'https://api.openai.com', defaultModels: ['o1', 'o1-mini', 'gpt-4o'] },
+  { id: 'xAI-grok', name: 'xAI (Grok)', key: 'xai-grok', iconFile: 'xai', type: 'openai-compatible', category: 'oauth', authMethod: 'oauth', oauthDisabled: true, baseUrl: 'https://api.x.ai/v1', defaultModels: ['grok-2', 'grok-2-vision'] },
+  { id: 'antigravity', name: 'Antigravity', key: 'antigravity', type: 'openai-compatible', category: 'oauth', authMethod: 'oauth', oauthDisabled: true, baseUrl: 'https://api.openai.com', defaultModels: ['gpt-4o'] },
+
+  // ─── OAuth (discontinued / deprecated by provider) ────────
+  // These used OAuth in 9router but are now deprecated or discontinued.
+  // Kept as dimmed OAuth entries so users know they exist but can't connect yet.
+  { id: 'kiro-ai', name: 'Kiro AI', key: 'kiro-ai', iconFile: 'kiro', type: 'openai-compatible', category: 'oauth', authMethod: 'oauth', oauthDisabled: true, baseUrl: 'https://kiro.amazon.com', defaultModels: ['claude-sonnet-4.5', 'glm-5', 'minimax-m2.5'], description: 'OAuth через AWS Builder ID / Google / GitHub' },
+  { id: 'qoder', name: 'Qoder', key: 'qoder', type: 'openai-compatible', category: 'oauth', authMethod: 'oauth', oauthDisabled: true, baseUrl: 'https://api.qoder.com', defaultModels: ['qoder-v1'], description: 'OAuth discontinued Alibaba (2026-04-15)' },
+  { id: 'gemini-cli', name: 'Gemini CLI', key: 'gemini-cli', iconFile: 'gemini', type: 'openai-compatible', category: 'oauth', authMethod: 'oauth', oauthDisabled: true, baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', defaultModels: ['gemini-2.0-flash', 'gemini-2.5-pro'], description: '⚠️ Risk: банят за использование с не-CLI инструментами' },
+
+  // ─── Free Tier Providers (API Key with free limits) ─────────
+  { id: 'opencode-free', name: 'OpenCode Free', key: 'opencode-free', iconFile: 'opencode', type: 'openai-compatible', category: 'free-tier', authMethod: 'no-auth', baseUrl: 'https://opencode.ai/zen/v1', defaultModels: ['opencode-free'] },
+  { id: 'openrouter', name: 'OpenRouter', key: 'openrouter', type: 'openai-compatible', category: 'free-tier', authMethod: 'apikey', baseUrl: 'https://openrouter.ai/api/v1', defaultModels: ['openai/gpt-4o', 'anthropic/claude-sonnet-4', 'google/gemini-2.5-pro'], apiKeyHint: 'sk-or-...' },
+  { id: 'nvidia-nim', name: 'NVIDIA NIM', key: 'nvidia-nim', iconFile: 'nvidia', type: 'openai-compatible', category: 'free-tier', authMethod: 'apikey', baseUrl: 'https://integrate.api.nvidia.com/v1', defaultModels: ['meta/llama-3.1-405b', 'mistralai/mixtral-8x22b'], apiKeyHint: 'nvapi-...' },
+  { id: 'ollama-cloud', name: 'Ollama Cloud', key: 'ollama-cloud', iconFile: 'ollama', type: 'openai-compatible', category: 'free-tier', authMethod: 'apikey', baseUrl: 'https://ollama.com/api', apiKeyHint: 'Создай на ollama.com → Settings → API Keys', description: 'Ollama Cloud — запуск больших моделей в облаке. Требуется аккаунт и API ключ' },
+  { id: 'vertex-ai', name: 'Vertex AI', key: 'vertex-ai', iconFile: 'vertex', type: 'openai-compatible', category: 'free-tier', authMethod: 'apikey', baseUrl: 'https://aiplatform.googleapis.com/v1', defaultModels: ['gemini-2.5-pro', 'claude-sonnet-4'], apiKeyHint: 'Bearer token...' },
+  { id: 'cloudflare', name: 'Cloudflare AI', key: 'cloudflare', iconFile: 'cloudflare-ai', type: 'openai-compatible', category: 'free-tier', authMethod: 'apikey', baseUrl: 'https://api.cloudflare.com/client/v4/accounts', defaultModels: ['@cf/meta/llama-3.1-8b', '@cf/mistral/mistral-7b'], apiKeyHint: 'Cloudflare API token' },
+  { id: 'byteplus', name: 'BytePlus ModelArk', key: 'byteplus', type: 'openai-compatible', category: 'free-tier', authMethod: 'apikey', baseUrl: 'https://api.byteplus.com/api/v3', defaultModels: ['doubao-pro', 'doubao-lite'], apiKeyHint: 'sk-...' },
 
   // ─── API Key Providers ────────────────────────────────────
-  { id: 'anthropic', name: 'Anthropic', type: 'anthropic', icon: '🟣', category: 'api-key', baseUrl: 'https://api.anthropic.com', defaultModels: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-haiku-3-20240307'] },
-  { id: 'openai', name: 'OpenAI', type: 'openai', icon: '🔵', category: 'api-key', baseUrl: 'https://api.openai.com/v1', defaultModels: ['gpt-4o', 'gpt-4o-mini', 'o1', 'o1-mini', 'o3-mini'] },
-  { id: 'alibaba', name: 'Alibaba', type: 'openai-compatible', icon: '🟠', category: 'api-key', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', defaultModels: ['qwen-max', 'qwen-plus', 'qwen-turbo'] },
-  { id: 'alibaba-intl', name: 'Alibaba Intl', type: 'openai-compatible', icon: '🌏', category: 'api-key', baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1', defaultModels: ['qwen-max', 'qwen-plus'] },
-  { id: 'cerebras', name: 'Cerebras', type: 'openai-compatible', icon: '🧠', category: 'api-key', baseUrl: 'https://api.cerebras.ai/v1', defaultModels: ['llama3.1-8b', 'llama3.1-70b'] },
-  { id: 'azure-openai', name: 'Azure OpenAI', type: 'openai-compatible', icon: '☁️', category: 'api-key', baseUrl: 'https://{resource}.openai.azure.com/openai/deployments/{deployment}', defaultModels: ['gpt-4o', 'gpt-4o-mini'] },
-  { id: 'cohere', name: 'Cohere', type: 'openai-compatible', icon: '🔵', category: 'api-key', baseUrl: 'https://api.cohere.ai/v1', defaultModels: ['command-r-plus', 'command-r'] },
-  { id: 'command-code', name: 'Command Code', type: 'openai-compatible', icon: '⌨️', category: 'api-key', baseUrl: 'https://api.cohere.ai/v1', defaultModels: ['command-r-plus-code'] },
-  { id: 'deepseek', name: 'DeepSeek', type: 'openai-compatible', icon: '🐋', category: 'api-key', baseUrl: 'https://api.deepseek.com/v1', defaultModels: ['deepseek-chat', 'deepseek-coder'] },
-  { id: 'fireworks', name: 'Fireworks AI', type: 'openai-compatible', icon: '🎆', category: 'api-key', baseUrl: 'https://api.fireworks.ai/inference/v1', defaultModels: ['accounts/fireworks/models/llama-v3p1-405b', 'accounts/fireworks/models/mixtral-8x22b'] },
-  { id: 'glm-china', name: 'GLM (China)', type: 'openai-compatible', icon: '🇨🇳', category: 'api-key', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', defaultModels: ['glm-4', 'glm-4v', 'glm-4-flash'] },
-  { id: 'glm-coding', name: 'GLM Coding', type: 'openai-compatible', icon: '💻', category: 'api-key', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', defaultModels: ['codegeex-4', 'glm-4-code'] },
-  { id: 'groq', name: 'Groq', type: 'openai-compatible', icon: '⚡', category: 'api-key', baseUrl: 'https://api.groq.com/openai/v1', defaultModels: ['llama-3.1-70b', 'llama-3.1-8b', 'mixtral-8x7b'] },
-  { id: 'hyperbolic', name: 'Hyperbolic', type: 'openai-compatible', icon: '🔮', category: 'api-key', baseUrl: 'https://api.hyperbolic.xyz/v1', defaultModels: ['meta-llama/Meta-Llama-3.1-405B', 'mistralai/Mixtral-8x22B'] },
-  { id: 'kimi', name: 'Kimi', type: 'openai-compatible', icon: '🌙', category: 'api-key', baseUrl: 'https://api.moonshot.cn/v1', defaultModels: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'] },
-  { id: 'minimax', name: 'Minimax (China)', type: 'openai-compatible', icon: '🎭', category: 'api-key', baseUrl: 'https://api.minimax.chat/v1', defaultModels: ['abab6.5-chat', 'abab6.5s-chat'] },
-  { id: 'minimax-coding', name: 'Minimax Coding', type: 'openai-compatible', icon: '🎭', category: 'api-key', baseUrl: 'https://api.minimax.chat/v1', defaultModels: ['abab6.5-code'] },
-  { id: 'mistral', name: 'Mistral', type: 'openai-compatible', icon: '🌊', category: 'api-key', baseUrl: 'https://api.mistral.ai/v1', defaultModels: ['mistral-large-latest', 'mistral-small-latest', 'codestral-latest'] },
-  { id: 'nebius', name: 'Nebius AI', type: 'openai-compatible', icon: '☁️', category: 'api-key', baseUrl: 'https://api.studio.nebius.ai/v1', defaultModels: ['llama-3.1-405b', 'mistral-large'] },
-  { id: 'ollama-local', name: 'Ollama Local', type: 'openai-compatible', icon: '🦙', category: 'api-key', baseUrl: 'http://localhost:11434/v1', defaultModels: ['llama3.1', 'mistral', 'codellama', 'deepseek-coder'] },
-  { id: 'perplexity', name: 'Perplexity', type: 'openai-compatible', icon: '🔍', category: 'api-key', baseUrl: 'https://api.perplexity.ai', defaultModels: ['sonar-pro', 'sonar', 'llama-3.1-sonar-large'] },
-  { id: 'siliconflow', name: 'SiliconFlow', type: 'openai-compatible', icon: '🔬', category: 'api-key', baseUrl: 'https://api.siliconflow.cn/v1', defaultModels: ['Qwen/Qwen2.5-72B-Instruct', 'deepseek-ai/DeepSeek-V3'] },
-  { id: 'together', name: 'Together AI', type: 'openai-compatible', icon: '🤝', category: 'api-key', baseUrl: 'https://api.together.xyz/v1', defaultModels: ['meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo', 'mistralai/Mixtral-8x22B-Instruct-v0.1'] },
-  { id: 'vercel', name: 'Vercel AI Gateway', type: 'openai-compatible', icon: '▲', category: 'api-key', baseUrl: 'https://gateway.vercel.com', defaultModels: ['openai/gpt-4o', 'anthropic/claude-sonnet-4'] },
-  { id: 'vertex-partner', name: 'Vertex Partner', type: 'openai-compatible', icon: '🔺', category: 'api-key', baseUrl: 'https://aiplatform.googleapis.com/v1', defaultModels: ['claude-sonnet-4', 'claude-opus-4'] },
-  { id: 'volcengine', name: 'Volcengine Ark', type: 'openai-compatible', icon: '🌋', category: 'api-key', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', defaultModels: ['doubao-pro-40k', 'doubao-pro-128k'] },
-  { id: 'xiaomi-mimo', name: 'Xiaomi MiMo', type: 'openai-compatible', icon: '📱', category: 'api-key', baseUrl: 'https://api.mimo.com/v1', defaultModels: ['mimo-v2'] },
-  { id: 'blackbox', name: 'Blackbox AI', type: 'openai-compatible', icon: '📦', category: 'api-key', baseUrl: 'https://api.blackbox.ai', defaultModels: ['blackbox-pro'] },
-  { id: 'chutes', name: 'Chutes AI', type: 'openai-compatible', icon: '🎢', category: 'api-key', baseUrl: 'https://llm.chutes.ai/v1', defaultModels: ['Llama-3.1-405B', 'Mixtral-8x22B'] },
+  { id: 'anthropic', name: 'Anthropic', key: 'anthropic', iconFile: 'anthropic', type: 'anthropic', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://api.anthropic.com', defaultModels: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-haiku-3-20240307'], availableModels: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-haiku-3-20240307', 'claude-3.5-sonnet-20241022', 'claude-3.5-haiku-20241022', 'claude-3-opus-20240229'], apiKeyHint: 'sk-ant-...' },
+  { id: 'openai', name: 'OpenAI', key: 'openai', type: 'openai', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://api.openai.com/v1', defaultModels: ['gpt-4o', 'gpt-4o-mini', 'o1', 'o1-mini', 'o3-mini'], availableModels: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'o1', 'o1-mini', 'o3-mini', 'o1-preview', 'o3', 'gpt-3.5-turbo'], apiKeyHint: 'sk-...' },
+  { id: 'alibaba', name: 'Alibaba (Qwen)', key: 'alibaba', iconFile: 'qwen', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', defaultModels: ['qwen-max', 'qwen-plus', 'qwen-turbo'], availableModels: ['qwen-max', 'qwen-plus', 'qwen-turbo', 'qwen-long', 'qwen-vl-max', 'qwen-coder-plus'], apiKeyHint: 'sk-...' },
+  { id: 'alibaba-intl', name: 'Alibaba Intl', key: 'alibaba-intl', iconFile: 'qwen', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1', defaultModels: ['qwen-max', 'qwen-plus'], availableModels: ['qwen-max', 'qwen-plus', 'qwen-turbo', 'qwen-long'], apiKeyHint: 'sk-...' },
+  { id: 'cerebras', name: 'Cerebras', key: 'cerebras', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://api.cerebras.ai/v1', defaultModels: ['llama3.1-8b', 'llama3.1-70b'], availableModels: ['llama3.1-8b', 'llama3.1-70b', 'llama-3.3-70b'], apiKeyHint: 'csk-...' },
+  { id: 'azure-openai', name: 'Azure OpenAI', key: 'azure-openai', iconFile: 'azure', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://{resource}.openai.azure.com/openai/deployments/{deployment}', defaultModels: ['gpt-4o', 'gpt-4o-mini'], description: 'Замените {resource} и {deployment} в URL', apiKeyHint: 'Azure API Key' },
+  { id: 'cohere', name: 'Cohere', key: 'cohere', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://api.cohere.ai/v1', defaultModels: ['command-r-plus', 'command-r'], availableModels: ['command-r-plus', 'command-r', 'command-r-plus-08-2024', 'command-r-08-2024', 'command', 'command-light'], apiKeyHint: 'API key' },
+  { id: 'command-code', name: 'Command Code', key: 'command-code', iconFile: 'cohere', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://api.cohere.ai/v1', defaultModels: ['command-r-plus-code'], availableModels: ['command-r-plus-code', 'command-r-code'], apiKeyHint: 'API key' },
+  { id: 'deepseek', name: 'DeepSeek', key: 'deepseek', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://api.deepseek.com/v1', defaultModels: ['deepseek-chat', 'deepseek-coder'], availableModels: ['deepseek-chat', 'deepseek-coder', 'deepseek-reasoner'], apiKeyHint: 'sk-...' },
+  { id: 'fireworks', name: 'Fireworks AI', key: 'fireworks', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://api.fireworks.ai/inference/v1', defaultModels: ['accounts/fireworks/models/llama-v3p1-405b', 'accounts/fireworks/models/mixtral-8x22b'], availableModels: ['accounts/fireworks/models/llama-v3p1-405b', 'accounts/fireworks/models/mixtral-8x22b', 'accounts/fireworks/models/qwen2p5-72b-instruct'], apiKeyHint: 'fw-...' },
+  { id: 'glm-china', name: 'GLM (China)', key: 'glm-china', iconFile: 'glm', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', defaultModels: ['glm-4', 'glm-4v', 'glm-4-flash'], availableModels: ['glm-4', 'glm-4v', 'glm-4-flash', 'glm-4-plus', 'glm-4-air', 'codegeex-4'], apiKeyHint: 'API key' },
+  { id: 'glm-coding', name: 'GLM Coding', key: 'glm-coding', iconFile: 'glm', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', defaultModels: ['codegeex-4', 'glm-4-code'], availableModels: ['codegeex-4', 'glm-4-code', 'glm-4-flash-code'], apiKeyHint: 'API key' },
+  { id: 'groq', name: 'Groq', key: 'groq', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://api.groq.com/openai/v1', defaultModels: ['llama-3.1-70b', 'llama-3.1-8b', 'mixtral-8x7b'], availableModels: ['llama-3.1-70b', 'llama-3.1-8b', 'mixtral-8x7b', 'gemma-7b', 'llama-3.3-70b', 'llama-guard-3-8b'], apiKeyHint: 'gsk_...' },
+  { id: 'hyperbolic', name: 'Hyperbolic', key: 'hyperbolic', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://api.hyperbolic.xyz/v1', defaultModels: ['meta-llama/Meta-Llama-3.1-405B', 'mistralai/Mixtral-8x22B'], availableModels: ['meta-llama/Meta-Llama-3.1-405B', 'mistralai/Mixtral-8x22B', 'meta-llama/Llama-3.3-70B'], apiKeyHint: 'API key' },
+  { id: 'kimi', name: 'Kimi', key: 'kimi', iconFile: 'kimi', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://api.moonshot.cn/v1', defaultModels: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'], availableModels: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k', 'moonshot-v1-auto'], apiKeyHint: 'sk-...' },
+  { id: 'minimax', name: 'Minimax (China)', key: 'minimax', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://api.minimax.chat/v1', defaultModels: ['abab6.5-chat', 'abab6.5s-chat'], availableModels: ['abab6.5-chat', 'abab6.5s-chat', 'abab6.5g-chat', 'abab5.5s-chat'], apiKeyHint: 'API key' },
+  { id: 'minimax-coding', name: 'Minimax Coding', key: 'minimax-coding', iconFile: 'minimax', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://api.minimax.chat/v1', defaultModels: ['abab6.5-code'], availableModels: ['abab6.5-code'], apiKeyHint: 'API key' },
+  { id: 'mistral', name: 'Mistral', key: 'mistral', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://api.mistral.ai/v1', defaultModels: ['mistral-large-latest', 'mistral-small-latest', 'codestral-latest'], availableModels: ['mistral-large-latest', 'mistral-small-latest', 'codestral-latest', 'mistral-nemo', 'pixtral-large', 'mistral-embed'], apiKeyHint: 'API key' },
+  { id: 'nebius', name: 'Nebius AI', key: 'nebius', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://api.studio.nebius.ai/v1', defaultModels: ['llama-3.1-405b', 'mistral-large'], availableModels: ['llama-3.1-405b', 'mistral-large', 'llama-3.1-70b'], apiKeyHint: 'API key' },
+  { id: 'ollama-local', name: 'Ollama Local', key: 'ollama-local', iconFile: 'ollama-local', type: 'openai-compatible', category: 'api-key', authMethod: 'no-auth', baseUrl: 'http://localhost:11434/v1', defaultModels: ['llama3.1', 'mistral', 'codellama', 'deepseek-coder'] },
+  { id: 'perplexity', name: 'Perplexity', key: 'perplexity', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://api.perplexity.ai', defaultModels: ['sonar-pro', 'sonar', 'llama-3.1-sonar-large'], availableModels: ['sonar-pro', 'sonar', 'sonar-plus', 'llama-3.1-sonar-small', 'llama-3.1-sonar-large', 'sonar-reasoning'], apiKeyHint: 'pplx-...' },
+  { id: 'siliconflow', name: 'SiliconFlow', key: 'siliconflow', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://api.siliconflow.cn/v1', defaultModels: ['Qwen/Qwen2.5-72B-Instruct', 'deepseek-ai/DeepSeek-V3'], availableModels: ['Qwen/Qwen2.5-72B-Instruct', 'deepseek-ai/DeepSeek-V3', 'meta-llama/Llama-3.1-405B-Instruct'], apiKeyHint: 'API key' },
+  { id: 'together', name: 'Together AI', key: 'together', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://api.together.xyz/v1', defaultModels: ['meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo', 'mistralai/Mixtral-8x22B-Instruct-v0.1'], availableModels: ['meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo', 'mistralai/Mixtral-8x22B-Instruct-v0.1', 'meta-llama/Llama-3.3-70B-Instruct-Turbo'], apiKeyHint: 'API key' },
+  { id: 'vercel', name: 'Vercel AI Gateway', key: 'vercel', iconFile: 'vercel', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://gateway.vercel.com', defaultModels: ['openai/gpt-4o', 'anthropic/claude-sonnet-4'], availableModels: ['openai/gpt-4o', 'openai/gpt-4o-mini', 'anthropic/claude-sonnet-4', 'anthropic/claude-opus-4'], apiKeyHint: 'API key' },
+  { id: 'vertex-partner', name: 'Vertex Partner', key: 'vertex-partner', iconFile: 'vertex-partner', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://aiplatform.googleapis.com/v1', defaultModels: ['claude-sonnet-4', 'claude-opus-4'], availableModels: ['claude-sonnet-4', 'claude-opus-4', 'gemini-2.5-pro'], apiKeyHint: 'Bearer token...' },
+  { id: 'volcengine', name: 'Volcengine Ark', key: 'volcengine', iconFile: 'byteplus', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', defaultModels: ['doubao-pro-40k', 'doubao-pro-128k'], availableModels: ['doubao-pro-40k', 'doubao-pro-128k', 'doubao-lite-40k', 'doubao-lite-128k'], apiKeyHint: 'API key' },
+  { id: 'xiaomi-mimo', name: 'Xiaomi MiMo', key: 'xiaomi-mimo', iconFile: 'xiaomi-mimo', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://api.mimo.ai/v1', defaultModels: ['mimo-v2'], availableModels: ['mimo-v2', 'mimo-v2-lite'], apiKeyHint: 'API key' },
+  { id: 'blackbox', name: 'Blackbox AI', key: 'blackbox', iconFile: 'blackbox', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://api.blackbox.ai/api/v1', defaultModels: ['blackbox-pro'], availableModels: ['blackbox-pro', 'blackbox-api'], apiKeyHint: 'API key' },
+  { id: 'chutes', name: 'Chutes AI', key: 'chutes', type: 'openai-compatible', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://llm.chutes.ai/v1', defaultModels: ['Llama-3.1-405B', 'Mixtral-8x22B'], availableModels: ['Llama-3.1-405B', 'Mixtral-8x22B', 'Llama-3.1-70B'], apiKeyHint: 'API key' },
 
   // ─── Anthropic-compatible ─────────────────────────────────
-  { id: 'vertex-anthropic', name: 'Vertex Anthropic', type: 'anthropic', icon: '🟣', category: 'api-key', baseUrl: 'https://aiplatform.googleapis.com/v1/projects/{project}/locations/{location}/publishers/anthropic', defaultModels: ['claude-sonnet-4@20250514', 'claude-opus-4@20250514'] },
+  { id: 'vertex-anthropic', name: 'Vertex Anthropic', key: 'vertex-anthropic', iconFile: 'vertex', type: 'anthropic', category: 'api-key', authMethod: 'apikey', baseUrl: 'https://aiplatform.googleapis.com/v1/projects/{project}/locations/{location}/publishers/anthropic', defaultModels: ['claude-sonnet-4@20250514', 'claude-opus-4@20250514'], apiKeyHint: 'Bearer token...', description: 'Замените {project} и {location} в URL' },
 ]
 
 // Grouped by category for display

@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { PROVIDER_CATALOG, PROVIDERS_BY_CATEGORY, type ProviderInfo } from '../lib/providers'
+import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
+import { PROVIDER_CATALOG, providerKey, providerIconUrl, type ProviderInfo } from '../lib/providers'
 
 interface SettingsPageProps {
   onBack: () => void
@@ -27,6 +27,9 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
   const [activeTab, setActiveTab] = useState<Tab>('general')
   const [visible, setVisible] = useState(false)
   const [activeModal, setActiveModal] = useState<string | null>(null)
+  const [addingProvider, setAddingProvider] = useState<ProviderInfo | null>(null)
+  const [editingProvider, setEditingProvider] = useState<ApiProvider | null>(null)
+  const providersRef = useRef<{ refresh: () => void }>(null)
 
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true))
@@ -53,6 +56,37 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
           </div>
         </div>
       )}
+
+      {/* Add from catalog modal — at root level, outside .settings-page */}
+      {addingProvider && (
+        <div className="modal-overlay" onClick={() => setAddingProvider(null)}>
+          <div className="modal-content modal-lg" onClick={e => e.stopPropagation()}>
+            <AddFromCatalogModal
+              provider={addingProvider}
+              onClose={() => setAddingProvider(null)}
+              onSaved={() => { setAddingProvider(null); providersRef.current?.refresh() }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Edit provider modal — at root level, outside .settings-page */}
+      {editingProvider && (() => {
+        const catalogEntry = PROVIDER_CATALOG.find(p => providerKey(p) === editingProvider.name)
+        if (!catalogEntry) return null
+        return (
+          <div className="modal-overlay" onClick={() => setEditingProvider(null)}>
+            <div className="modal-content modal-lg" onClick={e => e.stopPropagation()}>
+              <AddFromCatalogModal
+                provider={catalogEntry}
+                editProvider={editingProvider}
+                onClose={() => setEditingProvider(null)}
+                onSaved={() => { setEditingProvider(null); providersRef.current?.refresh() }}
+              />
+            </div>
+          </div>
+        )
+      })()}
 
       <div className={`settings-page ${visible ? 'visible' : ''}`}>
         {/* Header */}
@@ -85,7 +119,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
         <div className="settings-body" key={activeTab}>
           {activeTab === 'general' && <GeneralSection />}
           {activeTab === 'agents' && <AgentsSection />}
-          {activeTab === 'providers' && <ProvidersSection onAddProvider={(type) => setActiveModal(`add-provider-${type}`)} />}
+          {activeTab === 'providers' && <ProvidersSection ref={providersRef} onAddProvider={(type) => setActiveModal(`add-provider-${type}`)} onAddFromCatalog={(p) => setAddingProvider(p)} onEditProvider={(p) => setEditingProvider(p)} />}
           {activeTab === 'memory' && <MemorySection />}
           {activeTab === 'channels' && <ChannelsSection onAddChannel={() => setActiveModal('add-channel')} />}
         </div>
@@ -333,26 +367,87 @@ function AgentsSection() {
 
 // ─── Providers Section ───────────────────────────────────────
 
-interface ConnectedProvider {
-  id: string
-  providerId: string  // catalog ID
+interface ApiProvider {
   name: string
   type: string
-  baseUrl: string
-  model: string
-  apiKey: string
-  isDefault: boolean
+  base_url: string
+  api_key: string
+  models: string[]
+  default: boolean
+  _testStatus?: 'ok' | 'error' | null  // test result cache
 }
 
-function ProvidersSection({ onAddProvider }: { onAddProvider: (type: 'openai' | 'anthropic') => void }) {
-  const [connected, setConnected] = useState<ConnectedProvider[]>([
-    { id: 'conn-1', providerId: '9router', name: '9Router', type: 'openai-compatible', baseUrl: 'http://localhost:20128/v1', model: 'general-agent', apiKey: 'sk-***', isDefault: true },
-  ])
-
+const ProvidersSection = forwardRef<{ refresh: () => void }, { onAddProvider: (type: 'openai' | 'anthropic') => void; onAddFromCatalog: (p: ProviderInfo) => void; onEditProvider: (p: ApiProvider) => void }>(
+  function ProvidersSection({ onAddProvider, onAddFromCatalog, onEditProvider }, ref) {
+  const [connected, setConnected] = useState<ApiProvider[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [testing, setTesting] = useState<string | null>(null)  // name of provider being tested
+
+  // Fetch providers from API with polling
+  const fetchProviders = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:2088/api/providers')
+      if (res.ok) {
+        const data = await res.json()
+        setConnected(data.providers || [])
+      }
+    } catch (e) {
+      console.error('[providers] fetch error:', e)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // No polling — refresh happens on action (add/delete/edit)
+  useEffect(() => {
+    fetchProviders()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Expose fetchProviders to parent via ref
+  useImperativeHandle(ref, () => ({ refresh: fetchProviders }), [fetchProviders])
+
+  const handleDisconnect = async (name: string) => {
+    try {
+      const res = await fetch(`http://localhost:2088/api/providers/${encodeURIComponent(name)}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        fetchProviders()
+      }
+    } catch (e) {
+      console.error('[providers] delete error:', e)
+    }
+  }
+
+  const handleTest = async (conn: ApiProvider) => {
+    setTesting(conn.name)
+    try {
+      const res = await fetch(`http://localhost:2088/api/providers/${encodeURIComponent(conn.name)}/test`, {
+        method: 'POST',
+      })
+      const data = await res.json()
+      setConnected(prev => prev.map(c =>
+        c.name === conn.name
+          ? { ...c, _testStatus: data.status === 'ok' ? ('ok' as const) : ('error' as const) }
+          : c
+      ))
+    } catch (e) {
+      setConnected(prev => prev.map(c =>
+        c.name === conn.name ? { ...c, _testStatus: 'error' as const } : c
+      ))
+    } finally {
+      setTesting(null)
+    }
+  }
+
+  const handleEditProvider = (conn: ApiProvider) => {
+    onEditProvider(conn)
+  }
 
   const filteredCatalog = PROVIDER_CATALOG.filter(p =>
-    !connected.some(c => c.providerId === p.id) &&
+    !connected.some(c => c.name === providerKey(p)) &&
     (p.name.toLowerCase().includes(searchQuery.toLowerCase()) || !searchQuery)
   )
 
@@ -363,21 +458,7 @@ function ProvidersSection({ onAddProvider }: { onAddProvider: (type: 'openai' | 
   }
 
   const handleConnect = (provider: ProviderInfo) => {
-    const newConn: ConnectedProvider = {
-      id: `conn-${Date.now()}`,
-      providerId: provider.id,
-      name: provider.name,
-      type: provider.type,
-      baseUrl: provider.baseUrl,
-      model: provider.defaultModels[0],
-      apiKey: '',
-      isDefault: connected.length === 0,
-    }
-    setConnected([...connected, newConn])
-  }
-
-  const handleDisconnect = (connId: string) => {
-    setConnected(connected.filter(c => c.id !== connId))
+    onAddFromCatalog(provider)
   }
 
   return (
@@ -393,30 +474,92 @@ function ProvidersSection({ onAddProvider }: { onAddProvider: (type: 'openai' | 
       </div>
 
       {/* Connected providers */}
-      {connected.length > 0 && (
+      {loading ? (
+        <div className="providers-loading">
+          <div className="spinner" />
+          <span>Загрузка провайдеров...</span>
+        </div>
+      ) : connected.length > 0 ? (
         <section className="providers-section">
-          <h2 className="providers-section-title">Подключённые провайдеры</h2>
+          <div className="providers-section-header">
+            <h2 className="providers-section-title">Подключённые провайдеры</h2>
+            <span className="providers-count">{connected.length} {pluralize(connected.length, 'провайдер', 'провайдера', 'провайдеров')}</span>
+          </div>
           <div className="connected-providers-grid">
-            {connected.map(conn => (
-              <div key={conn.id} className="connected-provider-card">
-                <div className="cp-header">
-                  <span className="cp-icon">{PROVIDER_CATALOG.find(p => p.id === conn.providerId)?.icon || '🔌'}</span>
-                  <span className="cp-status-dot" />
-                </div>
-                <div className="cp-info">
-                  <span className="cp-name">{conn.name}</span>
-                  <span className="cp-model">{conn.model}</span>
-                </div>
-                <div className="cp-actions">
-                  {conn.isDefault && <span className="cp-badge">Default</span>}
-                  <button className="cp-disconnect-btn" onClick={() => handleDisconnect(conn.id)} title="Отключить">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            {connected.map(conn => {
+              const catalogEntry = PROVIDER_CATALOG.find(p => providerKey(p) === conn.name)
+              const displayName = catalogEntry?.name || conn.name
+              const iconUrl = catalogEntry ? providerIconUrl(catalogEntry) : null
+              const hasIcon = !!catalogEntry && !!iconUrl
+
+              return (
+                <div key={conn.name} className="connected-provider-card" onClick={() => handleEditProvider(conn)}>
+                  <div className="cp-icon-wrap">
+                    {hasIcon ? (
+                      <img src={iconUrl} alt={displayName} className="cp-icon-img"
+                        onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                    ) : (
+                      <svg className="cp-fallback-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="cp-info">
+                    <span className="cp-name">{displayName}</span>
+                    {conn.models.length > 0 && (
+                      <span className="cp-models">{conn.models.join(', ')}</span>
+                    )}
+                  </div>
+
+                  {/* Test button — manual test on click */}
+                  {conn._testStatus === 'ok' && (
+                    <svg className="cp-test-result ok" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                      onClick={e => { e.stopPropagation(); handleTest(conn) }}
+                      aria-label="Тест подключения">
+                      <path d="M22 4L12 14.01l-3-3" />
+                    </svg>
+                  )}
+                  {conn._testStatus === 'error' && (
+                    <svg className="cp-test-result error" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                      onClick={e => { e.stopPropagation(); handleTest(conn) }}
+                      aria-label="Тест подключения">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  )}
+                  {testing === conn.name && (
+                    <svg className="cp-test-result loading" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 12a9 9 0 11-6.2-8.6" />
+                    </svg>
+                  )}
+                  {!conn._testStatus && testing !== conn.name && (
+                    <svg className="cp-test-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                      onClick={e => { e.stopPropagation(); handleTest(conn) }}
+                      aria-label="Тест подключения">
+                      <path d="M22 11.08V12a10 10 0 11-5.9-9.1" />
+                      <path d="M22 4L12 14.01l-3-3" />
+                    </svg>
+                  )}
+
+                  <button className="cp-disconnect-btn"
+                    onClick={e => { e.stopPropagation(); handleDisconnect(conn.name) }}
+                    title="Отключить">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M18 6L6 18M6 6l12 12" />
                     </svg>
                   </button>
                 </div>
-              </div>
-            ))}
+              )
+            })}
+          </div>
+        </section>
+      ) : (
+        <section className="providers-section">
+          <div className="connected-providers-empty">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+            </svg>
+            <p>Нет подключённых провайдеров</p>
+            <span>Используйте кнопки выше или каталог ниже</span>
           </div>
         </section>
       )}
@@ -447,6 +590,261 @@ function ProvidersSection({ onAddProvider }: { onAddProvider: (type: 'openai' | 
       )}
     </div>
   )
+})
+
+function pluralize(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod100 >= 11 && mod100 <= 19) return many
+  if (mod10 === 1) return one
+  if (mod10 >= 2 && mod10 <= 4) return few
+  return many
+}
+
+// ─── Add from Catalog Modal ──────────────────────────────────
+
+function AddFromCatalogModal({ provider, editProvider, onClose, onSaved }: {
+  provider: ProviderInfo
+  editProvider?: ApiProvider
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const key = providerKey(provider)
+  const isNoAuth = provider.authMethod === 'no-auth'
+  const isEdit = !!editProvider
+  const [apiKey, setApiKey] = useState(isEdit ? '••••••••' : '')
+  const [modelsInput, setModelsInput] = useState(
+    isEdit ? editProvider!.models.join(', ') : (provider.defaultModels || []).join(', ')
+  )
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<'ok' | 'error' | null>(null)
+  const [testMessage, setTestMessage] = useState('')
+  const [fetchedModels, setFetchedModels] = useState<string[]>([])
+
+  /** Fetch models from provider API AFTER test connection succeeds */
+  // No auto-fetch on mount — models appear only after successful test
+
+  /** Parse models from comma-separated input */
+  const parseModels = () => modelsInput.split(',').map(m => m.trim()).filter(Boolean)
+
+  /** All known models for chips: fetched from API (after test) or catalog defaults (edit mode) */
+  const allKnownModels = fetchedModels.length > 0
+    ? fetchedModels
+    : (isEdit ? (provider.defaultModels || []) : [])
+  const customModels = parseModels().filter(m => !allKnownModels.includes(m))
+  const chipModels = [...new Set([...allKnownModels, ...customModels])]
+  const currentModels = parseModels()
+
+  const toggleModel = (model: string) => {
+    const models = parseModels()
+    if (models.includes(model)) {
+      setModelsInput(models.filter(m => m !== model).join(', '))
+    } else {
+      setModelsInput(models.length > 0 ? modelsInput + ', ' + model : model)
+    }
+  }
+
+  /** Smart test: try with key → try without → final result */
+  const handleTest = async () => {
+    setTesting(true)
+    setTestResult(null)
+    setTestMessage('')
+    setError('')
+    setFetchedModels([])
+
+    const modelList = parseModels()
+
+    const tryTest = async (useKey: boolean): Promise<{status: string; message?: string; models?: string[]}> => {
+      const tempName = key + '-test-temp'
+      const body: Record<string, unknown> = {
+        name: tempName,
+        type: provider.type,
+        base_url: provider.baseUrl,
+        api_key: useKey ? apiKey : '',
+        models: modelList,
+      }
+      // Create temp
+      await fetch('http://localhost:2088/api/providers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      try {
+        const res = await fetch(`http://localhost:2088/api/providers/${encodeURIComponent(tempName)}/test`, {
+          method: 'POST',
+        })
+        // Safely parse JSON — backend might return non-JSON on error
+        const text = await res.text()
+        try {
+          return JSON.parse(text)
+        } catch {
+          return { status: 'error', message: `Сервер вернул не JSON: ${text.slice(0, 100)}` }
+        }
+      } finally {
+        // Cleanup temp
+        await fetch(`http://localhost:2088/api/providers/${encodeURIComponent(tempName)}`, { method: 'DELETE' }).catch(() => {})
+      }
+    }
+
+    try {
+      if (isNoAuth || !apiKey.trim() || apiKey === '••••••••') {
+        // No-auth provider or empty/masked key — test without key
+        const result = await tryTest(false)
+        setTestResult(result.status === 'ok' ? 'ok' : 'error')
+        setTestMessage(result.message || '')
+        if (result.status === 'ok' && result.models) {
+          setFetchedModels(result.models)
+        }
+      } else {
+        // Has key — try WITH key first
+        let result = await tryTest(true)
+        if (result.status === 'ok') {
+          setTestResult('ok')
+          setTestMessage(result.message || '')
+          if (result.models) setFetchedModels(result.models)
+        } else {
+          // Failed with key — try WITHOUT key (provider might not need it)
+          result = await tryTest(false)
+          if (result.status === 'ok') {
+            setTestResult('ok')
+            setTestMessage(result.message + ' (работает без ключа)')
+            if (result.models) setFetchedModels(result.models)
+          } else {
+            setTestResult('error')
+            setTestMessage(result.message || 'Не удалось подключиться')
+          }
+        }
+      }
+    } catch (e) {
+      setTestResult('error')
+      setTestMessage('Ошибка сети')
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    setError('')
+    try {
+      const body: Record<string, unknown> = {
+        name: isEdit ? editProvider!.name : key,
+        type: provider.type,
+        base_url: provider.baseUrl,
+        api_key: isNoAuth ? '' : (apiKey === '••••••••' ? '' : apiKey),
+        models: parseModels(),
+      }
+      const res = await fetch(
+        isEdit
+          ? `http://localhost:2088/api/providers/${encodeURIComponent(editProvider!.name)}`
+          : 'http://localhost:2088/api/providers',
+        {
+          method: isEdit ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }
+      )
+      if (res.ok) {
+        onSaved()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setError(data.detail || 'Ошибка сохранения')
+      }
+    } catch (e) {
+      setError('Не удалось подключиться к серверу')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const iconUrl = providerIconUrl(provider)
+
+  return (
+    <div className="modal-inner">
+      {/* Provider header */}
+      <div className="catalog-modal-header">
+        <div className="catalog-modal-icon">
+          {iconUrl ? (
+            <img src={iconUrl} alt={provider.name} className="catalog-modal-icon-img" />
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+            </svg>
+          )}
+        </div>
+        <div className="catalog-modal-title-wrap">
+          <h2 className="modal-title">{isEdit ? 'Редактировать' : provider.name}</h2>
+          <span className="catalog-modal-url">{provider.baseUrl}</span>
+        </div>
+      </div>
+
+      <div className="modal-body">
+        {/* API Key — hidden for no-auth providers */}
+        {!isNoAuth && (
+          <div className="settings-field">
+            <label>API Key <span className="field-hint">{isEdit ? '(оставьте пустым, чтобы не менять)' : '(необязательно — если не знаешь, оставь пустым)'}</span></label>
+            <input type="password" className="settings-input" placeholder={provider.apiKeyHint || 'sk-...'}
+              value={apiKey} onChange={e => setApiKey(e.target.value)} />
+          </div>
+        )}
+
+        {isNoAuth && (
+          <div className="catalog-modal-info">
+            <span>🔓 Этот провайдер работает без API ключа</span>
+          </div>
+        )}
+
+        {/* Test button */}
+        <div className="catalog-modal-test-row">
+          <button className="catalog-modal-test-btn" onClick={handleTest} disabled={testing}>
+            {testing ? 'Тестирование...' : 'Тест подключения'}
+          </button>
+          {testResult === 'ok' && <span className="catalog-test-badge ok">✓ {testMessage}</span>}
+          {testResult === 'error' && <span className="catalog-test-badge error">✗ {testMessage}</span>}
+        </div>
+
+        {/* Models — single-line comma-separated input */}
+        <div className="settings-field">
+          <label>Модели <span className="field-hint">(через запятую)</span></label>
+          <input type="text" className="settings-input models-input"
+            value={modelsInput} onChange={e => setModelsInput(e.target.value)}
+            placeholder="gpt-4o, gpt-4o-mini" />
+        </div>
+
+        {/* Model chips — only shown after test or when editing with existing models */}
+        {chipModels.length > 0 && (
+          <div className="model-chips-container">
+            {chipModels.map(model => {
+              const isActive = currentModels.includes(model)
+              const isKnown = allKnownModels.includes(model)
+              return (
+                <button
+                  key={model}
+                  className={`model-chip${isActive ? ' active' : ''}${!isKnown ? ' custom' : ''}`}
+                  onClick={() => toggleModel(model)}
+                  type="button"
+                >
+                  {model}
+                  {!isKnown && <span className="chip-remove">×</span>}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {error && <div className="modal-error">{error}</div>}
+      </div>
+
+      <div className="modal-footer">
+        <button className="settings-btn-secondary" onClick={onClose}>Отмена</button>
+        <button className="settings-btn-primary" onClick={handleSave} disabled={saving}>
+          {saving ? 'Сохранение...' : (isEdit ? 'Сохранить' : 'Подключить')}
+        </button>
+      </div>
+    </div>
+  )
 }
 
 function ProviderGridSection({ title, providers, onConnect }: { title: string; providers: ProviderInfo[]; onConnect: (p: ProviderInfo) => void }) {
@@ -454,13 +852,29 @@ function ProviderGridSection({ title, providers, onConnect }: { title: string; p
     <section className="providers-section">
       <h2 className="providers-section-title">{title}</h2>
       <div className="provider-catalog-grid">
-        {providers.map(provider => (
-          <button key={provider.id} className="provider-catalog-card" onClick={() => onConnect(provider)}>
-            <span className="pc-icon">{provider.icon}</span>
-            <span className="pc-name">{provider.name}</span>
-            <span className="pc-models">{provider.defaultModels.slice(0, 2).join(', ')}</span>
-          </button>
-        ))}
+        {providers.map(provider => {
+          const iconUrl = providerIconUrl(provider)
+          const isOAuthDisabled = provider.oauthDisabled
+
+          return (
+            <button
+              key={provider.id}
+              className={`provider-catalog-card${isOAuthDisabled ? ' oauth-disabled' : ''}`}
+              onClick={() => !isOAuthDisabled && onConnect(provider)}
+              title={isOAuthDisabled ? 'OAuth подключение скоро' : provider.name}
+            >
+              <div className="pc-icon-wrap">
+                {iconUrl ? (
+                  <img src={iconUrl} alt={provider.name} className="pc-icon-img"
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                ) : null}
+              </div>
+              <span className="pc-name">{provider.name}</span>
+              <span className="pc-models">{(provider.defaultModels || []).slice(0, 2).join(', ')}</span>
+              {isOAuthDisabled && <span className="pc-oauth-badge">🔒 OAuth</span>}
+            </button>
+          )
+        })}
       </div>
     </section>
   )
@@ -596,6 +1010,46 @@ function ChannelsSection({ onAddChannel }: { onAddChannel: () => void }) {
 
 function AddProviderModal({ type, onClose }: { type: 'openai' | 'anthropic'; onClose: () => void }) {
   const isAnthropic = type === 'anthropic'
+  const [name, setName] = useState('')
+  const [baseUrl, setBaseUrl] = useState('')
+  const [model, setModel] = useState('')
+  const [apiKey, setApiKey] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      setError('Название обязательно')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+      const body: Record<string, unknown> = {
+        name: slug,
+        type: isAnthropic ? 'anthropic' : 'openai-compatible',
+        base_url: baseUrl,
+        api_key: apiKey,
+        models: model ? [model] : [],
+      }
+      const res = await fetch('http://localhost:2088/api/providers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (res.ok) {
+        onClose()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setError(data.detail || 'Ошибка сохранения')
+      }
+    } catch (e) {
+      setError('Не удалось подключиться к серверу')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="modal-inner">
@@ -610,26 +1064,33 @@ function AddProviderModal({ type, onClose }: { type: 'openai' | 'anthropic'; onC
       <div className="modal-body">
         <div className="settings-field">
           <label>Название</label>
-          <input type="text" className="settings-input" placeholder="My Provider" />
+          <input type="text" className="settings-input" placeholder="my-provider"
+            value={name} onChange={e => setName(e.target.value)} />
         </div>
         <div className="settings-field">
           <label>Base URL</label>
           <input type="text" className="settings-input"
-            placeholder={isAnthropic ? 'https://api.anthropic.com' : 'https://api.openai.com/v1'} />
+            placeholder={isAnthropic ? 'https://api.anthropic.com' : 'https://api.openai.com/v1'}
+            value={baseUrl} onChange={e => setBaseUrl(e.target.value)} />
         </div>
         <div className="settings-field">
           <label>Модель</label>
           <input type="text" className="settings-input"
-            placeholder={isAnthropic ? 'claude-sonnet-4' : 'gpt-4o'} />
+            placeholder={isAnthropic ? 'claude-sonnet-4' : 'gpt-4o'}
+            value={model} onChange={e => setModel(e.target.value)} />
         </div>
         <div className="settings-field">
           <label>API Key</label>
-          <input type="password" className="settings-input" placeholder="sk-..." />
+          <input type="password" className="settings-input" placeholder="sk-..."
+            value={apiKey} onChange={e => setApiKey(e.target.value)} />
         </div>
+        {error && <div className="modal-error">{error}</div>}
       </div>
       <div className="modal-footer">
         <button className="settings-btn-secondary" onClick={onClose}>Отмена</button>
-        <button className="settings-btn-primary" onClick={onClose}>Сохранить</button>
+        <button className="settings-btn-primary" onClick={handleSave} disabled={saving}>
+          {saving ? 'Сохранение...' : 'Сохранить'}
+        </button>
       </div>
     </div>
   )

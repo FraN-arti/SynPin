@@ -48,6 +48,10 @@ if _loaded_registry is None:
 chat_router.registry = _loaded_registry
 app.include_router(chat_router.router)
 
+# Providers config management API
+from .providers_router import router as providers_router
+app.include_router(providers_router)
+
 
 @app.get("/api/health")
 def health():

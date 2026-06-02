@@ -34,3 +34,9 @@ logs/
 
 # ChromaDB
 chroma_data/
+
+# User configs (NEVER commit - contains API keys!)
+core/synpin/config/*.yaml
+~/.synpin/
+*.yaml
+!web/vite.config.ts

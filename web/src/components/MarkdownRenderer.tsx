@@ -12,6 +12,17 @@ export function MarkdownRenderer({ content, isStreaming }: MarkdownRendererProps
     return renderMarkdown(content)
   }, [content])
 
+  // Empty message — show typing dots
+  if (!content) {
+    return (
+      <span className="typing-dots bubble">
+        <span className="typing-dot" />
+        <span className="typing-dot" />
+        <span className="typing-dot" />
+      </span>
+    )
+  }
+
   // During streaming, render raw text to avoid broken HTML from incomplete markdown
   if (isStreaming) {
     return <span className="raw-text">{content}</span>

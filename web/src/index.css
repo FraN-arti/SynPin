@@ -456,6 +456,14 @@ body {
   animation: bubbleFadeIn 0.4s ease 0.3s both;
 }
 
+/* Typing dots inside a bubble (no extra bg/padding) */
+.typing-dots.bubble {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  animation: none;
+}
+
 /* Message footer — time, model, tokens */
 .message-footer {
   font-size: 11px;

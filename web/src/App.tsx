@@ -3,6 +3,7 @@ import './index.css'
 import synpinLogo from './images/synpin.png'
 import { MarkdownRenderer } from './components/MarkdownRenderer'
 import { EmojiPicker } from './components/EmojiPicker'
+import { SettingsPage } from './components/SettingsPage'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:2088'
 const DEFAULT_MODEL = 'general-agent'
@@ -17,6 +18,7 @@ interface Message {
 }
 
 function App() {
+  const [page, setPage] = useState<'chat' | 'settings'>('chat')
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
@@ -289,7 +291,7 @@ function App() {
           </nav>
 
           <div className="sidebar-footer">
-            <button className="settings-btn">
+            <button className="settings-btn" onClick={() => setPage('settings')}>
               <span>⚙️</span> Настройки
             </button>
           </div>
@@ -298,7 +300,9 @@ function App() {
 
       {/* Main Area */}
       <main className="main-area">
-        {messages.length === 0 ? (
+        {page === 'settings' ? (
+          <SettingsPage onBack={() => setPage('chat')} />
+        ) : messages.length === 0 ? (
           <div className="empty-state">
             <img src={synpinLogo} alt="SynPin" className="empty-logo-img" />
             <h1 className="empty-title">Чем могу помочь?</h1>

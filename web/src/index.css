@@ -625,7 +625,7 @@ body {
 
 .emoji-picker-btn:hover {
   color: var(--orange);
-  background: var(--gray-800);
+  background: transparent;
 }
 
 .emoji-picker-panel {

@@ -443,7 +443,7 @@ function MemorySection() {
           <input type="number" className="settings-input" defaultValue={365} />
         </div>
         <div className="settings-field">
-          <label>Компактировать память при (> записей)</label>
+          <label>Компактировать память при ({'>'} записей)</label>
           <input type="number" className="settings-input" defaultValue={50} />
         </div>
       </section>

@@ -1,0 +1,9 @@
+roles:
+- rolesid: управляющий
+  name: Управляющий
+  description: управляющий отделом
+  color: '#f59e0b'
+- rolesid: сотрудник
+  name: Сотрудник
+  description: сотрудник отдела
+  color: '#6a4b16'

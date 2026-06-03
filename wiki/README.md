@@ -39,7 +39,7 @@
 | **State** | Zustand (клиент) + TanStack Query (сервер) |
 | **Память** | ChromaDB (векторный поиск) |
 | **Установка** | uv (Python) + npm (Web) |
-| **Запуск** | `python dev.py` (dev) / `synpin start` (prod) |
+| **Запуск** | `dev.bat` (dev) / `synpin start` (prod) |
 
 ## 📁 Структура
 

@@ -106,16 +106,24 @@ providers:
 
 ```yaml
 agents:
-  85n1yo4x:                    # agentid = ключ
-    model: "9router/general-agent"
-    provider: "9router"
-    enabled: true
-
-  1f39sqld:
+  ix13aox3:                    # agentid = ключ
+    name: QA Инженер
+    role: управляющий
+    department: советчик
     model: "9router/general-agent"
     enabled: true
 
-  ix13aox3:
+  8e5tv711:
+    name: Архитектор
+    role: сотрудник
+    department: советчик
+    model: "9router/general-agent"
+    enabled: true
+
+  yni1tbod:
+    name: Тестер
+    role: сотрудник
+    department: поиск
     model: "9router/general-agent"
     enabled: true
 ```
@@ -126,31 +134,27 @@ agents:
 
 ## roles.yaml
 
-Роли агентов с уникальными 12-символьными ID.
+Роли агентов с уникальными slug-идентификаторами.
 
 ```yaml
+# ~/.synpin/config/roles.yaml
 roles:
-  - rolesid: t0wy3h5qcd9m      # 12-символьный ID (a-z, 0-9)
-    name: Техлид
-    description: 'Руководит техническими решениями'
+  - rolesid: управляющий
+    name: Управляющий
+    description: управляющий отделом
     color: '#f59e0b'
 
-  - rolesid: 0xzkvsn954lt
-    name: Разработчик
-    description: 'Пишет код, делает рефакторинг'
-    color: '#3b82f6'
-
-  - rolesid: ntcn
-    name: Worker
-    description: 'Исполнитель задач'
-    color: '#6b7280'
+  - rolesid: сотрудник
+    name: Сотрудник
+    description: сотрудник отдела
+    color: '#6a4b16'
 ```
 
 ### Поля
 
 | Поле | Описание |
 |---|---|
-| `rolesid` | Уникальный 12-символьный ID |
+| `rolesid` | Уникальный slug роли (кириллица, латиница) |
 | `name` | Отображаемое имя роли |
 | `description` | Описание роли |
 | `color` | Цвет для UI (hex) |
@@ -159,24 +163,24 @@ roles:
 
 ## departments.yaml
 
-Департаменты с уникальными 12-символьными ID.
+Департаменты с уникальными slug-идентификаторами.
 
 ```yaml
 departments:
-  - departmentsid: 4lv3b3opepr8
-    name: Разработка
-    description: 'Backend, frontend, инфраструктура'
-    color: '#22c55e'
+  - departmentsid: кодер
+    name: кодер
+    description: занимается кодом
+    color: '#3b82f6'
 
-  - departmentsid: ytue80l14hnk
-    name: QA
-    description: 'Тестирование, контроль качества'
-    color: '#ef4444'
+  - departmentsid: поиск
+    name: поиск
+    description: поиск информации
+    color: '#929baa'
 
-  - departmentsid: qa
-    name: QA
-    description: 'Тестирование'
-    color: '#f59e0b'
+  - departmentsid: советчик
+    name: советчик
+    description: участвует в переговорах
+    color: '#bb3bf7'
 ```
 
 ---
@@ -210,26 +214,25 @@ agents:
 Личность и настройки конкретного агента.
 
 ```yaml
-# agents/85n1yo4x/agent.yaml
-agentid: 85n1yo4x
-name: Архитектор
-description: 'Проектирует системы, принимает архитектурные решения'
-role: t0wy3h5qcd9m
-department: 4lv3b3opepr8
+# agents/ix13aox3/agent.yaml
+agentid: ix13aox3
+name: QA Инженер
+description: ''
+role: управляющий
+department: советчик
 
 personality:
-  tone: профессиональный
-  style: развернутый, с примерами
+  tone: professional
+  style: analytical
   traits:
-    - аналитичный
-    - внимателен к деталям
+    - thinks before answering
 
 behavior:
   max_iterations: 10
   temperature: 0.7
-  max_tokens: 40096
+  max_tokens: 4096
 
-system_prompt: 'Ты — Архитектор...'
+system_prompt: ''
 
 memory: {}
 ```
@@ -241,8 +244,8 @@ memory: {}
 | `agentid` | Уникальный 8-символьный ID |
 | `name` | Отображаемое имя |
 | `description` | Краткое описание роли |
-| `role` | Ссылка на rolesid |
-| `department` | Ссылка на departmentsid |
+| `role` | Ссылка на rolesid (slug) |
+| `department` | Ссылка на departmentsid (slug) |
 | `personality.tone` | Тон общения |
 | `personality.style` | Стиль ответов |
 | `personality.traits` | Характеристики |

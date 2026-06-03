@@ -108,10 +108,10 @@ definitions:
       urls: "List of URLs (max 5)"
 ```
 
-### Инструменты в personality.yaml
+### Инструменты в agent.yaml
 
 ```yaml
-# ~/.synpin/data/agents/architect/personality.yaml
+# agents/architect/agent.yaml
 
 name: "Архитектор"
 

@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHand
 import { PROVIDER_CATALOG, providerKey, providerIconUrl, type ProviderInfo } from '../lib/providers'
 import { MemorySection } from './MemorySection'
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:2088'
+
 interface SettingsPageProps {
   onBack: () => void
   onAgentsChange?: () => void
@@ -403,7 +405,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
     if (!newRole.name.trim()) return
     const rolesid = newRole.name.trim().toLowerCase().replace(/\s+/g, '-')
     const updated = [...roles, { rolesid, ...newRole }]
-    const res = await fetch('http://localhost:2088/api/roles', {
+    const res = await fetch('${API_BASE}/api/roles', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ roles: updated }),
     })
@@ -418,7 +420,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
     if (!newDept.name.trim()) return
     const departmentsid = newDept.name.trim().toLowerCase().replace(/\s+/g, '-')
     const updated = [...departments, { departmentsid, ...newDept }]
-    const res = await fetch('http://localhost:2088/api/departments', {
+    const res = await fetch('${API_BASE}/api/departments', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ departments: updated }),
     })
@@ -431,7 +433,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const handleRemoveRole = async (rolesid: string) => {
     const updated = roles.filter(r => r.rolesid !== rolesid)
-    const res = await fetch('http://localhost:2088/api/roles', {
+    const res = await fetch('${API_BASE}/api/roles', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ roles: updated }),
     })
@@ -444,7 +446,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
   const handleRoleColorChange = async (rolesid: string, newColor: string) => {
     const updated = roles.map(r => r.rolesid === rolesid ? { ...r, color: newColor } : r)
     try {
-      const res = await fetch('http://localhost:2088/api/roles', {
+      const res = await fetch('${API_BASE}/api/roles', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roles: updated }),
       })
@@ -458,7 +460,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
   const handleDeptColorChange = async (departmentsid: string, newColor: string) => {
     const updated = departments.map(d => d.departmentsid === departmentsid ? { ...d, color: newColor } : d)
     try {
-      const res = await fetch('http://localhost:2088/api/departments', {
+      const res = await fetch('${API_BASE}/api/departments', {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ departments: updated }),
       })
@@ -471,7 +473,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const handleRemoveDept = async (departmentsid: string) => {
     const updated = departments.filter(d => d.departmentsid !== departmentsid)
-    const res = await fetch('http://localhost:2088/api/departments', {
+    const res = await fetch('${API_BASE}/api/departments', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ departments: updated }),
     })
@@ -483,7 +485,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const handleAgentRoleChange = async (agent: AgentData, newRole: string) => {
     try {
-      const res = await fetch(`http://localhost:2088/api/agents/${agent.slug}`, {
+      const res = await fetch(`${API_BASE}/api/agents/${agent.slug}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: newRole }),
       })
@@ -493,7 +495,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const handleAgentDeptChange = async (agent: AgentData, newDept: string) => {
     try {
-      const res = await fetch(`http://localhost:2088/api/agents/${agent.slug}`, {
+      const res = await fetch(`${API_BASE}/api/agents/${agent.slug}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ department: newDept }),
       })
@@ -521,7 +523,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const fetchAgents = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:2088/api/agents')
+      const res = await fetch('${API_BASE}/api/agents')
       if (res.ok) {
         const data = await res.json()
         setAgents(data.agents || [])
@@ -533,7 +535,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const fetchProviders = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:2088/api/providers')
+      const res = await fetch('${API_BASE}/api/providers')
       if (res.ok) {
         const data = await res.json()
         setProviders(data.providers || [])
@@ -545,7 +547,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const fetchRoles = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:2088/api/roles')
+      const res = await fetch('${API_BASE}/api/roles')
       if (res.ok) {
         const data = await res.json()
         setRoles(data.roles || [])
@@ -557,7 +559,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const fetchDepartments = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:2088/api/departments')
+      const res = await fetch('${API_BASE}/api/departments')
       if (res.ok) {
         const data = await res.json()
         setDepartments(data.departments || [])
@@ -569,7 +571,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const detectExternalAgents = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:2088/api/external-agents/detect')
+      const res = await fetch('${API_BASE}/api/external-agents/detect')
       if (res.ok) {
         const data = await res.json()
         setExternalAgents(data.agents || [])
@@ -583,7 +585,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const fetchTools = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:2088/api/tools')
+      const res = await fetch('${API_BASE}/api/tools')
       if (res.ok) {
         const data = await res.json()
         setToolsRegistry(data.tools || {})
@@ -596,7 +598,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const handleExternalToggle = async (agent: ExternalAgentData) => {
     try {
-      const res = await fetch(`http://localhost:2088/api/external-agents/${agent.slug}`, {
+      const res = await fetch(`${API_BASE}/api/external-agents/${agent.slug}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: !agent.enabled }),
@@ -611,7 +613,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const handleExternalRoleChange = async (agent: ExternalAgentData, newRole: string) => {
     try {
-      const res = await fetch(`http://localhost:2088/api/external-agents/${agent.slug}`, {
+      const res = await fetch(`${API_BASE}/api/external-agents/${agent.slug}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: newRole }),
@@ -629,7 +631,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
       ? currentTools.filter(t => t !== toolName)
       : [...currentTools, toolName]
     try {
-      const res = await fetch(`http://localhost:2088/api/tools/${agentid}`, {
+      const res = await fetch(`${API_BASE}/api/tools/${agentid}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tools: newTools }),
@@ -645,7 +647,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const handleExternalDeptChange = async (agent: ExternalAgentData, newDept: string) => {
     try {
-      const res = await fetch(`http://localhost:2088/api/external-agents/${agent.slug}`, {
+      const res = await fetch(`${API_BASE}/api/external-agents/${agent.slug}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ department: newDept }),
@@ -669,7 +671,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const handleToggle = async (agent: AgentData) => {
     try {
-      const res = await fetch(`http://localhost:2088/api/agents/${agent.slug}`, {
+      const res = await fetch(`${API_BASE}/api/agents/${agent.slug}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: !agent.enabled }),
@@ -684,7 +686,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const handleModelChange = async (agent: AgentData, newModel: string) => {
     try {
-      const res = await fetch(`http://localhost:2088/api/agents/${agent.slug}`, {
+      const res = await fetch(`${API_BASE}/api/agents/${agent.slug}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: newModel }),
@@ -699,7 +701,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const handleAgentFieldChange = async (agent: AgentData, field: string, value: unknown) => {
     try {
-      const res = await fetch(`http://localhost:2088/api/agents/${agent.slug}`, {
+      const res = await fetch(`${API_BASE}/api/agents/${agent.slug}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [field]: value }),
       })
@@ -716,7 +718,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
     if (!createForm.name.trim()) return
     setCreating(true)
     try {
-      const res = await fetch('http://localhost:2088/api/agents', {
+      const res = await fetch('${API_BASE}/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(createForm),
@@ -737,7 +739,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
   const handleDeleteAgent = async (slug: string) => {
     if (!confirm('Удалить агента?')) return
     try {
-      const res = await fetch(`http://localhost:2088/api/agents/${slug}`, { method: 'DELETE' })
+      const res = await fetch(`${API_BASE}/api/agents/${slug}`, { method: 'DELETE' })
       if (res.ok) {
         setHoveredAgent(null)
         fetchAgents()
@@ -1215,7 +1217,7 @@ const ProvidersSection = forwardRef<{ refresh: () => void }, { onAddProvider: (t
   // Fetch providers from API with polling
   const fetchProviders = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:2088/api/providers')
+      const res = await fetch('${API_BASE}/api/providers')
       if (res.ok) {
         const data = await res.json()
         setConnected(data.providers || [])
@@ -1238,7 +1240,7 @@ const ProvidersSection = forwardRef<{ refresh: () => void }, { onAddProvider: (t
 
   const handleDisconnect = async (name: string) => {
     try {
-      const res = await fetch(`http://localhost:2088/api/providers/${encodeURIComponent(name)}`, {
+      const res = await fetch(`${API_BASE}/api/providers/${encodeURIComponent(name)}`, {
         method: 'DELETE',
       })
       if (res.ok) {
@@ -1252,7 +1254,7 @@ const ProvidersSection = forwardRef<{ refresh: () => void }, { onAddProvider: (t
   const handleTest = async (conn: ApiProvider) => {
     setTesting(conn.name)
     try {
-      const res = await fetch(`http://localhost:2088/api/providers/${encodeURIComponent(conn.name)}/test`, {
+      const res = await fetch(`${API_BASE}/api/providers/${encodeURIComponent(conn.name)}/test`, {
         method: 'POST',
       })
       const data = await res.json()
@@ -1494,13 +1496,13 @@ function AddFromCatalogModal({ provider, editProvider, onClose, onSaved }: {
         models: modelList,
       }
       // Create temp
-      await fetch('http://localhost:2088/api/providers', {
+      await fetch('${API_BASE}/api/providers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
       try {
-        const res = await fetch(`http://localhost:2088/api/providers/${encodeURIComponent(tempName)}/test`, {
+        const res = await fetch(`${API_BASE}/api/providers/${encodeURIComponent(tempName)}/test`, {
           method: 'POST',
         })
         // Safely parse JSON — backend might return non-JSON on error
@@ -1512,7 +1514,7 @@ function AddFromCatalogModal({ provider, editProvider, onClose, onSaved }: {
         }
       } finally {
         // Cleanup temp
-        await fetch(`http://localhost:2088/api/providers/${encodeURIComponent(tempName)}`, { method: 'DELETE' }).catch(() => {})
+        await fetch(`${API_BASE}/api/providers/${encodeURIComponent(tempName)}`, { method: 'DELETE' }).catch(() => {})
       }
     }
 
@@ -1566,8 +1568,8 @@ function AddFromCatalogModal({ provider, editProvider, onClose, onSaved }: {
       }
       const res = await fetch(
         isEdit
-          ? `http://localhost:2088/api/providers/${encodeURIComponent(editProvider!.name)}`
-          : 'http://localhost:2088/api/providers',
+          ? `${API_BASE}/api/providers/${encodeURIComponent(editProvider!.name)}`
+          : '${API_BASE}/api/providers',
         {
           method: isEdit ? 'PUT' : 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1799,7 +1801,7 @@ function AddProviderModal({ type, onClose, onSaved }: { type: 'openai' | 'anthro
         api_key: apiKey,
         models: model ? [model] : [],
       }
-      const res = await fetch('http://localhost:2088/api/providers', {
+      const res = await fetch('${API_BASE}/api/providers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -1886,7 +1888,7 @@ function EditCustomProviderModal({ provider, onClose, onSaved }: { provider: Api
         api_key: apiKey || undefined,
         models,
       }
-      const res = await fetch(`http://localhost:2088/api/providers/${encodeURIComponent(provider.name)}`, {
+      const res = await fetch(`${API_BASE}/api/providers/${encodeURIComponent(provider.name)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

@@ -27,12 +27,15 @@ class AnthropicProvider(BaseProvider):
             "content-type": "application/json",
         }
 
-        # Extract system message if present
+        # Extract system message and filter tool messages
         system = None
         chat_messages = []
         for m in messages:
             if m.role == "system":
                 system = m.content
+            elif m.role == "tool":
+                # Anthropic API doesn't support tool role messages; skip them
+                continue
             else:
                 chat_messages.append({"role": m.role, "content": m.content})
 
@@ -48,6 +51,10 @@ class AnthropicProvider(BaseProvider):
             body["max_tokens"] = max_tokens
         else:
             body["max_tokens"] = 4096
+
+        # Send tools if provided
+        if tools:
+            body["tools"] = tools
 
         async with httpx.AsyncClient(timeout=300.0) as client:
             async with client.stream(

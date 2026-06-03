@@ -26,6 +26,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ..memory import MemoryManager
+from ..memory.store import USER_CHAR_LIMIT
 # ── Shared USER Path ──────────────────────────────────────────────────────────
 _shared_user_path = None
 def _get_shared_user_path() -> Path:
@@ -63,15 +64,32 @@ if DATA_DIR is None:
 
 # ── Manager Cache ────────────────────────────────────────────────────────
 
+import time
+
+_MANAGER_TTL = 300  # 5 minutes in seconds
 _managers: Dict[str, MemoryManager] = {}
+_manager_timestamps: Dict[str, float] = {}
 
 
 def get_manager(agent_id: str) -> MemoryManager:
-    """Get or create MemoryManager for an agent."""
+    """Get or create MemoryManager for an agent. Cache expires after 5 min."""
+    now = time.time()
+    if agent_id in _managers:
+        # Check if cache is still valid
+        created = _manager_timestamps.get(agent_id, 0)
+        if now - created > _MANAGER_TTL:
+            # Cache expired, recreate
+            try:
+                _managers[agent_id].close()
+            except Exception:
+                pass
+            del _managers[agent_id]
+            del _manager_timestamps[agent_id]
     if agent_id not in _managers:
         manager = MemoryManager(agent_id, DATA_DIR)
         manager.initialize()
         _managers[agent_id] = manager
+        _manager_timestamps[agent_id] = now
     return _managers[agent_id]
 
 
@@ -115,11 +133,6 @@ class SetSessionRequest(BaseModel):
 
 # ── Endpoints ────────────────────────────────────────────────────────────
 
-@router.get("/{agent_id}")
-async def read_agent_memory(agent_id: str, target: str = "memory"):
-    """Read agent memory (memory only). USER.md is global."""
-    manager = get_manager(agent_id)
-    return manager.read(target)
 @router.get("/user")
 async def read_global_user():
     """Read the global shared USER.md profile."""
@@ -129,7 +142,7 @@ async def read_global_user():
     content = path.read_text(encoding="utf-8")
     entries = [e.strip() for e in content.split("\n§\n") if e.strip()]
     current = len(content)
-    limit = 1375
+    limit = USER_CHAR_LIMIT
     pct = min(100, int((current / limit) * 100)) if limit > 0 else 0
     return {"success": True, "target": "user", "entries": entries, "usage": f"{pct}% — {current:,}/{limit:,} chars", "entry_count": len(entries)}
 @router.post("/user/add")
@@ -177,6 +190,13 @@ async def replace_user_entry(req: ReplaceRequest):
     entries[matches[0]] = req.new_content.strip()
     path.write_text("\n§\n".join(entries) + "\n", encoding="utf-8")
     return {"success": True, "message": "Entry replaced."}
+
+
+@router.get("/{agent_id}")
+async def read_agent_memory(agent_id: str, target: str = "memory"):
+    """Read agent memory (memory only). USER.md is global."""
+    manager = get_manager(agent_id)
+    return manager.read(target)
 
 
 @router.post("/{agent_id}/add")

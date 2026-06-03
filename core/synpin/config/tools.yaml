@@ -1,0 +1,131 @@
+# Реестр инструментов SynPin
+#
+# Каждый инструмент имеет:
+#   name:        уникальное имя (ключ)
+#   display:     отображаемое имя в UI
+#   description: описание для агента
+#   category:    категория для группировки в UI
+#   implemented: true — работает, false — заглушка (будет позже)
+#   builtin:     true — всегда включен, скрыт из UI переключателей
+#
+# Используется:
+#   - agents/{agentid}/agent.yaml → tools: [terminal, file_read, ...]
+#   - UI: модалка агента → секция "Инструменты"
+#   - движок: core/synpin/tools/
+
+tools:
+  # ─── Файловые операции ──────────────────────────
+  file_read:
+    display: "Чтение файлов"
+    description: "Читать содержимое файлов проекта"
+    category: files
+    implemented: true
+
+  file_write:
+    display: "Запись файлов"
+    description: "Создавать и обновлять файлы"
+    category: files
+    implemented: true
+
+  search_files:
+    display: "Поиск по файлам"
+    description: "Поиск по содержимому и именам файлов (grep, find)"
+    category: files
+    implemented: true
+
+  # ─── Код и терминал ─────────────────────────────
+  terminal:
+    display: "Терминал"
+    description: "Выполнение shell-команд (bash, git, npm, python...)"
+    category: code
+    implemented: true
+
+  code_exec:
+    display: "Запуск кода"
+    description: "Выполнение Python-скриптов и блоков кода"
+    category: code
+    implemented: true
+
+  # ─── Веб ────────────────────────────────────────
+  web_search:
+    display: "Поиск в интернете"
+    description: "Поиск информации в вебе"
+    category: web
+    implemented: true
+
+  browser:
+    display: "Браузер"
+    description: "Взаимодействие с веб-страницами (клики, формы, скриншоты)"
+    category: web
+    implemented: false
+
+  vision:
+    display: "Анализ изображений"
+    description: "Распознавание и анализ скриншотов, диаграмм, UI"
+    category: web
+    implemented: false
+
+  # ─── Память ─────────────────────────────────────
+  memory_read:
+    display: "Чтение памяти"
+    description: "Доступ к MEMORY.md, USER.md и контексту сессий"
+    category: memory
+    implemented: true
+    builtin: true
+
+  memory_write:
+    display: "Запись в память"
+    description: "Сохранение выводов, решений, предпочтений"
+    category: memory
+    implemented: true
+    builtin: true
+
+  # ─── Коммуникация ───────────────────────────────
+  message_send:
+    display: "Отправка сообщений"
+    description: "Отправка сообщений в каналы (Feishu, Telegram, Discord)"
+    category: communication
+    implemented: false
+
+  agent_call:
+    display: "Вызов агента"
+    description: "Делегирование задачи другому агенту в организации"
+    category: communication
+    implemented: false
+
+  # ─── Задачи ─────────────────────────────────────
+  task_create:
+    display: "Создание задачи"
+    description: "Создать задачу на канбан-доске"
+    category: tasks
+    implemented: false
+
+  task_update:
+    display: "Обновление задачи"
+    description: "Изменить статус, описание, приоритет задачи"
+    category: tasks
+    implemented: false
+
+  # ─── Скиллы ─────────────────────────────────────
+  skill_use:
+    display: "Использование скилла"
+    description: "Применить загруженный скилл (шаблон, процедура, подход)"
+    category: skills
+    implemented: false
+
+# Группировка для UI
+categories:
+  files:
+    display: "Файлы"
+  code:
+    display: "Код и терминал"
+  web:
+    display: "Веб"
+  memory:
+    display: "Память"
+  communication:
+    display: "Коммуникация"
+  tasks:
+    display: "Задачи"
+  skills:
+    display: "Скиллы"

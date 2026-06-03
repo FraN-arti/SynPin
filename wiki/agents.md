@@ -54,27 +54,25 @@ agents/
 ## Структура agent.yaml
 
 ```yaml
-# agents/85n1yo4x/agent.yaml
-agentid: 85n1yo4x
-name: Архитектор
-description: 'Проектирует системы, принимает архитектурные решения'
-role: t0wy3h5qcd9m          # rolesid из roles.yaml
-department: 4lv3b3opepr8     # departmentsid из departments.yaml
+# agents/ix13aox3/agent.yaml
+agentid: ix13aox3
+name: QA Инженер
+description: ''
+role: управляющий              # slug из roles.yaml
+department: советчик           # slug из departments.yaml
 
 personality:
-  tone: профессиональный
-  style: развернутый, с примерами
+  tone: professional
+  style: analytical
   traits:
-    - аналитичный
-    - внимателен к деталям
-    - прагматичный
+    - thinks before answering
 
 behavior:
   max_iterations: 10
   temperature: 0.7
-  max_tokens: 40096
+  max_tokens: 4096
 
-system_prompt: 'Ты — Архитектор...'
+system_prompt: ''
 memory: {}
 ```
 
@@ -87,15 +85,15 @@ memory: {}
 ```yaml
 # ~/.synpin/config/roles.yaml
 roles:
-  - rolesid: t0wy3h5qcd9m      # 12-символьный ID
-    name: Техлид
-    description: 'Руководит техническими решениями'
+  - rolesid: управляющий      # slug-идентификатор
+    name: Управляющий
+    description: управляющий отделом
     color: '#f59e0b'
 
-  - rolesid: 0xzkvsn954lt
-    name: Разработчик
-    description: 'Пишет код, делает рефакторинг'
-    color: '#3b82f6'
+  - rolesid: сотрудник
+    name: Сотрудник
+    description: сотрудник отдела
+    color: '#6a4b16'
 ```
 
 ### Типы ролей
@@ -115,15 +113,20 @@ roles:
 ```yaml
 # ~/.synpin/config/departments.yaml
 departments:
-  - departmentsid: 4lv3b3opepr8
-    name: Разработка
-    description: 'Backend, frontend, инфраструктура'
-    color: '#22c55e'
+  - departmentsid: кодер
+    name: кодер
+    description: занимается кодом
+    color: '#3b82f6'
 
-  - departmentsid: ytue80l14hnk
-    name: QA
-    description: 'Тестирование, контроль качества'
-    color: '#ef4444'
+  - departmentsid: поиск
+    name: поиск
+    description: поиск информации
+    color: '#929baa'
+
+  - departmentsid: советчик
+    name: советчик
+    description: участвует в переговорах
+    color: '#bb3bf7'
 ```
 
 ---
@@ -145,8 +148,8 @@ departments:
 ```json
 {
   "name": "Маркетолог",
-  "role": "t0wy3h5qcd9m",
-  "department": "4lv3b3opepr8",
+  "role": "сотрудник",
+  "department": "кодер",
   "model": "9router/general-agent",
   "description": "Продвижение продукта",
   "system_prompt": "Ты — Маркетолог...",

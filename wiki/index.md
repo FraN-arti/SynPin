@@ -35,16 +35,27 @@
 ---
 
 ## 📖 Структура документов
-
 ```
 wiki/
+├── README.md               # Wiki-оглавление
+├── index.md                # Навигация (этот файл)
 ├── quickstart.md           # Быстрый старт
 ├── configuration.md        # Конфигурация системы
 ├── agents.md               # Агенты: личность, скиллы, роли
+├── agent-roles.md          # Роли агентов
+├── tools.md                # Инструменты агентов
+├── integrations.md         # Hermes ACP, OpenClaw, Windsurf
+├── mcp-integration.md      # MCP интеграция
 ├── memory-sessions.md      # Память и сессии
+├── memory-system.md        # Система памяти
 ├── channels-hierarchy.md   # Каналы и иерархия
 ├── kanban-board.md         # Канбан-доска задач
-└── index.md                # Навигация (этот файл)
+├── forum.md                # Форум
+├── group-chat.md           # Group Chat Engine
+├── dashboard.md            # Дашборд
+├── architecture.md         # Архитектура системы
+├── philosophy.md           # Философия проекта
+└── roadmap.md              # Дорожная карта
 ```
 
 ---

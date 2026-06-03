@@ -2,8 +2,14 @@
 
 Built-in tool: always enabled, not shown in agent UI.
 """
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
+
+# Character limits
+MEMORY_CHAR_LIMIT = 2200
+USER_CHAR_LIMIT = 1375
 
 _DATA_DIR: Path | None = None
 
@@ -32,14 +38,29 @@ def _read_entries(path: Path) -> list[str]:
     content = path.read_text(encoding="utf-8").strip()
     if not content:
         return []
-    return [e.strip() for e in content.split("§") if e.strip()]
+    return [e.strip() for e in content.split("\n§\n") if e.strip()]
 
 
 def _write_entries(path: Path, entries: list[str]) -> None:
     """Write entries list back to file."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    content = "§\n".join(entries) + "\n" if entries else ""
-    path.write_text(content, encoding="utf-8")
+    content = "\n§\n".join(entries) + "\n" if entries else ""
+    # Atomic write: temp file + rename
+    fd, tmp_path = tempfile.mkstemp(
+        dir=str(path.parent), suffix=".tmp", prefix=".memory_"
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, str(path))
+    except BaseException:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 async def memory_write(params: dict[str, Any]) -> dict[str, Any]:
@@ -81,6 +102,11 @@ async def memory_write(params: dict[str, Any]) -> dict[str, Any]:
             return {"success": False, "output": "", "error": "content is required for add"}
         entries.append(content.strip())
         _write_entries(path, entries)
+        # Check char limit
+        written = path.read_text(encoding="utf-8")
+        limit = USER_CHAR_LIMIT if target == "user" else MEMORY_CHAR_LIMIT
+        if len(written) > limit:
+            return {"success": True, "output": f"Added. Total entries: {len(entries)}", "warning": f"Memory ({len(written):,} chars) exceeds limit ({limit:,} chars).", "error": None}
         return {"success": True, "output": f"Added. Total entries: {len(entries)}", "error": None}
 
     elif action == "remove":

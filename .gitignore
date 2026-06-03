@@ -35,11 +35,11 @@ logs/
 # ChromaDB
 chroma_data/
 
-# User configs (NEVER commit - contains API keys!)
-core/synpin/config/*.yaml
+# User home data
 ~/.synpin/
-*.yaml
-!web/vite.config.ts
 
 # Shared user data (NEVER commit)
 data/shared/
+
+# Configs with secrets (NEVER commit)
+core/synpin/config/providers.yaml

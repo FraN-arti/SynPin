@@ -90,17 +90,19 @@ function App() {
   // Reveal metadata 0.5s after streaming completes
   useEffect(() => {
     if (!isTyping && messages.length > 0) {
-      const lastMsg = messages[messages.length - 1]
-      if (lastMsg?.role === 'assistant') {
-        const timer = setTimeout(() => {
-          setRevealedMeta(prev => {
-            const next = new Set(prev)
-            next.add(lastMsg.id)
-            return next
-          })
-        }, 500)
-        return () => clearTimeout(timer)
-      }
+      const timer = setTimeout(() => {
+        setRevealedMeta(prev => {
+          const next = new Set(prev)
+          // Reveal ALL assistant messages that have model or agent_name (from history or done streaming)
+          for (const msg of messages) {
+            if (msg.role === 'assistant' && (msg.model || msg.agent_name)) {
+              next.add(msg.id)
+            }
+          }
+          return next
+        })
+      }, 500)
+      return () => clearTimeout(timer)
     }
   }, [isTyping, messages])
 
@@ -155,11 +157,13 @@ function App() {
         const data = await res.json()
         const msgs = data.messages || []
         if (msgs.length > 0) {
-          const restored: Message[] = msgs.map((m: { role: string; content: string }, i: number) => ({
+          const restored: Message[] = msgs.map((m: { role: string; content: string; model?: string; agent_name?: string }, i: number) => ({
             id: `restored-${i}`,
             role: m.role as 'user' | 'assistant',
             content: m.content,
             timestamp: new Date(),
+            model: m.model,
+            agent_name: m.agent_name,
           }))
           setMessages(restored)
         } else {

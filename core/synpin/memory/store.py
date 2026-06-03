@@ -73,7 +73,7 @@ class MemoryStore:
     def load_from_disk(self):
         """Load entries from MEMORY.md and USER.md, capture system prompt snapshot."""
         self.memory_entries = self._read_file(self.memory_dir / "MEMORY.md")
-        self.user_entries = self._read_file(self.memory_dir / "USER.md")
+        self.user_entries = self._read_file(self.data_dir / "shared" / "USER.md")
 
         # Deduplicate entries (preserves order, keeps first occurrence)
         self.memory_entries = list(dict.fromkeys(self.memory_entries))
@@ -382,7 +382,7 @@ class MemoryStore:
         if target == "user":
             header = (
                 f"USER PROFILE (who the user is) [{pct}% — {current:,}/{limit:,} chars]\n"
-                f"Факты о пользователе. Обновляй через memory_write если узнал новое."
+                f"Факты о пользователе. Используй эту информацию в диалоге. Дополняй через memory_write если узнал новое."
             )
         else:
             header = f"MEMORY (your personal notes) [{pct}% — {current:,}/{limit:,} chars]"

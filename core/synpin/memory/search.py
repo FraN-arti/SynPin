@@ -152,7 +152,7 @@ class MemorySearch:
             count += 1
         
         # Index USER.md
-        user_file = agent_dir / "USER.md"
+        user_file = self.data_dir / "shared" / "USER.md"
         if user_file.exists() and self.index_file(agent_id, user_file, "user"):
             count += 1
         

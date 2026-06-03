@@ -374,7 +374,7 @@ if scan_result:
 ## Контекст агента при старте
 
 ```
-1. personality.yaml — кто он, как общается
+1. agent.yaml — кто он, как общается
 2. MEMORY.md — frozen snapshot (компактная память)
 3. USER.md — frozen snapshot (предпочтения пользователя)
 4. facts/*.md — датированные решения (актуальные)

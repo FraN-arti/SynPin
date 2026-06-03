@@ -1,0 +1,25 @@
+agents:
+  ix13aox3:
+    name: QA Инженер
+    role: управляющий
+    department: советчик
+    model: 9router/general-agent
+    personality:
+      tone: professional
+      style: analytical
+      traits:
+      - thinks before answering
+    system_prompt: ''
+    enabled: true
+  8e5tv711:
+    name: Архитектор
+    role: сотрудник
+    department: советчик
+    model: 9router/general-agent
+    enabled: true
+  yni1tbod:
+    name: Тестер
+    role: сотрудник
+    department: поиск
+    model: 9router/general-agent
+    enabled: true

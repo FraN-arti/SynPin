@@ -1,0 +1,11 @@
+agentid: 8e5tv711
+name: Архитектор
+role: сотрудник
+department: советчик
+tools:
+- file_read
+- terminal
+- code_exec
+- file_write
+- search_files
+- web_search

@@ -71,14 +71,6 @@ class ToolRegistry:
             import importlib
             module = importlib.import_module(module_path, package=__package__)
             handler = getattr(module, tool_name, None)
-            if handler is None:
-                # Some modules might export under a different name
-                # Try to find any async callable
-                for attr_name in dir(module):
-                    attr = getattr(module, attr_name)
-                    if callable(attr) and attr_name == tool_name:
-                        handler = attr
-                        break
             return handler
         except Exception as e:
             logger.error("Failed to import tool '%s': %s", tool_name, e)

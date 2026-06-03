@@ -112,28 +112,51 @@ def _estimate_tokens(text: str) -> int:
 
 
 def _get_agent_compaction_config(agent_slug: str) -> dict:
-    """Load compaction + context_window settings for an agent."""
+    """Load compaction + context_window settings for an agent.
+    
+    Priority: global memory.yaml → per-agent config → hardcoded defaults.
+    """
+    # 1. Load global config from memory.yaml
+    global_cfg = {}
     try:
-        from ..agents.manager import get_agent
-        agent = get_agent(agent_slug)
-        if not agent:
-            return {}
-        memory = agent.get("memory", {})
-        return {
-            "context_window": agent.get("context_window", 128000),
-            "compaction_enabled": memory.get("compaction_enabled", True),
-            "trigger_percent": memory.get("compaction_trigger_percent", 80),
-            "keep_recent": memory.get("compaction_keep_recent", 10),
-            "strategy": memory.get("compaction_strategy", "truncate"),
+        from ..config.manager import load_yaml
+        full = load_yaml("memory.yaml")
+        global_cfg = {
+            "context_window": full.get("context_window", {}).get("default", 128000),
+            "compaction_enabled": full.get("compaction", {}).get("enabled", True),
+            "trigger_percent": full.get("compaction", {}).get("trigger_percent", 80),
+            "keep_recent": full.get("compaction", {}).get("keep_recent", 10),
+            "strategy": full.get("compaction", {}).get("strategy", "truncate"),
         }
     except Exception:
-        return {
+        global_cfg = {
             "context_window": 128000,
             "compaction_enabled": True,
             "trigger_percent": 80,
             "keep_recent": 10,
             "strategy": "truncate",
         }
+
+    # 2. Override with per-agent settings if present
+    try:
+        from ..agents.manager import get_agent
+        agent = get_agent(agent_slug)
+        if agent:
+            memory = agent.get("memory", {})
+            if "compaction_enabled" in memory:
+                global_cfg["compaction_enabled"] = memory["compaction_enabled"]
+            if "compaction_trigger_percent" in memory:
+                global_cfg["trigger_percent"] = memory["compaction_trigger_percent"]
+            if "compaction_keep_recent" in memory:
+                global_cfg["keep_recent"] = memory["compaction_keep_recent"]
+            if "compaction_strategy" in memory:
+                global_cfg["strategy"] = memory["compaction_strategy"]
+            if agent.get("context_window"):
+                global_cfg["context_window"] = agent["context_window"]
+    except Exception:
+        pass
+
+    return global_cfg
 
 
 def compact_messages(

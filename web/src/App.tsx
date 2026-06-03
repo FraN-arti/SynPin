@@ -311,9 +311,9 @@ function App() {
         const lines = buffer.split('\n')
         buffer = lines.pop() || '' // keep incomplete line in buffer
 
+        let streamDone = false
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue
-
           const data = line.slice(6)
           let parsed: Record<string, unknown>
           try {
@@ -369,11 +369,13 @@ function App() {
                 : m
               )
             )
+            streamDone = true
             break
           } else if (parsed.type === 'error') {
             throw new Error(String(parsed.message || 'Stream error'))
           }
         }
+        if (streamDone) break
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error'

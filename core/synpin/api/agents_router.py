@@ -141,3 +141,24 @@ async def update_departments(req: dict):
     """Replace all departments."""
     departments = req.get("departments", [])
     return {"departments": manager.save_departments(departments)}
+
+
+# ─── Tools ───────────────────────────────────────────────────────
+
+@router.get("/tools")
+async def get_tools():
+    """Get tools registry."""
+    return manager.load_tools()
+
+
+@router.get("/tools/{agentid}")
+async def get_agent_tools(agentid: str):
+    """Get enabled tools for an agent."""
+    return {"tools": manager.get_agent_tools(agentid)}
+
+
+@router.put("/tools/{agentid}")
+async def set_agent_tools(agentid: str, req: dict):
+    """Set enabled tools for an agent."""
+    tools = req.get("tools", [])
+    return {"tools": manager.set_agent_tools(agentid, tools)}

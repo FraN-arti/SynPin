@@ -188,6 +188,7 @@ def load_agents() -> dict[str, Any]:
             "model": model,
             "provider": provider,
             "skills": cfg.get("skills", []),
+            "tools": agent_data.get("tools", []),
             # From agent.yaml
             "name": agent_data.get("name", _DEFAULT_NAMES.get(slug, slug.replace("-", " ").title())),
             "description": agent_data.get("description", ""),
@@ -304,7 +305,8 @@ def save_agent(slug: str, updates: dict[str, Any]) -> dict[str, Any]:
 
     # Personalization + role/dept → agent.yaml
     personalization_keys = {"name", "description", "role", "department", "tone", "style", "traits",
-                           "system_prompt", "max_iterations", "temperature", "max_tokens", "memory"}
+                           "system_prompt", "max_iterations", "temperature", "max_tokens", "memory",
+                           "tools"}
     personalization = {k: v for k, v in updates.items() if k in personalization_keys}
 
     # Update agents.yaml
@@ -423,3 +425,37 @@ def save_departments(departments: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
     _save_yaml(config_path, {"departments": departments})
     return departments
+
+
+# ─── Tools ───────────────────────────────────────────────────────
+
+def load_tools() -> dict[str, Any]:
+    """Load tools registry from config/tools.yaml."""
+    config_path = _get_config_dir() / "tools.yaml"
+    data = _load_yaml(config_path)
+    return data
+
+
+def save_tools(data: dict[str, Any]) -> dict[str, Any]:
+    """Save tools registry to config/tools.yaml."""
+    config_path = _get_config_dir() / "tools.yaml"
+    _save_yaml(config_path, data)
+    return data
+
+
+def get_agent_tools(agentid: str) -> list[str]:
+    """Get list of enabled tool names for an agent."""
+    agent = get_agent(agentid)
+    if not agent:
+        return []
+    return agent.get("tools", [])
+
+
+def set_agent_tools(agentid: str, tools: list[str]) -> dict[str, Any]:
+    """Set list of enabled tool names for an agent."""
+    agent_dir = ensure_agent_dir(agentid)
+    agent_yaml_path = agent_dir / "agent.yaml"
+    agent_data = _load_yaml(agent_yaml_path)
+    agent_data["tools"] = tools
+    _save_yaml(agent_yaml_path, agent_data)
+    return get_agent(agentid) or {}

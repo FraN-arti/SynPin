@@ -19,6 +19,7 @@ class AnthropicProvider(BaseProvider):
         temperature: float = 0.7,
         max_tokens: int | None = None,
         stream: bool = True,
+        tools: list[dict] | None = None,
     ) -> AsyncIterator[str]:
         headers = {
             "x-api-key": self.api_key,

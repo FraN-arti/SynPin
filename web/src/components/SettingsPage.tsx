@@ -336,6 +336,7 @@ interface AgentData {
   model: string
   provider: string | null
   skills: string[]
+  tools: string[]
   enabled: boolean
   description: string
   tone: string
@@ -372,6 +373,7 @@ function AgentsSection() {
   const [agents, setAgents] = useState<AgentData[]>([])
   const [providers, setProviders] = useState<{name: string; models: string[]}[]>([])
   const [hoveredAgent, setHoveredAgent] = useState<string | null>(null)
+  const [overlayShift, setOverlayShift] = useState<Record<string, number>>({})
   const [roles, setRoles] = useState<{rolesid: string; name: string; description: string; color: string}[]>([])
   const [departments, setDepartments] = useState<{departmentsid: string; name: string; description: string; color: string}[]>([])
   const [newRole, setNewRole] = useState({ name: '', description: '', color: '#f59e0b' })
@@ -385,6 +387,8 @@ function AgentsSection() {
   })
   const [creating, setCreating] = useState(false)
   const [formTouched, setFormTouched] = useState(false)
+  const [toolsRegistry, setToolsRegistry] = useState<Record<string, {display: string; description: string; category: string; implemented: boolean}>>({})
+  const [toolsCategories, setToolsCategories] = useState<Record<string, {display: string}>>({})
 
   // Build lookup maps from roles/departments
   const roleMap: Record<string, {name: string; color: string}> = {}
@@ -494,6 +498,24 @@ function AgentsSection() {
     } catch (e) { console.error('[agents] dept change error:', e) }
   }
 
+  const handleAgentEnter = useCallback((slug: string, el: HTMLDivElement | null) => {
+    setHoveredAgent(slug)
+    if (!el) return
+    requestAnimationFrame(() => {
+      const rect = el.getBoundingClientRect()
+      const cardH = rect.height
+      // Overlay: top=-60%, height=320% → bottom edge = cardTop + 2.6*cardH
+      const overlayBottom = rect.top + cardH * 2.6
+      const viewH = window.innerHeight
+      if (overlayBottom > viewH - 12) {
+        const shift = Math.ceil(overlayBottom - viewH + 12)
+        setOverlayShift(prev => ({ ...prev, [slug]: shift }))
+      } else {
+        setOverlayShift(prev => { const n = { ...prev }; delete n[slug]; return n })
+      }
+    })
+  }, [])
+
   const fetchAgents = useCallback(async () => {
     try {
       const res = await fetch('http://localhost:2088/api/agents')
@@ -556,6 +578,19 @@ function AgentsSection() {
     }
   }, [])
 
+  const fetchTools = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:2088/api/tools')
+      if (res.ok) {
+        const data = await res.json()
+        setToolsRegistry(data.tools || {})
+        setToolsCategories(data.categories || {})
+      }
+    } catch (e) {
+      console.error('[tools] fetch error:', e)
+    }
+  }, [])
+
   const handleExternalToggle = async (agent: ExternalAgentData) => {
     try {
       const res = await fetch(`http://localhost:2088/api/external-agents/${agent.slug}`, {
@@ -586,6 +621,24 @@ function AgentsSection() {
     }
   }
 
+  const handleToolToggle = async (agentid: string, toolName: string, currentTools: string[]) => {
+    const newTools = currentTools.includes(toolName)
+      ? currentTools.filter(t => t !== toolName)
+      : [...currentTools, toolName]
+    try {
+      const res = await fetch(`http://localhost:2088/api/tools/${agentid}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tools: newTools }),
+      })
+      if (res.ok) {
+        fetchAgents()
+      }
+    } catch (e) {
+      console.error('[tools] toggle error:', e)
+    }
+  }
+
   const handleExternalDeptChange = async (agent: ExternalAgentData, newDept: string) => {
     try {
       const res = await fetch(`http://localhost:2088/api/external-agents/${agent.slug}`, {
@@ -607,7 +660,8 @@ function AgentsSection() {
     fetchRoles()
     fetchDepartments()
     detectExternalAgents()
-  }, [fetchAgents, fetchProviders, fetchRoles, fetchDepartments, detectExternalAgents])
+    fetchTools()
+  }, [fetchAgents, fetchProviders, fetchRoles, fetchDepartments, detectExternalAgents, fetchTools])
 
   const handleToggle = async (agent: AgentData) => {
     try {
@@ -856,8 +910,8 @@ function AgentsSection() {
           <div className="settings-grid">
             {externalAgents.map(agent => (
               <div key={agent.slug} className="agent-card-wrapper"
-                onMouseEnter={() => setHoveredAgent(agent.slug)}
-                onMouseLeave={() => setHoveredAgent(null)}>
+                onMouseEnter={(e) => handleAgentEnter(agent.slug, e.currentTarget)}
+                onMouseLeave={() => { setHoveredAgent(null); setOverlayShift(prev => { const n = { ...prev }; delete n[agent.slug]; return n }) }}>
                 <section className={`settings-card agent-card external-agent ${!agent.enabled ? 'disabled' : ''}`}>
                   <div className="agent-header">
                     <div className="agent-identity">
@@ -892,7 +946,7 @@ function AgentsSection() {
                   </div>
                 </section>
                 {hoveredAgent === agent.slug && (
-                  <div className="agent-expanded-overlay">
+                  <div className="agent-expanded-overlay" style={overlayShift[agent.slug] != null ? { marginTop: -overlayShift[agent.slug]! } : undefined}>
                     <div className="agent-expanded-content">
                       <div className="agent-expanded-header">
                         <span className="agent-expanded-avatar external" style={{ background: agent.color }}>{agent.icon_letter}</span>
@@ -973,8 +1027,8 @@ function AgentsSection() {
             <div className="settings-grid">
               {(grouped[roleId] || []).map(agent => (
                 <div key={agent.slug} className="agent-card-wrapper"
-                  onMouseEnter={() => setHoveredAgent(agent.slug)}
-                  onMouseLeave={() => setHoveredAgent(null)}>
+                  onMouseEnter={(e) => handleAgentEnter(agent.slug, e.currentTarget)}
+                  onMouseLeave={() => { setHoveredAgent(null); setOverlayShift(prev => { const n = { ...prev }; delete n[agent.slug]; return n }) }}>
                   <section className={`settings-card agent-card ${!agent.enabled ? 'disabled' : ''}`}>
                     <div className="agent-header">
                       <div className="agent-identity">
@@ -1010,7 +1064,7 @@ function AgentsSection() {
                     )}
                   </section>
                   {hoveredAgent === agent.slug && (
-                    <div className="agent-expanded-overlay">
+                    <div className="agent-expanded-overlay" style={overlayShift[agent.slug] != null ? { marginTop: -overlayShift[agent.slug]! } : undefined}>
                       <div className="agent-expanded-content">
                         <div className="agent-expanded-header">
                           <span className="agent-expanded-avatar">{agent.name[0]}</span>
@@ -1058,6 +1112,35 @@ function AgentsSection() {
                               </div>
                             </div>
                           )}
+                          {/* Tools */}
+                          <div className="expanded-field">
+                            <label>Инструменты</label>
+                            <div className="tools-grid">
+                              {Object.entries(toolsCategories).map(([catKey, cat]) => {
+                                const catTools = Object.entries(toolsRegistry).filter(([, t]) => t.category === catKey)
+                                if (catTools.length === 0) return null
+                                return (
+                                  <div key={catKey} className="tools-category">
+                                    <span className="tools-category-label">{cat.display}</span>
+                                    <div className="tools-chips">
+                                      {catTools.map(([name, tool]) => {
+                                        const isEnabled = (agent.tools || []).includes(name)
+                                        const isImplemented = tool.implemented !== false
+                                        return (
+                                          <button key={name}
+                                            className={`tool-chip ${isEnabled ? 'active' : ''} ${!isImplemented ? 'dimmed' : ''}`}
+                                            onClick={() => isImplemented && handleToolToggle(agent.agentid, name, agent.tools || [])}
+                                            title={tool.description + (!isImplemented ? ' (будет доступно позже)' : '')}>
+                                            <span className="tool-chip-name">{tool.display}</span>
+                                          </button>
+                                        )
+                                      })}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
                           <div className="expanded-field">
                             <label>System Prompt</label>
                             <textarea className="settings-input expanded-textarea" rows={4}

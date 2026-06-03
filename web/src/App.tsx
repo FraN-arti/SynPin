@@ -22,11 +22,21 @@ interface AgentConfig {
   tone: string
   style: string
   traits: string[]
+  tools: string[]
   temperature: number
   max_tokens: number
   enabled: boolean
   is_external?: boolean
   type?: string
+}
+
+interface ToolCall {
+  id: string
+  name: string
+  params: Record<string, unknown>
+  status: 'running' | 'completed' | 'error'
+  result?: string
+  error?: string
 }
 
 interface Message {
@@ -37,6 +47,7 @@ interface Message {
   model?: string
   agent_name?: string
   usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number }
+  tools?: ToolCall[]
 }
 
 function App() {
@@ -152,18 +163,22 @@ function App() {
 
     setIsTyping(true)
 
-    // Create assistant message placeholder
+    // Create assistant message placeholder with tools array
     const assistantId = (Date.now() + 1).toString()
     setMessages(prev => [...prev, {
       id: assistantId,
       role: 'assistant',
       content: '',
       timestamp: new Date(),
+      tools: [],
     }])
 
+    const activeTools: ToolCall[] = []
+    let toolIndex = 0
+
     try {
-      // Build history including the new user message
-      const history = [...messages.map(m => ({ role: m.role, content: m.content })), { role: 'user' as const, content: userInput }]
+      // Build history: just existing messages (userMsg not included yet — it's in req.message)
+      const history = messages.map(m => ({ role: m.role, content: m.content }))
 
       // Build merged system prompt from agent config
       let systemPrompt: string | undefined
@@ -172,16 +187,28 @@ function App() {
       let temperature = 0.7
       let maxTokens: number | undefined
       let chatEndpoint = `${API_BASE}/api/chat/stream`
+      let enabledTools: string[] = []
 
       if (activeAgent) {
         agentName = activeAgent.name
         temperature = activeAgent.temperature || 0.7
         maxTokens = activeAgent.max_tokens
+        enabledTools = activeAgent.tools || []
 
         // Route to Hermes endpoint if external agent
         if (activeAgent.is_external && activeAgent.type === 'hermes') {
           chatEndpoint = `${API_BASE}/api/chat/hermes/stream`
-          // Hermes uses its own system prompt handling
+          // Build SynPin context for external agent
+          const ctx: string[] = [
+            `Ты работаешь внутри платформы SynPin — системы управления агентами (agent-driven organization).`,
+            `Ты подключён как внешний агент (external agent) в организации SynPin.`,
+          ]
+          if (activeAgent.name) ctx.push(`Твоё имя в SynPin: ${activeAgent.name}`)
+          if (activeAgent.role_name) ctx.push(`Твоя роль: ${activeAgent.role_name}`)
+          if (activeAgent.department_name) ctx.push(`Твой департамент: ${activeAgent.department_name}`)
+          if (activeAgent.system_prompt) ctx.push(activeAgent.system_prompt)
+          ctx.push(`Если тебя спрашивают где ты или что ты — ты внутри SynPin и можешь помогать с задачами организации.`)
+          systemPrompt = ctx.join('\n')
         } else {
           // SynPin agent — build system prompt
           model = activeAgent.model
@@ -210,6 +237,7 @@ function App() {
           agent_name: agentName,
           temperature,
           max_tokens: maxTokens,
+          tools: enabledTools,
         }),
       })
 
@@ -250,6 +278,39 @@ function App() {
             setMessages(prev =>
               prev.map(m => m.id === assistantId ? { ...m, content: fullContent } : m)
             )
+          } else if (parsed.type === 'tool_start') {
+            const toolName = String(parsed.tool || '')
+            const ti = toolIndex++
+            const tc: ToolCall = {
+              id: `${assistantId}-tool-${ti}`,
+              name: toolName,
+              params: (parsed.params as Record<string, unknown>) || {},
+              status: 'running',
+            }
+            activeTools.push(tc)
+            setMessages(prev =>
+              prev.map(m => m.id === assistantId
+                ? { ...m, tools: [...(m.tools || []), tc] }
+                : m
+              )
+            )
+          } else if (parsed.type === 'tool_end') {
+            const toolName = String(parsed.tool || '')
+            const idx = activeTools.findIndex(t => t.name === toolName && t.status === 'running')
+            if (idx !== -1) {
+              const tc = activeTools[idx]
+              if (tc) {
+                tc.status = parsed.success ? 'completed' : 'error'
+                tc.result = String(parsed.result || '')
+                tc.error = parsed.error ? String(parsed.error) : undefined
+                setMessages(prev =>
+                  prev.map(m => m.id === assistantId
+                    ? { ...m, tools: [...activeTools] }
+                    : m
+                  )
+                )
+              }
+            }
           } else if (parsed.type === 'done') {
             const usage = parsed.usage as { prompt_tokens: number; completion_tokens: number; total_tokens: number } | undefined
             const model = parsed.model as string | undefined
@@ -465,6 +526,21 @@ function App() {
                           <img src={synpinLogo} alt="S" className="avatar-logo" />
                         ) : 'U'}
                       </div>
+                      {/* Tool blocks between avatar and bubble */}
+                      {msg.tools && msg.tools.length > 0 && (
+                        <div className="message-tools">
+                          {msg.tools.map(tc => (
+                            <div key={tc.id}
+                              className={`tool-block ${tc.status === 'running' ? 'running' : tc.status === 'error' ? 'error' : 'done'}`}
+                              title={tc.status === 'running' ? `Выполняется: ${tc.name}` : tc.status === 'error' ? `Ошибка: ${tc.error}` : `Готово: ${tc.name}`}>
+                              <span className="tool-block-name">{tc.name}</span>
+                              <span className={`tool-block-status ${tc.status}`}>
+                                {tc.status === 'running' ? '⟳' : tc.status === 'error' ? '✕' : '✓'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <div className={`message-wrapper ${isLastAssistant ? 'streaming' : ''}`}>
                         <div className="message-bubble">
                           <MarkdownRenderer content={msg.content} isStreaming={isLastAssistant} />

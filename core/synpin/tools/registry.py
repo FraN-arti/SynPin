@@ -59,6 +59,8 @@ class ToolRegistry:
             "search_files": ".search_files",
             "web_search": ".web_search",
             "code_exec": ".code_exec",
+            "memory_read": ".memory_read",
+            "memory_write": ".memory_write",
         }
 
         module_path = _MODULE_MAP.get(tool_name)

@@ -1,85 +1,73 @@
 # 🧠 Память и сессии
 
-Система памяти SynPin построена по принципу Hermes — простые Markdown-файлы, прозрачная структура, лёгкий бэкап.
+Система памяти SynPin построена по принципу Hermes — простые Markdown-файлы, прозрачная структура, лёгкий бэкап. Дополнена иерархией контекста (координатор vs исполнители) и датированными фактами.
 
 ---
 
-## Структура
+## Структура на диске
 
 ```
 ~/.synpin/data/
+├── state.db                      # SQLite: индекс + FTS5
 ├── agents/
 │   ├── architect/
-│   │   ├── MEMORY.md        # долговременная память
-│   │   ├── personality.yaml # ВСЁ: агент + пользователь
-│   │   ├── skills.yaml      # подключённые скиллы
-│   │   └── sessions/        # история сессий
-│   ├── developer/
-│   │   ├── MEMORY.md
-│   │   ├── personality.yaml
-│   │   ├── skills.yaml
-│   │   └── sessions/
-│   └── researcher/
+│   │   ├── MEMORY.md             # компактная память (frozen snapshot)
+│   │   ├── state.json            # bookmarks per channel
+│   │   ├── facts/                # датированные решения
+│   │   │   ├── 2026-06-03_port-2099.md
+│   │   │   └── 2026-06-02_api-convention.md
+│   │   └── sessions/             # Markdown архив
+│   │       └── 2026-06-03_api.md
+│   └── developer/
 │       ├── MEMORY.md
-│       ├── personality.yaml
-│       ├── skills.yaml
+│       ├── state.json
+│       ├── facts/
 │       └── sessions/
+├── teams/
+│   └── engineering/
+│       ├── MEMORY.md             # память канала
+│       └── sessions/
+│           └── 2026-06-03_api.md
 └── shared/
-    └── MEMORY.md            # общие знания команды
+    └── MEMORY.md                 # глобальная память команды
 ```
 
 ### Принцип
 
-- **Каждый агент — изолирован.** Своя память, свои сессии, свой контекст.
-- **MEMORY.md — долговременная память.** Факты, уроки, решения.
-- **USER.md — предпочтения пользователя** для этого конкретного агента.
-- **Сессии — история взаимодействий.** Markdown-файлы, читаемые человеком.
-- **Shared MEMORY.md — коллективное обучение.** Ошибка одного = знание всех.
+- **SQLite** — индекс сессий + FTS5 поиск (быстрый доступ)
+- **Markdown** — human-readable архив (удобный бэкап, версионирование)
+- **state.json** — per-agent bookmark (восстановление после рестарта)
+- **Frozen snapshot** — системный промпт фиксируется при старте
+- **Датированные факты** — агент видит актуальность решений
 
 ---
 
-## MEMORY.md
+## MEMORY.md — компактная память
 
-Долговременная память агента. Заполняется автоматически + вручную.
+Долговременная память агента. **Не раздувается.**
 
 ```markdown
-# Agent Memory — architect
+# Memory — architect
 
-## Facts
-- Проект на FastAPI + React
-- Порт 2088 для API, 2099 для Vite dev
-- Пользователь предпочитает YAML конфиги
-- LM Studio запущен на localhost:1234
+## Patterns
+- Text-fallback: инструменты шлём как role="user"
+- Порты: 2088 prod, 2099 dev
+- Гит: всегда советоваться перед push
 
-## Lessons Learned
-- При проектировании API всегда учитывать auth middleware первым
-- FastAPI dependencies — лучший способ для cross-cutting concerns
-- Пользователь не любит verbose логи
+## Conventions
+- YAML для конфигов
+- Pydantic v2 для валидации
 
-## Active Decisions
-- Используем Pydantic v2 для валидации
-- ChromaDB для векторной памяти (когда подключим)
-- JWT для авторизации с refresh tokens
-
-## Past Errors
-- 2025-06-01: Забыл про CORS middleware → добавлен в базовый шаблон
-- 2025-06-02: Не учёл rate limiting → добавлен как обязательный пункт
+## Anti-patterns
+- Не забывать auth middleware
+- Не делать verbose логи
 ```
 
-### Секции
-
-| Секция | Описание | Кто заполняет |
-|---|---|---|
-| `Facts` | Факты о проекте, окружении, предпочтениях | Агент + пользователь |
-| `Lessons Learned` | Уроки из ошибок и успехов | Агент (автоматически) |
-| `Active Decisions` | Текущие архитектурные решения | Агент |
-| `Past Errors` | Прошлые ошибки и как были исправлены | Агент (автоматически) |
+**Лимит:** ~2200 символов. Если не влезает — компакция.
 
 ---
 
-## USER.md
-
-Предпочтения пользователя для конкретного агента.
+## USER.md — предпочтения пользователя
 
 ```markdown
 # User Profile — architect
@@ -87,204 +75,262 @@
 ## Communication
 - Язык: русский
 - Стиль: кратко, по делу
-- Предпочитает схемы и диаграммы
 
 ## Preferences
-- Любит YAML вместо JSON для конфигов
+- Любит YAML вместо JSON
 - Не любит verbose логи
-- Хочет видеть процесс обсуждения, не только результат
-
-## Project Context
-- Работает над SynPin — агентский фреймворк
-- Стек: Python/FastAPI + React/Vite
-- Локальный-first, данные не уходят наружу
 ```
+
+**Лимит:** ~1375 символов.
 
 ---
 
-## Сессии
+## facts/*.md — датированные решения
 
-Каждое взаимодействие агента с пользователем — отдельная сессия в Markdown.
+Конкретные ситуативные решения с привязкой ко времени.
 
 ```markdown
-# Session: Архитектура API для авторизации
+# 2026-06-03_port-2099
 
-**Agent:** architect
-**Started:** 2025-06-01 14:30
-**Ended:** 2025-06-01 14:45
-**Task:** Спроектируй API для авторизации
+## Контекст
+Нужен порт для dev-сервера SynPin
+
+## Решение
+Используем 2099 — остальные закрыты
+
+## Статус
+Актуально
+```
+
+**Почему датированные файлы:** агент при поиске видит актуальность. Факт от вчера > факт от 3 месяцев назад.
+
+**Структура имени:** `YYYY-MM-DD_topic.md`
 
 ---
 
-**User:** Спроектируй API для авторизации
+## state.json — bookmark после рестарта
 
-**Architect:** Предлагаю JWT-based auth с refresh tokens.
-Вот схема:
+Каждый агент хранит файл-закладку. Это не сессия, это **указатель**.
 
-1. POST /auth/login → access_token + refresh_token
-2. POST /auth/refresh → новый access_token
-3. POST /auth/logout → инвалидация refresh_token
+```json
+{
+  "active_sessions": {
+    "engineering": {
+      "session_id": "2026-06-03_api-redesign",
+      "last_position": 42,
+      "last_action": "Решили использовать REST",
+      "waiting_for": "ответ от developer"
+    },
+    "direct": {
+      "session_id": "2026-06-03_chat-with-artur",
+      "last_position": 8,
+      "last_action": "Обсуждали архитектуру памяти",
+      "waiting_for": null
+    }
+  },
+  "last_compaction": "2026-06-03T12:00:00"
+}
+```
 
-**User:** А что насчёт rate limiting?
+### Поток при рестарте
 
-**Architect:** Добавим middleware на уровне FastAPI:
-- 10 запросов/мин на login
-- 3 запроса/мин на refresh
+```
+Рестарт SynPin / компа / браузера
+    │
+    ▼
+Загрузка агента
+    │
+    ▼
+Чтение state.json
+    │
+    ├──→ engineering: "я был в сессии api-redesign, позиция 42"
+    │    → читаю последние N сообщений из sessions/2026-06-03_api-redesign.md
+    │    → контекст восстановлен
+    │
+    └──→ direct: "я был в chat-with-artur, позиция 8"
+         → читаю последние N сообщений
+    
+    ▼
+Агент готов работать во всех каналах
+```
+
+### Поток при новом сообщении
+
+```
+Пользователь пишет в engineering
+    │
+    ▼
+Router: "это для architect"
+    │
+    ▼
+Агент читает state.json → engineering → session_id
+    │
+    ▼
+Читает sessions/2026-06-03_api-redesign.md с позиции 42
+    │
+    ▼
+Имеет полный контекст → отвечает
+    │
+    ▼
+Обновляет state.json: last_position = 43
+```
 
 ---
 
-**Outcome:** success
-**Summary:** JWT auth + refresh tokens + rate limiting middleware
-**Key Decisions:**
-- JWT с expiry 15min для access token
-- Refresh token в httpOnly cookie
-- Rate limiting через SlowAPI
-```
+## Frozen Snapshot (из Hermes)
 
-### Формат имени файла
+Системный промпт фиксируется при старте сессии и не меняется.
 
 ```
-YYYY-MM-DD_short-description.md
+Старт сессии
+    │
+    ▼
+Чтение MEMORY.md + USER.md + facts/*.md
+    │
+    ▼
+Заморозка → frozen_snapshot (в system prompt)
+    │
+    ▼
+Во время сессии:
+    ├── Записи в MEMORY.md → обновляются на диске
+    ├── НО НЕ меняют frozen_snapshot
+    └── Tool-ответы показывают актуальное состояние
+    │
+    ▼
+Конец сессии → следующая сессия читает заново
 ```
 
-Примеры:
-- `2025-06-01_architecture-api.md`
-- `2025-06-02_auth-tests.md`
-- `2025-06-03_bugfix-404.md`
+**Зачем:**
+- Системный промпт стабилен → **prefix cache не ломается**
+- Агент видит актуальное состояние через tool-ответы
+- Нет race condition при конкурентных записях
 
 ---
 
-## Shared MEMORY.md
+## Иерархия контекста
 
-Общая память команды. Ошибка одного агента автоматически записывается сюда — другие агенты видят и не повторяют.
+### Координатор vs Исполнители
+
+| Роль | Что видит |
+|------|-----------|
+| **Координатор** | Полная командная сессия + shared memory + персональная память |
+| **Агент-исполнитель** | Своя задача + релевантные решения + shared memory |
+
+Координатор ** должен** видеть всё — он принимает стратегические решения. Исполнитель видит только свою часть — чтобы не перегружать контекст.
+
+### Командные сессии
+
+Каждый канал — **свой каталог** с файлами.
+
+```
+teams/engineering/sessions/
+├── 2026-06-03_api-redesign.md      # полный диалог всех участников
+├── 2026-06-02_deploy-plan.md
+└── ...
+```
+
+**Кто хранит полный контекст:** координатор канала.
+
+**Исполнители** хранят только **свой** лог в персональных sessions/:
+```
+agents/developer/sessions/2026-06-03_api-redesign_my-part.md
+```
+
+Это не дублирование — это **проекция**. Координатор хранит оригинал, агент — свою релевантную часть.
+
+---
+
+## Компакция
+
+### Аналогия с Git
+
+```
+Агенты работают параллельно (ветки)
+    │
+    ▼
+Координатор компактирует (merge в main)
+    ├── Суммаризует диалог
+    ├── Извлекает факты → facts/*.md
+    ├── Обновляет MEMORY.md
+    │
+    ▼
+Следующая задача: агент читает обновлённый MEMORY.md (pull)
+```
+
+Агенты **не ждут** компакции. Они работают со своим контекстом. Когда начинают новую задачу — **обязательно** читают актуальный MEMORY.md.
+
+### Шаблон компакции (из Hermes)
 
 ```markdown
-# Shared Team Memory
+[CONTEXT COMPACTION — REFERENCE ONLY]
 
-## Collective Lessons
-- Все агенты: при работе с API всегда проверять auth middleware
-- developer: FastAPI middleware должен быть перед роутами
-- architect: При проектировании учитывать rate limiting с самого начала
+## Active Task
+Текущая задача
 
-## Project Standards
-- YAML для конфигов
-- Pydantic v2 для валидации
-- TypeScript strict mode в React
-- Тесты обязательны для API endpoints
+## Completed Actions
+- Что сделано
 
-## Known Issues
-- CORS middleware забыт в базовом шаблоне (исправлено 2025-06-01)
-- Rate limiting не был в initial design (добавлено 2025-06-01)
+## Active State
+- Что происходит сейчас
+
+## In Progress
+- Что в работе
+
+## Blocked
+- Что заблокировано
+
+## Key Decisions
+- Какие решения приняты
+
+## Resolved Questions
+- Какие вопросы закрыты
+
+## Pending User Asks
+- Что ждёт ответа
+
+## Relevant Files
+- Какие файлы задействованы
+
+## Remaining Work
+- Что осталось
+```
+
+### Детерминированный fallback (из Hermes)
+
+Если LLM недоступен для суммаризации — суммаризация по правилам:
+
+```python
+def deterministic_summary(messages):
+    """Правила без LLM: берём первые/последние сообщения, извлекаем ключевое."""
+    summary = []
+    summary.append("## Active Task")
+    summary.append(extract_last_task(messages))
+    summary.append("## Key Decisions")
+    summary.append(extract_decisions(messages))
+    summary.append("## Relevant Files")
+    summary.append(extract_files(messages))
+    return "\n".join(summary)
 ```
 
 ---
 
 ## Типы сессий
 
-Не все сессии одинаковы. Тип определяет как сессия влияет на память.
-
 ### 1. Обычная сессия (default)
 
 Стандартный диалог пользователя с агентом.
-
-```yaml
-type: "session"
-```
-
-**Что происходит:**
-- Агент ведёт диалог
-- В конце ключевые факты/решения/ошибки автоматически сохраняются в MEMORY.md
 
 ### 2. Checkpoint — подведение итогов
 
 Запускается когда этап завершён или по запросу пользователя.
 
-```yaml
-type: "checkpoint"
-```
-
-**Что происходит:**
-- Агент анализирует все сессии с последнего checkpoint
-- Агрессивная суммаризация → MEMORY.md
-- Обновляет Active Decisions, Facts, Lessons Learned
-- Записывает итоги этапа
-
-**Когда использовать:**
-- Завершена фаза разработки
-- Пользователь просит: «подведи итоги»
-- Автоматически после N выполненных задач
-
 ### 3. Retrospective — анализ ошибок
 
 Специальная сессия для анализа того, что пошло не так.
 
-```yaml
-type: "retrospective"
-```
-
-**Что происходит:**
-- Агент просматривает ошибки за период
-- Формулирует Lessons Learned
-- Записывает в **shared MEMORY.md** — чтобы другие агенты тоже знали
-- Создаёт правила «не делать X в контексте Y»
-
-**Когда использовать:**
-- После критической ошибки
-- Пользователь просит: «разбери что пошло не так»
-- Автоматически при повторении одной ошибки 2+ раз
-
 ---
 
-## Автоматическое извлечение фактов
-
-Ключевая фишка — агент не просто ведёт диалог, а **извлекает знания** из него.
-
-### Процесс
-
-```
-Диалог с пользователем
-  ↓
-Агент маркирует важное в процессе:
-  📌 "Это важное решение" → decision
-  ⚠️ "Это ошибка, не повторять" → lesson
-  💡 "Это факт о проекте" → fact
-  ✅ "Этап завершён" → checkpoint trigger
-  ↓
-В конце сессии → автосохранение:
-  ┌─────────────────────────────────────┐
-  │ MEMORY.md (агент)                   │
-  │ ├── Facts: +новые факты             │
-  │ ├── Lessons Learned: +уроки         │
-  │ ├── Active Decisions: обновлены     │
-  │ └── Past Errors: +ошибки            │
-  ├─────────────────────────────────────┤
-  │ shared/MEMORY.md (команда)          │
-  │ └── Collective Lessons: +общие      │
-  └─────────────────────────────────────┘
-```
-
-### Как агент «не наступает на грабли»
-
-| Механизм | Что даёт |
-|---|---|
-| **MEMORY.md** при старте | Прошлые ошибки видны сразу |
-| **Shared MEMORY.md** | Ошибки других агентов тоже видны |
-| **Последние 5 сессий** | Контекст недавних решений |
-| **Checkpoint** | Структурированные итоги → MEMORY.md |
-| **Retrospective** | Анализ ошибок → правила для всех |
-
-### Пример
-
-```
-Агент developer: "Забыл про auth middleware" → Ошибка → Past Errors
-       ↓
-shared/MEMORY.md: "Все агенты: auth middleware — первый пункт"
-       ↓
-Агент architect (новая сессия):
-  Загружает shared MEMORY.md → видит правило → не повторяет
-```
-
-### Авто-чистка
+## Авто-чистка
 
 ```yaml
 # settings.yaml
@@ -294,95 +340,48 @@ sessions:
   auto_summarize: true   # суммаризировать ключевые факты перед удалением
 ```
 
-### Команды (будут добавлены)
-
-```bash
-synpin sessions list              # список сессий агента
-synpin sessions show <id>         # показать сессию
-synpin sessions clean --older 7d  # удалить старые
-synpin sessions summarize         # суммаризировать все сессии в MEMORY.md
-
-# Типы сессий
-synpin session start --type checkpoint     # начать checkpoint
-synpin session start --type retrospective  # начать retrospective
-```
-
 ---
 
-## Контекст агента
+## Конкурентный доступ (из Hermes)
 
-При старте сессии агент загружает:
-
-1. **personality.yaml** — кто он, как общается (см. [Агенты](agents.md))
-2. **MEMORY.md** — свои долговременные знания
-3. **USER.md** — предпочтения пользователя
-4. **skills.yaml + SKILL.md** — активные скиллы (см. [Агенты](agents.md))
-5. **Shared MEMORY.md** — коллективные знания команды
-6. **Последние 5 сессий** — недавний контекст
-
-Это даёт агенту полную картину без потери нити разговора.
-
----
-
-## Поиск по памяти (FTS5 — по умолчанию)
-
-Поиск по сессиям, MEMORY.md, задачам и форуму реализован на **SQLite FTS5** — полнотекстовый поиск без LLM.
-
-### Почему FTS5
-
-| Параметр | Значение |
-|---|---|
-| Скорость | Мгновенно (4500× быстрее LLM-поиска) |
-| Зависимости | Нулевые — SQLite встроен в Python |
-| Формат | Один файл `.db` — portable |
-| Стоимость | Бесплатно, локально |
-
-### Что индексируется
-
-- Сессии агентов (`sessions/*.md`)
-- MEMORY.md всех агентов
-- Shared MEMORY.md
-- Канбан-задачи (`data/tasks/*.yaml`)
-- Форум-посты
-
-### Операторы поиска
-
-```
-python AND fastapi          # оба термина
-"exact phrase"              # точная фраза
-auth OR login               # любой термин
-deploy*                     # wildcard (deploy, deployment, deployed)
-python NOT java             # исключение
-```
-
-### Пример API
+File locking для безопасной записи из нескольких сессий:
 
 ```python
-from core.search import SearchIndex
-
-idx = SearchIndex(db_path="~/.synpin/data/search.db")
-
-# Индексация
-idx.index_session("architect", "2025-06-01_api-design.md", content)
-idx.index_memory("architect", memory_md_content)
-idx.index_task("TASK-001", "Реализовать auth", tags=["backend", "security"])
-
-# Поиск
-results = idx.search("auth middleware", limit=10)
-# → [{file, agent, score, snippet, type}, ...]
+with file_lock(MEMORY.md):
+    # Перечитать с диска (другая сессия могла записать)
+    fresh = read_file(MEMORY.md)
+    # Модифицировать
+    fresh.append(new_entry)
+    # Записать
+    write_file(MEMORY.md, fresh)
 ```
 
-### Расширенная память (опционально)
+---
 
-Поверх FTS5 можно подключить векторный поиск:
+## Threat Scanning (из Hermes)
 
-| Тип | Описание |
-|---|---|
-| **ChromaDB** | Векторный поиск по памяти |
-| **Embedding** | Семантический поиск (`all-MiniLM-L6-v2` и др.) |
-| **Semantic search** | «Найди похожие ошибки» по смыслу, не по ключевым словам |
+Защита от injection в память:
 
-Базовый поиск (FTS5) работает всегда. Векторный — опция.
+```python
+# При записи в MEMORY.md:
+scan_result = threat_scan(content)
+if scan_result:
+    return error("Blocked: potential injection pattern")
+```
+
+---
+
+## Контекст агента при старте
+
+```
+1. personality.yaml — кто он, как общается
+2. MEMORY.md — frozen snapshot (компактная память)
+3. USER.md — frozen snapshot (предпочтения пользователя)
+4. facts/*.md — датированные решения (актуальные)
+5. skills.yaml + SKILL.md — активные скиллы
+6. shared/MEMORY.md — коллективные знания
+7. state.json — bookmarks per channel
+```
 
 ---
 

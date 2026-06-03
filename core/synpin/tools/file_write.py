@@ -15,13 +15,24 @@ _ROOT = Path(r"D:\synpin")
 
 
 def _validate_path(path_str: str) -> Path | None:
-    """Resolve and validate that the path is inside the root directory."""
+    """Resolve and validate that the path is inside the root directory.
+    
+    Handles forward slashes, relative paths, whitespace, quotes.
+    """
+    if not path_str:
+        return None
+
+    path_str = path_str.strip().strip('"').strip("'")
+    path_str = path_str.replace("/", "\\")
+
     try:
-        resolved = Path(path_str).resolve()
+        p = Path(path_str)
+        if not p.is_absolute():
+            p = _ROOT / p
+        resolved = p.resolve()
     except (OSError, ValueError):
         return None
 
-    # Security: must be under root
     try:
         resolved.relative_to(_ROOT)
     except ValueError:

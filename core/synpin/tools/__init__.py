@@ -31,6 +31,8 @@ from .file_write import file_write
 from .search_files import search_files
 from .web_search import web_search
 from .code_exec import code_exec
+from .memory_read import memory_read
+from .memory_write import memory_write
 
 # Registry dict mapping tool names to handler functions (loaded lazily)
 _tool_handlers: dict[str, ToolHandler] | None = None
@@ -51,6 +53,8 @@ def get_tool_registry() -> dict[str, ToolHandler]:
             "search_files": search_files,
             "web_search": web_search,
             "code_exec": code_exec,
+            "memory_read": memory_read,
+            "memory_write": memory_write,
         }
     return _tool_handlers
 

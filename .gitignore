@@ -40,3 +40,6 @@ core/synpin/config/*.yaml
 ~/.synpin/
 *.yaml
 !web/vite.config.ts
+
+# Shared user data (NEVER commit)
+data/shared/

@@ -75,14 +75,30 @@ class OpenAIProvider(BaseProvider):
 
         async with httpx.AsyncClient(timeout=300.0) as client:
             if not stream:
-                # ── Non-streaming ──
-                resp = await client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers=headers,
-                    json=body,
-                )
-                resp.raise_for_status()
-                data = resp.json()
+                # ── Non-streaming with retry on transient errors ──
+                data = None
+                for attempt in range(3):
+                    try:
+                        resp = await client.post(
+                            f"{self.base_url}/chat/completions",
+                            headers=headers,
+                            json=body,
+                        )
+                        if resp.status_code in (502, 503, 529) and attempt < 2:
+                            import asyncio
+                            await asyncio.sleep(1.0 * (attempt + 1))
+                            continue
+                        resp.raise_for_status()
+                        data = resp.json()
+                        break
+                    except (httpx.ConnectError, httpx.ReadTimeout) as e:
+                        if attempt < 2:
+                            import asyncio
+                            await asyncio.sleep(1.0 * (attempt + 1))
+                            continue
+                        raise
+                if data is None:
+                    raise httpx.HTTPStatusError("All retry attempts failed", request=resp.request, response=resp)
 
                 choice = data.get("choices", [{}])[0]
                 message = choice.get("message", {})

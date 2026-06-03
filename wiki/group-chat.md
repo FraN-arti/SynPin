@@ -35,6 +35,67 @@
 
 ---
 
+## Каналы
+
+Каждый канал — **отдельный каталог** с файлами.
+
+```
+teams/
+├── engineering/
+│   ├── MEMORY.md               # память канала
+│   └── sessions/
+│       ├── 2026-06-03_api.md   # командная сессия
+│       └── 2026-06-02_deploy.md
+├── design/
+│   ├── MEMORY.md
+│   └── sessions/
+│       └── 2026-06-03_ui.md
+└── devops/
+    ├── MEMORY.md
+    └── sessions/
+        └── 2026-06-03_ci.md
+```
+
+### Идентификаторы каналов
+
+Каналы используют ID-based имена (как агенты):
+- `engineering` — инженерный канал
+- `design` — дизайн-канал
+- `devops` — девопс-канал
+
+---
+
+## Иерархия контекста
+
+### Координатор vs Исполнители
+
+| Роль | Что видит | Зачем |
+|------|-----------|-------|
+| **Координатор канала** | Полный диалог + shared memory | Принимает стратегические решения |
+| **Агент-исполнитель** | Свою задачу + релевантные решения | Не перегружается контекстом |
+
+### Пример
+
+```
+Канал: engineering
+Координатор: architect (видит ВСЁ)
+
+Участники:
+├── developer (видит свою часть: "напиши auth endpoint")
+├── reviewer (видит свою часть: "проверь код")
+└── tester (видит свою часть: "напиши тесты")
+```
+
+### Как работает
+
+1. Координатор получает полный диалог
+2. Разбивает на подзадачи
+3. Каждому исполнителю — только его часть
+4. Исполнители работают параллельно
+5. Координатор собирает результаты
+
+---
+
 ## Механизм обсуждений
 
 ### 1. Message Queue
@@ -61,7 +122,9 @@
 
 ## Интеграция с памятью
 
-Перед обсуждением каждый агент **загружает контекст из памяти**:
+### Перед обсуждением
+
+Каждый агент загружает контекст из памяти:
 
 ```python
 # Архитектор начинает обсуждение
@@ -75,7 +138,9 @@ context = memory.search(
 architect.propose(f"На основе опыта: {context}")
 ```
 
-После обсуждения — **результат записывается в память**:
+### После обсуждения
+
+Результат записывается в память:
 
 ```python
 memory.store(
@@ -84,6 +149,21 @@ memory.store(
     agents=["architect", "programmer", "reviewer"],
     task_id="task_042"
 )
+```
+
+### Память канала
+
+```markdown
+# Shared Team Memory — engineering
+
+## Collective Lessons
+- Все агенты: при работе с API всегда проверять auth middleware
+- developer: FastAPI middleware должен быть перед роутами
+
+## Project Standards
+- YAML для конфигов
+- Pydantic v2 для валидации
+- TypeScript strict mode в React
 ```
 
 ---
@@ -95,6 +175,7 @@ memory.store(
 ```json
 {
   "type": "group_message",
+  "channel": "engineering",
   "task_id": "task_042",
   "agent": "architect",
   "message": "Предлагаю FastAPI + JWT auth",
@@ -106,6 +187,61 @@ UI показывает:
 - Кто говорит
 - Что предлагает
 - Статус обсуждения (discussion / consensus / conflict)
+
+---
+
+## Командные сессии
+
+Командные сессии хранятся в `teams/*/sessions/`.
+
+### Формат файла
+
+```markdown
+# Session: API Redesign
+
+**Channel:** engineering
+**Started:** 2026-06-03 14:30
+**Participants:** architect, developer, reviewer
+**Task:** Спроектируй API для авторизации
+
+---
+
+**Architect:** Предлагаю JWT-based auth с refresh tokens.
+
+**Developer:** Хорошо. Ещё rate limiting на login.
+
+**Reviewer:** В прошлый раз забыли логи. Добавим structured logging.
+
+**Architect:** Согласен. Итоговый план: JWT + rate limiting + logging.
+
+---
+
+**Outcome:** success
+**Summary:** JWT auth + refresh tokens + rate limiting + structured logging
+**Key Decisions:**
+- JWT с expiry 15min для access token
+- Refresh token в httpOnly cookie
+- Rate limiting через SlowAPI
+```
+
+### Формат имени файла
+
+```
+YYYY-MM-DD_short-description.md
+```
+
+---
+
+## Автоматическое извлечение фактов
+
+Из командных сессий извлекаются:
+
+| Тип | Куда записывается |
+|-----|-------------------|
+| **Решения** | `teams/*/MEMORY.md` + `shared/MEMORY.md` |
+| **Ошибки** | `agents/*/MEMORY.md` (Anti-patterns) + `shared/MEMORY.md` |
+| **Факты** | `agents/*/facts/YYYY-MM-DD_topic.md` |
+| **Паттерны** | `agents/*/MEMORY.md` (Patterns) |
 
 ---
 

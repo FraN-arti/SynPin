@@ -5,7 +5,10 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="SynPin",
@@ -34,14 +37,17 @@ _config_candidates = [
 ]
 
 _loaded_registry: ProviderRegistry | None = None
+_loaded_config_path: Path | None = None
 for candidate in _config_candidates:
     if candidate.exists():
         _loaded_registry = ProviderRegistry.from_config(candidate)
+        _loaded_config_path = candidate
         print(f"  [chat] Loaded providers from: {candidate}")
         break
 
 if _loaded_registry is None:
     _loaded_registry = ProviderRegistry()
+    _loaded_config_path = None
     print("  [chat] No providers.yaml found — chat disabled")
 
 # Inject registry into the router module
@@ -64,10 +70,45 @@ app.include_router(external_agents_router)
 from .hermes_chat_router import router as hermes_chat_router
 app.include_router(hermes_chat_router)
 
+# Memory management API
+from .memory_router import router as memory_router
+app.include_router(memory_router)
+
+# Config management API (compaction, sessions, context_window)
+from .config_router import router as config_router
+app.include_router(config_router)
+
 
 @app.get("/api/health")
 def health():
     return {"status": "ok", "version": "0.1.0"}
+
+
+@app.post("/api/admin/reload")
+def reload_config():
+    """Manual config reload — re-reads providers.yaml."""
+    if _loaded_registry and _loaded_config_path:
+        _loaded_registry.reload()
+        return {"status": "ok", "message": f"Reloaded from {_loaded_config_path.name}"}
+    return {"status": "error", "message": "No config path set"}
+
+
+# --- Config Watcher: auto-reload on file change ---
+from ..config.watcher import ConfigWatcher
+
+_config_watcher = ConfigWatcher(interval=5)
+
+def _on_providers_changed(path: Path, mtime: float):
+    """Callback when providers.yaml changes on disk."""
+    if _loaded_registry:
+        _loaded_registry.reload()
+        print(f"  [config] ⚡ providers.yaml reloaded (mtime={mtime:.0f})")
+
+if _loaded_config_path:
+    _config_watcher.watch(_loaded_config_path, _on_providers_changed)
+
+_config_watcher.start()
+print(f"  [config] ConfigWatcher active (polling every 5s)")
 
 
 # Serve React SPA (built static files) — ONLY in production

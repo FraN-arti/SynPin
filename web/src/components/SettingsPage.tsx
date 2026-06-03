@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { PROVIDER_CATALOG, providerKey, providerIconUrl, type ProviderInfo } from '../lib/providers'
+import { MemorySection } from './MemorySection'
 
 interface SettingsPageProps {
   onBack: () => void
+  onAgentsChange?: () => void
 }
 
 type Tab = 'general' | 'agents' | 'providers' | 'memory' | 'channels' | 'skills'
@@ -25,7 +27,7 @@ const SECTION_INFO: Record<Tab, { title: string; description: string }> = {
   skills: { title: 'Скиллы', description: 'База скиллов системы — подходы, шаблоны, процедуры' },
 }
 
-export function SettingsPage({ onBack }: SettingsPageProps) {
+export function SettingsPage({ onBack, onAgentsChange }: SettingsPageProps) {
   const [activeTab, setActiveTab] = useState<Tab>('general')
   const [visible, setVisible] = useState(false)
   const [activeModal, setActiveModal] = useState<string | null>(null)
@@ -133,7 +135,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
         {/* Tab content with fade animation */}
         <div className="settings-body" key={activeTab}>
           {activeTab === 'general' && <GeneralSection />}
-          {activeTab === 'agents' && <AgentsSection />}
+          {activeTab === 'agents' && <AgentsSection onAgentsChange={onAgentsChange} />}
           {activeTab === 'providers' && <ProvidersSection ref={providersRef} onAddProvider={(type) => setActiveModal(`add-provider-${type}`)} onAddFromCatalog={(p) => setAddingProvider(p)} onEditProvider={(p) => setEditingProvider(p)} />}
           {activeTab === 'memory' && <MemorySection />}
           {activeTab === 'channels' && <ChannelsSection onAddChannel={() => setActiveModal('add-channel')} />}
@@ -346,6 +348,7 @@ interface AgentData {
   max_iterations: number
   temperature: number
   max_tokens: number
+  context_window: number
   memory: Record<string, unknown>
   is_external?: boolean
 }
@@ -369,7 +372,7 @@ interface ExternalAgentData {
   is_external: true
 }
 
-function AgentsSection() {
+function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
   const [agents, setAgents] = useState<AgentData[]>([])
   const [providers, setProviders] = useState<{name: string; models: string[]}[]>([])
   const [hoveredAgent, setHoveredAgent] = useState<string | null>(null)
@@ -387,7 +390,7 @@ function AgentsSection() {
   })
   const [creating, setCreating] = useState(false)
   const [formTouched, setFormTouched] = useState(false)
-  const [toolsRegistry, setToolsRegistry] = useState<Record<string, {display: string; description: string; category: string; implemented: boolean}>>({})
+  const [toolsRegistry, setToolsRegistry] = useState<Record<string, {display: string; description: string; category: string; implemented: boolean; builtin?: boolean}>>({})
   const [toolsCategories, setToolsCategories] = useState<Record<string, {display: string}>>({})
 
   // Build lookup maps from roles/departments
@@ -633,6 +636,7 @@ function AgentsSection() {
       })
       if (res.ok) {
         fetchAgents()
+        onAgentsChange?.()
       }
     } catch (e) {
       console.error('[tools] toggle error:', e)
@@ -1102,6 +1106,19 @@ function AgentsSection() {
                           {agent.provider && (
                             <div className="expanded-field"><label>Провайдер</label><span>{agent.provider}</span></div>
                           )}
+                          <div className="expanded-field">
+                            <label>Контекстное окно (токены)</label>
+                            <input
+                              type="number"
+                              className="settings-input"
+                              value={agent.context_window || ''}
+                              placeholder="128000"
+                              onBlur={e => {
+                                const val = Number(e.target.value)
+                                if (val > 0 && val !== agent.context_window) handleAgentFieldChange(agent, 'context_window', val)
+                              }}
+                            />
+                          </div>
                           {agent.skills.length > 0 && (
                             <div className="expanded-field">
                               <label>Скиллы</label>
@@ -1117,7 +1134,7 @@ function AgentsSection() {
                             <label>Инструменты</label>
                             <div className="tools-grid">
                               {Object.entries(toolsCategories).map(([catKey, cat]) => {
-                                const catTools = Object.entries(toolsRegistry).filter(([, t]) => t.category === catKey)
+                                const catTools = Object.entries(toolsRegistry).filter(([, t]) => t.category === catKey && !t.builtin)
                                 if (catTools.length === 0) return null
                                 return (
                                   <div key={catKey} className="tools-category">
@@ -1691,69 +1708,7 @@ function ProviderGridSection({ title, providers, onConnect }: { title: string; p
   )
 }
 
-// ─── Memory Section ──────────────────────────────────────────
-
-function MemorySection() {
-  return (
-    <div className="settings-grid">
-      <section className="settings-card">
-        <h2 className="settings-card-title">👤 Память агентов</h2>
-        <Toggle label="Включена" defaultChecked />
-        <Toggle label="Автосохранение по окончании сессии" defaultChecked />
-        <Toggle label="Сохранять уроки из ошибок" defaultChecked />
-        <Toggle label="Сохранять активные решения" defaultChecked />
-        <div className="settings-field">
-          <label>Макс. сессий на агента</label>
-          <input type="number" className="settings-input" defaultValue={50} />
-        </div>
-        <div className="settings-field">
-          <label>Макс. длина summary (символы)</label>
-          <input type="number" className="settings-input" defaultValue={500} />
-        </div>
-      </section>
-
-      <section className="settings-card">
-        <h2 className="settings-card-title">👥 Командная память</h2>
-        <Toggle label="Включена" defaultChecked />
-        <Toggle label="Автoshare новых паттернов" defaultChecked />
-        <Toggle label="Автoshare архитектурных решений" defaultChecked />
-        <Toggle label="Автoshare лучших практик" defaultChecked />
-        <Toggle label="Автoshare найденных багов" defaultChecked />
-      </section>
-
-      <section className="settings-card">
-        <h2 className="settings-card-title">🔍 Поиск</h2>
-        <Toggle label="SQLite FTS5 (основной)" defaultChecked />
-        <Toggle label="Векторный поиск (дополнительный)" />
-        <div className="settings-field">
-          <label>Вес точного совпадения</label>
-          <input type="number" className="settings-input" defaultValue={10} />
-        </div>
-        <div className="settings-field">
-          <label>Вес пословного совпадения</label>
-          <input type="number" className="settings-input" defaultValue={5} />
-        </div>
-      </section>
-
-      <section className="settings-card">
-        <h2 className="settings-card-title">🗑 Lifecycle</h2>
-        <div className="settings-field">
-          <label>Архивировать сессии через (дней)</label>
-          <input type="number" className="settings-input" defaultValue={90} />
-        </div>
-        <div className="settings-field">
-          <label>Удалить архивные через (дней)</label>
-          <input type="number" className="settings-input" defaultValue={365} />
-        </div>
-        <div className="settings-field">
-          <label>Компактировать память при ({'>'} записей)</label>
-          <input type="number" className="settings-input" defaultValue={50} />
-        </div>
-      </section>
-    </div>
-  )
-}
-
+// MemorySection imported from ./MemorySection
 // ─── Channels Section ────────────────────────────────────────
 
 const sampleChannels = [

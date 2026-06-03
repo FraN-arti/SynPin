@@ -14,6 +14,7 @@ class ProviderRegistry:
     def __init__(self):
         self._providers: dict[str, BaseProvider] = {}
         self._default: str | None = None
+        self._config_path: Path | None = None  # Stored for hot-reload
 
     def register(self, name: str, provider: BaseProvider, default: bool = False):
         self._providers[name] = provider
@@ -31,20 +32,39 @@ class ProviderRegistry:
     def from_config(cls, config_path: str | Path) -> "ProviderRegistry":
         """Load providers from YAML config."""
         registry = cls()
-
         config_path = Path(config_path)
+
         if not config_path.exists():
             return registry
 
+        registry._config_path = config_path
+        registry._load(config_path)
+        return registry
+
+    def reload(self) -> None:
+        """Hot-reload providers from stored config path.
+
+        Re-reads the YAML and replaces all providers in-place.
+        Callers holding a reference to this registry automatically get new providers.
+        """
+        if not self._config_path or not self._config_path.exists():
+            return
+        self._load(self._config_path)
+
+    def _load(self, config_path: Path) -> None:
+        """Parse YAML and populate providers."""
         with open(config_path) as f:
             config = yaml.safe_load(f) or {}
+
+        new_providers: dict[str, BaseProvider] = {}
+        new_default: str | None = None
 
         for name, cfg in config.get("providers", {}).items():
             provider_type = cfg.get("type", "").lower()
             api_key = cfg.get("api_key", "")
             base_url = cfg.get("base_url", "")
 
-            if provider_type == "openai" or provider_type == "openai-compatible":
+            if provider_type in ("openai", "openai-compatible"):
                 provider = OpenAIProvider(
                     api_key=api_key,
                     base_url=base_url or "https://api.openai.com/v1",
@@ -54,7 +74,9 @@ class ProviderRegistry:
             else:
                 continue
 
-            is_default = cfg.get("default", False)
-            registry.register(name, provider, default=is_default)
+            new_providers[name] = provider
+            if cfg.get("default", False) or new_default is None:
+                new_default = name
 
-        return registry
+        self._providers = new_providers
+        self._default = new_default

@@ -17,9 +17,29 @@ _MAX_CHARS = 1_000_000
 
 
 def _validate_path(path_str: str) -> Path | None:
-    """Resolve and validate that the path is inside the root directory."""
+    """Resolve and validate that the path is inside the root directory.
+    
+    Handles common model quirks:
+    - Forward slashes (D:/synpin/dev.bat)
+    - Relative paths (./dev.bat, dev.bat)
+    - Trailing/leading whitespace
+    - Paths without drive letter
+    """
+    if not path_str:
+        return None
+
+    # Clean up
+    path_str = path_str.strip().strip('"').strip("'")
+    path_str = path_str.replace("/", "\\")  # Normalize forward slashes
+
     try:
-        resolved = Path(path_str).resolve()
+        p = Path(path_str)
+
+        # If relative, resolve relative to ROOT
+        if not p.is_absolute():
+            p = _ROOT / p
+
+        resolved = p.resolve()
     except (OSError, ValueError):
         return None
 

@@ -43,10 +43,12 @@
               ▼
 ┌─────────────────────────────────────────────────────┐
 │              Memory System                          │
-│  ChromaDB (векторный поиск) + JSON (кэш хешей)     │
-│  - Agent Memory (per agent)                         │
+│  SQLite (FTS5) + Markdown (архив)                  │
+│  - Frozen Snapshot (system prompt)                  │
+│  - Per-Agent Memory (MEMORY.md + facts/)           │
 │  - Shared Memory (team knowledge)                   │
-│  - Error Log (collective learning)                  │
+│  - Sessions (Markdown archive)                      │
+│  - Team Channels (teams/*/sessions/)               │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -94,10 +96,29 @@ FastAPI сервер — единая точка входа:
 
 ### 7. Memory (`core/synpin/memory/`)
 Система памяти — обязательный компонент:
-- **ChromaDB** — векторный семантический поиск по знаниям
-- **Per-agent** — каждый агент помнит свои ошибки и решения
-- **Shared** — коллективная память команды
-- **Error Log** — журнал ошибок для обучения
+
+**Основа: FTS5 + Markdown**
+- **SQLite (state.db)** — индекс сессий + FTS5 поиск
+- **Markdown-файлы** — human-readable архив
+
+**Ключевые концепции (из Hermes):**
+- **Frozen Snapshot** — системный промпт фиксируется при старте
+- **File Locking** — безопасный конкурентный доступ
+- **Threat Scanning** — защита от injection
+
+**Иерархия контекста:**
+- **Координатор** — видит полный диалог
+- **Исполнители** — видят только свою часть
+
+**Структура данных:**
+- `MEMORY.md` — компактная память (~2200 символов)
+- `facts/*.md` — датированные решения
+- `sessions/*.md` — история диалогов
+- `teams/*/sessions/*.md` — командные сессии
+- `state.json` — bookmarks per agent
+
+**Расширение (будущее):**
+- ChromaDB — векторный поиск (опционально)
 
 ---
 
@@ -108,7 +129,7 @@ synpin/
 ├── core/                      ← Python ядро
 │   ├── synpin/
 │   │   ├── agents/            ← роли агентов
-│   │   ├── memory/            ← ChromaDB + кэш
+│   │   ├── memory/            ← FTS5 + Markdown + frozen snapshot
 │   │   ├── tools/             ← MCP, web, code, file
 │   │   ├── router/            ← делегат ↔ команда
 │   │   ├── engine/            ← agent loop

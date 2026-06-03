@@ -46,7 +46,6 @@ interface Message {
   timestamp: Date
   model?: string
   agent_name?: string
-  usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number }
   tools?: ToolCall[]
 }
 
@@ -65,8 +64,23 @@ function App() {
   const [activeAgent, setActiveAgent] = useState<AgentConfig | null>(null)
   const [availableAgents, setAvailableAgents] = useState<AgentConfig[]>([])
   const [agentSelectorOpen, setAgentSelectorOpen] = useState(false)
+  const [pendingNewSession, setPendingNewSession] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const activeAgentRef = useRef<AgentConfig | null>(null)
+
+  // Keep ref in sync with state
+  activeAgentRef.current = activeAgent
+
+  // Tool display names for badges
+  const TOOL_DISPLAY_NAMES: Record<string, string> = {
+    terminal: 'Терминал',
+    file_read: 'Чтение файла',
+    file_write: 'Запись файла',
+    search_files: 'Поиск файлов',
+    web_search: 'Поиск в интернете',
+    code_exec: 'Python',
+  }
 
   // Save sidebar state
   useEffect(() => {
@@ -130,6 +144,33 @@ function App() {
     }
     loadAgents()
   }, [])
+
+  // Load chat history when active agent changes
+  useEffect(() => {
+    if (!activeAgent) return
+    const loadHistory = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web`)
+        if (!res.ok) return
+        const data = await res.json()
+        const msgs = data.messages || []
+        if (msgs.length > 0) {
+          const restored: Message[] = msgs.map((m: { role: string; content: string }, i: number) => ({
+            id: `restored-${i}`,
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+            timestamp: new Date(),
+          }))
+          setMessages(restored)
+        } else {
+          setMessages([])
+        }
+      } catch (e) {
+        console.error('[history] load error:', e)
+      }
+    }
+    loadHistory()
+  }, [activeAgent])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -235,11 +276,19 @@ function App() {
           history,
           system_prompt: systemPrompt,
           agent_name: agentName,
+          agent_slug: activeAgent?.slug || undefined,
+          channel_id: 'web',
+          new_session: pendingNewSession,
           temperature,
           max_tokens: maxTokens,
           tools: enabledTools,
         }),
       })
+
+      // Reset pending flag after first request
+      if (pendingNewSession) {
+        setPendingNewSession(false)
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -312,12 +361,11 @@ function App() {
               }
             }
           } else if (parsed.type === 'done') {
-            const usage = parsed.usage as { prompt_tokens: number; completion_tokens: number; total_tokens: number } | undefined
             const model = parsed.model as string | undefined
             const agentName = parsed.agent_name as string | undefined
             setMessages(prev =>
               prev.map(m => m.id === assistantId
-                ? { ...m, model: model || 'assistant', agent_name: agentName, usage: usage || undefined }
+                ? { ...m, model: model || 'assistant', agent_name: agentName }
                 : m
               )
             )
@@ -338,7 +386,7 @@ function App() {
     } finally {
       setIsTyping(false)
     }
-  }, [input, isTyping, messages])
+  }, [input, isTyping, messages, activeAgent])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -355,17 +403,11 @@ function App() {
     if (msg.role === 'user') {
       return <span className="message-time">{formatTime(msg.timestamp)}</span>
     }
-    // Assistant: time — [tokens] · [model] · [in/out]
+    // Assistant: time — agent_name · model
     return (
       <>
         <span className="message-time">{formatTime(msg.timestamp)}</span>
         <span className="meta-sep"> — </span>
-        {msg.usage && (
-          <>
-            <span className="meta-badge gold">{msg.usage.total_tokens} tok</span>
-            <span className="meta-dot"> · </span>
-          </>
-        )}
         {msg.agent_name && (
           <>
             <span className="meta-badge gold">{msg.agent_name}</span>
@@ -373,13 +415,7 @@ function App() {
           </>
         )}
         {msg.model && msg.model !== msg.agent_name && (
-          <>
-            <span className="meta-badge">{msg.model}</span>
-            <span className="meta-dot"> · </span>
-          </>
-        )}
-        {msg.usage && (
-          <span className="meta-badge gold">IN: {msg.usage.prompt_tokens} · OUT: {msg.usage.completion_tokens}</span>
+          <span className="meta-badge">{msg.model}</span>
         )}
       </>
     )
@@ -398,6 +434,27 @@ function App() {
       el.selectionStart = el.selectionEnd = start + emoji.length
     })
   }
+
+  // Refresh agents list (called after tool/agent changes in Settings)
+  const refreshAgents = useCallback(async () => {
+    try {
+      const agentsRes = await fetch(`${API_BASE}/api/agents`)
+      const agentsData = await agentsRes.json()
+      const synpinAgents = (agentsData.agents || []).map((a: AgentConfig) => ({ ...a, is_external: false }))
+      const extRes = await fetch(`${API_BASE}/api/external-agents`)
+      const extData = await extRes.json()
+      const extAgents = (extData.agents || []).filter((a: AgentConfig) => a.enabled)
+      const allAgents = [...synpinAgents, ...extAgents]
+      setAvailableAgents(allAgents)
+      const current = activeAgentRef.current
+      if (current) {
+        const fresh = allAgents.find(a => a.slug === current.slug)
+        if (fresh) setActiveAgent(fresh)
+      }
+    } catch (e) {
+      console.error('[agents] refresh error:', e)
+    }
+  }, [])
 
   const renderInput = () => (
     <form onSubmit={handleSubmit} className="input-container">
@@ -438,7 +495,10 @@ function App() {
       {/* Sidebar — slides in/out */}
       <aside className={`sidebar ${sidebarOpen && sidebarReady ? 'open' : ''}`}>
         <div className="sidebar-content">
-          <button className="new-chat-btn">
+          <button className="new-chat-btn" onClick={() => {
+            setMessages([])
+            setPendingNewSession(true)
+          }}>
             <span className="new-chat-icon">+</span>
             Новый чат
           </button>
@@ -506,7 +566,7 @@ function App() {
       {/* Main Area */}
       <main className="main-area">
         {page === 'settings' ? (
-          <SettingsPage onBack={() => setPage('chat')} />
+          <SettingsPage onBack={() => setPage('chat')} onAgentsChange={refreshAgents} />
         ) : messages.length === 0 ? (
           <div className="empty-state">
             <img src={synpinLogo} alt="SynPin" className="empty-logo-img" />
@@ -533,7 +593,7 @@ function App() {
                             <div key={tc.id}
                               className={`tool-block ${tc.status === 'running' ? 'running' : tc.status === 'error' ? 'error' : 'done'}`}
                               title={tc.status === 'running' ? `Выполняется: ${tc.name}` : tc.status === 'error' ? `Ошибка: ${tc.error}` : `Готово: ${tc.name}`}>
-                              <span className="tool-block-name">{tc.name}</span>
+                              <span className="tool-block-name">{TOOL_DISPLAY_NAMES[tc.name] || tc.name}</span>
                               <span className={`tool-block-status ${tc.status}`}>
                                 {tc.status === 'running' ? '⟳' : tc.status === 'error' ? '✕' : '✓'}
                               </span>

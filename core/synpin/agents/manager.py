@@ -93,8 +93,12 @@ def _global_memory_defaults() -> dict[str, Any]:
     lifecycle = mem.get("lifecycle", {})
     cleanup = lifecycle.get("cleanup", {})
     retention = lifecycle.get("retention", {})
+    compaction = mem.get("compaction", {})
+    sessions_cfg = mem.get("sessions", {})
+    ctx = mem.get("context_window", {})
 
     return {
+        # Legacy memory settings
         "max_sessions": session.get("max_sessions_per_agent", 50),
         "session_summary": session.get("session_summary", True),
         "summary_max_length": session.get("summary_max_length", 500),
@@ -103,6 +107,20 @@ def _global_memory_defaults() -> dict[str, Any]:
         "compact_memory_threshold": cleanup.get("compact_memory_threshold", 50),
         "lesson_retention_days": retention.get("lessons", "keep"),
         "session_retention_days": retention.get("session_summaries", 90),
+        # Compaction settings
+        "compaction_enabled": compaction.get("enabled", True),
+        "compaction_trigger_percent": compaction.get("trigger_percent", 80),
+        "compaction_keep_recent": compaction.get("keep_recent", 10),
+        "compaction_strategy": compaction.get("strategy", "truncate"),
+        # Session settings
+        "session_auto_reset_enabled": sessions_cfg.get("auto_reset", {}).get("enabled", True),
+        "session_auto_reset_mode": sessions_cfg.get("auto_reset", {}).get("mode", "daily"),
+        "session_auto_reset_time": sessions_cfg.get("auto_reset", {}).get("reset_time", "00:00"),
+        "session_auto_reset_interval": sessions_cfg.get("auto_reset", {}).get("interval_hours", 24),
+        "session_archive_on_reset": sessions_cfg.get("archive_on_reset", True),
+        "session_max_history": sessions_cfg.get("max_history", 100),
+        # Global context window
+        "context_window_default": ctx.get("default", 128000),
     }
 
 
@@ -158,6 +176,10 @@ def load_agents() -> dict[str, Any]:
         if "memory" in agent_data and agent_data["memory"]:
             agent_memory.update(agent_data["memory"])
 
+        # Context window: per-agent override or global default
+        ctx_override = agent_data.get("context_window") or agent_memory.get("context_window")
+        context_window = ctx_override or global_memory.get("context_window_default", 128000)
+
         # Build resolved agent
         personality = agent_data.get("personality", {})
         behavior = agent_data.get("behavior", {})
@@ -200,6 +222,7 @@ def load_agents() -> dict[str, Any]:
             "max_iterations": behavior.get("max_iterations", 10),
             "temperature": behavior.get("temperature", 0.7),
             "max_tokens": behavior.get("max_tokens", 4096),
+            "context_window": context_window,
             # Memory (resolved)
             "memory": agent_memory,
         }
@@ -306,7 +329,7 @@ def save_agent(slug: str, updates: dict[str, Any]) -> dict[str, Any]:
     # Personalization + role/dept → agent.yaml
     personalization_keys = {"name", "description", "role", "department", "tone", "style", "traits",
                            "system_prompt", "max_iterations", "temperature", "max_tokens", "memory",
-                           "tools"}
+                           "tools", "context_window"}
     personalization = {k: v for k, v in updates.items() if k in personalization_keys}
 
     # Update agents.yaml

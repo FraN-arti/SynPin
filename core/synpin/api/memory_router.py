@@ -1,0 +1,275 @@
+"""Memory API Router — endpoints for agent memory management.
+
+Endpoints:
+- GET  /api/memory/{agent_id}           — read agent memory
+- POST /api/memory/{agent_id}/add       — add entry
+- POST /api/memory/{agent_id}/replace   — replace entry
+- POST /api/memory/{agent_id}/remove    — remove entry
+- GET  /api/memory/{agent_id}/facts     — list facts
+- POST /api/memory/{agent_id}/facts     — add fact
+- GET  /api/memory/{agent_id}/facts/{filename} — read fact
+- DELETE /api/memory/{agent_id}/facts/{filename} — remove fact
+- POST /api/memory/{agent_id}/search    — search memory
+- GET  /api/memory/{agent_id}/state     — get state
+- POST /api/memory/{agent_id}/state     — set active session
+- GET  /api/memory/{agent_id}/stats     — get statistics
+- POST /api/memory/{agent_id}/reindex   — re-index for search
+- GET  /api/config/memory               — read global memory config
+- PUT  /api/config/memory               — update global memory config
+"""
+
+import logging
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+from ..memory import MemoryManager
+# ── Shared USER Path ──────────────────────────────────────────────────────────
+_shared_user_path = None
+def _get_shared_user_path() -> Path:
+    """Get path to global shared USER.md."""
+    global _shared_user_path
+    if _shared_user_path is not None:
+        return _shared_user_path
+    shared_dir = DATA_DIR / "shared"
+    shared_dir.mkdir(parents=True, exist_ok=True)
+    _shared_user_path = shared_dir / "USER.md"
+    return _shared_user_path
+
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/memory", tags=["memory"])
+
+# ── Data Directory ───────────────────────────────────────────────────────
+
+# Resolve data path: prod ~/.synpin/data first, then dev core/data/
+_data_candidates = [
+    Path.home() / ".synpin" / "data",  # production
+    Path(__file__).resolve().parent.parent.parent / "data",  # dev
+]
+
+DATA_DIR: Optional[Path] = None
+for candidate in _data_candidates:
+    if candidate.exists():
+        DATA_DIR = candidate
+        break
+
+if DATA_DIR is None:
+    DATA_DIR = _data_candidates[0]
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+# ── Manager Cache ────────────────────────────────────────────────────────
+
+_managers: Dict[str, MemoryManager] = {}
+
+
+def get_manager(agent_id: str) -> MemoryManager:
+    """Get or create MemoryManager for an agent."""
+    if agent_id not in _managers:
+        manager = MemoryManager(agent_id, DATA_DIR)
+        manager.initialize()
+        _managers[agent_id] = manager
+    return _managers[agent_id]
+
+
+# ── Request/Response Models ──────────────────────────────────────────────
+
+class AddRequest(BaseModel):
+    target: str = "memory"  # "memory" or "user"
+    content: str
+
+
+class ReplaceRequest(BaseModel):
+    target: str = "memory"
+    old_text: str
+    new_content: str
+
+
+class RemoveRequest(BaseModel):
+    target: str = "memory"
+    old_text: str
+
+
+class AddFactRequest(BaseModel):
+    topic: str
+    content: str
+    date: Optional[str] = None
+
+
+class SearchRequest(BaseModel):
+    query: str
+    file_type: Optional[str] = None
+    limit: int = 10
+
+
+class SetSessionRequest(BaseModel):
+    channel: str
+    session_id: str
+    last_position: int = 0
+    last_action: str = ""
+    waiting_for: Optional[str] = None
+
+
+# ── Endpoints ────────────────────────────────────────────────────────────
+
+@router.get("/{agent_id}")
+async def read_agent_memory(agent_id: str, target: str = "memory"):
+    """Read agent memory (memory only). USER.md is global."""
+    manager = get_manager(agent_id)
+    return manager.read(target)
+@router.get("/user")
+async def read_global_user():
+    """Read the global shared USER.md profile."""
+    path = _get_shared_user_path()
+    if not path.exists():
+        return {"success": True, "target": "user", "entries": [], "usage": "0% — 0/1,375 chars", "entry_count": 0}
+    content = path.read_text(encoding="utf-8")
+    entries = [e.strip() for e in content.split("\n§\n") if e.strip()]
+    current = len(content)
+    limit = 1375
+    pct = min(100, int((current / limit) * 100)) if limit > 0 else 0
+    return {"success": True, "target": "user", "entries": entries, "usage": f"{pct}% — {current:,}/{limit:,} chars", "entry_count": len(entries)}
+@router.post("/user/add")
+async def add_user_entry(req: AddRequest):
+    """Add entry to global shared USER.md."""
+    path = _get_shared_user_path()
+    if not path.exists():
+        path.write_text(req.content.strip() + "\n", encoding="utf-8")
+        return {"success": True, "message": "Entry added.", "entries": [req.content.strip()]}
+    import re
+    content = path.read_text(encoding="utf-8")
+    entries = [e.strip() for e in content.split("\n§\n") if e.strip()]
+    if req.content.strip() in entries:
+        return {"success": True, "message": "Entry already exists.", "entries": entries}
+    new_content = content.rstrip("\n") + "\n§\n" + req.content.strip() + "\n"
+    path.write_text(new_content, encoding="utf-8")
+    return {"success": True, "message": "Entry added.", "entries": entries + [req.content.strip()]}
+@router.post("/user/remove")
+async def remove_user_entry(req: RemoveRequest):
+    """Remove entry from global shared USER.md."""
+    path = _get_shared_user_path()
+    if not path.exists():
+        return {"success": False, "error": "USER.md does not exist."}
+    content = path.read_text(encoding="utf-8")
+    entries = [e.strip() for e in content.split("\n§\n") if e.strip()]
+    matches = [e for e in entries if req.old_text in e]
+    if not matches:
+        return {"success": False, "error": f"No entry matched '{req.old_text}'."}
+    if len(matches) > 1 and len({e: 1 for e in matches}) > 1:
+        return {"success": False, "error": "Multiple entries matched. Be more specific.", "matches": [e[:80] for e in matches]}
+    entries.remove(matches[0])
+    path.write_text("\n§\n".join(entries) + "\n", encoding="utf-8")
+    return {"success": True, "message": "Entry removed."}
+@router.post("/user/replace")
+async def replace_user_entry(req: ReplaceRequest):
+    """Replace entry in global shared USER.md."""
+    path = _get_shared_user_path()
+    if not path.exists():
+        return {"success": False, "error": "USER.md does not exist."}
+    content = path.read_text(encoding="utf-8")
+    entries = [e.strip() for e in content.split("\n§\n") if e.strip()]
+    matches = [i for i, e in enumerate(entries) if req.old_text in e]
+    if not matches:
+        return {"success": False, "error": f"No entry matched '{req.old_text}'."}
+    entries[matches[0]] = req.new_content.strip()
+    path.write_text("\n§\n".join(entries) + "\n", encoding="utf-8")
+    return {"success": True, "message": "Entry replaced."}
+
+
+@router.post("/{agent_id}/add")
+async def add_entry(agent_id: str, req: AddRequest):
+    """Add entry to agent memory."""
+    manager = get_manager(agent_id)
+    return manager.add(req.target, req.content)
+
+
+@router.post("/{agent_id}/replace")
+async def replace_entry(agent_id: str, req: ReplaceRequest):
+    """Replace entry in agent memory."""
+    manager = get_manager(agent_id)
+    return manager.replace(req.target, req.old_text, req.new_content)
+
+
+@router.post("/{agent_id}/remove")
+async def remove_entry(agent_id: str, req: RemoveRequest):
+    """Remove entry from agent memory."""
+    manager = get_manager(agent_id)
+    return manager.remove(req.target, req.old_text)
+
+
+@router.get("/{agent_id}/facts")
+async def list_facts(agent_id: str, limit: int = 50):
+    """List fact files for an agent."""
+    manager = get_manager(agent_id)
+    return manager.list_facts(limit)
+
+
+@router.post("/{agent_id}/facts")
+async def add_fact(agent_id: str, req: AddFactRequest):
+    """Add a dated fact."""
+    manager = get_manager(agent_id)
+    return manager.add_fact(req.topic, req.content, req.date)
+
+
+@router.get("/{agent_id}/facts/{filename}")
+async def read_fact(agent_id: str, filename: str):
+    """Read a specific fact."""
+    manager = get_manager(agent_id)
+    return manager.read_fact(filename)
+
+
+@router.delete("/{agent_id}/facts/{filename}")
+async def remove_fact(agent_id: str, filename: str):
+    """Remove a fact."""
+    manager = get_manager(agent_id)
+    return manager.remove_fact(filename)
+
+
+@router.post("/{agent_id}/search")
+async def search_memory(agent_id: str, req: SearchRequest):
+    """Search across agent memory."""
+    manager = get_manager(agent_id)
+    results = manager.search(req.query, req.file_type, req.limit)
+    return {"results": results, "count": len(results)}
+
+
+@router.get("/{agent_id}/state")
+async def get_state(agent_id: str):
+    """Get agent state (active sessions)."""
+    manager = get_manager(agent_id)
+    return {
+        "active_sessions": manager.get_all_active_sessions(),
+        "last_compaction": manager.get_last_compaction(),
+    }
+
+
+@router.post("/{agent_id}/state")
+async def set_session(agent_id: str, req: SetSessionRequest):
+    """Set active session for a channel."""
+    manager = get_manager(agent_id)
+    manager.set_active_session(
+        req.channel,
+        req.session_id,
+        req.last_position,
+        req.last_action,
+        req.waiting_for,
+    )
+    return {"success": True}
+
+
+@router.get("/{agent_id}/stats")
+async def get_stats(agent_id: str):
+    """Get memory statistics."""
+    manager = get_manager(agent_id)
+    return manager.get_stats()
+
+
+@router.post("/{agent_id}/reindex")
+async def reindex(agent_id: str):
+    """Re-index memory for search."""
+    manager = get_manager(agent_id)
+    manager.reindex()
+    return {"success": True, "message": "Re-indexed"}

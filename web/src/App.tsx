@@ -555,12 +555,6 @@ function App() {
             )}
           </div>
 
-          <nav className="sidebar-nav">
-            <div className="nav-section-title">Сегодня</div>
-            <button className="nav-item">Архитектура API</button>
-            <button className="nav-item">Тесты для auth</button>
-          </nav>
-
           <div className="sidebar-footer">
             <button className="settings-btn" onClick={() => setPage('settings')}>
               <span>⚙️</span> Настройки

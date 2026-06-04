@@ -405,7 +405,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
     if (!newRole.name.trim()) return
     const rolesid = newRole.name.trim().toLowerCase().replace(/\s+/g, '-')
     const updated = [...roles, { rolesid, ...newRole }]
-    const res = await fetch('${API_BASE}/api/roles', {
+    const res = await fetch(`${API_BASE}/api/roles`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ roles: updated }),
     })
@@ -420,7 +420,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
     if (!newDept.name.trim()) return
     const departmentsid = newDept.name.trim().toLowerCase().replace(/\s+/g, '-')
     const updated = [...departments, { departmentsid, ...newDept }]
-    const res = await fetch('${API_BASE}/api/departments', {
+    const res = await fetch(`${API_BASE}/api/departments`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ departments: updated }),
     })
@@ -433,7 +433,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const handleRemoveRole = async (rolesid: string) => {
     const updated = roles.filter(r => r.rolesid !== rolesid)
-    const res = await fetch('${API_BASE}/api/roles', {
+    const res = await fetch(`${API_BASE}/api/roles`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ roles: updated }),
     })
@@ -446,7 +446,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
   const handleRoleColorChange = async (rolesid: string, newColor: string) => {
     const updated = roles.map(r => r.rolesid === rolesid ? { ...r, color: newColor } : r)
     try {
-      const res = await fetch('${API_BASE}/api/roles', {
+      const res = await fetch(`${API_BASE}/api/roles`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roles: updated }),
       })
@@ -460,7 +460,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
   const handleDeptColorChange = async (departmentsid: string, newColor: string) => {
     const updated = departments.map(d => d.departmentsid === departmentsid ? { ...d, color: newColor } : d)
     try {
-      const res = await fetch('${API_BASE}/api/departments', {
+      const res = await fetch(`${API_BASE}/api/departments`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ departments: updated }),
       })
@@ -473,7 +473,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const handleRemoveDept = async (departmentsid: string) => {
     const updated = departments.filter(d => d.departmentsid !== departmentsid)
-    const res = await fetch('${API_BASE}/api/departments', {
+    const res = await fetch(`${API_BASE}/api/departments`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ departments: updated }),
     })
@@ -523,7 +523,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const fetchAgents = useCallback(async () => {
     try {
-      const res = await fetch('${API_BASE}/api/agents')
+      const res = await fetch(`${API_BASE}/api/agents`)
       if (res.ok) {
         const data = await res.json()
         setAgents(data.agents || [])
@@ -535,7 +535,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const fetchProviders = useCallback(async () => {
     try {
-      const res = await fetch('${API_BASE}/api/providers')
+      const res = await fetch(`${API_BASE}/api/providers`)
       if (res.ok) {
         const data = await res.json()
         setProviders(data.providers || [])
@@ -547,7 +547,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const fetchRoles = useCallback(async () => {
     try {
-      const res = await fetch('${API_BASE}/api/roles')
+      const res = await fetch(`${API_BASE}/api/roles`)
       if (res.ok) {
         const data = await res.json()
         setRoles(data.roles || [])
@@ -559,7 +559,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const fetchDepartments = useCallback(async () => {
     try {
-      const res = await fetch('${API_BASE}/api/departments')
+      const res = await fetch(`${API_BASE}/api/departments`)
       if (res.ok) {
         const data = await res.json()
         setDepartments(data.departments || [])
@@ -571,7 +571,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const detectExternalAgents = useCallback(async () => {
     try {
-      const res = await fetch('${API_BASE}/api/external-agents/detect')
+      const res = await fetch(`${API_BASE}/api/external-agents/detect`)
       if (res.ok) {
         const data = await res.json()
         setExternalAgents(data.agents || [])
@@ -585,7 +585,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const fetchTools = useCallback(async () => {
     try {
-      const res = await fetch('${API_BASE}/api/tools')
+      const res = await fetch(`${API_BASE}/api/tools`)
       if (res.ok) {
         const data = await res.json()
         setToolsRegistry(data.tools || {})
@@ -718,7 +718,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
     if (!createForm.name.trim()) return
     setCreating(true)
     try {
-      const res = await fetch('${API_BASE}/api/agents', {
+      const res = await fetch(`${API_BASE}/api/agents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(createForm),
@@ -1217,7 +1217,7 @@ const ProvidersSection = forwardRef<{ refresh: () => void }, { onAddProvider: (t
   // Fetch providers from API with polling
   const fetchProviders = useCallback(async () => {
     try {
-      const res = await fetch('${API_BASE}/api/providers')
+      const res = await fetch(`${API_BASE}/api/providers`)
       if (res.ok) {
         const data = await res.json()
         setConnected(data.providers || [])
@@ -1496,7 +1496,7 @@ function AddFromCatalogModal({ provider, editProvider, onClose, onSaved }: {
         models: modelList,
       }
       // Create temp
-      await fetch('${API_BASE}/api/providers', {
+      await fetch(`${API_BASE}/api/providers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -1569,7 +1569,7 @@ function AddFromCatalogModal({ provider, editProvider, onClose, onSaved }: {
       const res = await fetch(
         isEdit
           ? `${API_BASE}/api/providers/${encodeURIComponent(editProvider!.name)}`
-          : '${API_BASE}/api/providers',
+          : `${API_BASE}/api/providers`,
         {
           method: isEdit ? 'PUT' : 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1801,7 +1801,7 @@ function AddProviderModal({ type, onClose, onSaved }: { type: 'openai' | 'anthro
         api_key: apiKey,
         models: model ? [model] : [],
       }
-      const res = await fetch('${API_BASE}/api/providers', {
+      const res = await fetch(`${API_BASE}/api/providers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

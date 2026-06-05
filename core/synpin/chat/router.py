@@ -844,10 +844,23 @@ async def stream_response(
                     model_tool_calls = text_tool_calls
                     is_text_fallback = True
                 else:
-                    # No tool calls at all → done
+                    # No tool calls at all → yield Phase 1 result directly, skip Phase 2
+                    # (Mistral requires last message to be user/tool, not assistant)
                     if full_text:
-                        chat_messages.append(ChatMessage(role="assistant", content=full_text))
-                    break
+                        yield f"data: {json.dumps({'type': 'chunk', 'content': full_text})}\n\n"
+                    if usage:
+                        yield f"__USAGE__:{json.dumps(usage)}"
+                    done_data = {"type": "done", "model": model_name}
+                    if agent_name:
+                        done_data["agent_name"] = agent_name
+                    if usage:
+                        done_data["usage"] = {
+                            "prompt_tokens": usage.get("prompt_tokens", 0),
+                            "completion_tokens": usage.get("completion_tokens", 0),
+                            "total_tokens": usage.get("total_tokens", 0),
+                        }
+                    yield f"data: {json.dumps(done_data)}\n\n"
+                    return
 
             # Execute all tool calls and collect results
             tool_results_for_msg = []  # For text fallback: [(name, result_text)]
@@ -905,13 +918,20 @@ async def stream_response(
                         content=f"[Результат инструмента {t_name}]\n{result_text}\n\nПродолжай работать. Если задача выполнена — подведи итог.",
                     ))
             else:
-                # Native: append assistant msg with tool_calls + tool results
+                # Native: append assistant msg with tool_calls FIRST, then tool results
+                # (Mistral requires assistant before tool, not after)
                 assistant_msg = ChatMessage(
                     role="assistant",
                     content=full_text or None,
                     tool_calls=model_tool_calls,
                 )
                 chat_messages.append(assistant_msg)
+                # Tool results were already appended in the loop above — need to reorder
+                # Move tool messages after assistant by rebuilding the list
+                # Find and reposition tool messages
+                tool_msgs = [m for m in chat_messages if m.role == "tool"]
+                non_tool_msgs = [m for m in chat_messages if m.role != "tool"]
+                chat_messages = non_tool_msgs + tool_msgs
 
     # ── Phase 2: Stream final response ──
     # No tools in Phase 2 — tool loop already exhausted; stream text + usage only
@@ -983,6 +1003,11 @@ async def chat_stream(req: ChatRequest):
 
     model = req.model or "default"
     provider_name = req.provider
+
+    # Strip provider prefix from model name (e.g. "mistral/codestral-latest" → "codestral-latest")
+    # Agents store models as "provider/model" for SynPin routing, but APIs expect bare model names
+    if provider_name and model.startswith(f"{provider_name}/"):
+        model = model[len(provider_name) + 1:]
 
     # If new_session requested, clear the active session for this channel FIRST
     if req.new_session and req.agent_slug and req.channel_id:

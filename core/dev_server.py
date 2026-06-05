@@ -56,7 +56,7 @@ def find_free_port(start: int, max_attempts: int = 10) -> int:
 def print_banner(core_port: int, web_port: int):
     print()
     print(f"  {Fore.CYAN}{Style.BRIGHT}╔══════════════════════════════════════════╗{Style.NORMAL}{Fore.RESET}")
-    print(f"  {Fore.CYAN}{Style.BRIGHT}║{Style.NORMAL}{Fore.RESET}  {Fore.MAGENTA}{Style.BRIGHT}🚀 SynPin v0.1.0 — Development Mode{Style.NORMAL}{Fore.RESET}  {Fore.CYAN}{Style.BRIGHT}║{Style.NORMAL}{Fore.RESET}")
+    print(f"  {Fore.CYAN}{Style.BRIGHT}║{Style.NORMAL}{Fore.RESET}  {Fore.MAGENTA}{Style.BRIGHT}🚀 SynPin v0.2.2 — Development Mode{Style.NORMAL}{Fore.RESET}  {Fore.CYAN}{Style.BRIGHT}║{Style.NORMAL}{Fore.RESET}")
     print(f"  {Fore.CYAN}{Style.BRIGHT}╚══════════════════════════════════════════╝{Style.NORMAL}{Fore.RESET}")
     print()
     print(f"  {Fore.WHITE}{Style.DIM}Core:  http://{CORE_HOST}:{core_port}/api{Style.NORMAL}{Fore.RESET}")

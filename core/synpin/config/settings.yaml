@@ -1,112 +1,87 @@
-# settings.yaml — General system settings
-#
-# Controls: server config, UI settings, feed config, templates
-
-# Server settings
+primary_agent_slug: hermes-agent
 server:
-  host: "0.0.0.0"
+  host: 0.0.0.0
   port: 2088
   dev_port: 2099
   cors_origins:
-    - "http://localhost:2099"
-    - "http://localhost:2088"
-  # Rate limiting
+  - http://localhost:2099
+  - http://localhost:2088
   rate_limit:
     enabled: true
     requests_per_minute: 60
-
-# UI settings
+  gateway_auth: none
 ui:
-  theme: "dark"  # dark | light (light coming soon)
-  language: "ru"  # ru | en
-  # Sidebar
+  theme: dark
+  language: ru
   sidebar:
     default_open: false
     show_icons: true
-  # Chat
   chat:
-    show_metadata: true       # show time/model/tokens below messages
-    metadata_delay_ms: 500    # delay before showing agent metadata
-    max_message_length: 4000  # max chars per message
-    auto_scroll: true         # auto-scroll to bottom on new messages
-    streaming_border: true    # animated border during streaming
-
-# Activity feed
+    show_metadata: true
+    metadata_delay_ms: 500
+    max_message_length: 4000
+    auto_scroll: true
+    streaming_border: true
 feed:
   enabled: true
   max_items: 50
-  time_range: "24h"  # 1h, 6h, 24h, 7d, 30d
+  time_range: 24h
   filters:
     new_ideas: true
     task_updates: true
     memory_updates: false
     board_updates: true
     delegations: true
-    # Per-agent filters:
-    # "@frontend": false
-  sort: "newest"  # newest | oldest
-  group_by: "department"  # none | department | type
-
-# Kanban
+  sort: newest
+  group_by: department
 kanban:
   default_stages:
-    - slug: "backlog"
-      name: "Бэклог"
-      color: "#6b7280"
-    - slug: "in-progress"
-      name: "В работе"
-      color: "#f59e0b"
-    - slug: "review"
-      name: "Ревью"
-      color: "#3b82f6"
-    - slug: "testing"
-      name: "Тестирование"
-      color: "#8b5cf6"
-    - slug: "done"
-      name: "Готово"
-      color: "#10b981"
-  require_signoff: true  # require agent signature on stage transitions
-  auto_archive_days: 30  # auto-archive done tasks after N days
-
-# Forum
+  - slug: backlog
+    name: Бэклог
+    color: '#6b7280'
+  - slug: in-progress
+    name: В работе
+    color: '#f59e0b'
+  - slug: review
+    name: Ревью
+    color: '#3b82f6'
+  - slug: testing
+    name: Тестирование
+    color: '#8b5cf6'
+  - slug: done
+    name: Готово
+    color: '#10b981'
+  require_signoff: true
+  auto_archive_days: 30
 forum:
   sections:
-    - slug: "ideas"
-      name: "Идеи"
-      icon: "💡"
-      description: "Предложения и голосования"
-    - slug: "qa"
-      name: "Q&A"
-      icon: "❓"
-      description: "Вопросы и ответы"
-    - slug: "discussions"
-      name: "Обсуждения"
-      icon: "🗣"
-      description: "Архитектурные дискуссии"
-    - slug: "knowledge"
-      name: "База знаний"
-      icon: "📚"
-      description: "Паттерны, находки, лучшие практики"
-  auto_promote_to_kanban: true  # accepted ideas auto-create kanban tasks
-
-# Templates
+  - slug: ideas
+    name: Идеи
+    icon: 💡
+    description: Предложения и голосования
+  - slug: qa
+    name: Q&A
+    icon: ❓
+    description: Вопросы и ответы
+  - slug: discussions
+    name: Обсуждения
+    icon: 🗣
+    description: Архитектурные дискуссии
+  - slug: knowledge
+    name: База знаний
+    icon: 📚
+    description: Паттерны, находки, лучшие практики
+  auto_promote_to_kanban: true
 templates:
-  # Default task template
   task:
-    title_format: "[{department}] {summary}"
-    default_description: |
-      ## Описание
-      {description}
-
-      ## Критерии приёмки
-      - [ ] 
-    auto_assign: false  # auto-assign to department head
-
-  # Default agent session template
+    title_format: '[{department}] {summary}'
+    default_description: "## Описание\n{description}\n\n## Критерии приёмки\n- [ ]\
+      \ \n"
+    auto_assign: false
   session:
     system_includes:
-      - "personality"
-      - "memory"
-      - "skills"
-      - "channel_context"
-      - "recent_sessions"
+    - personality
+    - memory
+    - skills
+    - channel_context
+    - recent_sessions

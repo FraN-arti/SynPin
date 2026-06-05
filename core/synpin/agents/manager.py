@@ -203,6 +203,7 @@ def load_agents() -> dict[str, Any]:
             "slug": slug,
             "agentid": agent_data.get("agentid", ""),
             "enabled": cfg.get("enabled", True),
+            "is_primary": cfg.get("is_primary", False),
             "role": role_id,
             "role_name": role_name,
             "department": dept_id,
@@ -323,7 +324,7 @@ def delete_agent(slug: str) -> bool:
 def save_agent(slug: str, updates: dict[str, Any]) -> dict[str, Any]:
     """Save agent updates. Operational → agents.yaml, personalization + role/dept → agent.yaml."""
     # Operational fields → agents.yaml (role & department NOT here — they go to agent.yaml)
-    operational_keys = {"enabled", "model", "provider", "skills"}
+    operational_keys = {"enabled", "model", "provider", "skills", "is_primary"}
     operational = {k: v for k, v in updates.items() if k in operational_keys}
 
     # Personalization + role/dept → agent.yaml
@@ -337,6 +338,11 @@ def save_agent(slug: str, updates: dict[str, Any]) -> dict[str, Any]:
         config_path = _get_config_dir() / "agents.yaml"
         data = _load_yaml(config_path)
         if slug in data.get("agents", {}):
+            # If setting is_primary=True, unset all others first
+            if operational.get("is_primary"):
+                for other_slug, other_cfg in data.get("agents", {}).items():
+                    if other_slug != slug:
+                        other_cfg["is_primary"] = False
             data["agents"][slug].update(operational)
             _save_yaml(config_path, data)
 

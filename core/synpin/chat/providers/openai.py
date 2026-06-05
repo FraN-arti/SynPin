@@ -12,6 +12,9 @@ from .base import BaseProvider, ChatMessage
 class OpenAIProvider(BaseProvider):
     """Provider for OpenAI-compatible APIs."""
 
+    # Override in subclasses for providers that don't support all OpenAI params
+    supports_stream_options = True
+
     def __init__(self, api_key: str, base_url: str):
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
@@ -51,7 +54,7 @@ class OpenAIProvider(BaseProvider):
         }
         if max_tokens:
             body["max_tokens"] = max_tokens
-        if stream:
+        if stream and self.supports_stream_options:
             body["stream_options"] = {"include_usage": True}
         if tools:
             body["tools"] = tools

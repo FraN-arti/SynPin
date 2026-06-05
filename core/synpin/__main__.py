@@ -51,7 +51,7 @@ def cmd_start(args):
     pid_file.parent.mkdir(parents=True, exist_ok=True)
     pid_file.write_text(json.dumps({"pid": os.getpid(), "port": port}))
 
-    print(f"🚀 SynPin v0.1.0")
+    print(f"🚀 SynPin v0.2.2")
     print(f"   API:  http://{host}:{port}/api")
     print(f"   Web:  http://{host}:{port}")
     print(f"   Docs: http://{host}:{port}/docs")
@@ -132,7 +132,7 @@ def cmd_status(args):
 
 def cmd_version(args):
     """Show version."""
-    print("SynPin v0.1.0")
+    print("SynPin v0.2.2")
 
 
 def cmd_config(args):

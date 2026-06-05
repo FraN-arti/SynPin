@@ -15,7 +15,7 @@
 │   ├── roles.yaml            # Роли агентов
 │   ├── departments.yaml      # Департаменты
 │   ├── external_agents.yaml  # Внешние агенты (Hermes)
-│   └── memory.yaml           # Настройки памяти
+│   └── tools.yaml            # Инструменты
 ├── agents/
 │   ├── 85n1yo4x/             # agentid = имя директории
 │   │   ├── agent.yaml        # Личность и настройки
@@ -26,6 +26,9 @@
 │       └── agent.yaml
 ├── logs/
 └── data/
+    ├── agents/               # Память агентов (MEMORY.md, facts/)
+    ├── shared/               # Глобальный USER.md
+    └── search.db             # SQLite FTS5 индекс
 ```
 
 ---
@@ -82,12 +85,14 @@ providers:
       - claude-sonnet-4-20250514
       - claude-3-5-haiku-20241022
 
-  local:
-    type: "openai-compatible"
-    base_url: "http://localhost:1234/v1"
-    api_key: ""
+  mistral:
+    type: "openai"
+    base_url: "https://api.mistral.ai/v1"
+    api_key: "..."
+    supports_stream_options: false
     models:
-      - local-model
+      - mistral-large-latest
+      - codestral-latest
 ```
 
 ### Типы провайдеров

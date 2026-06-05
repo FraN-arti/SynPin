@@ -26,6 +26,7 @@ interface AgentConfig {
   temperature: number
   max_tokens: number
   enabled: boolean
+  is_primary?: boolean
   is_external?: boolean
   type?: string
 }
@@ -49,6 +50,70 @@ interface Message {
   tools?: ToolCall[]
 }
 
+// ─── Tool Timeline (collapsible action flow) ────────────────
+
+interface ToolTimelineProps {
+  tools: ToolCall[]
+  isLive: boolean
+  toolNames: Record<string, string>
+}
+
+function ToolTimeline({ tools, isLive, toolNames }: ToolTimelineProps) {
+  const [expanded, setExpanded] = useState(isLive)
+
+  // Auto-expand when live (tools running), auto-collapse when done
+  useEffect(() => {
+    if (isLive) setExpanded(true)
+  }, [isLive])
+
+  const doneCount = tools.filter(t => t.status === 'completed').length
+  const errorCount = tools.filter(t => t.status === 'error').length
+  const runningCount = tools.filter(t => t.status === 'running').length
+  const total = tools.length
+
+  // Summary line for collapsed state
+  const summary = errorCount > 0
+    ? `${errorCount} ошибка${errorCount > 1 ? '' : ''}`
+    : runningCount > 0
+      ? `${doneCount + 1}/${total} действий...`
+      : `${total} действий ✓`
+
+  return (
+    <div className={`tool-timeline ${expanded ? 'expanded' : 'collapsed'}`}>
+      {/* Header — always visible */}
+      <button
+        className="tool-timeline-header"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <span className="tool-timeline-icon">
+          {runningCount > 0 ? '⚡' : errorCount > 0 ? '⚠' : '✓'}
+        </span>
+        <span className="tool-timeline-summary">{summary}</span>
+        <span className={`tool-timeline-chevron ${expanded ? 'open' : ''}`}>▾</span>
+      </button>
+
+      {/* Expandable list */}
+      <div className={`tool-timeline-body ${expanded ? 'open' : ''}`}>
+        {tools.map((tc) => (
+          <div key={tc.id} className={`tool-timeline-row ${tc.status}`}>
+            <span className="tool-timeline-status">
+              {tc.status === 'running' && <span className="tool-spinner" />}
+              {tc.status === 'completed' && <span className="tool-check">✓</span>}
+              {tc.status === 'error' && <span className="tool-error">✕</span>}
+            </span>
+            <span className="tool-timeline-name">
+              {toolNames[tc.name] || tc.name}
+            </span>
+            {tc.status === 'error' && tc.error && (
+              <span className="tool-timeline-error">{tc.error}</span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const [page, setPage] = useState<'chat' | 'settings'>('chat')
   const [messages, setMessages] = useState<Message[]>([])
@@ -63,8 +128,9 @@ function App() {
   const [revealedMeta, setRevealedMeta] = useState<Set<string>>(new Set())
   const [activeAgent, setActiveAgent] = useState<AgentConfig | null>(null)
   const [availableAgents, setAvailableAgents] = useState<AgentConfig[]>([])
-  const [agentSelectorOpen, setAgentSelectorOpen] = useState(false)
-  const [pendingNewSession, setPendingNewSession] = useState(false)
+  const [agentSearch, setAgentSearch] = useState('')
+  const [primarySlug, setPrimarySlug] = useState('')
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const activeAgentRef = useRef<AgentConfig | null>(null)
@@ -80,6 +146,8 @@ function App() {
     search_files: 'Поиск файлов',
     web_search: 'Поиск в интернете',
     code_exec: 'Python',
+    memory_read: 'Чтение памяти',
+    memory_write: 'Запись в память',
   }
 
   // Save sidebar state
@@ -136,9 +204,19 @@ function App() {
         const allAgents = [...synpinAgents, ...extAgents]
         setAvailableAgents(allAgents)
 
-        // Set default active agent (first enabled one)
+        // Load primary agent slug
+        let primarySlug = ''
+        try {
+          const primaryRes = await fetch(`${API_BASE}/api/config/primary-agent`)
+          const primaryData = await primaryRes.json()
+          primarySlug = primaryData.slug || ''
+          setPrimarySlug(primarySlug)
+        } catch {}
+
+        // Set default active agent: primary first, then first enabled
         if (allAgents.length > 0 && !activeAgent) {
-          setActiveAgent(allAgents[0])
+          const primary = primarySlug ? allAgents.find(a => a.slug === primarySlug) : null
+          setActiveAgent(primary || allAgents[0])
         }
       } catch (e) {
         console.error('[agents] load error:', e)
@@ -282,17 +360,13 @@ function App() {
           agent_name: agentName,
           agent_slug: activeAgent?.slug || undefined,
           channel_id: 'web',
-          new_session: pendingNewSession,
+
           temperature,
           max_tokens: maxTokens,
           tools: enabledTools,
         }),
       })
 
-      // Reset pending flag after first request
-      if (pendingNewSession) {
-        setPendingNewSession(false)
-      }
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -452,6 +526,12 @@ function App() {
       const extAgents = (extData.agents || []).filter((a: AgentConfig) => a.enabled)
       const allAgents = [...synpinAgents, ...extAgents]
       setAvailableAgents(allAgents)
+      // Also refresh primary slug
+      try {
+        const primaryRes = await fetch(`${API_BASE}/api/config/primary-agent`)
+        const primaryData = await primaryRes.json()
+        setPrimarySlug(primaryData.slug || '')
+      } catch {}
       const current = activeAgentRef.current
       if (current) {
         const fresh = allAgents.find(a => a.slug === current.slug)
@@ -501,64 +581,120 @@ function App() {
       {/* Sidebar — slides in/out */}
       <aside className={`sidebar ${sidebarOpen && sidebarReady ? 'open' : ''}`}>
         <div className="sidebar-content">
-          <button className="new-chat-btn" onClick={() => {
-            setMessages([])
-            setPendingNewSession(true)
-          }}>
-            <span className="new-chat-icon">+</span>
-            Новый чат
-          </button>
-
-          {/* Agent Selector */}
-          <div className="agent-selector">
-            <button
-              className="agent-selector-trigger"
-              onClick={() => setAgentSelectorOpen(!agentSelectorOpen)}
-            >
-              <span className="agent-selector-avatar" style={{ background: activeAgent?.is_external ? '#f97316' : '#6b7280' }}>
-                {activeAgent?.is_external ? 'H' : activeAgent?.name?.[0] || '?'}
-              </span>
-              <div className="agent-selector-info">
-                <span className="agent-selector-name">{activeAgent?.name || 'Выберите агента'}</span>
-                <span className="agent-selector-role">{activeAgent?.role_name || activeAgent?.type || ''}</span>
+          {/* Primary Agent — pinned above search */}
+          {primarySlug && availableAgents.find(a => a.slug === primarySlug) && (() => {
+            const primary = availableAgents.find(a => a.slug === primarySlug)!
+            return (
+              <div className="primary-agent">
+                <button
+                  className="agent-list-item active"
+                  onClick={() => {
+                    setActiveAgent(primary)
+                    setMessages([])
+                  }}
+                >
+                  <span className="agent-list-avatar" style={{ background: primary.is_external ? '#f97316' : '#6b7280' }}>
+                    {primary.is_external ? 'H' : primary.name[0]}
+                  </span>
+                  <div className="agent-list-info">
+                    <span className="agent-list-name">
+                      {primary.name}
+                    </span>
+                    <span className="agent-list-role">{primary.role_name || primary.type}</span>
+                  </div>
+                  <span
+                    className="star-toggle active"
+                    title="Снять с главного"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      fetch(`${API_BASE}/api/config/primary-agent`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ slug: '' }),
+                      }).then(() => setPrimarySlug(''))
+                    }}
+                  >★</span>
+                </button>
               </div>
-              <svg className={`agent-selector-arrow ${agentSelectorOpen ? 'open' : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </button>
+            )
+          })()}
 
-            {agentSelectorOpen && (
-              <div className="agent-selector-dropdown">
-                {availableAgents.map(agent => (
+          {/* Agent Search */}
+          <div className="agent-search">
+            <input
+              className="agent-search-input"
+              type="text"
+              placeholder="Поиск агента..."
+              value={agentSearch}
+              onChange={(e) => setAgentSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Agent List — always visible, filtered by search, excludes primary */}
+          {(() => {
+            const filteredAgents = availableAgents
+              .filter(agent => agent.slug !== primarySlug)
+              .filter(agent => {
+                if (!agentSearch.trim()) return true
+                const q = agentSearch.toLowerCase()
+                return (
+                  agent.name.toLowerCase().includes(q) ||
+                  (agent.role_name || '').toLowerCase().includes(q) ||
+                  (agent.type || '').toLowerCase().includes(q)
+                )
+              })
+            return (
+              <div className={`agent-list ${filteredAgents.length > 3 ? 'has-overflow' : ''}`}>
+                {filteredAgents.map(agent => (
                   <button
                     key={agent.slug}
-                    className={`agent-selector-item ${activeAgent?.slug === agent.slug ? 'active' : ''}`}
+                    className={`agent-list-item ${activeAgent?.slug === agent.slug ? 'active' : ''}`}
                     onClick={() => {
                       setActiveAgent(agent)
-                      setAgentSelectorOpen(false)
                       setMessages([])
+                      setAgentSearch('')
                     }}
                   >
-                    <span className="agent-selector-item-avatar" style={{ background: agent.is_external ? '#f97316' : '#6b7280' }}>
+                    <span className="agent-list-avatar" style={{ background: agent.is_external ? '#f97316' : '#6b7280' }}>
                       {agent.is_external ? 'H' : agent.name[0]}
                     </span>
-                    <div className="agent-selector-item-info">
-                      <span className="agent-selector-item-name">
+                    <div className="agent-list-info">
+                      <span className="agent-list-name">
                         {agent.name}
                         {agent.is_external && <span className="agent-badge extern">extern</span>}
                       </span>
-                      <span className="agent-selector-item-role">{agent.role_name || agent.type}</span>
+                      <span className="agent-list-role">{agent.role_name || agent.type}</span>
                     </div>
+                    <span
+                      className={`star-toggle ${primarySlug === agent.slug ? 'active' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const newPrimary = primarySlug === agent.slug ? '' : agent.slug
+                        fetch(`${API_BASE}/api/config/primary-agent`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ slug: newPrimary }),
+                        }).then(() => setPrimarySlug(newPrimary))
+                      }}
+                    >★</span>
                   </button>
                 ))}
+                {filteredAgents.length === 0 && agentSearch.trim() && (
+                  <div className="agent-list-empty">Ничего не найдено</div>
+                )}
               </div>
-            )}
-          </div>
+            )
+          })()}
 
           <div className="sidebar-footer">
             <button className="settings-btn" onClick={() => setPage('settings')}>
               <span>⚙️</span> Настройки
             </button>
+            <div className="version-bar">
+              <span className="version-label">VERSION</span>
+              <span className="version-number">v0.2.2</span>
+              <span className="version-status up-to-date" />
+            </div>
           </div>
         </div>
       </aside>
@@ -586,20 +722,13 @@ function App() {
                           <img src={synpinLogo} alt="S" className="avatar-logo" />
                         ) : 'U'}
                       </div>
-                      {/* Tool blocks between avatar and bubble */}
+                      {/* Tool timeline — collapsible action flow */}
                       {msg.tools && msg.tools.length > 0 && (
-                        <div className="message-tools">
-                          {msg.tools.map(tc => (
-                            <div key={tc.id}
-                              className={`tool-block ${tc.status === 'running' ? 'running' : tc.status === 'error' ? 'error' : 'done'}`}
-                              title={tc.status === 'running' ? `Выполняется: ${tc.name}` : tc.status === 'error' ? `Ошибка: ${tc.error}` : `Готово: ${tc.name}`}>
-                              <span className="tool-block-name">{TOOL_DISPLAY_NAMES[tc.name] || tc.name}</span>
-                              <span className={`tool-block-status ${tc.status}`}>
-                                {tc.status === 'running' ? '⟳' : tc.status === 'error' ? '✕' : '✓'}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
+                        <ToolTimeline
+                          tools={msg.tools}
+                          isLive={isLastAssistant && isTyping}
+                          toolNames={TOOL_DISPLAY_NAMES}
+                        />
                       )}
                       <div className={`message-wrapper ${isLastAssistant ? 'streaming' : ''}`}>
                         <div className="message-bubble">

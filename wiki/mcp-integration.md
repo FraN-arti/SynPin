@@ -1,5 +1,7 @@
 # 🔧 MCP Integration
 
+> **📋 Статус: Планируется (Фаза 4)** — это design spec, не реализовано.
+
 ## Что такое MCP
 
 **Model Context Protocol** — стандарт Anthropic для подключения инструментов к AI агентам.

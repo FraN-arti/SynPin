@@ -8,21 +8,17 @@
 - [🏗️ Архитектура](architecture.md)
 - [⚙️ Конфигурация](configuration.md)
 - [🧠 Память и сессии](memory-sessions.md)
-- [🏢 Каналы и иерархия](channels-hierarchy.md)
-- [📋 Kanban-доска](kanban-board.md)
-- [🧠 Memory System](memory-system.md)
-- [💬 Group Chat Engine](group-chat.md)
-- [🎭 Agent Roles](agent-roles.md)
-- [📊 Dashboard](dashboard.md)
-- [🔧 MCP Integration](mcp-integration.md)
-- [📅 Roadmap](roadmap.md)
+- [🛠 Инструменты](tools.md)
+- [🤖 Агенты](agents.md)
+- [🔌 Интеграции](integrations.md)
 - [🚀 Быстрый старт](quickstart.md)
+- [📅 Roadmap](roadmap.md)
 
 ---
 
 ## 🎯 Краткое описание
 
-**SynPin** — мульти-модальный фреймворк для создания многоагентных систем, где агенты:
+**SynPin** — платформа для создания агентных систем, где агенты:
 
 - ✅ **Имеют память** — учатся на ошибках, накапливают опыт
 - ✅ **Общаются друг с другом** — видишь процесс, не только результат
@@ -36,8 +32,7 @@
 |------|-----------|
 | **Ядро** | Python 3.11+, FastAPI, uvicorn, pydantic |
 | **Web UI** | React 19, Vite 6, TypeScript 5.7, Tailwind 4 |
-| **State** | Zustand (клиент) + TanStack Query (сервер) |
-| **Память** | ChromaDB (векторный поиск) |
+| **Память** | SQLite FTS5 + Markdown |
 | **Установка** | uv (Python) + npm (Web) |
 | **Запуск** | `dev.bat` (dev) / `synpin start` (prod) |
 
@@ -45,24 +40,22 @@
 
 ```
 synpin/
-├── core/              ← Python ядро (агенты, память, MCP, API)
+├── core/              ← Python ядро (агенты, память, инструменты, API)
 │   └── synpin/
 │       ├── agents/    ← роли агентов
-│       ├── memory/    ← система памяти
-│       ├── tools/     ← инструменты
-│       ├── router/    ← делегат ↔ команда
-│       ├── engine/    ← основной цикл
+│       ├── memory/    ← FTS5 + Markdown + frozen snapshot
+│       ├── tools/     ← инструменты (8 штук)
+│       ├── chat/      ← чат-роутер + провайдеры
+│       ├── config/    ← менеджер конфигурации
 │       └── api/       ← FastAPI сервер
-├── web/               ← React UI (дашборд)
+├── web/               ← React UI (чат + настройки)
 │   └── src/
-│       ├── api/       ← API-клиент
-│       ├── stores/    ← Zustand сторы
-│       ├── types/     ← TypeScript типы
+│       ├── App.tsx    ← основной компонент
 │       ├── components/← UI компоненты
-│       ├── pages/     ← Страницы
-│       └── hooks/     ← React хуки
+│       └── lib/       ← утилиты
 └── wiki/              ← Эта документация
 ```
 
 ---
-*Последнее обновление: 3 июня 2026*
+
+*Последнее обновление: 4 июня 2026*

@@ -1,16 +1,76 @@
-"""REST API for Hermes Agent chat proxy."""
+"""REST API for Hermes Agent chat proxy.
+
+Hermes maintains its own context, memory, and session management.
+SynPin only needs to persist conversation history for agent-switch continuity.
+"""
 import httpx
 import json
 import os
+import logging
 from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/chat", tags=["hermes-chat"])
 
 HERMES_API_URL = "http://127.0.0.1:8642"
 HERMES_API_KEY = ""  # Will be loaded from config
+
+# History storage
+_DATA_DIR = None
+MAX_HISTORY_MESSAGES = 100
+
+
+def _get_data_dir():
+    global _DATA_DIR
+    if _DATA_DIR is not None:
+        return _DATA_DIR
+    candidates = [
+        Path.home() / ".synpin" / "data",
+        Path(__file__).resolve().parent.parent.parent / "data",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            _DATA_DIR = candidate
+            return _DATA_DIR
+    _DATA_DIR = candidates[0]
+    _DATA_DIR.mkdir(parents=True, exist_ok=True)
+    return _DATA_DIR
+
+
+def _get_history_path(agent_slug: str, channel_id: str):
+    data_dir = _get_data_dir()
+    if not data_dir:
+        return None
+    return data_dir / "agents" / agent_slug / "sessions" / f"{channel_id}.json"
+
+
+def _load_chat_history(agent_slug: str, channel_id: str) -> list[dict]:
+    path = _get_history_path(agent_slug, channel_id)
+    if not path or not path.exists():
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.warning("Failed to load history for %s/%s: %s", agent_slug, channel_id, e)
+        return []
+
+
+def _save_chat_history(agent_slug: str, channel_id: str, messages: list[dict]):
+    path = _get_history_path(agent_slug, channel_id)
+    if not path:
+        return
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        trimmed = messages[-MAX_HISTORY_MESSAGES:]
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(trimmed, f, ensure_ascii=False, indent=1)
+    except Exception as e:
+        logger.warning("Failed to save history for %s/%s: %s", agent_slug, channel_id, e)
 
 
 class HermesChatRequest(BaseModel):
@@ -20,6 +80,8 @@ class HermesChatRequest(BaseModel):
     temperature: float = 0.7
     max_tokens: int | None = None
     agent_name: str | None = None
+    agent_slug: str | None = None  # For history persistence
+    channel_id: str | None = None  # For history persistence
 
 
 def _get_hermes_key() -> str:
@@ -28,12 +90,11 @@ def _get_hermes_key() -> str:
     if HERMES_API_KEY:
         return HERMES_API_KEY
 
-    # Check multiple possible .env locations
     home = Path.home()
     candidates = [
         Path(os.environ.get("HERMES_HOME", "")) / ".env" if os.environ.get("HERMES_HOME") else None,
-        home / "AppData" / "Local" / "hermes" / ".env",  # Windows
-        home / ".hermes" / ".env",  # Linux/macOS
+        home / "AppData" / "Local" / "hermes" / ".env",
+        home / ".hermes" / ".env",
     ]
 
     for env_path in candidates:
@@ -104,7 +165,6 @@ async def stream_hermes_response(
                         except json.JSONDecodeError:
                             continue
 
-                        # Extract content from OpenAI format
                         choices = data.get("choices", [])
                         if choices:
                             delta = choices[0].get("delta", {})
@@ -113,7 +173,6 @@ async def stream_hermes_response(
                                 full_content += content
                                 yield f"data: {json.dumps({'type': 'chunk', 'content': content})}\n\n"
 
-                        # Extract usage from final chunk
                         if "usage" in data:
                             usage = data["usage"]
                         if "model" in data:
@@ -126,7 +185,6 @@ async def stream_hermes_response(
         yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
         return
 
-    # Send done event
     done_data = {"type": "done", "model": model, "agent_name": "Hermes Agent"}
     if usage:
         done_data["usage"] = {
@@ -139,23 +197,64 @@ async def stream_hermes_response(
 
 @router.post("/hermes/stream")
 async def hermes_chat_stream(req: HermesChatRequest):
-    """Stream chat response from Hermes Agent via SSE."""
-    # Build messages in OpenAI format
+    """Stream chat response from Hermes Agent via SSE.
+
+    History persistence: SynPin saves conversation history to disk so that
+    when the user switches agents and comes back, the context is restored.
+    Hermes handles its own memory/session — we only persist the conversation.
+    """
+    channel_id = req.channel_id or "web"
+    agent_slug = req.agent_slug
+
+    # Load persisted history if available
+    history = list(req.history)
+    if agent_slug:
+        persisted = _load_chat_history(agent_slug, channel_id)
+        # Use frontend history if longer (has current session), else persisted
+        if len(persisted) > len(history):
+            history = persisted
+
+    # Compact history if too long (same logic as internal agents)
+    if agent_slug and history:
+        try:
+            from ..chat.router import compact_messages
+            history, compaction_notice = compact_messages(
+                history,
+                system_prompt=req.system_prompt or "",
+                agent_slug=agent_slug,
+            )
+            if compaction_notice:
+                logger.info("Hermes compaction for %s: %s", agent_slug, compaction_notice)
+        except Exception as e:
+            logger.warning("Compaction failed for Hermes %s: %s", agent_slug, e)
+
+    # Build messages for Hermes
     messages = []
 
-    # Add system prompt if provided
+    # System prompt (from frontend — contains SynPin identity context)
     if req.system_prompt:
         messages.append({"role": "system", "content": req.system_prompt})
 
-    # Add history
-    for msg in req.history:
+    # History
+    for msg in history:
         messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
 
-    # Add current message
+    # Current message
     messages.append({"role": "user", "content": req.message})
 
+    async def wrapped_stream():
+        """Stream response and save history after completion."""
+        async for chunk in stream_hermes_response(messages, req.temperature, req.max_tokens):
+            yield chunk
+
+        # Save history after streaming completes
+        if agent_slug:
+            updated_history = list(history)
+            updated_history.append({"role": "user", "content": req.message})
+            _save_chat_history(agent_slug, channel_id, updated_history)
+
     return StreamingResponse(
-        stream_hermes_response(messages, req.temperature, req.max_tokens),
+        wrapped_stream(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

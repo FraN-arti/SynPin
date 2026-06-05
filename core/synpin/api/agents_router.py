@@ -24,6 +24,7 @@ class AgentUpdate(BaseModel):
     temperature: float | None = None
     max_tokens: int | None = None
     memory: dict | None = None
+    is_primary: bool | None = None
 
 
 class AgentCreate(BaseModel):

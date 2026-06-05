@@ -156,3 +156,67 @@ async def update_memory_config(req: MemoryConfigUpdate):
         "compaction": full.get("compaction"),
         "sessions": full.get("sessions"),
     }
+
+
+# ── Primary Agent ───────────────────────────────────────────────────
+
+class PrimaryAgentUpdate(BaseModel):
+    slug: str
+
+
+@router.get("/primary-agent")
+async def get_primary_agent():
+    """Get the primary agent slug."""
+    path = CONFIG_DIR / "settings.yaml"
+    full = _load_yaml(path)
+    return {"slug": full.get("primary_agent_slug", "")}
+
+
+@router.put("/primary-agent")
+async def set_primary_agent(req: PrimaryAgentUpdate):
+    """Set the primary agent slug. Empty string clears it."""
+    path = CONFIG_DIR / "settings.yaml"
+    full = _load_yaml(path)
+    full["primary_agent_slug"] = req.slug
+    _save_yaml(path, full)
+    logger.info("Primary agent set to: %s", req.slug or "(none)")
+    return {"success": True, "slug": req.slug}
+
+
+# ── General Settings CRUD ────────────────────────────────────────────────────
+
+
+class SettingsUpdate(BaseModel):
+    """Partial update for settings.yaml."""
+    server: Optional[Dict[str, Any]] = None
+    ui: Optional[Dict[str, Any]] = None
+    feed: Optional[Dict[str, Any]] = None
+    kanban: Optional[Dict[str, Any]] = None
+
+
+@router.get("/settings")
+async def get_settings():
+    """Read full settings.yaml."""
+    path = CONFIG_DIR / "settings.yaml"
+    full = _load_yaml(path)
+    return full
+
+
+@router.put("/settings")
+async def update_settings(req: SettingsUpdate):
+    """Update settings.yaml (partial deep merge)."""
+    path = CONFIG_DIR / "settings.yaml"
+    full = _load_yaml(path)
+
+    if req.server is not None:
+        full["server"] = _deep_merge(full.get("server", {}), req.server)
+    if req.ui is not None:
+        full["ui"] = _deep_merge(full.get("ui", {}), req.ui)
+    if req.feed is not None:
+        full["feed"] = _deep_merge(full.get("feed", {}), req.feed)
+    if req.kanban is not None:
+        full["kanban"] = _deep_merge(full.get("kanban", {}), req.kanban)
+
+    _save_yaml(path, full)
+    logger.info("settings.yaml updated via API")
+    return {"success": True, "settings": full}

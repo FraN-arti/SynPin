@@ -221,107 +221,491 @@ function CustomDropdown({ value, options, onChange, width }: CustomDropdownProps
 
 // ─── General Section ─────────────────────────────────────────
 
+interface OverviewStats {
+  agents: number
+  agents_internal: number
+  agents_external: number
+  total_messages: number
+  total_sessions: number
+  config_files: number
+  uptime: string
+}
+
+interface SettingsData {
+  server: {
+    host: string
+    port: number
+    dev_port: number
+    cors_origins: string[]
+    rate_limit: { enabled: boolean; requests_per_minute: number }
+  }
+  ui: {
+    theme: string
+    language: string
+    sidebar: { default_open: boolean; show_icons: boolean }
+    chat: {
+      show_metadata: boolean
+      metadata_delay_ms: number
+      max_message_length: number
+      auto_scroll: boolean
+      streaming_border: boolean
+    }
+  }
+  models: {
+    vision: string
+    image_gen: string
+    web_search: string
+    web_extract: string
+    summarization: string
+  }
+  feed: {
+    enabled: boolean
+    max_items: number
+    time_range: string
+    filters: {
+      new_ideas: boolean
+      task_updates: boolean
+      memory_updates: boolean
+      board_updates: boolean
+    }
+    sort: string
+    group_by: string
+  }
+}
+
 function GeneralSection() {
-  const handleAutosave = useCallback((key: string, value: string | boolean) => {
-    console.log(`[autosave] ${key} =`, value)
-    // TODO: POST to /api/settings
+  const [settings, setSettings] = useState<SettingsData | null>(null)
+  const [overview, setOverview] = useState<OverviewStats | null>(null)
+  const [availableModels, setAvailableModels] = useState<{ provider: string; model: string }[]>([])
+  const [saving, setSaving] = useState(false)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Load settings
+  useEffect(() => {
+    fetch(`${API_BASE}/api/config/settings`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setSettings(data) })
+      .catch(() => {})
   }, [])
 
+  // Load available models from providers
+  useEffect(() => {
+    fetch(`${API_BASE}/api/providers`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.providers) {
+          const models: { provider: string; model: string }[] = []
+          for (const p of data.providers) {
+            for (const m of (p.models || [])) {
+              models.push({ provider: p.name, model: m })
+            }
+          }
+          setAvailableModels(models)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  // Load stats
+  useEffect(() => {
+    fetch(`${API_BASE}/api/stats/overview`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setOverview(data) })
+      .catch(() => {})
+  }, [])
+
+  // Debounced save
+  const saveSettings = useCallback((patch: Partial<SettingsData>) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(async () => {
+      setSaving(true)
+      try {
+        await fetch(`${API_BASE}/api/config/settings`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        })
+      } catch {}
+      setTimeout(() => setSaving(false), 600)
+    }, 400)
+  }, [])
+
+  const updateServer = useCallback((key: string, value: any) => {
+    setSettings(prev => prev ? { ...prev, server: { ...prev.server, [key]: value } } : prev)
+    saveSettings({ server: { [key]: value } as any })
+  }, [saveSettings])
+
+  const updateUI = useCallback((path: string, value: string | boolean | number) => {
+    setSettings(prev => {
+      if (!prev) return prev
+      const ui = { ...prev.ui }
+      if (path.startsWith('chat.')) {
+        const key = path.slice(5) as keyof typeof ui.chat
+        ui.chat = { ...ui.chat, [key]: value }
+      } else if (path.startsWith('sidebar.')) {
+        const key = path.slice(8) as keyof typeof ui.sidebar
+        ui.sidebar = { ...ui.sidebar, [key]: value }
+      } else {
+        ;(ui as any)[path] = value
+      }
+      return { ...prev, ui }
+    })
+    const parts = path.split('.')
+    if (parts.length === 1) {
+      saveSettings({ ui: { [path]: value } as any })
+    } else {
+      const key0 = parts[0]!
+      const key1 = parts[1]!
+      saveSettings({ ui: { [key0]: { [key1]: value } } as any })
+    }
+  }, [saveSettings])
+
+  const updateModels = useCallback((key: string, value: string) => {
+    setSettings(prev => prev ? { ...prev, models: { ...prev.models, [key]: value } } : prev)
+    saveSettings({ models: { [key]: value } as any })
+  }, [saveSettings])
+
+  const updateFeed = useCallback((key: string, value: string | number | boolean) => {
+    setSettings(prev => {
+      if (!prev) return prev
+      const feed = { ...prev.feed }
+      if (key.startsWith('filters.')) {
+        const fkey = key.slice(8) as keyof typeof feed.filters
+        feed.filters = { ...feed.filters, [fkey]: value }
+      } else {
+        ;(feed as any)[key] = value
+      }
+      return { ...prev, feed }
+    })
+    if (key.startsWith('filters.')) {
+      saveSettings({ feed: { filters: { [key.slice(8)]: value } } as any })
+    } else {
+      saveSettings({ feed: { [key]: value } as any })
+    }
+  }, [saveSettings])
+
+  if (!settings) {
+    return <div className="settings-loading">Загрузка...</div>
+  }
+
   return (
-    <div className="settings-grid">
+    <div className="general-settings">
+      {/* ─── 📊 Обзор системы ─── */}
+      <section className="settings-card">
+        <h2 className="settings-card-title">📊 Обзор системы</h2>
+        <div className="stats-summary">
+          <div className="stats-card">
+            <span className="stats-card-value">{overview?.agents ?? '—'}</span>
+            <span className="stats-card-label">Агентов</span>
+            <span className="stats-card-detail">
+              {overview?.agents_internal ?? 0} внутр. + {overview?.agents_external ?? 0} внешн.
+            </span>
+          </div>
+          <div className="stats-card">
+            <span className="stats-card-value">{overview?.total_messages ?? '—'}</span>
+            <span className="stats-card-label">Сообщений</span>
+            <span className="stats-card-detail">{overview?.total_sessions ?? 0} сессий</span>
+          </div>
+          <div className="stats-card">
+            <span className="stats-card-value">{overview?.config_files ?? '—'}</span>
+            <span className="stats-card-label">Конфигов</span>
+            <span className="stats-card-detail">YAML файлов</span>
+          </div>
+          <div className="stats-card">
+            <span className="stats-card-value">{overview?.uptime ?? '—'}</span>
+            <span className="stats-card-label">Аптайм</span>
+            <span className="stats-card-detail">с момента запуска</span>
+          </div>
+        </div>
+      </section>
+
+      <div className="settings-divider" />
+
+      {/* ─── 🖥 Сервер ─── */}
       <section className="settings-card">
         <h2 className="settings-card-title">🖥 Сервер</h2>
-        <div className="settings-field">
-          <label>Порт API</label>
-          <input type="number" className="settings-input" defaultValue={2088}
-            onChange={e => handleAutosave('server.port', e.target.value)} />
+        <div className="settings-row-2">
+          <div className="settings-field">
+            <label>Хост</label>
+            <input type="text" className="settings-input"
+              value={settings.server.host}
+              onChange={e => updateServer('host', e.target.value)} />
+          </div>
+          <div className="settings-field">
+            <label>Порт API</label>
+            <input type="number" className="settings-input"
+              value={settings.server.port}
+              onChange={e => updateServer('port', parseInt(e.target.value) || 2088)} />
+          </div>
         </div>
-        <div className="settings-field">
-          <label>Порт Dev (Vite)</label>
-          <input type="number" className="settings-input" defaultValue={2099}
-            onChange={e => handleAutosave('server.dev_port', e.target.value)} />
+        <div className="settings-row-2">
+          <div className="settings-field">
+            <label>Порт Dev (Vite)</label>
+            <input type="number" className="settings-input"
+              value={settings.server.dev_port}
+              onChange={e => updateServer('dev_port', parseInt(e.target.value) || 2099)} />
+          </div>
+          <div className="settings-field">
+            <label>Rate Limit (req/min)</label>
+            <input type="number" className="settings-input"
+              value={settings.server.rate_limit?.requests_per_minute ?? 60}
+              onChange={e => updateServer('rate_limit', {
+                enabled: settings.server.rate_limit?.enabled ?? true,
+                requests_per_minute: parseInt(e.target.value) || 60,
+              })} />
+          </div>
         </div>
-        <div className="settings-field">
-          <label>Host</label>
-          <input type="text" className="settings-input" defaultValue="0.0.0.0"
-            onChange={e => handleAutosave('server.host', e.target.value)} />
-        </div>
+        <Toggle
+          label="Rate Limiting"
+          checked={settings.server.rate_limit?.enabled ?? true}
+          onChange={v => updateServer('rate_limit', {
+            enabled: v,
+            requests_per_minute: settings.server.rate_limit?.requests_per_minute ?? 60,
+          })} />
       </section>
 
-      <section className="settings-card">
-        <h2 className="settings-card-title">🎨 Интерфейс</h2>
-        <div className="settings-field">
-          <label>Тема</label>
-          <CustomDropdown
-            value="dark"
-            onChange={v => handleAutosave('ui.theme', v)}
-            options={[
-              { value: 'dark', label: 'Тёмная' },
-              { value: 'dark-oled', label: 'Тёмная (OLED)' },
-              { value: 'light', label: 'Светлая (скоро)', disabled: true },
-            ]}
-          />
-        </div>
-        <div className="settings-field">
-          <label>Язык</label>
-          <CustomDropdown
-            value="ru"
-            onChange={v => handleAutosave('ui.language', v)}
-            options={[
-              { value: 'ru', label: 'Русский' },
-              { value: 'en', label: 'English' },
-            ]}
-          />
-        </div>
-        <Toggle label="Показывать метаданные сообщений" defaultChecked
-          onChange={v => handleAutosave('ui.chat.show_metadata', v)} />
-        <Toggle label="Анимированная обводка при стриминге" defaultChecked
-          onChange={v => handleAutosave('ui.chat.streaming_border', v)} />
-        <Toggle label="Автоскролл к новым сообщениям" defaultChecked
-          onChange={v => handleAutosave('ui.chat.auto_scroll', v)} />
-      </section>
+      <div className="settings-divider" />
 
+      <div className="settings-row-2">
+        {/* ─── 🎨 Интерфейс ─── */}
+        <section className="settings-card">
+          <h2 className="settings-card-title">Интерфейс</h2>
+        <div className="settings-row-2">
+          <div className="settings-field">
+            <label>Тема</label>
+            <CustomDropdown
+              value={settings.ui.theme}
+              onChange={v => updateUI('theme', v)}
+              options={[
+                { value: 'dark', label: 'Тёмная' },
+                { value: 'dark-oled', label: 'Тёмная (OLED)' },
+                { value: 'light', label: 'Светлая (скоро)', disabled: true },
+              ]}
+            />
+          </div>
+          <div className="settings-field">
+            <label>Язык</label>
+            <CustomDropdown
+              value={settings.ui.language}
+              onChange={v => updateUI('language', v)}
+              options={[
+                { value: 'ru', label: 'Русский' },
+                { value: 'en', label: 'English' },
+              ]}
+            />
+          </div>
+        </div>
+        <div className="settings-divider-thin" />
+        <h3 className="settings-subsection-title">Чат</h3>
+        <Toggle
+          label="Показывать метаданные сообщений"
+          checked={settings.ui.chat.show_metadata}
+          onChange={v => updateUI('chat.show_metadata', v)} />
+        <Toggle
+          label="Анимированная обводка при стриминге"
+          checked={settings.ui.chat.streaming_border}
+          onChange={v => updateUI('chat.streaming_border', v)} />
+        <Toggle
+          label="Автоскролл к новым сообщениям"
+          checked={settings.ui.chat.auto_scroll}
+          onChange={v => updateUI('chat.auto_scroll', v)} />
+        <div className="settings-field">
+          <label>Макс. длина сообщения</label>
+          <input type="number" className="settings-input"
+            value={settings.ui.chat.max_message_length}
+            onChange={e => updateUI('chat.max_message_length', parseInt(e.target.value) || 4000)} />
+        </div>
+        <div className="settings-divider-thin" />
+        <h3 className="settings-subsection-title">Сайдбар</h3>
+        <Toggle
+          label="Открыт по умолчанию"
+          checked={settings.ui.sidebar.default_open}
+          onChange={v => updateUI('sidebar.default_open', v)} />
+        <Toggle
+          label="Показывать иконки"
+          checked={settings.ui.sidebar.show_icons}
+          onChange={v => updateUI('sidebar.show_icons', v)} />
+        </section>
+
+        {/* ─── 🤖 Настройка моделей ─── */}
+        <section className="settings-card">
+          <h2 className="settings-card-title">Настройка моделей</h2>
+          <p className="settings-card-desc">Модели для специализированных задач</p>
+          <div className="settings-field">
+            <label>Визион (анализ изображений)</label>
+            <CustomDropdown
+              value={settings.models?.vision || ''}
+              onChange={v => updateModels('vision', v)}
+              options={[
+                { value: '', label: 'Не настроено' },
+                ...availableModels.map(m => ({ value: `${m.provider}/${m.model}`, label: `${m.model} (${m.provider})` })),
+              ]}
+            />
+          </div>
+          <div className="settings-field">
+            <label>Генерация изображений</label>
+            <CustomDropdown
+              value={settings.models?.image_gen || ''}
+              onChange={v => updateModels('image_gen', v)}
+              options={[
+                { value: '', label: 'Не настроено' },
+                ...availableModels.map(m => ({ value: `${m.provider}/${m.model}`, label: `${m.model} (${m.provider})` })),
+              ]}
+            />
+          </div>
+          <div className="settings-field">
+            <label>Веб-поиск</label>
+            <CustomDropdown
+              value={settings.models?.web_search || ''}
+              onChange={v => updateModels('web_search', v)}
+              options={[
+                { value: '', label: 'Не настроено' },
+                ...availableModels.map(m => ({ value: `${m.provider}/${m.model}`, label: `${m.model} (${m.provider})` })),
+              ]}
+            />
+          </div>
+          <div className="settings-field">
+            <label>Веб-экстракт</label>
+            <CustomDropdown
+              value={settings.models?.web_extract || ''}
+              onChange={v => updateModels('web_extract', v)}
+              options={[
+                { value: '', label: 'Не настроено' },
+                ...availableModels.map(m => ({ value: `${m.provider}/${m.model}`, label: `${m.model} (${m.provider})` })),
+              ]}
+            />
+          </div>
+          <div className="settings-field">
+            <label>Суммаризация</label>
+            <CustomDropdown
+              value={settings.models?.summarization || ''}
+              onChange={v => updateModels('summarization', v)}
+              options={[
+                { value: '', label: 'Не настроено' },
+                ...availableModels.map(m => ({ value: `${m.provider}/${m.model}`, label: `${m.model} (${m.provider})` })),
+              ]}
+            />
+          </div>
+        </section>
+      </div>
+
+      <div className="settings-divider" />
+
+      {/* ─── 📡 Лента активности ─── */}
       <section className="settings-card">
         <h2 className="settings-card-title">📡 Лента активности</h2>
-        <div className="settings-field">
-          <label>Макс. записей</label>
-          <input type="number" className="settings-input" defaultValue={50}
-            onChange={e => handleAutosave('feed.max_items', e.target.value)} />
+        <div className="settings-row-2">
+          <div className="settings-field">
+            <label>Макс. записей</label>
+            <input type="number" className="settings-input"
+              value={settings.feed.max_items}
+              onChange={e => updateFeed('max_items', parseInt(e.target.value) || 50)} />
+          </div>
+          <div className="settings-field">
+            <label>Период</label>
+            <CustomDropdown
+              value={settings.feed.time_range}
+              onChange={v => updateFeed('time_range', v)}
+              options={[
+                { value: '1h', label: '1 час' },
+                { value: '6h', label: '6 часов' },
+                { value: '24h', label: '24 часа' },
+                { value: '7d', label: '7 дней' },
+                { value: '30d', label: '30 дней' },
+              ]}
+            />
+          </div>
         </div>
-        <div className="settings-field">
-          <label>Период</label>
-          <CustomDropdown
-            value="24h"
-            onChange={v => handleAutosave('feed.time_range', v)}
-            options={[
-              { value: '1h', label: '1 час' },
-              { value: '6h', label: '6 часов' },
-              { value: '24h', label: '24 часа' },
-              { value: '7d', label: '7 дней' },
-              { value: '30d', label: '30 дней' },
-            ]}
-          />
+        <Toggle
+          label="Лента включена"
+          checked={settings.feed.enabled}
+          onChange={v => updateFeed('enabled', v)} />
+        <div className="settings-divider-thin" />
+        <h3 className="settings-subsection-title">Фильтры</h3>
+        <Toggle
+          label="Новые идеи"
+          checked={settings.feed.filters.new_ideas}
+          onChange={v => updateFeed('filters.new_ideas', v)} />
+        <Toggle
+          label="Обновления задач"
+          checked={settings.feed.filters.task_updates}
+          onChange={v => updateFeed('filters.task_updates', v)} />
+        <Toggle
+          label="Обновления памяти"
+          checked={settings.feed.filters.memory_updates}
+          onChange={v => updateFeed('filters.memory_updates', v)} />
+        <Toggle
+          label="Обновления канбана"
+          checked={settings.feed.filters.board_updates}
+          onChange={v => updateFeed('filters.board_updates', v)} />
+        <div className="settings-divider-thin" />
+        <div className="settings-row-2">
+          <div className="settings-field">
+            <label>Сортировка</label>
+            <CustomDropdown
+              value={settings.feed.sort}
+              onChange={v => updateFeed('sort', v)}
+              options={[
+                { value: 'newest', label: 'Сначала новые' },
+                { value: 'oldest', label: 'Сначала старые' },
+              ]}
+            />
+          </div>
+          <div className="settings-field">
+            <label>Группировка</label>
+            <CustomDropdown
+              value={settings.feed.group_by}
+              onChange={v => updateFeed('group_by', v)}
+              options={[
+                { value: 'none', label: 'Без группировки' },
+                { value: 'department', label: 'По департаменту' },
+                { value: 'type', label: 'По типу' },
+              ]}
+            />
+          </div>
         </div>
-        <Toggle label="Новые идеи" defaultChecked
-          onChange={v => handleAutosave('feed.filters.new_ideas', v)} />
-        <Toggle label="Обновления задач" defaultChecked
-          onChange={v => handleAutosave('feed.filters.task_updates', v)} />
-        <Toggle label="Обновления памяти"
-          onChange={v => handleAutosave('feed.filters.memory_updates', v)} />
-        <Toggle label="Обновления канбана" defaultChecked
-          onChange={v => handleAutosave('feed.filters.board_updates', v)} />
+      </section>
+
+      <div className="settings-divider" />
+
+      {/* ─── 🔧 Система ─── */}
+      <section className="settings-card">
+        <h2 className="settings-card-title">🔧 Система</h2>
+        <div className="settings-system-info">
+          <div className="settings-system-row">
+            <span className="settings-system-label">Версия</span>
+            <span className="settings-system-value">0.1.0</span>
+          </div>
+          <div className="settings-system-row">
+            <span className="settings-system-label">API</span>
+            <span className="settings-system-value">{settings.server.host}:{settings.server.port}</span>
+          </div>
+          <div className="settings-system-row">
+            <span className="settings-system-label">Dev</span>
+           <span className="settings-system-value">:{settings.server.dev_port}</span>
+          </div>
+          <div className="settings-system-row">
+            <span className="settings-system-label">Тема</span>
+            <span className="settings-system-value">{settings.ui.theme}</span>
+          </div>
+          <div className="settings-system-row">
+            <span className="settings-system-label">CORS</span>
+            <span className="settings-system-value">{settings.server.cors_origins?.length ?? 0} origins</span>
+          </div>
+        </div>
+        {saving && <div className="settings-save-indicator">✓ Сохранено</div>}
       </section>
     </div>
   )
 }
-
 // ─── Toggle Component ────────────────────────────────────────
 
-function Toggle({ label, defaultChecked, onChange }: { label: string; defaultChecked?: boolean; onChange?: (v: boolean) => void }) {
+function Toggle({ label, defaultChecked, checked, onChange }: { label: string; defaultChecked?: boolean; checked?: boolean; onChange?: (v: boolean) => void }) {
+  const isControlled = checked !== undefined
   return (
     <div className="settings-field-row">
       <label className="settings-toggle">
-        <input type="checkbox" defaultChecked={defaultChecked}
+        <input type="checkbox" {...(isControlled ? { checked } : { defaultChecked })}
           onChange={e => onChange?.(e.target.checked)} />
         <span>{label}</span>
       </label>
@@ -502,24 +886,6 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
       if (res.ok) fetchAgents()
     } catch (e) { console.error('[agents] dept change error:', e) }
   }
-
-  const handleAgentEnter = useCallback((slug: string, el: HTMLDivElement | null) => {
-    setHoveredAgent(slug)
-    if (!el) return
-    requestAnimationFrame(() => {
-      const rect = el.getBoundingClientRect()
-      const cardH = rect.height
-      // Overlay: top=-60%, height=320% → bottom edge = cardTop + 2.6*cardH
-      const overlayBottom = rect.top + cardH * 2.6
-      const viewH = window.innerHeight
-      if (overlayBottom > viewH - 12) {
-        const shift = Math.ceil(overlayBottom - viewH + 12)
-        setOverlayShift(prev => ({ ...prev, [slug]: shift }))
-      } else {
-        setOverlayShift(prev => { const n = { ...prev }; delete n[slug]; return n })
-      }
-    })
-  }, [])
 
   const fetchAgents = useCallback(async () => {
     try {
@@ -916,8 +1282,8 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
           <div className="settings-grid">
             {externalAgents.map(agent => (
               <div key={agent.slug} className="agent-card-wrapper"
-                onMouseEnter={(e) => handleAgentEnter(agent.slug, e.currentTarget)}
-                onMouseLeave={() => { setHoveredAgent(null); setOverlayShift(prev => { const n = { ...prev }; delete n[agent.slug]; return n }) }}>
+                onClick={() => setHoveredAgent(prev => prev === agent.slug ? null : agent.slug)}
+                                onMouseLeave={() => { if (hoveredAgent === agent.slug) { setHoveredAgent(null); setOverlayShift(prev => { const n = { ...prev }; delete n[agent.slug]; return n }) } }}>
                 <section className={`settings-card agent-card external-agent ${!agent.enabled ? 'disabled' : ''}`}>
                   <div className="agent-header">
                     <div className="agent-identity">
@@ -1033,8 +1399,8 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
             <div className="settings-grid">
               {(grouped[roleId] || []).map(agent => (
                 <div key={agent.slug} className="agent-card-wrapper"
-                  onMouseEnter={(e) => handleAgentEnter(agent.slug, e.currentTarget)}
-                  onMouseLeave={() => { setHoveredAgent(null); setOverlayShift(prev => { const n = { ...prev }; delete n[agent.slug]; return n }) }}>
+                  onClick={() => setHoveredAgent(prev => prev === agent.slug ? null : agent.slug)}
+                                  onMouseLeave={() => { if (hoveredAgent === agent.slug) { setHoveredAgent(null); setOverlayShift(prev => { const n = { ...prev }; delete n[agent.slug]; return n }) } }}>
                   <section className={`settings-card agent-card ${!agent.enabled ? 'disabled' : ''}`}>
                     <div className="agent-header">
                       <div className="agent-identity">

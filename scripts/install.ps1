@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  SynPin v0.1.0 - Installation" -ForegroundColor Cyan
+Write-Host "  SynPin v0.2.2 - Installation" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 

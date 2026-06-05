@@ -1,188 +1,97 @@
 # 🛠 Инструменты агентов
 
-Инструменты — **что агент может делать** с системой. Не все агенты имеют все инструменты.
+Инструменты — **что агент может делать** с системой. Реализовано 8 из 16 запланированных.
 
 ---
 
 ## Архитектура
 
 ```
-core/tools/
-├── base.py          # базовые инструменты (все агенты)
-├── filesystem.py    # чтение/запись/поиск файлов
-├── terminal.py      # выполнение команд
-├── web.py           # поиск + парсинг (опционально)
-└── registry.py      # реестр доступных инструментов
+core/synpin/tools/
+├── base.py              # базовые типы (ToolHandler, ToolResult, make_error)
+├── registry.py          # реестр — загружает tools.yaml, резолвит handlers
+├── terminal.py          # async shell exec
+├── file_read.py         # чтение файлов с номерами строк
+├── file_write.py        # атомарная запись файлов
+├── search_files.py      # ripgrep + Python fallback
+├── web_search.py        # DuckDuckGo поиск
+├── code_exec.py         # sandboxed Python exec
+├── memory_read.py       # чтение MEMORY/USER/facts
+└── memory_write.py      # add/remove/replace entries
 ```
 
-Каждый инструмент — функция с описанием, параметрами и результатом.
+Каждый инструмент — async функция с описанием, параметрами и результатом.
 
 ---
 
-## Доступные инструменты
+## Реализованные инструменты (8/16)
 
 ### Базовые (все агенты)
 
-| Инструмент | Что делает | Пример |
+| Инструмент | Что делает | Параметры |
 |---|---|---|
-| `read_file` | Читает файл с номерами строк | `read_file("wiki/agents.md")` |
-| `search_files` | Ищет по имени или содержимому | `search_files("auth", target="content")` |
-| `list_dir` | Список файлов в директории | `list_dir("wiki/")` |
+| `file_read` | Читает файл с номерами строк | `path`, `offset=1`, `limit=500` |
+| `search_files` | Ищет по имени или содержимому | `pattern`, `target="content"`, `path="."` |
 
 ### Для разработчиков
 
-| Инструмент | Что делает | Пример |
+| Инструмент | Что делает | Параметры |
 |---|---|---|
-| `write_file` | Создаёт/перезаписывает файл | `write_file("new.py", "print('hi')")` |
-| `patch_file` | Правит часть файла (find & replace) | `patch_file("app.py", "old", "new")` |
-| `run_command` | Выполняет shell-команду | `run_command("git status")` |
+| `file_write` | Создаёт/перезаписывает файл | `path`, `content` |
+| `terminal` | Выполняет shell-команду | `command`, `timeout=180`, `workdir` |
+| `code_exec` | Выполняет Python-код | `code`, `timeout=30` |
 
 ### Для исследователей
 
-| Инструмент | Что делает | Пример |
+| Инструмент | Что делает | Параметры |
 |---|---|---|
-| `web_search` | Поиск в интернете | `web_search("FastAPI auth best practices")` |
-| `web_extract` | Парсит страницу в markdown | `web_extract(["https://example.com"])` |
+| `web_search` | Поиск в интернете (DuckDuckGo) | `query`, `limit=5` |
 
-### Для всех (опционально)
+### Память
 
-| Инструмент | Что делает | Пример |
+| Инструмент | Что делает | Параметры |
 |---|---|---|
-| `read_image` | Загружает изображение для анализа | `read_image("screenshot.png")` |
-| `run_python` | Выполняет Python-код | `run_python("import json; ...")` |
+| `memory_read` | Читает MEMORY/USER/facts | `target`, `filename` (опционально) |
+| `memory_write` | Записывает в память | `action` (add/replace/remove), `target`, `content` |
 
 ---
 
-## Конфигурация инструментов
+## Реестр инструментов
 
-### tools.yaml (глобальный)
+Инструменты загружаются из `~/.synpin/config/tools.yaml`. Реестр динамически импортирует handlers:
+
+```python
+# core/synpin/tools/registry.py
+_MODULE_MAP = {
+    "terminal": ".terminal",
+    "file_read": ".file_read",
+    "file_write": ".file_write",
+    "search_files": ".search_files",
+    "web_search": ".web_search",
+    "code_exec": ".code_exec",
+    "memory_read": ".memory_read",
+    "memory_write": ".memory_write",
+}
+```
+
+### Список инструментов агента
 
 ```yaml
 # ~/.synpin/config/tools.yaml
-
-# Определения всех доступных инструментов
-definitions:
-  read_file:
+tools:
+  terminal:
+    description: "Execute a shell command"
+    parameters:
+      command: "Shell command to execute"
+      timeout: "Max seconds (default: 180)"
+      workdir: "Working directory"
+  
+  file_read:
     description: "Read a text file with line numbers"
     parameters:
       path: "Path to the file"
       offset: "Start line (default: 1)"
       limit: "Max lines (default: 500)"
-
-  search_files:
-    description: "Search file contents or find files by name"
-    parameters:
-      pattern: "Regex or glob pattern"
-      target: "content or files"
-      path: "Directory to search (default: .)"
-
-  write_file:
-    description: "Write content to a file (overwrites)"
-    parameters:
-      path: "File path"
-      content: "Complete file content"
-
-  patch_file:
-    description: "Targeted find-and-replace in a file"
-    parameters:
-      path: "File path"
-      old_string: "Text to find"
-      new_string: "Replacement text"
-
-  run_command:
-    description: "Execute a shell command"
-    parameters:
-      command: "Shell command"
-      timeout: "Max seconds (default: 180)"
-      workdir: "Working directory"
-
-  web_search:
-    description: "Search the web"
-    parameters:
-      query: "Search query"
-      limit: "Max results (default: 5)"
-
-  web_extract:
-    description: "Extract content from URLs"
-    parameters:
-      urls: "List of URLs (max 5)"
-```
-
-### Инструменты в agent.yaml
-
-```yaml
-# agents/architect/agent.yaml
-
-name: "Архитектор"
-
-tools:
-  enabled:
-    - read_file
-    - search_files
-    - list_dir
-    - write_file        # для документации
-    - patch_file        # для правок конфигов
-  disabled:
-    - run_command       # не нужно архитектору
-    - web_search        # не нужно
-    - web_extract
-
-  limits:
-    max_file_size: "100KB"     # не читать огромные файлы
-    max_search_results: 50     # лимит результатов поиска
-    command_timeout: 60        # таймаут команд (если разрешены)
-    allowed_dirs:              # доступ только к этим директориям
-      - "~/.synpin/data/"
-      - "~/.synpin/config/"
-      - "~/.synpin/wiki/"
-```
-
-### Инструменты по ролям (дефолты)
-
-```yaml
-# ~/.synpin/config/tools.yaml
-
-role_defaults:
-  worker:
-    enabled:
-      - read_file
-      - search_files
-      - list_dir
-    disabled:
-      - run_command
-      - web_search
-
-  developer:
-    enabled:
-      - read_file
-      - search_files
-      - list_dir
-      - write_file
-      - patch_file
-      - run_command
-    disabled:
-      - web_search
-
-  researcher:
-    enabled:
-      - read_file
-      - search_files
-      - list_dir
-      - web_search
-      - web_extract
-    disabled:
-      - run_command
-      - write_file
-
-  head:
-    enabled:
-      - read_file
-      - search_files
-      - list_dir
-      - write_file
-      - patch_file
-    disabled:
-      - run_command
 ```
 
 ---
@@ -195,24 +104,21 @@ role_defaults:
 
 | Защита | Что делает |
 |---|---|
-| **allowed_dirs** | Агент видит только разрешённые директории |
-| **max_file_size** | Не читает файлы больше лимита |
-| **command_timeout** | Команды не зависают навсегда |
-| **blocked_commands** | Запрещённые команды (rm -rf, sudo, и т.д.) |
-| **read-only mode** | Агент может только читать, не писать |
+| **command_timeout** | Команды не зависают навсегда (30s для shell) |
+| **file_read limits** | Не читает файлы больше 1MB |
+| **code_exec sandbox** | Python exec в изолированном контексте |
 
-### Запрещённые команды
+### Реализованные ограничения
 
 ```yaml
-blocked_commands:
-  - "rm -rf"
-  - "sudo"
-  - "curl | bash"
-  - "wget | sh"
-  - "chmod 777"
-  - "dd if="
-  - "mkfs"
-  - "format"
+# tools.yaml — пример
+tools:
+  terminal:
+    timeout: 30
+  file_read:
+    max_size: 1048576  # 1MB
+  code_exec:
+    timeout: 30
 ```
 
 ---
@@ -224,21 +130,21 @@ blocked_commands:
 ```
 Доступные инструменты:
 
-1. read_file(path, offset=1, limit=500)
+1. file_read(path, offset=1, limit=500)
    → Читает файл с номерами строк
 
 2. search_files(pattern, target="content", path=".")
    → Ищет по содержимому или имени
 
-3. write_file(path, content)
+3. file_write(path, content)
    → Создаёт/перезаписывает файл
 
-4. patch_file(path, old_string, new_string)
-   → Правит часть файла
+4. terminal(command, timeout=180)
+   → Выполняет shell-команду
 
 Ограничения:
 - Только директории: ~/.synpin/data/, ~/.synpin/config/
-- Максимум файл: 100KB
+- Максимум файл: 1MB
 - Запрещено: rm, sudo, curl|bash
 
 Используй инструменты когда нужно. Не используй когда можешь ответить напрямую.
@@ -249,8 +155,7 @@ blocked_commands:
 ```
 User: "Найди все файлы где упоминается CORS"
 
-Agent: search_files("CORS", target="content", path="~/.synpin/")
-
+Agent: search_files("CORS", target="content", path="D:\\synpin\\")
 Result: 
   wiki/channels-hierarchy.md:108| Не забыл про CORS middleware
   core/main.py:45| app.add_middleware(CORSMiddleware, ...)
@@ -262,20 +167,17 @@ Agent: Нашёл 2 файла:
 
 ---
 
-## Связь с скиллами
+## Нереализованные инструменты (планируются)
 
-Скиллы могут **требовать определённые инструменты**:
-
-```yaml
-# SKILL.md: react-component
-
-required_tools:
-  - read_file
-  - write_file
-  - patch_file
-
-# Если у агента нет этих инструментов — скилл не работает
-```
+| Инструмент | Что делает | Статус |
+|---|---|---|
+| `browser` | Веб-браузер (Puppeteer/Playwright) | Фаза 3 |
+| `vision` | Анализ изображений | Фаза 3 |
+| `message_send` | Отправка сообщений в каналы | Фаза 3 |
+| `agent_call` | Вызов другого агента | Фаза 3 |
+| `task_create` | Управление задачами | Фаза 6 |
+| `task_update` | Обновление задач | Фаза 6 |
+| `skill_use` | Использование навыков | Фаза 3 |
 
 ---
 

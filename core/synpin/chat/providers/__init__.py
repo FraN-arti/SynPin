@@ -69,6 +69,9 @@ class ProviderRegistry:
                     api_key=api_key,
                     base_url=base_url or "https://api.openai.com/v1",
                 )
+                # Some providers (Mistral, local LLMs) don't support stream_options
+                if cfg.get("supports_stream_options") is False:
+                    provider.supports_stream_options = False
             elif provider_type == "anthropic":
                 provider = AnthropicProvider(api_key=api_key)
             else:

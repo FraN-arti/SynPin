@@ -3,7 +3,7 @@ agents:
     name: QA Инженер
     role: управляющий
     department: советчик
-    model: 9router/general-agent
+    model: mistral/mistral-large-latest
     personality:
       tone: professional
       style: analytical
@@ -11,15 +11,18 @@ agents:
       - thinks before answering
     system_prompt: ''
     enabled: true
+    is_primary: false
   8e5tv711:
     name: Архитектор
     role: сотрудник
     department: советчик
     model: 9router/general-agent
     enabled: true
+    is_primary: false
   yni1tbod:
     name: Тестер
     role: сотрудник
     department: поиск
     model: 9router/general-agent
     enabled: true
+    is_primary: true

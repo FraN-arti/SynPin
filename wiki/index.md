@@ -20,42 +20,47 @@
 | [**Агенты**](agents.md) | Личность, скиллы, роли, контекст загрузки |
 | [Память и сессии](memory-sessions.md) | MEMORY.md, типы сессий, авто-очистка |
 | [Инструменты](tools.md) | Файлы, команды, web, безопасность |
-| [**Интеграции**](integrations.md) | Hermes ACP, OpenClaw, Windsurf |
+| [**Интеграции**](integrations.md) | Hermes ACP, внешние агенты |
 
 ---
 
-## 🏢 Организация
+## 📖 Структура
 
 | Документ | Описание |
 |---|---|
-| [Каналы и иерархия](channels-hierarchy.md) | Отделы, главы, совет директоров, @mention |
-| [Канбан-доска](kanban-board.md) | Задачи, дедлайны, подписи этапов, история решений |
-| [**Форум**](forum.md) | Идеи, Q&A, обсуждения, знания, **лента** |
+| [Архитектура](architecture.md) | Архитектура системы |
+| [Философия](philosophy.md) | Философия проекта |
+| [Roadmap](roadmap.md) | Дорожная карта |
 
 ---
 
-## 📖 Структура документов
+## 📁 Структура документов
+
 ```
 wiki/
-├── README.md               # Wiki-оглавление
-├── index.md                # Навигация (этот файл)
+├── README.md               # Wiki-оглавление (этот файл)
+├── index.md                # Навигация
 ├── quickstart.md           # Быстрый старт
 ├── configuration.md        # Конфигурация системы
 ├── agents.md               # Агенты: личность, скиллы, роли
-├── agent-roles.md          # Роли агентов
 ├── tools.md                # Инструменты агентов
-├── integrations.md         # Hermes ACP, OpenClaw, Windsurf
-├── mcp-integration.md      # MCP интеграция
+├── integrations.md         # Hermes, внешние агенты
 ├── memory-sessions.md      # Память и сессии
 ├── memory-system.md        # Система памяти
-├── channels-hierarchy.md   # Каналы и иерархия
-├── kanban-board.md         # Канбан-доска задач
-├── forum.md                # Форум
-├── group-chat.md           # Group Chat Engine
-├── dashboard.md            # Дашборд
+├── channels-hierarchy.md   # Каналы (мессенджеры)
+├── dashboard.md            # Web UI (чат + настройки)
 ├── architecture.md         # Архитектура системы
 ├── philosophy.md           # Философия проекта
-└── roadmap.md              # Дорожная карта
+├── roadmap.md              # Дорожная карта
+│
+├── 📋 Design Specs (планируется):
+│   ├── kanban-board.md     # Kanban-доска задач
+│   ├── forum.md            # Форум
+│   ├── group-chat.md       # Group Chat Engine
+│   ├── mcp-integration.md  # MCP интеграция
+│   ├── agent-roles.md      # Роли агентов
+│   ├── themes-research.md  # Исследование тем
+│   └── onboarding.md       # Стартовое окно
 ```
 
 ---
@@ -69,12 +74,12 @@ Agents (личность + скиллы + роли)
     ↓
 Channels (где работают агенты)
     ↓
-Kanban (что делают агенты)
+Tools (что делают агенты)
     ↓
 Memory (что запоминают)
 ```
 
-Каждый документ ссылается на связанные. Начни с Configuration → Agents → Channels.
+Каждый документ ссылается на связанные. Начни с Configuration → Agents → Tools.
 
 ---
 

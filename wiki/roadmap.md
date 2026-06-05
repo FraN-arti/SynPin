@@ -88,12 +88,31 @@
 ## Фаза 2: Стабилизация (ближайшее)
 
 ### Исправления
-- [ ] **Settings bug**: одинарные кавычки в fetch() → backtick interpolation
+- [x] **Settings bug**: одинарные кавычки в fetch() → backtick interpolation ✅ dd36eed
 - [ ] **Settings: Channels** — подключить к бэкенду
 - [ ] **Settings: General** — подключить сохранение
-- [ ] **Мёртвый код**: axios, zustand, react-router-dom, react-query → удалить
+- [x] **Мёртвый код**: axios, zustand, react-router-dom, react-query → удалён ✅ dd36eed
 - [ ] **memory_write tool**: memory_read инжект в промпт (агент не знает когда вызывать)
 - [ ] **Search shared**: FTS5 индексация shared/USER.md
+
+### CLI и дизайн
+- [ ] **CLI `synpin`**: дизайн в консоли (цвета, форматирование, брендинг)
+- [ ] **CLI проверки и фолбеки**: что если сервер запущен/порт занят/Python не установлен
+- [ ] **Автообновление**: `synpin update` — надёжный rollback, проверка версий, бэкап
+
+### Onboarding (первый запуск)
+- [ ] **Стартовое окно**: приветственная страница при первом запуске (нет конфигов)
+- [ ] **Мастер настройки**: пошаговый setup wizard (провайдер, модель, имя пользователя)
+- [ ] **Пропуск**: опция "я уже знаю что делаю" → переход к 기본ным настройкам
+
+### Визуальная тема (по аналогии с OpenClaw)
+- [ ] **Тема**: dark/light переключение
+- [ ] **Custom Theme Studio**: hue slider → 60+ CSS переменных через OKLCH
+- [ ] **6 пресетов**: Ocean, Spring, Sunset, Forest, Purple, Mocha
+- [ ] **Advanced panel**: 5 групп цветов (Background, Text, Accent, Border, Semantic)
+- [ ] **Per-variable overrides** с reset
+- [ ] Хранение в localStorage, real-time preview
+- [ ] Оранжевый (hue=25) как дефолтная стартовая позиция
 
 ### Тесты
 - [ ] pytest конфигурация

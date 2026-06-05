@@ -16,3 +16,9 @@ department: советчик
 agentid: ix13aox3
 tools:
 - memory_read
+- file_read
+- file_write
+- search_files
+- code_exec
+- terminal
+- web_search

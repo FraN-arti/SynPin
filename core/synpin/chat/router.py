@@ -345,25 +345,26 @@ def _load_memory_block(agent_slug: str) -> str:
         block = manager.get_system_prompt_block()
         manager.close()
 
-        # Add memory instructions if block exists
-        if block:
-            instructions = (
-                "\n\n══════════════════════════════════════════════\n"
-                "MEMORY INSTRUCTIONS\n"
-                "══════════════════════════════════════════════\n"
-                "You have persistent memory tools:\n"
-                "- memory_write(action='add', target='memory', content='...') — save important facts, decisions, patterns\n"
-                "- memory_write(action='add', target='user', content='...') — save info about the user\n"
-                "- memory_read(target='memory'/'user'/'facts') — recall saved information\n\n"
-                "PROACTIVELY save:\n"
-                "- User preferences, habits, communication style\n"
-                "- Important decisions and their reasoning\n"
-                "- Errors encountered and lessons learned\n"
-                "- Project context and current tasks\n"
-                "- Any information the user explicitly asks to remember\n\n"
-                "Do NOT save: trivial conversation content, temporary debugging, repeated information."
-            )
-            block += instructions
+        # Always add memory instructions (even for new agents with empty memory)
+        instructions = (
+            "\n\n══════════════════════════════════════════════\n"
+            "MEMORY INSTRUCTIONS\n"
+            "══════════════════════════════════════════════\n"
+            "You have persistent memory tools:\n"
+            "- memory_write(action='add', target='memory', content='...') — save important facts, decisions, patterns\n"
+            "- memory_write(action='add', target='user', content='...') — save info about the user\n"
+            "- memory_read(target='memory'/'user'/'facts') — recall saved information\n\n"
+            "CRITICAL: When the user tells you about themselves (name, role, preferences, habits), "
+            "ALWAYS call memory_write(action='add', target='user', content='...') to save it.\n\n"
+            "PROACTIVELY save:\n"
+            "- User preferences, habits, communication style\n"
+            "- Important decisions and their reasoning\n"
+            "- Errors encountered and lessons learned\n"
+            "- Project context and current tasks\n"
+            "- Any information the user explicitly asks to remember\n\n"
+            "Do NOT save: trivial conversation content, temporary debugging, repeated information."
+        )
+        block = (block or "") + instructions
 
         return block or ""
     except Exception as e:

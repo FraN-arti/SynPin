@@ -187,6 +187,58 @@ function App() {
     }
   }, [])
 
+  // Apply saved theme on initial load
+  useEffect(() => {
+    const applyTheme = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/config/settings`)
+        if (!res.ok) return
+        const settings = await res.json()
+        const theme = settings?.ui?.theme
+        if (!theme) return
+
+        const root = document.documentElement
+
+        // Clear all classes
+        root.classList.remove('light-theme', 'dark-theme', 'oled-theme')
+
+        // Clear inline styles
+        for (let i = root.style.length - 1; i >= 0; i--) {
+          const prop = root.style[i]
+          if (prop && prop.startsWith('--')) {
+            root.style.removeProperty(prop)
+          }
+        }
+
+        if (theme === 'dark') {
+          // Default dark
+        } else if (theme === 'dark-oled') {
+          root.classList.add('oled-theme')
+        } else if (theme === 'light') {
+          root.classList.add('light-theme')
+        } else if (theme === 'tweakcn') {
+          root.classList.add('dark-theme')
+          // Load saved TweakCN theme
+          const themesRes = await fetch(`${API_BASE}/api/themes/tweakcn/list`)
+          if (themesRes.ok) {
+            const themesData = await themesRes.json()
+            // 'current' is always first in the list
+            const savedTheme = themesData?.themes?.[0]
+            if (savedTheme) {
+              const vars = savedTheme.dark || savedTheme.light
+              if (vars) {
+                Object.entries(vars).forEach(([key, value]) => {
+                  root.style.setProperty(key, value as string)
+                })
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+    applyTheme()
+  }, [])
+
   // Load available agents (both SynPin and external)
   useEffect(() => {
     const loadAgents = async () => {

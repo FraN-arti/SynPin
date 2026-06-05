@@ -278,6 +278,11 @@ function GeneralSection() {
   const [overview, setOverview] = useState<OverviewStats | null>(null)
   const [availableModels, setAvailableModels] = useState<{ provider: string; model: string }[]>([])
   const [saving, setSaving] = useState(false)
+  const [customThemes, setCustomThemes] = useState<{ id: string; name: string; source_url: string; dark?: Record<string, string>; light?: Record<string, string>; raw?: { light: Record<string, string>; dark: Record<string, string> } }[]>([])
+  const [tweakcnUrl, setTweakcnUrl] = useState('')
+  const [tweakcnLoading, setTweakcnLoading] = useState(false)
+  const [tweakcnError, setTweakcnError] = useState('')
+  const [tweakcnSuccess, setTweakcnSuccess] = useState('')
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Load settings
@@ -313,6 +318,55 @@ function GeneralSection() {
       .then(data => { if (data) setOverview(data) })
       .catch(() => {})
   }, [])
+
+  // Load custom themes
+  useEffect(() => {
+    fetch(`${API_BASE}/api/themes/tweakcn/list`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.themes) setCustomThemes(data.themes) })
+      .catch(() => {})
+  }, [])
+
+  // Apply theme when it changes
+  useEffect(() => {
+    if (!settings) return
+
+    const root = document.documentElement
+    const theme = settings.ui.theme
+
+    // Clear ALL classes first
+    root.classList.remove('light-theme', 'dark-theme', 'oled-theme')
+
+    // Clear all inline custom properties
+    const existingVars = root.style;
+    for (let i = existingVars.length - 1; i >= 0; i--) {
+      const prop = existingVars[i];
+      if (prop && prop.startsWith('--')) {
+        root.style.removeProperty(prop);
+      }
+    }
+
+    // Apply theme
+    if (theme === 'dark') {
+      // Default dark - no classes needed, CSS :root handles it
+    } else if (theme === 'dark-oled') {
+      root.classList.add('oled-theme')
+    } else if (theme === 'light') {
+      root.classList.add('light-theme')
+    } else if (theme === 'tweakcn') {
+      root.classList.add('dark-theme')
+      // Find the 'current' theme (or first available)
+      const current = customThemes.find(t => t.id === 'current') || customThemes[0]
+      if (current) {
+        const vars = current.dark || current.light
+        if (vars) {
+          Object.entries(vars).forEach(([key, value]) => {
+            root.style.setProperty(key, value as string)
+          })
+        }
+      }
+    }
+  }, [settings?.ui.theme, customThemes])
 
   // Debounced save
   const saveSettings = useCallback((patch: Partial<SettingsData>) => {
@@ -383,6 +437,79 @@ function GeneralSection() {
       saveSettings({ feed: { [key]: value } as any })
     }
   }, [saveSettings])
+
+  // Import TweakCN theme
+  const handleTweakcnImport = useCallback(async () => {
+    if (!tweakcnUrl.trim()) return
+
+    setTweakcnLoading(true)
+    setTweakcnError('')
+    setTweakcnSuccess('')
+
+    try {
+      const res = await fetch(`${API_BASE}/api/themes/tweakcn/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: tweakcnUrl.trim() }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.detail || 'Failed to import theme')
+      }
+
+      const data = await res.json()
+
+      // Save the theme with fixed ID 'current' (overwrites existing)
+      const saveRes = await fetch(`${API_BASE}/api/themes/tweakcn/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: 'current',
+          name: data.name,
+          url: data.source_url,
+          light: data.light,
+          dark: data.dark,
+          raw: data.raw,
+        }),
+      })
+
+      if (!saveRes.ok) throw new Error('Failed to save theme')
+
+      // Apply the theme immediately
+      const root = document.documentElement
+      const vars = data.dark  // TweakCN themes are always dark
+
+      // Clear all custom properties first
+      const existingVars = root.style;
+      for (let i = existingVars.length - 1; i >= 0; i--) {
+        const prop = existingVars[i];
+        if (prop && prop.startsWith('--')) {
+          root.style.removeProperty(prop);
+        }
+      }
+
+      // Apply new theme variables
+      Object.entries(vars).forEach(([key, value]) => {
+        root.style.setProperty(key, value as string)
+      })
+
+      // Refresh custom themes list
+      const listRes = await fetch(`${API_BASE}/api/themes/tweakcn/list`)
+      if (listRes.ok) {
+        const listData = await listRes.json()
+        if (listData?.themes) setCustomThemes(listData.themes)
+      }
+
+      setTweakcnSuccess(`Тема "${data.name}" загружена и применена!`)
+      setTweakcnUrl('')
+      setTimeout(() => setTweakcnSuccess(''), 3000)
+    } catch (err: any) {
+      setTweakcnError(err.message || 'Ошибка при загрузке темы')
+    } finally {
+      setTweakcnLoading(false)
+    }
+  }, [tweakcnUrl, settings, updateUI])
 
   if (!settings) {
     return <div className="settings-loading">Загрузка...</div>
@@ -479,7 +606,8 @@ function GeneralSection() {
               options={[
                 { value: 'dark', label: 'Тёмная' },
                 { value: 'dark-oled', label: 'Тёмная (OLED)' },
-                { value: 'light', label: 'Светлая (скоро)', disabled: true },
+                { value: 'light', label: 'Светлая' },
+                { value: 'tweakcn', label: 'TweakCN' },
               ]}
             />
           </div>
@@ -495,6 +623,38 @@ function GeneralSection() {
             />
           </div>
         </div>
+
+        {/* TweakCN Import Section */}
+        {settings.ui.theme === 'tweakcn' && (
+          <div className="tweakcn-section">
+            <div className="settings-divider-thin" />
+            <h3 className="settings-subsection-title">TweakCN Theme</h3>
+            <div className="tweakcn-input-row">
+              <input
+                type="text"
+                className="settings-input"
+                placeholder="https://tweakcn.com/themes/..."
+                value={tweakcnUrl}
+                onChange={e => setTweakcnUrl(e.target.value)}
+                disabled={tweakcnLoading}
+              />
+              <button
+                className="settings-btn-primary"
+                onClick={handleTweakcnImport}
+                disabled={tweakcnLoading || !tweakcnUrl.trim()}>
+                {tweakcnLoading ? 'Загрузка...' : 'Сохранить'}
+              </button>
+            </div>
+            {tweakcnError && <div className="tweakcn-error">{tweakcnError}</div>}
+            {tweakcnSuccess && <div className="tweakcn-success">{tweakcnSuccess}</div>}
+            {customThemes.length > 0 && customThemes[0] && (
+              <div className="tweakcn-saved-info">
+                <span className="tweakcn-saved-label">Текущая тема: {customThemes[0].name}</span>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="settings-divider-thin" />
         <h3 className="settings-subsection-title">Чат</h3>
         <Toggle

@@ -82,6 +82,10 @@ app.include_router(config_router)
 from .stats_router import router as stats_router
 app.include_router(stats_router)
 
+# TweakCN themes API
+from .themes_router import router as themes_router
+app.include_router(themes_router)
+
 
 @app.get("/api/health")
 def health():

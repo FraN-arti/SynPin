@@ -73,10 +73,24 @@ function ToolTimeline({ tools, isLive, toolNames }: ToolTimelineProps) {
 
   // Summary line for collapsed state
   const summary = errorCount > 0
-    ? `${errorCount} ошибка${errorCount > 1 ? '' : ''}`
+    ? `${errorCount} ошибка${errorCount > 1 ? 'и' : ''}`
     : runningCount > 0
-      ? `${doneCount + 1}/${total} действий...`
+      ? `${doneCount}/${total} действий...`
       : `${total} действий ✓`
+
+  // Render chips for collapsed state
+  const renderChips = () => (
+    <div className="tool-chips">
+      {tools.map((tc) => (
+        <span key={tc.id} className={`tool-chip ${tc.status}`}>
+          {tc.status === 'running' && <span className="tool-spinner" />}
+          {tc.status === 'completed' && <span className="tool-check">✓</span>}
+          {tc.status === 'error' && <span className="tool-error">✕</span>}
+          <span>{toolNames[tc.name] || tc.name}</span>
+        </span>
+      ))}
+    </div>
+  )
 
   return (
     <div className={`tool-timeline ${expanded ? 'expanded' : 'collapsed'}`}>
@@ -92,24 +106,29 @@ function ToolTimeline({ tools, isLive, toolNames }: ToolTimelineProps) {
         <span className={`tool-timeline-chevron ${expanded ? 'open' : ''}`}>▾</span>
       </button>
 
-      {/* Expandable list */}
-      <div className={`tool-timeline-body ${expanded ? 'open' : ''}`}>
-        {tools.map((tc) => (
-          <div key={tc.id} className={`tool-timeline-row ${tc.status}`}>
-            <span className="tool-timeline-status">
-              {tc.status === 'running' && <span className="tool-spinner" />}
-              {tc.status === 'completed' && <span className="tool-check">✓</span>}
-              {tc.status === 'error' && <span className="tool-error">✕</span>}
-            </span>
-            <span className="tool-timeline-name">
-              {toolNames[tc.name] || tc.name}
-            </span>
-            {tc.status === 'error' && tc.error && (
-              <span className="tool-timeline-error">{tc.error}</span>
-            )}
-          </div>
-        ))}
-      </div>
+      {/* Collapsed: horizontal chips */}
+      {!expanded && renderChips()}
+
+      {/* Expanded: vertical list */}
+      {expanded && (
+        <div className="tool-timeline-body open">
+          {tools.map((tc) => (
+            <div key={tc.id} className={`tool-timeline-row ${tc.status}`}>
+              <span className="tool-timeline-status">
+                {tc.status === 'running' && <span className="tool-spinner" />}
+                {tc.status === 'completed' && <span className="tool-check">✓</span>}
+                {tc.status === 'error' && <span className="tool-error">✕</span>}
+              </span>
+              <span className="tool-timeline-name">
+                {toolNames[tc.name] || tc.name}
+              </span>
+              {tc.status === 'error' && tc.error && (
+                <span className="tool-timeline-error">{tc.error}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

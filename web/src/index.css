@@ -639,7 +639,78 @@ body {
   animation: fadeIn 0.2s ease;
 }
 
-.tool-timeline-header {
+/* Horizontal mode (collapsed) - single line with chips */
+.tool-timeline.collapsed .tool-timeline-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  color: var(--gray-300);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.tool-timeline.collapsed .tool-timeline-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.tool-timeline.collapsed .tool-timeline-body {
+  display: none;
+}
+
+/* Chips container in collapsed state */
+.tool-timeline.collapsed .tool-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 10px 6px;
+}
+
+.tool-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.tool-chip.running {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.tool-chip.completed {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.tool-chip.error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.tool-chip .tool-spinner {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--gray-600);
+  border-top-color: #f59e0b;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Expanded mode (vertical list) */
+.tool-timeline.expanded .tool-timeline-header {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -654,7 +725,7 @@ body {
   transition: background 0.15s ease;
 }
 
-.tool-timeline-header:hover {
+.tool-timeline.expanded .tool-timeline-header:hover {
   background: rgba(255, 255, 255, 0.03);
 }
 
@@ -680,7 +751,7 @@ body {
   transform: rotate(180deg);
 }
 
-/* Collapsed body — hidden */
+/* Expanded body — vertical list */
 .tool-timeline-body {
   max-height: 0;
   overflow: hidden;

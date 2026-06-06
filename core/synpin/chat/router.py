@@ -366,7 +366,9 @@ def _load_memory_block(agent_slug: str) -> str:
             "- Greetings, status updates, 'working on...' messages\n"
             "- Temporary debugging info\n"
             "- Information already saved (read first, then decide)\n"
-            "- Trivial conversation content"
+            "- Trivial conversation content\n\n"
+            "Auto-compaction: memory auto-compacts when full (dedup + remove old entries). "
+            "If you get an error about limit, use memory_write(action='remove') to free space first."
         )
         block = (block or "") + instructions
 

@@ -191,8 +191,13 @@ function App() {
       const depts = (data.otdels || []).map((d: any) => ({
         id: d.otdelid,
         name: d.name,
+        description: d.description || '',
         color: d.color || '#f97316',
+        mentor_role: d.mentor_role || '',
+        escalation: d.escalation || '',
         agent_count: d.agent_count || 0,
+        head: d.head || '',
+        workers: d.workers || [],
       }))
       setSidebarDepartments(depts)
     } catch {}
@@ -927,12 +932,12 @@ function App() {
           return (
             <>
               <OtdelChatView
-                otdel={{ ...otdel, otdelid: otdel.id, description: '', mentor_role: '', escalation: '', agent_count: otdel.agent_count }}
+                otdel={{ ...otdel, otdelid: otdel.id }}
                 onBack={() => setActiveOtdelId(null)}
                 onOpenSettings={() => setOtdelSettingsOpen(true)}
               />
               <OtdelSettingsPanel
-                otdel={{ ...otdel, otdelid: otdel.id, description: '', mentor_role: '', escalation: '', agent_count: otdel.agent_count }}
+                otdel={{ ...otdel, otdelid: otdel.id }}
                 open={otdelSettingsOpen}
                 onClose={() => setOtdelSettingsOpen(false)}
                 onSaved={refreshDepartments}

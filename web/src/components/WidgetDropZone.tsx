@@ -22,8 +22,13 @@ export interface WidgetLayout {
 export interface Department {
   id: string
   name: string
+  description: string
   color: string
+  mentor_role: string
+  escalation: string
   agent_count: number
+  head: string
+  workers: string[]
 }
 
 // ─── Widget metadata ─────────────────────────────────────────────

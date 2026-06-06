@@ -205,6 +205,9 @@ class OtdelCreate(BaseModel):
     color: str = "#f97316"
     mentor_role: str = ""
     escalation: str = ""
+    head: str = ""
+    workers: list[str] = []
+
 
 class OtdelUpdate(BaseModel):
     name: str | None = None
@@ -212,6 +215,8 @@ class OtdelUpdate(BaseModel):
     color: str | None = None
     mentor_role: str | None = None
     escalation: str | None = None
+    head: str | None = None
+    workers: list[str] | None = None
 
 
 @router.get("/otdels")
@@ -238,6 +243,8 @@ async def create_otdel(req: OtdelCreate):
         color=req.color,
         mentor_role=req.mentor_role,
         escalation=req.escalation,
+        head=req.head,
+        workers=req.workers,
     )
 
 

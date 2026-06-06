@@ -650,7 +650,8 @@ def get_otdel(otdel_id: str) -> dict[str, Any] | None:
 
 
 def create_otdel(name: str, description: str = "", color: str = "#f97316",
-                 mentor_role: str = "", escalation: str = "") -> dict[str, Any]:
+                 mentor_role: str = "", escalation: str = "",
+                 head: str = "", workers: list[str] | None = None) -> dict[str, Any]:
     """Create a new otdel: generates ID, creates directory + otdel.yaml, saves to config."""
     otdel_id = _generate_long_id()
     otdels_dir = _get_otdels_dir()
@@ -665,6 +666,8 @@ def create_otdel(name: str, description: str = "", color: str = "#f97316",
         "color": color,
         "mentor_role": mentor_role,
         "escalation": escalation,
+        "head": head,
+        "workers": workers or [],
     }
     _save_yaml(otdel_dir / "otdel.yaml", otdel_data)
 

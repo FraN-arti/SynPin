@@ -2311,7 +2311,9 @@ function DepartmentsSection() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/departments`).then(r => r.json()).then(d => setDepartments(d.departments || [])).catch(() => {})
+    // TODO: load from new departments API when backend is ready
+    // For now start empty — old /api/departments returns agent departments, not ours
+    setDepartments([])
     fetch(`${API_BASE}/api/roles`).then(r => r.json()).then(d => setRoles(d.roles || [])).catch(() => {})
   }, [])
 
@@ -2319,23 +2321,25 @@ function DepartmentsSection() {
     if (!form.name.trim()) return
     setSaving(true)
     try {
-      const res = await fetch(`${API_BASE}/api/departments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setDepartments(prev => [...prev, data.department])
-        setShowCreate(false)
-        setForm({ name: '', description: '', color: '#f97316', mentor_role: '', escalation: '' })
+      // TODO: POST to new departments API
+      const newDept: Department = {
+        id: crypto.randomUUID().slice(0, 18),
+        name: form.name.trim(),
+        description: form.description,
+        color: form.color,
+        mentor_role: form.mentor_role,
+        escalation: form.escalation,
+        agent_count: 0,
       }
+      setDepartments(prev => [...prev, newDept])
+      setShowCreate(false)
+      setForm({ name: '', description: '', color: '#f97316', mentor_role: '', escalation: '' })
     } catch {} finally { setSaving(false) }
   }
 
   const handleDelete = async (id: string) => {
-    const res = await fetch(`${API_BASE}/api/departments/${id}`, { method: 'DELETE' })
-    if (res.ok) setDepartments(prev => prev.filter(d => d.id !== id))
+    // TODO: DELETE from new departments API
+    setDepartments(prev => prev.filter(d => d.id !== id))
   }
 
   return (
@@ -2345,7 +2349,7 @@ function DepartmentsSection() {
         <button className="settings-btn-primary" onClick={() => setShowCreate(true)}>+ Создать отдел</button>
       </div>
 
-      {departments.length === 0 && !showCreate && (
+      {departments.length === 0 && (
         <div className="settings-empty-state">
           <p>Отделы не созданы</p>
           <p className="settings-empty-hint">Создайте первый отдел для организации командной работы агентов</p>
@@ -2371,45 +2375,53 @@ function DepartmentsSection() {
         </div>
       ))}
 
+      {/* Create Department modal */}
       {showCreate && (
-        <div className="settings-card department-create-card">
-          <h3 className="department-create-title">Новый отдел</h3>
-          <div className="settings-field">
-            <label>Название</label>
-            <input className="settings-input" placeholder="Backend, Frontend, DevOps..."
-              value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-          </div>
-          <div className="settings-field">
-            <label>Описание</label>
-            <textarea className="settings-textarea" rows={3} placeholder="Что делает этот отдел..."
-              value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
-          </div>
-          <div className="settings-field">
-            <label>Цвет</label>
-            <div className="department-color-row">
-              <input type="color" className="department-color-picker" value={form.color}
-                onChange={e => setForm(f => ({ ...f, color: e.target.value }))} />
-              <span className="department-color-value">{form.color}</span>
+        <div className="modal-overlay" onClick={() => setShowCreate(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <div className="modal-header">
+              <h2>Новый отдел</h2>
+              <button className="modal-close" onClick={() => setShowCreate(false)}>×</button>
             </div>
-          </div>
-          <div className="settings-field">
-            <label>Ментор (роль)</label>
-            <select className="settings-input" value={form.mentor_role}
-              onChange={e => setForm(f => ({ ...f, mentor_role: e.target.value }))}>
-              <option value="">Не назначен</option>
-              {roles.map(r => <option key={r.rolesid} value={r.rolesid}>{r.name}</option>)}
-            </select>
-          </div>
-          <div className="settings-field">
-            <label>Эскалация</label>
-            <input className="settings-input" placeholder="Пока не реализовано"
-              value={form.escalation} onChange={e => setForm(f => ({ ...f, escalation: e.target.value }))} disabled />
-          </div>
-          <div className="department-create-actions">
-            <button className="settings-btn-secondary" onClick={() => setShowCreate(false)}>Отмена</button>
-            <button className="settings-btn-primary" onClick={handleCreate} disabled={saving || !form.name.trim()}>
-              {saving ? 'Создание...' : 'Создать'}
-            </button>
+            <div className="modal-body">
+              <div className="settings-field">
+                <label>Название *</label>
+                <input className="settings-input" placeholder="Backend, Frontend, DevOps..."
+                  value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+              </div>
+              <div className="settings-field">
+                <label>Описание</label>
+                <textarea className="settings-input" rows={3} placeholder="Что делает этот отдел..."
+                  value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+              </div>
+              <div className="settings-field">
+                <label>Цвет</label>
+                <div className="department-color-row">
+                  <input type="color" className="department-color-picker" value={form.color}
+                    onChange={e => setForm(f => ({ ...f, color: e.target.value }))} />
+                  <span className="department-color-value">{form.color}</span>
+                </div>
+              </div>
+              <div className="settings-field">
+                <label>Ментор (роль)</label>
+                <select className="settings-input" value={form.mentor_role}
+                  onChange={e => setForm(f => ({ ...f, mentor_role: e.target.value }))}>
+                  <option value="">Не назначен</option>
+                  {roles.map(r => <option key={r.rolesid} value={r.rolesid}>{r.name}</option>)}
+                </select>
+              </div>
+              <div className="settings-field">
+                <label>Эскалация</label>
+                <input className="settings-input" placeholder="Пока не реализовано"
+                  value={form.escalation} onChange={e => setForm(f => ({ ...f, escalation: e.target.value }))} disabled />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="settings-btn-secondary" onClick={() => setShowCreate(false)}>Отмена</button>
+              <button className="settings-btn-primary" disabled={saving || !form.name.trim()} onClick={handleCreate}>
+                {saving ? 'Создание...' : 'Создать'}
+              </button>
+            </div>
           </div>
         </div>
       )}

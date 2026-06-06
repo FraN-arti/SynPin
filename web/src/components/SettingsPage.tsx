@@ -277,7 +277,6 @@ function GeneralSection() {
   const [settings, setSettings] = useState<SettingsData | null>(null)
   const [overview, setOverview] = useState<OverviewStats | null>(null)
   const [availableModels, setAvailableModels] = useState<{ provider: string; model: string }[]>([])
-  const [saving, setSaving] = useState(false)
   const [customThemes, setCustomThemes] = useState<{ id: string; name: string; source_url: string; dark?: Record<string, string>; light?: Record<string, string>; raw?: { light: Record<string, string>; dark: Record<string, string> } }[]>([])
   const [tweakcnUrl, setTweakcnUrl] = useState('')
   const [tweakcnLoading, setTweakcnLoading] = useState(false)
@@ -372,7 +371,6 @@ function GeneralSection() {
   const saveSettings = useCallback((patch: Partial<SettingsData>) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(async () => {
-      setSaving(true)
       try {
         await fetch(`${API_BASE}/api/config/settings`, {
           method: 'PUT',
@@ -380,7 +378,6 @@ function GeneralSection() {
           body: JSON.stringify(patch),
         })
       } catch {}
-      setTimeout(() => setSaving(false), 600)
     }, 400)
   }, [])
 
@@ -827,34 +824,6 @@ function GeneralSection() {
       </section>
 
       <div className="settings-divider" />
-
-      {/* ─── 🔧 Система ─── */}
-      <section className="settings-card">
-        <h2 className="settings-card-title">🔧 Система</h2>
-        <div className="settings-system-info">
-          <div className="settings-system-row">
-            <span className="settings-system-label">Версия</span>
-            <span className="settings-system-value">0.1.0</span>
-          </div>
-          <div className="settings-system-row">
-            <span className="settings-system-label">API</span>
-            <span className="settings-system-value">{settings.server.host}:{settings.server.port}</span>
-          </div>
-          <div className="settings-system-row">
-            <span className="settings-system-label">Dev</span>
-           <span className="settings-system-value">:{settings.server.dev_port}</span>
-          </div>
-          <div className="settings-system-row">
-            <span className="settings-system-label">Тема</span>
-            <span className="settings-system-value">{settings.ui.theme}</span>
-          </div>
-          <div className="settings-system-row">
-            <span className="settings-system-label">CORS</span>
-            <span className="settings-system-value">{settings.server.cors_origins?.length ?? 0} origins</span>
-          </div>
-        </div>
-        {saving && <div className="settings-save-indicator">✓ Сохранено</div>}
-      </section>
     </div>
   )
 }
@@ -938,6 +907,25 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
   const [formTouched, setFormTouched] = useState(false)
   const [toolsRegistry, setToolsRegistry] = useState<Record<string, {display: string; description: string; category: string; implemented: boolean; builtin?: boolean}>>({})
   const [toolsCategories, setToolsCategories] = useState<Record<string, {display: string}>>({})
+
+  // Auto-calculate overlay shift when agent card is hovered
+  useEffect(() => {
+    if (!hoveredAgent) return
+    const timer = setTimeout(() => {
+      const wrapper = document.querySelector(`.agent-card-wrapper:hover`) ||
+                      document.querySelector(`.agent-expanded-overlay`)
+      if (!wrapper) return
+      const rect = wrapper.getBoundingClientRect()
+      const vh = window.innerHeight
+      const overlayHeight = rect.height * 3.2 // 320% from CSS
+      const overlayTop = rect.top - rect.height * 0.6 // top: -60%
+      const overflow = (overlayTop + overlayHeight) - vh
+      if (overflow > 0) {
+        setOverlayShift(prev => ({ ...prev, [hoveredAgent]: overflow + 16 }))
+      }
+    }, 10)
+    return () => clearTimeout(timer)
+  }, [hoveredAgent])
 
   // Build lookup maps from roles/departments
   const roleMap: Record<string, {name: string; color: string}> = {}

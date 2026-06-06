@@ -701,10 +701,10 @@ async def execute_tool(tool_name: str, params: dict, agent_slug: str | None = No
 def _parse_text_tool_calls(text: str) -> list[dict]:
     """Parse tool calls from plain text output (fallback for models without native function calling).
     
-    Looks for JSON patterns like:
-    - {"name": "terminal", "params": {"command": "ls"}}
-    - {"tool": "file_read", "params": {"path": "..."}}
-    - ```tool_call\n{"name": "...", "params": {...}}\n```
+    Looks for patterns:
+    - ```tool_call\n{"name": "...", "params": {...}}\n``` (old format)
+    - {"name": "...", "params": {"command": "ls"}} (JSON format)
+    - <function=name><parameter=path>D:\path</parameter> (Llama.cpp / GGUF XML format)
     
     Returns list of OpenAI-format tool_call dicts.
     """
@@ -732,7 +732,7 @@ def _parse_text_tool_calls(text: str) -> list[dict]:
     if calls:
         return calls
     
-    # Pattern 2: Raw JSON in text (nemotron-style output)
+    # Pattern 2: RAW JSON in text (nemotron-style output)
     # Match standalone JSON objects that look like tool calls
     json_pattern = re.compile(r'\{[^{}]*"name"\s*:\s*"[^"]+"\s*,\s*"params"\s*:\s*\{[^{}]*\}[^{}]*\}')
     for match in json_pattern.finditer(text):
@@ -767,6 +767,43 @@ def _parse_text_tool_calls(text: str) -> list[dict]:
                         })
             except json.JSONDecodeError:
                 continue
+    
+    # Pattern 4: Llama.cpp / GGUF XML format
+    # Looks for: <function=name><parameter=path>D:\path</parameter>
+    if not calls:
+        xml_pattern = re.compile(r'<function=([a-z_]+)>\s*(?:<parameter=([a-z_]+)>([^<]*)</parameter>)?')
+        for match in xml_pattern.finditer(text):
+            name = match.group(1)
+            if name:
+                params = {}
+                param_name = match.group(2)
+                param_value = match.group(3)
+                if param_name and param_value:
+                    params[param_name] = param_value
+                calls.append({
+                    "id": f"call_text_{len(calls)}",
+                    "type": "function",
+                    "function": {"name": name, "arguments": json.dumps(params)}
+                })
+    
+    # Pattern 5: <arg_key> format (used by some GGUF models)
+    # Looks for: <arg_key=name><parameter=name>value</parameter>
+    # Multiline: <arg_key=file_read>\n<parameter=path>...
+    if not calls:
+        multi_xml_pattern = re.compile(r'<arg_key=(\w+)>\s*(?:<parameter=(\w+)>([^<]+)</parameter>)?', re.DOTALL)
+        for match in multi_xml_pattern.finditer(text):
+            name = match.group(1)
+            if name:
+                params = {}
+                param_name = match.group(2)
+                param_value = match.group(3)
+                if param_name and param_value:
+                    params[param_name] = param_value
+                calls.append({
+                    "id": f"call_text_{len(calls)}",
+                    "type": "function",
+                    "function": {"name": name, "arguments": json.dumps(params)}
+                })
     
     return calls
 

@@ -58,20 +58,6 @@ def cmd_start(args):
     print()
 
     try:
-        # Configure file logging for diagnostics
-        import logging
-        log_dir = Path.home() / ".synpin" / "logs"
-        log_dir.mkdir(parents=True, exist_ok=True)
-        log_file = log_dir / "synpin.log"
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s %(name)s %(levelname)s %(message)s",
-            handlers=[
-                logging.FileHandler(log_file, encoding="utf-8"),
-                logging.StreamHandler(),
-            ],
-        )
-
         uvicorn.run(
             "synpin.api.server:app",
             host=host,

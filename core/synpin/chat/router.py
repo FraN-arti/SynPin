@@ -885,8 +885,8 @@ async def stream_response(
                 except json.JSONDecodeError:
                     t_params = {}
 
-                # Check if tool is enabled
-                if t_name not in tool_names:
+                # Check if tool is enabled (builtins always allowed)
+                if t_name not in tool_names and t_name not in BUILTINS:
                     tool_result = {"success": False, "output": "", "error": f"Tool '{t_name}' not enabled"}
                 else:
                     # yield tool_start

@@ -765,6 +765,18 @@ body {
 /* === Avatar streaming glow === */
 .message-avatar.assistant.streaming {
   box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.5);
+  animation: avatar-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes avatar-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.5);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.3);
+    opacity: 0.7;
+  }
 }
 
 .avatar-logo {

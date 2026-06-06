@@ -96,11 +96,11 @@ def _parse_mentions(text: str) -> list[str]:
 def _build_otdel_system_prompt(otdel: dict, agent: dict, is_head: bool) -> str:
     """Build system prompt for an agent in otdel chat.
     
-    Combines: otdel context + agent's own prompt + role in otdel.
+    Combines: agent's own prompt + otdel context + role in otdel.
     """
     parts = []
     
-    # Agent's own system prompt
+    # Agent's own system prompt (FIRST - this is their identity)
     own_prompt = agent.get("system_prompt", "")
     if own_prompt:
         parts.append(own_prompt)
@@ -193,8 +193,8 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
     history.append(user_msg)
     _save_history(otdel_id, history)
     
-    # Parse @mentions
-    mentions = _parse_mentions(req.message)
+    # Parse @mentions from user message
+    user_mentions = _parse_mentions(req.message)
     
     # Find head agent
     head_slug = otdel.get("head", "")
@@ -208,16 +208,15 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
     if head_agent:
         agents_to_process.append((head_agent, True))
     
-    # Workers process if @mentioned by name
+    # Workers process if @mentioned in user message
     for slug in worker_slugs:
         if slug == head_slug:
-            continue  # Head already added
+            continue
         agent = get_agent(slug)
         if not agent:
             continue
-        # Check if this agent was @mentioned
         agent_name_lower = agent.get("name", "").lower()
-        if agent_name_lower in mentions:
+        if agent_name_lower in user_mentions:
             agents_to_process.append((agent, False))
     
     # If no agents to process, just return
@@ -228,42 +227,63 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
             "responses": [],
         }
     
-    # Process each agent (in background)
+    # Process agents iteratively: user message -> Head -> @mentions in Head response -> Workers -> etc.
     task_id = f"otdel_{otdel_id}_{uuid.uuid4().hex[:8]}"
     chat_task = task_manager.create(task_id)
     
     async def _process_agents():
-        """Process all responding agents sequentially."""
+        """Process agents iteratively until no new @mentions."""
         responses = []
         
-        for agent, is_head in agents_to_process:
+        # Queue of agents to process: (agent, is_head, triggering_message)
+        # triggering_message is the message content that caused this agent to be called
+        agent_queue = [(agent, True, req.message) for agent in [head_agent] if agent]
+        
+        # Add workers mentioned in user message
+        for slug in worker_slugs:
+            if slug == head_slug:
+                continue
+            agent = get_agent(slug)
+            if not agent:
+                continue
+            agent_name_lower = agent.get("name", "").lower()
+            if agent_name_lower in user_mentions:
+                agent_queue.append((agent, False, req.message))
+        
+        processed_count = 0
+        max_iterations = 10  # Prevent infinite loops
+        
+        while agent_queue and processed_count < max_iterations:
+            agent, is_head, trigger_message = agent_queue.pop(0)
             agent_slug = agent.get("slug", "")
             agent_name = agent.get("name", "")
             
             # Build system prompt
             system_prompt = _build_otdel_system_prompt(otdel, agent, is_head)
             
-            # Build context: all history as context for Head, only relevant for workers
+            # Reload history to get all messages so far
+            history = _load_history(otdel_id)
+            
+            # Build context
             if is_head:
                 # Head sees everything
                 context_messages = [
                     {"role": m.get("role", "user"), "content": f"[{m.get('sender', '?')}] {m.get('content', '')}"}
-                    for m in history[:-1]  # Exclude current message (it's in user turn)
+                    for m in history[:-1]  # Exclude current trigger message
                 ]
             else:
-                # Worker sees only messages mentioning them + their own responses
+                # Worker sees: user messages, head messages mentioning them, own messages
                 context_messages = []
                 for m in history[:-1]:
                     sender = m.get("sender", "")
                     content = m.get("content", "")
-                    # Include: own messages, messages from head mentioning this agent, messages from user
-                    if sender == agent_slug or sender == "user":
+                    if sender == "user" or sender == agent_slug:
                         context_messages.append({
                             "role": "user" if sender != agent_slug else "assistant",
                             "content": f"[{sender}] {content}" if sender != agent_slug else content,
                         })
                     elif sender == head_slug:
-                        # Head's messages — include if relevant
+                        # Include head messages (they may contain @mentions to this worker)
                         context_messages.append({
                             "role": "user",
                             "content": f"[{agent_name}] {content}",
@@ -271,7 +291,7 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
             
             # Build messages for LLM
             messages = [ChatMessage(role=m["role"], content=m["content"]) for m in context_messages]
-            messages.append(ChatMessage(role="user", content=req.message))
+            messages.append(ChatMessage(role="user", content=trigger_message))
             
             # Get provider/model info
             model = agent.get("model", "default")
@@ -322,6 +342,22 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                 history.append(agent_msg)
                 _save_history(otdel_id, history)
                 responses.append(agent_msg)
+                
+                # Check for NEW @mentions in this response
+                new_mentions = _parse_mentions(full_response)
+                if new_mentions and not is_head:
+                    # Head mentioned someone - add them to queue
+                    for slug in worker_slugs:
+                        if slug == head_slug or slug == agent_slug:
+                            continue
+                        mentioned_agent = get_agent(slug)
+                        if not mentioned_agent:
+                            continue
+                        mentioned_name_lower = mentioned_agent.get("name", "").lower()
+                        if mentioned_name_lower in new_mentions:
+                            agent_queue.append((mentioned_agent, False, full_response))
+            
+            processed_count += 1
         
         # Signal completion
         await chat_task.queue.put(None)

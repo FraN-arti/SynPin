@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { EmojiPicker } from './EmojiPicker'
+import { MarkdownRenderer } from './MarkdownRenderer'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:2088'
 
@@ -23,6 +24,7 @@ interface ChatMessage {
   content: string
   is_head?: boolean
   timestamp: string
+  streaming?: boolean
 }
 
 interface Agent {
@@ -90,8 +92,6 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings }: OtdelChatViewPr
       })
 
       if (res.ok) {
-        // Reload history after agents respond
-        // Poll for completion
         const data = await res.json()
         if (data.task_id) {
           await pollTask(data.task_id)
@@ -181,18 +181,20 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings }: OtdelChatViewPr
               const left = isLeftSide(msg)
               const senderName = msg.sender === 'user' ? 'Вы' : getAgentName(msg.sender)
               const isHead = msg.is_head === true
+              const isStreaming = msg.streaming === true
 
               return (
-                <div key={msg.id} className={`otdel-msg-row ${left ? 'left' : 'right'}`}>
+                <div key={msg.id} className={`otdel-msg-row ${left ? 'left' : 'right'} ${isStreaming ? 'streaming' : ''}`}>
                   <div className={`otdel-msg-avatar ${left ? 'left' : 'right'}`}>
                     {left ? '👤' : '🏢'}
+                    {isStreaming && <div className="otdel-msg-streaming-dots"><span></span><span></span><span></span></div>}
                   </div>
                   <div className="otdel-msg-body">
                     <div className={`otdel-msg-name ${left ? 'left' : 'right'} ${isHead ? 'head' : ''}`}>
                       {senderName}
                     </div>
                     <div className={`otdel-msg-bubble ${left ? 'left' : 'right'} ${isHead ? 'head' : ''}`}>
-                      {msg.content}
+                      <MarkdownRenderer content={msg.content} />
                     </div>
                   </div>
                 </div>

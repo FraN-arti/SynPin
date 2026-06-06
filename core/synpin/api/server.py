@@ -55,7 +55,7 @@ chat_router.registry = _loaded_registry
 app.include_router(chat_router.router)
 
 # Otdel chat router
-from .chat import otdel_chat_router
+from ..chat import otdel_chat_router
 otdel_chat_router.registry = _loaded_registry
 app.include_router(otdel_chat_router.router)
 

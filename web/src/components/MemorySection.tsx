@@ -143,12 +143,36 @@ export function MemorySection() {
           </span>
         </div>
 
-        {/* Entry list (read-only) */}
+        {/* Entry list (read-only, deduplicated by key) */}
         <div className="memory-entries">
           {loading ? (
             <div className="memory-loading">Загрузка...</div>
           ) : userData?.entries && userData.entries.length > 0 ? (
-            userData.entries.map((entry, i) => (
+            (() => {
+              /* Keep only the last entry per unique key (most complete wins) */
+              const seen = new Map<number, string>()
+              userData.entries.forEach((entry, i) => {
+                const p = parseEntry(entry)
+                if (p.key) seen.set(i, p.key)
+              })
+              const uniqueByValue = new Map<string, number>()
+              userData.entries.forEach((entry, i) => {
+                const p = parseEntry(entry)
+                const dedupeKey = p.key || entry.trim()
+                if (p.key) {
+                  uniqueByValue.set(dedupeKey, i)  /* last wins */
+                }
+              })
+              const keepIndices = new Set<number>()
+              userData.entries.forEach((entry, i) => {
+                const p = parseEntry(entry)
+                if (!p.key) { keepIndices.add(i); return }
+                const dedupeKey = p.key
+                if (uniqueByValue.get(dedupeKey) === i) keepIndices.add(i)
+              })
+              return userData.entries
+                .filter((_, i) => keepIndices.has(i))
+                .map((entry, i) => (
               <div key={i} className="memory-entry">
                 {(() => {
                   const parsed = parseEntry(entry)
@@ -166,6 +190,7 @@ export function MemorySection() {
                 })()}
               </div>
             ))
+            })()
           ) : (
             <div className="memory-empty">Агенты ещё ничего не записали о пользователе</div>
           )}
@@ -177,7 +202,7 @@ export function MemorySection() {
         {/* Block 2: Compaction */}
         <section className="settings-card memory-settings-half">
           <h2 className="settings-card-title">🗜 Компакция</h2>
-          <p className="memory-card-desc">Сжатие контекста при превышении лимита.</p>
+          <p className="memory-card-desc">Автоматическое сжатие истории сообщений когда контекст заполняется. Не даёт диалогу «упасть» из-за переполнения.</p>
 
           <div className="memory-config-form">
             <div className="settings-field-row">
@@ -215,7 +240,7 @@ export function MemorySection() {
             <div className="settings-field">
               <div className="settings-field-label">
                 <label>Оставить последних</label>
-                <span className="settings-field-hint">Количество последних сообщений, которые не сжимаются</span>
+                <span className="settings-field-hint">Последние N сообщений остаются без изменений — агент помнит недавний контекст</span>
               </div>
               <input
                 type="number"
@@ -254,7 +279,7 @@ export function MemorySection() {
         {/* Block 3: Sessions */}
         <section className="settings-card memory-settings-half">
           <h2 className="settings-card-title">💬 Сессии</h2>
-          <p className="memory-card-desc">Автосброс и архивация сессий.</p>
+          <p className="memory-card-desc">Периодическая очистка контекста сессии. Старые диалоги архивируются, начинается чистый разговор.</p>
 
           <div className="memory-config-form">
             <div className="settings-field-row">
@@ -341,11 +366,12 @@ export function MemorySection() {
                 />
                 <span>Архивировать</span>
               </label>
+              <span className="settings-field-hint-inline">Перед сбросом сохранять историю в архив, чтобы ничего не потерялось</span>
             </div>
             <div className="settings-field">
               <div className="settings-field-label">
                 <label>Макс. сообщений</label>
-                <span className="settings-field-hint">Лимит сообщений в активной сессии</span>
+                <span className="settings-field-hint">Лимит сообщений в активной сессии — при достижении контекст начнёт сжиматься</span>
               </div>
               <input
                 type="number"

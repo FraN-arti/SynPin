@@ -334,8 +334,13 @@ function App() {
         if (!res.ok) return
         const data = await res.json()
         const msgs = data.messages || []
+
+        // Check if last message is user without assistant response (background task ongoing)
+        const lastMsg = msgs[msgs.length - 1]
+        const hasPendingTask = lastMsg?.role === 'user'
+
         if (msgs.length > 0) {
-          const restored: Message[] = msgs.map((m: { role: string; content: string; model?: string; agent_name?: string }, i: number) => ({
+          let restored: Message[] = msgs.map((m: { role: string; content: string; model?: string; agent_name?: string }, i: number) => ({
             id: `restored-${i}`,
             role: m.role as 'user' | 'assistant',
             content: m.content,
@@ -343,6 +348,19 @@ function App() {
             model: m.model,
             agent_name: m.agent_name,
           }))
+
+          // Add placeholder if background task is ongoing
+          if (hasPendingTask) {
+            restored.push({
+              id: `placeholder-${Date.now()}`,
+              role: 'assistant',
+              content: '',
+              timestamp: new Date(),
+              tools: [],
+            })
+            setIsTyping(true) // Show spinner while polling
+          }
+
           setMessages(restored)
         } else {
           setMessages([])
@@ -353,6 +371,53 @@ function App() {
     }
     loadHistory()
   }, [activeAgent])
+
+  // ─── Polling: check for background task completion ──────────────────
+  // When SSE is interrupted (browser closed/reloaded), this still gets answers
+  useEffect(() => {
+    if (!activeAgent) return
+
+    // Check if there's an empty assistant placeholder
+    const hasEmptyPlaceholder = messages.some(m => m.role === 'assistant' && !m.content)
+    if (!hasEmptyPlaceholder) return
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web`)
+        if (!res.ok) return
+        const data = await res.json()
+        const serverMsgs = data.messages || []
+
+        // Find the latest assistant message from server
+        const lastAssistant = serverMsgs.filter((m: {role: string}) => m.role === 'assistant').pop()
+        if (!lastAssistant) return
+
+        // Check if we already have this content
+        const myLastAssistant = messages.filter(m => m.role === 'assistant').pop()
+        if (!myLastAssistant || myLastAssistant.content !== lastAssistant.content) {
+          // Update the placeholder with server's answer
+          setMessages(prev => {
+            const lastAssistantId = prev.map(m => m.id).reverse().find(id => {
+              const msg = prev.find(m => m.id === id)
+              return msg?.role === 'assistant' && !msg.content
+            })
+            if (lastAssistantId) {
+              setIsTyping(false)
+              return prev.map(m => m.id === lastAssistantId
+                ? { ...m, content: lastAssistant.content, model: lastAssistant.model, agent_name: lastAssistant.agent_name }
+                : m
+              )
+            }
+            return prev
+          })
+        }
+      } catch (e) {
+        // Polling failed — silent
+      }
+    }, 2000) // Poll every 2 seconds
+
+    return () => clearInterval(pollInterval)
+  }, [activeAgent, messages])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })

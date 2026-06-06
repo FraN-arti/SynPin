@@ -140,7 +140,12 @@ export function SettingsPage({ onBack, onAgentsChange }: SettingsPageProps) {
           {activeTab === 'agents' && <AgentsSection onAgentsChange={onAgentsChange} />}
           {activeTab === 'providers' && <ProvidersSection ref={providersRef} onAddProvider={(type) => setActiveModal(`add-provider-${type}`)} onAddFromCatalog={(p) => setAddingProvider(p)} onEditProvider={(p) => setEditingProvider(p)} />}
           {activeTab === 'memory' && <MemorySection />}
-          {activeTab === 'channels' && <ChannelsSection onAddChannel={() => setActiveModal('add-channel')} />}
+          {activeTab === 'channels' && (
+            <>
+              <ChannelsSection onAddChannel={() => setActiveModal('add-channel')} />
+              <DepartmentsSection />
+            </>
+          )}
           {activeTab === 'skills' && <SkillsSection />}
         </div>
       </div>
@@ -2284,6 +2289,132 @@ function ChannelsSection({ onAddChannel }: { onAddChannel: () => void }) {
           )}
         </div>
       ))}
+    </div>
+  )
+}
+
+// ─── Departments (Отделы) ──────────────────────────────────────
+
+interface Department {
+  id: string
+  name: string
+  description: string
+  color: string
+  mentor_role: string
+  escalation: string
+  agent_count: number
+}
+
+function DepartmentsSection() {
+  const [departments, setDepartments] = useState<Department[]>([])
+  const [showCreate, setShowCreate] = useState(false)
+  const [roles, setRoles] = useState<{ rolesid: string; name: string }[]>([])
+  const [form, setForm] = useState({ name: '', description: '', color: '#f97316', mentor_role: '', escalation: '' })
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/departments`).then(r => r.json()).then(d => setDepartments(d.departments || [])).catch(() => {})
+    fetch(`${API_BASE}/api/roles`).then(r => r.json()).then(d => setRoles(d.roles || [])).catch(() => {})
+  }, [])
+
+  const handleCreate = async () => {
+    if (!form.name.trim()) return
+    setSaving(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/departments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setDepartments(prev => [...prev, data.department])
+        setShowCreate(false)
+        setForm({ name: '', description: '', color: '#f97316', mentor_role: '', escalation: '' })
+      }
+    } catch {} finally { setSaving(false) }
+  }
+
+  const handleDelete = async (id: string) => {
+    const res = await fetch(`${API_BASE}/api/departments/${id}`, { method: 'DELETE' })
+    if (res.ok) setDepartments(prev => prev.filter(d => d.id !== id))
+  }
+
+  return (
+    <div className="settings-sections">
+      <div className="section-header-row">
+        <span className="section-count">{departments.length} отделов</span>
+        <button className="settings-btn-primary" onClick={() => setShowCreate(true)}>+ Создать отдел</button>
+      </div>
+
+      {departments.length === 0 && !showCreate && (
+        <div className="settings-empty-state">
+          <p>Отделы не созданы</p>
+          <p className="settings-empty-hint">Создайте первый отдел для организации командной работы агентов</p>
+        </div>
+      )}
+
+      {departments.map(dept => (
+        <div key={dept.id} className="settings-card department-card">
+          <div className="department-header">
+            <div className="department-identity">
+              <span className="department-color-dot" style={{ background: dept.color }} />
+              <div>
+                <span className="department-name">{dept.name}</span>
+                <span className="department-meta">{dept.mentor_role ? `Ментор: ${dept.mentor_role}` : 'Без ментора'} · {dept.agent_count} агентов</span>
+              </div>
+            </div>
+            <div className="department-actions">
+              <button className="settings-btn-secondary">Настройки</button>
+              <button className="settings-btn-danger" onClick={() => handleDelete(dept.id)}>Удалить</button>
+            </div>
+          </div>
+          {dept.description && <p className="department-desc">{dept.description}</p>}
+        </div>
+      ))}
+
+      {showCreate && (
+        <div className="settings-card department-create-card">
+          <h3 className="department-create-title">Новый отдел</h3>
+          <div className="settings-field">
+            <label>Название</label>
+            <input className="settings-input" placeholder="Backend, Frontend, DevOps..."
+              value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+          </div>
+          <div className="settings-field">
+            <label>Описание</label>
+            <textarea className="settings-textarea" rows={3} placeholder="Что делает этот отдел..."
+              value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+          </div>
+          <div className="settings-field">
+            <label>Цвет</label>
+            <div className="department-color-row">
+              <input type="color" className="department-color-picker" value={form.color}
+                onChange={e => setForm(f => ({ ...f, color: e.target.value }))} />
+              <span className="department-color-value">{form.color}</span>
+            </div>
+          </div>
+          <div className="settings-field">
+            <label>Ментор (роль)</label>
+            <select className="settings-input" value={form.mentor_role}
+              onChange={e => setForm(f => ({ ...f, mentor_role: e.target.value }))}>
+              <option value="">Не назначен</option>
+              {roles.map(r => <option key={r.rolesid} value={r.rolesid}>{r.name}</option>)}
+            </select>
+          </div>
+          <div className="settings-field">
+            <label>Эскалация</label>
+            <input className="settings-input" placeholder="Пока не реализовано"
+              value={form.escalation} onChange={e => setForm(f => ({ ...f, escalation: e.target.value }))} disabled />
+          </div>
+          <div className="department-create-actions">
+            <button className="settings-btn-secondary" onClick={() => setShowCreate(false)}>Отмена</button>
+            <button className="settings-btn-primary" onClick={handleCreate} disabled={saving || !form.name.trim()}>
+              {saving ? 'Создание...' : 'Создать'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

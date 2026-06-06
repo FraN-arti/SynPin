@@ -149,6 +149,7 @@ function App() {
   const [availableAgents, setAvailableAgents] = useState<AgentConfig[]>([])
   const [agentSearch, setAgentSearch] = useState('')
   const [primarySlug, setPrimarySlug] = useState('')
+  const [departments, setDepartments] = useState<{ id: string; name: string; color: string; agent_count: number }[]>([])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -298,6 +299,13 @@ function App() {
       }
     }
     loadAgents()
+  }, [])
+
+  // Load departments for sidebar
+  useEffect(() => {
+    fetch(`${API_BASE}/api/departments`).then(r => r.json()).then(d => {
+      setDepartments(d.departments || [])
+    }).catch(() => {})
   }, [])
 
   // Load chat history when active agent changes
@@ -836,6 +844,20 @@ function App() {
               </div>
             )
           })()}
+
+          {/* Departments — visible when created */}
+          {departments.length > 0 && (
+            <div className="sidebar-departments">
+              <div className="sidebar-section-label">Отделы</div>
+              {departments.map(dept => (
+                <button key={dept.id} className="sidebar-department-item">
+                  <span className="department-color-dot" style={{ background: dept.color }} />
+                  <span className="sidebar-department-name">{dept.name}</span>
+                  <span className="sidebar-department-count">{dept.agent_count}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="sidebar-footer">
             <button className="settings-btn" onClick={() => setPage('settings')}>

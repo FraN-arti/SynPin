@@ -1,7 +1,7 @@
 """Terminal tool — execute shell commands via asyncio subprocess.
 
 Runs commands through bash with a 30-second timeout.
-Restricted to working directory D:\\synpin\\ and its subdirectories.
+Default working directory: first allowed directory (configurable).
 """
 from __future__ import annotations
 
@@ -10,9 +10,12 @@ import os
 from pathlib import Path
 
 from .base import ToolResult, make_success, make_error
+from .security import get_allowed_roots
 
-# Root directory for command execution (security boundary)
-_WORK_ROOT = Path(r"D:\synpin")
+# Default working directory for command execution
+def _get_work_root() -> Path:
+    roots = get_allowed_roots()
+    return roots[0] if roots else Path(r"D:\synpin")
 
 # Maximum execution time in seconds
 _TIMEOUT = 30
@@ -37,7 +40,7 @@ async def terminal(params: dict) -> ToolResult:
             command,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            cwd=str(_WORK_ROOT),
+            cwd=str(_get_work_root()),
         )
 
         try:

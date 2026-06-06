@@ -1,6 +1,6 @@
 """File read tool — read file contents with optional offset and limit.
 
-Restricted to reading files under D:\\synpin\\.
+Restricted to reading files under allowed directories (configurable).
 """
 from __future__ import annotations
 
@@ -8,55 +8,17 @@ import asyncio
 from pathlib import Path
 
 from .base import ToolResult, make_success, make_error
-
-# Security boundary — all file reads must be under this directory
-_ROOT = Path(r"D:\synpin")
+from .security import get_allowed_roots, validate_path
 
 # Max characters to return (1 MB safety limit)
 _MAX_CHARS = 1_000_000
-
-
-def _validate_path(path_str: str) -> Path | None:
-    """Resolve and validate that the path is inside the root directory.
-    
-    Handles common model quirks:
-    - Forward slashes (D:/synpin/dev.bat)
-    - Relative paths (./dev.bat, dev.bat)
-    - Trailing/leading whitespace
-    - Paths without drive letter
-    """
-    if not path_str:
-        return None
-
-    # Clean up
-    path_str = path_str.strip().strip('"').strip("'")
-    path_str = path_str.replace("/", "\\")  # Normalize forward slashes
-
-    try:
-        p = Path(path_str)
-
-        # If relative, resolve relative to ROOT
-        if not p.is_absolute():
-            p = _ROOT / p
-
-        resolved = p.resolve()
-    except (OSError, ValueError):
-        return None
-
-    # Security: must be under root
-    try:
-        resolved.relative_to(_ROOT)
-    except ValueError:
-        return None
-
-    return resolved
 
 
 async def file_read(params: dict) -> ToolResult:
     """Read a file's contents.
 
     Params:
-        path (str): Path to the file (relative to D:\\synpin\\ or absolute).
+        path (str): Path to the file (relative to allowed roots or absolute).
         offset (int, optional): Start reading from this line (1-indexed).
         limit (int, optional): Maximum number of lines to read.
 
@@ -67,15 +29,15 @@ async def file_read(params: dict) -> ToolResult:
     if not path_str:
         return make_error("Missing required parameter: path")
 
-    resolved = _validate_path(path_str)
+    resolved = validate_path(path_str)
     if resolved is None:
+        roots = get_allowed_roots()
         return make_error(
-            f"Path '{path_str}' is outside the allowed directory ({_ROOT})."
+            f"Path '{path_str}' is outside the allowed directories ({', '.join(str(r) for r in roots)})."
         )
 
     if not resolved.exists():
         return make_error(f"File not found: {path_str}")
-
     if not resolved.is_file():
         return make_error(f"Path is not a file: {path_str}")
 

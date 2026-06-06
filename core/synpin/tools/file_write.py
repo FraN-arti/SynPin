@@ -1,7 +1,7 @@
 """File write tool — write content to a file.
 
 Creates parent directories as needed. Overwrites existing files.
-Restricted to writing files under D:\\synpin\\.
+Restricted to writing files under allowed directories (configurable).
 """
 from __future__ import annotations
 
@@ -9,43 +9,14 @@ import asyncio
 from pathlib import Path
 
 from .base import ToolResult, make_success, make_error
-
-# Security boundary — all file writes must be under this directory
-_ROOT = Path(r"D:\synpin")
-
-
-def _validate_path(path_str: str) -> Path | None:
-    """Resolve and validate that the path is inside the root directory.
-    
-    Handles forward slashes, relative paths, whitespace, quotes.
-    """
-    if not path_str:
-        return None
-
-    path_str = path_str.strip().strip('"').strip("'")
-    path_str = path_str.replace("/", "\\")
-
-    try:
-        p = Path(path_str)
-        if not p.is_absolute():
-            p = _ROOT / p
-        resolved = p.resolve()
-    except (OSError, ValueError):
-        return None
-
-    try:
-        resolved.relative_to(_ROOT)
-    except ValueError:
-        return None
-
-    return resolved
+from .security import get_allowed_roots, validate_path
 
 
 async def file_write(params: dict) -> ToolResult:
     """Write content to a file (overwrites existing content).
 
     Params:
-        path (str): Path to the file (relative to D:\\synpin\\ or absolute).
+        path (str): Path to the file (relative to allowed roots or absolute).
         content (str): Content to write.
 
     Returns:
@@ -59,10 +30,11 @@ async def file_write(params: dict) -> ToolResult:
     if content is None:
         return make_error("Missing required parameter: content")
 
-    resolved = _validate_path(path_str)
+    resolved = validate_path(path_str)
     if resolved is None:
+        roots = get_allowed_roots()
         return make_error(
-            f"Path '{path_str}' is outside the allowed directory ({_ROOT})."
+            f"Path '{path_str}' is outside the allowed directories ({', '.join(str(r) for r in roots)})."
         )
 
     try:

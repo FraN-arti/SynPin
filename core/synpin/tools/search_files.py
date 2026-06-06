@@ -1,47 +1,25 @@
 """Search files tool — search for files by name or content.
 
 Uses ripgrep (rg) for content search and glob patterns for file search.
-Restricted to searching under D:\\synpin\\.
+Restricted to searching under allowed directories (configurable).
 """
 from __future__ import annotations
 
 import asyncio
+import re
 from pathlib import Path
 
 from .base import ToolResult, make_success, make_error
-
-# Security boundary
-_ROOT = Path(r"D:\synpin")
+from .security import get_allowed_roots, validate_path
 
 # Max results to return
 _MAX_RESULTS = 50
 
 
-def _validate_path(path_str: str) -> Path | None:
-    """Resolve and validate that the path is inside the root directory.
-    
-    Handles forward slashes, relative paths, whitespace, quotes.
-    """
-    if not path_str:
-        return None
-
-    path_str = path_str.strip().strip('"').strip("'")
-    path_str = path_str.replace("/", "\\")
-
-    try:
-        p = Path(path_str)
-        if not p.is_absolute():
-            p = _ROOT / p
-        resolved = p.resolve()
-    except (OSError, ValueError):
-        return None
-
-    try:
-        resolved.relative_to(_ROOT)
-    except ValueError:
-        return None
-
-    return resolved
+def _get_search_root() -> Path:
+    """Get the primary search root (first allowed directory)."""
+    roots = get_allowed_roots()
+    return roots[0] if roots else Path(r"D:\synpin")
 
 
 async def search_files(params: dict) -> ToolResult:
@@ -49,7 +27,7 @@ async def search_files(params: dict) -> ToolResult:
 
     Params:
         pattern (str): Glob pattern (for files) or regex pattern (for content).
-        path (str, optional): Directory to search in. Defaults to D:\\synpin\\.
+        path (str, optional): Directory to search in. Defaults to first allowed root.
         target (str, optional): "files" for file name search, "content" for
             content search. Defaults to "files".
         limit (int, optional): Maximum number of results. Defaults to 50.
@@ -65,11 +43,12 @@ async def search_files(params: dict) -> ToolResult:
     limit = min(params.get("limit", _MAX_RESULTS), _MAX_RESULTS)
 
     # Determine search directory
-    search_path_str = params.get("path", str(_ROOT))
-    search_path = _validate_path(search_path_str)
+    search_path_str = params.get("path", str(_get_search_root()))
+    search_path = validate_path(search_path_str)
     if search_path is None:
+        roots = get_allowed_roots()
         return make_error(
-            f"Path '{search_path_str}' is outside the allowed directory ({_ROOT})."
+            f"Path '{search_path_str}' is outside the allowed directories ({', '.join(str(r) for r in roots)})."
         )
     if not search_path.exists():
         return make_error(f"Path not found: {search_path_str}")
@@ -98,7 +77,7 @@ async def _search_by_name(search_path: Path, pattern: str, limit: int) -> ToolRe
     if not matches:
         return make_success("No files found matching the pattern.")
 
-    lines = [str(m.relative_to(_ROOT)) for m in matches]
+    lines = [str(m.relative_to(_get_search_root())) for m in matches]
     header = f"[{len(lines)} file(s) found]"
     return make_success(f"{header}\n" + "\n".join(lines))
 
@@ -116,7 +95,8 @@ async def _search_by_content(search_path: Path, pattern: str, limit: int) -> Too
 
         output = stdout_bytes.decode("utf-8", errors="replace") if stdout_bytes else ""
         # Strip absolute paths to show relative ones
-        output = output.replace(str(_ROOT) + "\\", "").replace(str(_ROOT) + "/", "")
+        root_str = str(_get_search_root())
+        output = output.replace(root_str + "\\", "").replace(root_str + "/", "")
 
         if not output.strip():
             # Try with -i (case insensitive) as fallback
@@ -128,7 +108,8 @@ async def _search_by_content(search_path: Path, pattern: str, limit: int) -> Too
             )
             stdout2, _ = await asyncio.wait_for(proc2.communicate(), timeout=15)
             output = stdout2.decode("utf-8", errors="replace") if stdout2 else ""
-            output = output.replace(str(_ROOT) + "\\", "").replace(str(_ROOT) + "/", "")
+            root_str = str(_get_search_root())
+        output = output.replace(root_str + "\\", "").replace(root_str + "/", "")
 
         if not output.strip():
             return make_success("No content matches found.")
@@ -168,7 +149,7 @@ async def _fallback_content_search(search_path: Path, pattern: str, limit: int) 
                 text = fpath.read_text(encoding="utf-8", errors="replace")
                 for i, line in enumerate(text.splitlines(), 1):
                     if regex.search(line):
-                        rel = fpath.relative_to(_ROOT)
+                        rel = fpath.relative_to(_get_search_root())
                         results.append(f"{rel}:{i}: {line.strip()}")
                         if len(results) >= limit:
                             return

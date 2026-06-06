@@ -4670,3 +4670,343 @@ body {
   gap: 6px;
   pointer-events: none;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Otdel Chat View
+   ═══════════════════════════════════════════════════════════════ */
+
+.otdel-chat-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+  background: var(--black);
+  animation: fadeIn 0.3s ease;
+}
+
+.otdel-chat-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gray-800);
+  background: var(--gray-900);
+  flex-shrink: 0;
+}
+
+.otdel-back-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.otdel-back-btn:hover {
+  color: var(--white);
+  background: var(--gray-800);
+}
+
+.otdel-header-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.otdel-header-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.otdel-header-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--white);
+}
+
+.otdel-header-desc {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 1px;
+}
+
+.otdel-settings-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--gray-800);
+  border: 1px solid var(--gray-700);
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.otdel-settings-btn:hover {
+  background: var(--gray-700);
+  color: var(--white);
+}
+
+.otdel-settings-icon {
+  font-size: 14px;
+}
+
+.otdel-messages-area {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.otdel-messages-container {
+  max-width: 100%;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.otdel-empty-chat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.otdel-empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.otdel-empty-chat p {
+  margin: 0;
+  font-size: 15px;
+}
+
+.otdel-empty-hint {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 8px;
+}
+
+.otdel-bottom-input {
+  padding: 12px 16px;
+  border-top: 1px solid var(--gray-800);
+  background: var(--gray-900);
+}
+
+.otdel-bottom-input .input-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 640px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.otdel-bottom-input .chat-textarea {
+  flex: 1;
+  min-height: 42px;
+  max-height: 150px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--gray-800);
+  border: 1px solid var(--gray-700);
+  color: var(--white);
+  font-family: inherit;
+  font-size: 14px;
+  resize: none;
+  line-height: 1.5;
+  outline: none;
+  scrollbar-width: none;
+}
+
+.otdel-bottom-input .chat-textarea::placeholder {
+  color: var(--gray-500);
+}
+
+.otdel-bottom-input .chat-textarea:focus {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 1px var(--orange);
+}
+
+.otdel-bottom-input .send-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  background: var(--orange);
+  color: var(--white);
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.otdel-bottom-input .send-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.otdel-bottom-input .send-btn:not(:disabled):hover {
+  opacity: 0.85;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Otdel Settings Panel (slide-out from left)
+   ═══════════════════════════════════════════════════════════════ */
+
+.otdel-settings-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 200;
+  animation: fadeIn 0.2s ease;
+}
+
+.otdel-settings-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.95);
+  width: 460px;
+  max-width: 90vw;
+  max-height: 85vh;
+  overflow: hidden;
+  background: #111;
+  border: 1px solid var(--gray-800);
+  border-radius: 8px;
+  z-index: 201;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.otdel-settings-panel.open {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+}
+
+.otdel-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--gray-800);
+  flex-shrink: 0;
+}
+
+.otdel-settings-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--white);
+}
+
+.otdel-settings-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 22px;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: all 0.15s;
+}
+
+.otdel-settings-close:hover {
+  color: var(--white);
+  background: var(--gray-800);
+}
+
+.otdel-settings-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.otdel-settings-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--gray-900);
+  border-radius: 8px;
+  border: 1px solid var(--gray-800);
+  margin-bottom: 4px;
+}
+
+.otdel-settings-preview-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.otdel-settings-preview-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--white);
+}
+
+.otdel-mentor-hint {
+  display: block;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.otdel-workers-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.otdel-workers-count {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.otdel-workers-empty {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.otdel-workers-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.otdel-settings-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--gray-800);
+  flex-shrink: 0;
+  background: #111;
+}

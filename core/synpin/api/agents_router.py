@@ -197,6 +197,74 @@ async def delete_department(dept_id: str):
     return {"ok": True}
 
 
+# ─── Otdels (Organizational units with chat channels) ─────────────
+
+class OtdelCreate(BaseModel):
+    name: str
+    description: str = ""
+    color: str = "#f97316"
+    mentor_role: str = ""
+    escalation: str = ""
+
+class OtdelUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    color: str | None = None
+    mentor_role: str | None = None
+    escalation: str | None = None
+
+
+@router.get("/otdels")
+async def get_otdels():
+    """Get all otdels with agent counts."""
+    return {"otdels": manager.get_otdels_with_agents()}
+
+
+@router.get("/otdels/{otdel_id}")
+async def get_otdel(otdel_id: str):
+    """Get a single otdel by ID."""
+    otdel = manager.get_otdel(otdel_id)
+    if not otdel:
+        raise HTTPException(404, f"Otdel not found: {otdel_id}")
+    return otdel
+
+
+@router.post("/otdels")
+async def create_otdel(req: OtdelCreate):
+    """Create a new otdel."""
+    return manager.create_otdel(
+        name=req.name,
+        description=req.description,
+        color=req.color,
+        mentor_role=req.mentor_role,
+        escalation=req.escalation,
+    )
+
+
+@router.put("/otdels/{otdel_id}")
+async def update_otdel(otdel_id: str, req: OtdelUpdate):
+    """Update an otdel."""
+    updates = req.model_dump(exclude_none=True)
+    if not updates:
+        otdel = manager.get_otdel(otdel_id)
+        if not otdel:
+            raise HTTPException(404, f"Otdel not found: {otdel_id}")
+        return otdel
+    result = manager.update_otdel(otdel_id, updates)
+    if not result:
+        raise HTTPException(404, f"Otdel not found: {otdel_id}")
+    return result
+
+
+@router.delete("/otdels/{otdel_id}")
+async def delete_otdel(otdel_id: str):
+    """Delete an otdel and its directory."""
+    ok = manager.delete_otdel(otdel_id)
+    if not ok:
+        raise HTTPException(404, f"Otdel not found: {otdel_id}")
+    return {"ok": True}
+
+
 # ─── Tools ───────────────────────────────────────────────────────
 
 @router.get("/tools")

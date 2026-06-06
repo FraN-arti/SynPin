@@ -10,13 +10,30 @@ _LOCK = threading.Lock()
 
 
 def _get_config_dir() -> Path:
-    """Resolve config directory: prod ~/.synpin/config/ first, then dev core/config/."""
+    """Resolve config directory.
+    SYNPIN_DEV=1 → always use dev path (core/synpin/config/)
+    Otherwise → ~/.synpin/config/ (prod) with fallback to dev.
+    On first prod run, copies templates to user home."""
     global _CONFIG_DIR
     if _CONFIG_DIR is not None:
         return _CONFIG_DIR
 
     prod = Path.home() / ".synpin" / "config"
     dev = Path(__file__).resolve().parent.parent / "config"
+
+    # Dev mode: always use project directory
+    if os.environ.get("SYNPIN_DEV") == "1":
+        _CONFIG_DIR = dev
+        return _CONFIG_DIR
+
+    if not prod.exists():
+        # First run — copy templates to user home
+        templates_dir = dev / "templates"
+        if templates_dir.exists():
+            prod.mkdir(parents=True, exist_ok=True)
+            import shutil
+            for tpl in templates_dir.glob("*.yaml"):
+                shutil.copy2(str(tpl), str(prod / tpl.name))
 
     if prod.exists():
         _CONFIG_DIR = prod

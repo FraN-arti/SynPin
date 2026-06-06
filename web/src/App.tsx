@@ -4,6 +4,8 @@ import synpinLogo from './images/synpin.png'
 import { MarkdownRenderer } from './components/MarkdownRenderer'
 import { EmojiPicker } from './components/EmojiPicker'
 import { SettingsPage } from './components/SettingsPage'
+import { OtdelChatView } from './components/OtdelChatView'
+import { OtdelSettingsPanel } from './components/OtdelSettingsPanel'
 import {
   WidgetDropZone,
   useWidgetLayout,
@@ -152,6 +154,8 @@ function ToolTimeline({ tools, isLive, toolNames }: ToolTimelineProps) {
 
 function App() {
   const [page, setPage] = useState<'chat' | 'settings'>('chat')
+  const [activeOtdelId, setActiveOtdelId] = useState<string | null>(null)
+  const [otdelSettingsOpen, setOtdelSettingsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
@@ -166,7 +170,7 @@ function App() {
   const [availableAgents, setAvailableAgents] = useState<AgentConfig[]>([])
   const [agentSearch, setAgentSearch] = useState('')
   const [primarySlug, setPrimarySlug] = useState('')
-  // Departments for sidebar — loaded from /api/departments
+  // Otdels for sidebar — loaded from /api/otdels
   const [sidebarDepartments, setSidebarDepartments] = useState<Department[]>([])
 
   // Widget layout (left/right zones on main page)
@@ -182,10 +186,10 @@ function App() {
 
   const refreshDepartments = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/departments`)
+      const res = await fetch(`${API_BASE}/api/otdels`)
       const data = await res.json()
-      const depts = (data.departments || []).map((d: any) => ({
-        id: d.departmentsid,
+      const depts = (data.otdels || []).map((d: any) => ({
+        id: d.otdelid,
         name: d.name,
         color: d.color || '#f97316',
         agent_count: d.agent_count || 0,
@@ -912,11 +916,30 @@ function App() {
             departments={sidebarDepartments}
             onRemove={removeWidget}
             isDragging={!!activeDragId}
+            onDepartmentClick={(id) => { setActiveOtdelId(id); setPage('chat') }}
           />
           <main className="main-area">
         {page === 'settings' ? (
           <SettingsPage onBack={() => setPage('chat')} onAgentsChange={refreshAgents} onDepartmentsChange={refreshDepartments} />
-        ) : messages.length === 0 ? (
+        ) : activeOtdelId ? (() => {
+          const otdel = sidebarDepartments.find(d => d.id === activeOtdelId)
+          if (!otdel) return null
+          return (
+            <>
+              <OtdelChatView
+                otdel={{ ...otdel, otdelid: otdel.id, description: '', mentor_role: '', escalation: '', agent_count: otdel.agent_count }}
+                onBack={() => setActiveOtdelId(null)}
+                onOpenSettings={() => setOtdelSettingsOpen(true)}
+              />
+              <OtdelSettingsPanel
+                otdel={{ ...otdel, otdelid: otdel.id, description: '', mentor_role: '', escalation: '', agent_count: otdel.agent_count }}
+                open={otdelSettingsOpen}
+                onClose={() => setOtdelSettingsOpen(false)}
+                onSaved={refreshDepartments}
+              />
+            </>
+          )
+        })() : messages.length === 0 ? (
           <div className="empty-state">
             <img src={synpinLogo} alt="SynPin" className="empty-logo-img" />
             <h1 className="empty-title">Чем могу помочь?</h1>
@@ -970,6 +993,7 @@ function App() {
             departments={sidebarDepartments}
             onRemove={removeWidget}
             isDragging={!!activeDragId}
+            onDepartmentClick={(id) => { setActiveOtdelId(id); setPage('chat') }}
           />
         </div>
         <DragOverlay>

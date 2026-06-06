@@ -1,0 +1,4 @@
+# Otdels — organizational units with chat channels
+# Each otdel has its own mentor, workers, and chat
+# NOT the same as Departments (agent groupings)
+otdels: []

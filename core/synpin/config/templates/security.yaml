@@ -1,0 +1,3 @@
+# Security settings — allowed directories for file operations
+security:
+  allowed_directories: []

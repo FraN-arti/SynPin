@@ -21,6 +21,7 @@ web/*.tsbuildinfo
 
 # Runtime data
 core/departments/
+core/otdels/
 Thumbs.db
 
 # Environment
@@ -46,3 +47,8 @@ data/shared/
 
 # Configs with secrets (NEVER commit)
 core/synpin/config/providers.yaml
+
+# User config (stored in ~/.synpin/config/, NOT in git)
+core/synpin/config/*.yaml
+# But keep templates tracked
+!core/synpin/config/templates/

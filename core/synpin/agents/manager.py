@@ -24,11 +24,30 @@ def _generate_long_id(length: int = 12) -> str:
 
 
 def _get_config_dir() -> Path:
+    """Get config directory.
+    SYNPIN_DEV=1 → always use dev path (core/synpin/config/)
+    Otherwise → ~/.synpin/config/ (prod) with fallback to dev.
+    On first prod run, copies templates to user home."""
     global _CONFIG_DIR
     if _CONFIG_DIR is not None:
         return _CONFIG_DIR
     prod = Path.home() / ".synpin" / "config"
     dev = Path(__file__).resolve().parent.parent / "config"
+
+    # Dev mode: always use project directory
+    if os.environ.get("SYNPIN_DEV") == "1":
+        _CONFIG_DIR = dev
+        return _CONFIG_DIR
+
+    if not prod.exists():
+        # First run — copy templates to user home
+        templates_dir = dev / "templates"
+        if templates_dir.exists():
+            prod.mkdir(parents=True, exist_ok=True)
+            import shutil
+            for tpl in templates_dir.glob("*.yaml"):
+                shutil.copy2(str(tpl), str(prod / tpl.name))
+
     _CONFIG_DIR = prod if prod.exists() else dev
     return _CONFIG_DIR
 
@@ -564,6 +583,156 @@ def delete_department(dept_id: str) -> bool:
     dept_dir = departments_dir / dept_id
     if dept_dir.exists():
         shutil.rmtree(str(dept_dir))
+
+    return True
+
+
+# ─── Otdels (Organizational units with chat channels) ─────────────
+# NOTE: Otdels are SEPARATE from Departments (agent groupings).
+# Departments = categories in Agents tab (departments.yaml, departmentsid)
+# Otdels = org units with chat channels (otdels.yaml, otdelid)
+
+def _get_otdels_dir() -> Path:
+    """Get otdels directory (~/.synpin/otdels/)."""
+    prod = Path.home() / ".synpin" / "otdels"
+    dev = Path(__file__).resolve().parent.parent.parent / "otdels"
+    return prod if prod.exists() else dev
+
+
+def load_otdels() -> list[dict[str, Any]]:
+    """Load otdels from config/otdels.yaml."""
+    config_path = _get_config_dir() / "otdels.yaml"
+    data = _load_yaml(config_path)
+    return data.get("otdels", [])
+
+
+def save_otdels(otdels: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Save otdels list to config/otdels.yaml."""
+    config_path = _get_config_dir() / "otdels.yaml"
+    for otdel in otdels:
+        if not otdel.get("otdelid"):
+            otdel["otdelid"] = _generate_long_id()
+    _save_yaml(config_path, {"otdels": otdels})
+    return otdels
+
+
+def _count_agents_in_otdel(otdel_id: str) -> int:
+    """Count how many agents belong to an otdel."""
+    agents_data = _load_yaml(_get_config_dir() / "agents.yaml")
+    agents_cfg = agents_data.get("agents", {})
+    count = 0
+    for slug, cfg in agents_cfg.items():
+        agent_yaml_path = _get_agents_dir() / slug / "agent.yaml"
+        agent_data = _load_yaml(agent_yaml_path)
+        otdel = agent_data.get("otdel", cfg.get("otdel", ""))
+        if otdel == otdel_id:
+            count += 1
+    return count
+
+
+def get_otdels_with_agents() -> list[dict[str, Any]]:
+    """Load otdels with agent counts resolved."""
+    otdels = load_otdels()
+    for otdel in otdels:
+        otdel_id = otdel.get("otdelid", "")
+        otdel["agent_count"] = _count_agents_in_otdel(otdel_id)
+    return otdels
+
+
+def get_otdel(otdel_id: str) -> dict[str, Any] | None:
+    """Get a single otdel by ID."""
+    otdels = load_otdels()
+    for otdel in otdels:
+        if otdel.get("otdelid") == otdel_id:
+            otdel["agent_count"] = _count_agents_in_otdel(otdel_id)
+            return otdel
+    return None
+
+
+def create_otdel(name: str, description: str = "", color: str = "#f97316",
+                 mentor_role: str = "", escalation: str = "") -> dict[str, Any]:
+    """Create a new otdel: generates ID, creates directory + otdel.yaml, saves to config."""
+    otdel_id = _generate_long_id()
+    otdels_dir = _get_otdels_dir()
+    otdel_dir = otdels_dir / otdel_id
+    otdel_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create otdel.yaml inside the directory
+    otdel_data = {
+        "otdelid": otdel_id,
+        "name": name,
+        "description": description,
+        "color": color,
+        "mentor_role": mentor_role,
+        "escalation": escalation,
+    }
+    _save_yaml(otdel_dir / "otdel.yaml", otdel_data)
+
+    # Create subdirectories for future use
+    (otdel_dir / "agents").mkdir(exist_ok=True)
+    (otdel_dir / "chat").mkdir(exist_ok=True)
+
+    # Add to otdels.yaml config
+    config_path = _get_config_dir() / "otdels.yaml"
+    data = _load_yaml(config_path)
+    otdels = data.get("otdels", [])
+    otdels.append(otdel_data)
+    data["otdels"] = otdels
+    _save_yaml(config_path, data)
+
+    otdel_data["agent_count"] = 0
+    return otdel_data
+
+
+def update_otdel(otdel_id: str, updates: dict[str, Any]) -> dict[str, Any] | None:
+    """Update an otdel's fields. Returns updated otdel or None if not found."""
+    config_path = _get_config_dir() / "otdels.yaml"
+    data = _load_yaml(config_path)
+    otdels = data.get("otdels", [])
+
+    found = False
+    for otdel in otdels:
+        if otdel.get("otdelid") == otdel_id:
+            otdel.update({k: v for k, v in updates.items() if k != "otdelid"})
+            found = True
+            break
+
+    if not found:
+        return None
+
+    data["otdels"] = otdels
+    _save_yaml(config_path, data)
+
+    # Also update otdel.yaml inside directory
+    otdels_dir = _get_otdels_dir()
+    otdel_dir = otdels_dir / otdel_id
+    if otdel_dir.exists():
+        _save_yaml(otdel_dir / "otdel.yaml",
+                   next(o for o in otdels if o["otdelid"] == otdel_id))
+
+    return get_otdel(otdel_id)
+
+
+def delete_otdel(otdel_id: str) -> bool:
+    """Delete an otdel: remove from config + delete directory recursively."""
+    import shutil
+
+    config_path = _get_config_dir() / "otdels.yaml"
+    data = _load_yaml(config_path)
+    otdels = data.get("otdels", [])
+
+    new_otdels = [o for o in otdels if o.get("otdelid") != otdel_id]
+    if len(new_otdels) == len(otdels):
+        return False  # Not found
+
+    data["otdels"] = new_otdels
+    _save_yaml(config_path, data)
+
+    # Remove otdel directory (otdel.yaml, agents subdir, etc.)
+    otdels_dir = _get_otdels_dir()
+    otdel_dir = otdels_dir / otdel_id
+    if otdel_dir.exists():
+        shutil.rmtree(str(otdel_dir))
 
     return True
 

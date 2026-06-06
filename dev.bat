@@ -7,6 +7,7 @@ if /i "%~1"=="--stop" goto :stop
 
 :run
 title SynPin Dev
+set SYNPIN_DEV=1
 echo.
 echo   Starting SynPin Development...
 echo.

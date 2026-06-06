@@ -12,7 +12,7 @@ import { CSS } from '@dnd-kit/utilities'
 
 // ─── Types ───────────────────────────────────────────────────────
 
-export type WidgetType = 'departments' | 'skills' | 'channels'
+export type WidgetType = 'departments'
 
 export interface WidgetLayout {
   left: WidgetType[]
@@ -30,8 +30,6 @@ export interface Department {
 
 export const WIDGET_META: Record<WidgetType, { label: string; icon: string }> = {
   departments: { label: 'Отделы', icon: '🏢' },
-  skills: { label: 'Скиллы', icon: '🧠' },
-  channels: { label: 'Каналы', icon: '📡' },
 }
 
 // ─── Layout persistence ──────────────────────────────────────────
@@ -46,9 +44,13 @@ export function loadWidgetLayout(): WidgetLayout {
       const parsed = JSON.parse(raw)
       // Migrate old format
       if (parsed.widgets && Array.isArray(parsed.widgets)) {
-        return { left: parsed.widgets, right: [] }
+        return { left: parsed.widgets.filter((w: string) => ['departments'].includes(w)), right: [] }
       }
-      return parsed
+      // Filter out removed widget types
+      return {
+        left: (parsed.left || []).filter((w: string) => ['departments'].includes(w)),
+        right: (parsed.right || []).filter((w: string) => ['departments'].includes(w)),
+      }
     }
   } catch {}
   return EMPTY_LAYOUT
@@ -60,14 +62,14 @@ export function saveWidgetLayout(layout: WidgetLayout) {
 
 // ─── Widget content renderers ────────────────────────────────────
 
-function DepartmentsWidgetContent({ departments }: { departments: Department[] }) {
+function DepartmentsWidgetContent({ departments, onDepartmentClick }: { departments: Department[]; onDepartmentClick?: (id: string) => void }) {
   if (departments.length === 0) {
     return <div className="widget-empty">Нет отделов</div>
   }
   return (
     <div className="widget-departments-list">
       {departments.map(dept => (
-        <button key={dept.id} className="sidebar-department-item">
+        <button key={dept.id} className="sidebar-department-item" onClick={() => onDepartmentClick?.(dept.id)}>
           <span className="department-color-dot" style={{ background: dept.color }} />
           <span className="sidebar-department-name">{dept.name}</span>
           <span className="sidebar-department-count">{dept.agent_count}</span>
@@ -83,9 +85,10 @@ interface SortableWidgetProps {
   id: WidgetType
   departments: Department[]
   onRemove: (id: WidgetType) => void
+  onDepartmentClick?: (id: string) => void
 }
 
-function SortableWidget({ id, departments, onRemove }: SortableWidgetProps) {
+function SortableWidget({ id, departments, onRemove, onDepartmentClick }: SortableWidgetProps) {
   const {
     attributes,
     listeners,
@@ -116,7 +119,7 @@ function SortableWidget({ id, departments, onRemove }: SortableWidgetProps) {
         </button>
       </div>
       <div className="widget-card-body">
-        {id === 'departments' && <DepartmentsWidgetContent departments={departments} />}
+        {id === 'departments' && <DepartmentsWidgetContent departments={departments} onDepartmentClick={onDepartmentClick} />}
       </div>
     </div>
   )
@@ -130,9 +133,10 @@ interface WidgetDropZoneProps {
   departments: Department[]
   onRemove: (side: 'left' | 'right', id: WidgetType) => void
   isDragging: boolean
+  onDepartmentClick?: (id: string) => void
 }
 
-export function WidgetDropZone({ side, widgets, departments, onRemove, isDragging }: WidgetDropZoneProps) {
+export function WidgetDropZone({ side, widgets, departments, onRemove, isDragging, onDepartmentClick }: WidgetDropZoneProps) {
   const { isOver, setNodeRef } = useDroppable({ id: `drop-zone-${side}` })
 
   // Show zone when dragging OR when has widgets
@@ -156,6 +160,7 @@ export function WidgetDropZone({ side, widgets, departments, onRemove, isDraggin
               id={widgetId}
               departments={departments}
               onRemove={(id) => onRemove(side, id)}
+              onDepartmentClick={onDepartmentClick}
             />
           ))}
         </div>
@@ -194,7 +199,7 @@ export function useWidgetLayout() {
 
     // New tab from settings — strip "tab-" prefix
     const widgetType = widgetId.startsWith('tab-') ? widgetId.replace('tab-', '') : widgetId
-    if (!['departments', 'skills', 'channels'].includes(widgetType)) return
+    if (!['departments'].includes(widgetType)) return
 
     const overId = String(over.id)
 

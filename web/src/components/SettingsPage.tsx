@@ -6,7 +6,7 @@ import { useDraggable } from '@dnd-kit/core'
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:2088'
 
 // Tabs that can be dragged to widget zones
-const DRAGGABLE_TABS = new Set(['departments', 'skills', 'channels'])
+const DRAGGABLE_TABS = new Set(['departments'])
 
 function DraggableTab({ tab, isActive, onClick }: { tab: { id: string; label: string }; isActive: boolean; onClick: () => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -978,16 +978,15 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const handleAddDept = async () => {
     if (!newDept.name.trim()) return
-    const departmentsid = newDept.name.trim().toLowerCase().replace(/\s+/g, '-')
-    const updated = [...departments, { departmentsid, ...newDept }]
-    const res = await fetch(`${API_BASE}/api/departments`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ departments: updated }),
-    })
-    if (res.ok) {
-      const data = await res.json()
-      setDepartments(data.departments)
-    }
+    try {
+      const res = await fetch(`${API_BASE}/api/departments`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newDept.name.trim(), description: newDept.description, color: newDept.color }),
+      })
+      if (res.ok) {
+        fetchDepartments()
+      }
+    } catch (e) { console.error('[departments] add error:', e) }
     setNewDept({ name: '', description: '', color: '#3b82f6' })
   }
 
@@ -1018,29 +1017,26 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
   }
 
   const handleDeptColorChange = async (departmentsid: string, newColor: string) => {
-    const updated = departments.map(d => d.departmentsid === departmentsid ? { ...d, color: newColor } : d)
     try {
-      const res = await fetch(`${API_BASE}/api/departments`, {
+      const res = await fetch(`${API_BASE}/api/departments/${departmentsid}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ departments: updated }),
+        body: JSON.stringify({ color: newColor }),
       })
       if (res.ok) {
-        const data = await res.json()
-        setDepartments(data.departments)
+        fetchDepartments()
       }
     } catch (e) { console.error('[departments] color change error:', e) }
   }
 
   const handleRemoveDept = async (departmentsid: string) => {
-    const updated = departments.filter(d => d.departmentsid !== departmentsid)
-    const res = await fetch(`${API_BASE}/api/departments`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ departments: updated }),
-    })
-    if (res.ok) {
-      const data = await res.json()
-      setDepartments(data.departments)
-    }
+    try {
+      const res = await fetch(`${API_BASE}/api/departments/${departmentsid}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        fetchDepartments()
+      }
+    } catch (e) { console.error('[departments] remove error:', e) }
   }
 
   const handleAgentRoleChange = async (agent: AgentData, newRole: string) => {
@@ -2316,10 +2312,10 @@ function ChannelsSection({ onAddChannel }: { onAddChannel: () => void }) {
   )
 }
 
-// ─── Departments (Отделы) ──────────────────────────────────────
+// ─── Otdels (Отделы) ──────────────────────────────────────────
 
-interface Department {
-  departmentsid: string
+interface Otdel {
+  otdelid: string
   name: string
   description: string
   color: string
@@ -2329,39 +2325,39 @@ interface Department {
 }
 
 function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChange?: () => void }) {
-  const [departments, setDepartments] = useState<Department[]>([])
+  const [otdels, setOtdels] = useState<Otdel[]>([])
   const [showCreate, setShowCreate] = useState(false)
-  const [editing, setEditing] = useState<Department | null>(null)
+  const [editing, setEditing] = useState<Otdel | null>(null)
   const [roles, setRoles] = useState<{ rolesid: string; name: string }[]>([])
   const [form, setForm] = useState({ name: '', description: '', color: '#f97316', mentor_role: '', escalation: '' })
   const [saving, setSaving] = useState(false)
 
-  const loadDepartments = async () => {
+  const loadOtdels = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/departments`)
+      const res = await fetch(`${API_BASE}/api/otdels`)
       const data = await res.json()
-      setDepartments(data.departments || [])
+      setOtdels(data.otdels || [])
     } catch {}
   }
 
   useEffect(() => {
-    loadDepartments()
+    loadOtdels()
     fetch(`${API_BASE}/api/roles`).then(r => r.json()).then(d => setRoles(d.roles || [])).catch(() => {})
   }, [])
 
   const resetForm = () => setForm({ name: '', description: '', color: '#f97316', mentor_role: '', escalation: '' })
 
   const openCreate = () => { resetForm(); setShowCreate(true) }
-  const openEdit = (dept: Department) => {
-    setForm({ name: dept.name, description: dept.description, color: dept.color || '#f97316', mentor_role: dept.mentor_role || '', escalation: dept.escalation || '' })
-    setEditing(dept)
+  const openEdit = (otdel: Otdel) => {
+    setForm({ name: otdel.name, description: otdel.description, color: otdel.color || '#f97316', mentor_role: otdel.mentor_role || '', escalation: otdel.escalation || '' })
+    setEditing(otdel)
   }
 
   const handleCreate = async () => {
     if (!form.name.trim()) return
     setSaving(true)
     try {
-      const res = await fetch(`${API_BASE}/api/departments`, {
+      const res = await fetch(`${API_BASE}/api/otdels`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2373,7 +2369,7 @@ function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChange?: () 
         }),
       })
       if (res.ok) {
-        await loadDepartments()
+        await loadOtdels()
         setShowCreate(false)
         resetForm()
         onDepartmentsChange?.()
@@ -2385,7 +2381,7 @@ function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChange?: () 
     if (!editing || !form.name.trim()) return
     setSaving(true)
     try {
-      const res = await fetch(`${API_BASE}/api/departments/${editing.departmentsid}`, {
+      const res = await fetch(`${API_BASE}/api/otdels/${editing.otdelid}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2397,7 +2393,7 @@ function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChange?: () 
         }),
       })
       if (res.ok) {
-        await loadDepartments()
+        await loadOtdels()
         setEditing(null)
         resetForm()
         onDepartmentsChange?.()
@@ -2407,9 +2403,9 @@ function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChange?: () 
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`${API_BASE}/api/departments/${id}`, { method: 'DELETE' })
+      const res = await fetch(`${API_BASE}/api/otdels/${id}`, { method: 'DELETE' })
       if (res.ok) {
-        await loadDepartments()
+        await loadOtdels()
         onDepartmentsChange?.()
       }
     } catch {}
@@ -2470,33 +2466,33 @@ function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChange?: () 
   return (
     <div className="settings-sections">
       <div className="section-header-row">
-        <span className="section-count">{departments.length} отделов</span>
+        <span className="section-count">{otdels.length} отделов</span>
         <button className="settings-btn-primary" onClick={openCreate}>+ Создать отдел</button>
       </div>
 
-      {departments.length === 0 && (
+      {otdels.length === 0 && (
         <div className="settings-empty-state">
           <p>Отделы не созданы</p>
           <p className="settings-empty-hint">Создайте первый отдел для организации командной работы агентов</p>
         </div>
       )}
 
-      {departments.map(dept => (
-        <div key={dept.departmentsid} className="settings-card department-card">
+      {otdels.map(otdel => (
+        <div key={otdel.otdelid} className="settings-card department-card">
           <div className="department-header">
             <div className="department-identity">
-              <span className="department-color-dot" style={{ background: dept.color }} />
+              <span className="department-color-dot" style={{ background: otdel.color }} />
               <div>
-                <span className="department-name">{dept.name}</span>
-                <span className="department-meta">{dept.mentor_role ? `Ментор: ${dept.mentor_role}` : 'Без ментора'} · {dept.agent_count} агентов</span>
+                <span className="department-name">{otdel.name}</span>
+                <span className="department-meta">{otdel.mentor_role ? `Ментор: ${otdel.mentor_role}` : 'Без ментора'} · {otdel.agent_count} агентов</span>
               </div>
             </div>
             <div className="department-actions">
-              <button className="settings-btn-secondary" onClick={() => openEdit(dept)}>Настройки</button>
-              <button className="settings-btn-danger" onClick={() => handleDelete(dept.departmentsid)}>Удалить</button>
+              <button className="settings-btn-secondary" onClick={() => openEdit(otdel)}>Настройки</button>
+              <button className="settings-btn-danger" onClick={() => handleDelete(otdel.otdelid)}>Удалить</button>
             </div>
           </div>
-          {dept.description && <p className="department-desc">{dept.description}</p>}
+          {otdel.description && <p className="department-desc">{otdel.description}</p>}
         </div>
       ))}
 

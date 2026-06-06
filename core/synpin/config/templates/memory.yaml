@@ -1,0 +1,6 @@
+# Memory configuration
+context_window:
+  default: 128000
+compaction:
+  enabled: true
+  trigger_percent: 80

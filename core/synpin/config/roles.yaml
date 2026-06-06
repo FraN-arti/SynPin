@@ -1,9 +1,0 @@
-roles:
-- rolesid: управляющий
-  name: Управляющий
-  description: управляющий отделом
-  color: '#f59e0b'
-- rolesid: совет-директоров
-  name: 'Совет Директоров '
-  description: это почти верхушка айзберга
-  color: '#b60af5'

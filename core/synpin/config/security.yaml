@@ -1,9 +1,0 @@
-# Security settings — allowed directories for file operations
-# All file tools (read, write, search, terminal cwd) are restricted to these directories
-
-security:
-  allowed_directories:
-    - "D:\\synpin"
-    # Add more directories as needed, e.g.:
-    # - "C:\\Projects"
-    # - "C:\\Games\\l2client"

@@ -1,0 +1,3 @@
+# Roles configuration
+# Roles define what agents do (mentor, coder, etc.)
+roles: []

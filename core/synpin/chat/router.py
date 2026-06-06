@@ -806,11 +806,11 @@ async def stream_response(
     tool_count = 0
 
     # ── Phase 1: Tool loop (native function calling) ──
+    import logging
+    _log = logging.getLogger("synpin.chat")
+    _tool_names_sent = [t.get("function", {}).get("name", "?") for t in (native_tools or [])]
+    _log.info("CHAT tools=%s model=%s provider=%s", _tool_names_sent, model, provider_name if provider else "NONE")
     if native_tools:
-        import logging
-        _log = logging.getLogger("synpin.chat")
-        _log.info("Tool loop: %d tools available: %s", len(native_tools),
-                  [t.get("function", {}).get("name", "?") for t in native_tools])
         for iteration in range(MAX_TOOL_ITERATIONS):
             # Call LLM non-streaming with tools
             full_text = ""

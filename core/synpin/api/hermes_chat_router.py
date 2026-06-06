@@ -244,13 +244,25 @@ async def hermes_chat_stream(req: HermesChatRequest):
 
     async def wrapped_stream():
         """Stream response and save history after completion."""
+        full_response = ""
         async for chunk in stream_hermes_response(messages, req.temperature, req.max_tokens):
+            # Capture assistant response for history
+            if '"type": "chunk"' in chunk:
+                try:
+                    payload = json.loads(chunk.split("data: ", 1)[1].split("
+")[0])
+                    if payload.get("type") == "chunk":
+                        full_response += payload.get("content", "")
+                except Exception:
+                    pass
             yield chunk
 
-        # Save history after streaming completes
+        # Save history after streaming completes (user + assistant)
         if agent_slug:
             updated_history = list(history)
             updated_history.append({"role": "user", "content": req.message})
+            if full_response:
+                updated_history.append({"role": "assistant", "content": full_response})
             _save_chat_history(agent_slug, channel_id, updated_history)
 
     return StreamingResponse(

@@ -368,8 +368,12 @@ function App() {
             agent_name: m.agent_name,
           }))
 
-          // Add placeholder if background task is ongoing
-          if (hasPendingTask) {
+          // Check if restored messages already end with empty assistant (from SSE)
+          const lastRestored = restored[restored.length - 1]
+          const alreadyHasPlaceholder = lastRestored?.role === 'assistant' && !lastRestored.content
+
+          // Add placeholder if background task is ongoing AND no placeholder exists
+          if (hasPendingTask && !alreadyHasPlaceholder) {
             restored.push({
               id: `placeholder-${Date.now()}`,
               role: 'assistant',
@@ -469,7 +473,26 @@ function App() {
       timestamp: new Date(),
     }
 
-    setMessages(prev => [...prev, userMsg])
+    setMessages(prev => {
+      const newMsgs = [...prev, userMsg]
+      // Check if there's already an empty assistant placeholder at the end
+      const lastMsg = newMsgs[newMsgs.length - 1]
+      const hasEmptyPlaceholder = lastMsg?.role === 'assistant' && !lastMsg.content
+      
+      if (hasEmptyPlaceholder) {
+        // Reuse existing placeholder - don't create duplicate
+        return newMsgs
+      }
+      
+      // Create new assistant placeholder
+      return [...newMsgs, {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        tools: [],
+      }]
+    })
     const userInput = input
     setInput('')
 

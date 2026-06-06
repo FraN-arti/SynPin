@@ -6,6 +6,7 @@ import json
 import asyncio
 import re
 import logging
+import uuid
 from datetime import datetime
 from pathlib import Path
 from fastapi import APIRouter, HTTPException
@@ -14,6 +15,7 @@ from pydantic import BaseModel
 
 from .providers import ProviderRegistry
 from .providers.base import ChatMessage
+from .task_manager import task_manager
 
 logger = logging.getLogger(__name__)
 
@@ -1058,13 +1060,24 @@ async def chat_stream(req: ChatRequest):
     if req.agent_slug and req.channel_id:
         _update_session_state(req.agent_slug, req.channel_id, req.message, message_count)
 
-    # Wrap generator to capture response text and save history
+    # ── Background execution: decoupled from HTTP response ──
+    # 1. Save user message IMMEDIATELY (before LLM starts)
     agent_slug = req.agent_slug
     channel_id = req.channel_id
     history_before = list(req.history)
     user_message = req.message
 
-    async def _stream_with_save():
+    if agent_slug and channel_id:
+        new_messages = history_before + [
+            {"role": "user", "content": user_message},
+        ]
+        _save_chat_history(agent_slug, channel_id, new_messages)
+
+    # 2. Create background task for LLM execution
+    task_id = f"{agent_slug or 'chat'}_{channel_id or 'web'}_{uuid.uuid4().hex[:8]}"
+
+    async def _background_execution():
+        """Run LLM in background — survives client disconnect."""
         full_response = ""
         async for chunk in stream_response(
             provider_name=provider_name,
@@ -1077,6 +1090,7 @@ async def chat_stream(req: ChatRequest):
             agent_slug=req.agent_slug,
             tool_names=req.tools or [],
         ):
+            await chat_task.queue.put(chunk)
             # Capture chunk content for history
             if '"type": "chunk"' in chunk:
                 try:
@@ -1085,9 +1099,8 @@ async def chat_stream(req: ChatRequest):
                         full_response += payload.get("content", "")
                 except Exception:
                     pass
-            yield chunk
 
-        # Save full history after streaming completes
+        # Save assistant response after streaming completes
         if agent_slug and channel_id and full_response:
             new_messages = history_before + [
                 {"role": "user", "content": user_message},
@@ -1095,8 +1108,25 @@ async def chat_stream(req: ChatRequest):
             ]
             _save_chat_history(agent_slug, channel_id, new_messages)
 
+        # Signal completion
+        await chat_task.queue.put(None)
+
+    chat_task = task_manager.create(task_id)
+    chat_task.task = asyncio.create_task(_background_execution())
+
+    # 3. SSE generator reads from queue (real-time streaming)
+    async def _sse_from_queue():
+        """Read chunks from background task queue."""
+        while True:
+            chunk = await chat_task.queue.get()
+            if chunk is None:
+                break
+            yield chunk
+        # Cleanup
+        task_manager.cleanup(task_id)
+
     return StreamingResponse(
-        _stream_with_save(),
+        _sse_from_queue(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -1207,3 +1237,20 @@ async def clear_chat_history(agent_slug: str, channel_id: str = "web"):
     """Clear persisted chat history for an agent+channel."""
     _clear_chat_history(agent_slug, channel_id)
     return {"success": True}
+
+
+@router.get("/tasks")
+async def get_active_tasks():
+    """Get status of active background tasks."""
+    from .task_manager import task_manager
+    return {
+        "active": task_manager.active_count(),
+        "tasks": [
+            {
+                "id": t.task_id,
+                "done": t.done,
+                "error": t.error,
+            }
+            for t in task_manager._tasks.values()
+        ],
+    }

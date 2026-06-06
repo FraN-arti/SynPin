@@ -2,15 +2,25 @@
 
 Hermes maintains its own context, memory, and session management.
 SynPin only needs to persist conversation history for agent-switch continuity.
+
+Architecture: background task execution decoupled from HTTP response.
+- User message saved immediately to disk
+- LLM execution runs in asyncio.Task (survives client disconnect)
+- SSE streaming reads from asyncio.Queue (real-time)
+- History saved by background task (independent of client)
 """
 import httpx
 import json
 import os
 import logging
+import uuid
+import asyncio
 from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+
+from ..chat.task_manager import task_manager
 
 logger = logging.getLogger(__name__)
 
@@ -242,31 +252,56 @@ async def hermes_chat_stream(req: HermesChatRequest):
     # Current message
     messages.append({"role": "user", "content": req.message})
 
-    async def wrapped_stream():
-        """Stream response and save history after completion."""
+    # ── Background execution: decoupled from HTTP response ──
+    # 1. Save user message IMMEDIATELY
+    if agent_slug:
+        updated_history = list(history)
+        updated_history.append({"role": "user", "content": req.message})
+        _save_chat_history(agent_slug, channel_id, updated_history)
+
+    # 2. Create background task for Hermes LLM execution
+    task_id = f"hermes_{channel_id}_{uuid.uuid4().hex[:8]}"
+
+    async def _background_execution():
+        """Run Hermes LLM in background — survives client disconnect."""
         full_response = ""
         async for chunk in stream_hermes_response(messages, req.temperature, req.max_tokens):
+            await hermes_task.queue.put(chunk)
             # Capture assistant response for history
             if '"type": "chunk"' in chunk:
                 try:
-                    payload = json.loads(chunk.split("data: ", 1)[1].split("
-")[0])
+                    payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
                     if payload.get("type") == "chunk":
                         full_response += payload.get("content", "")
                 except Exception:
                     pass
-            yield chunk
 
-        # Save history after streaming completes (user + assistant)
-        if agent_slug:
+        # Save assistant response after streaming completes
+        if agent_slug and full_response:
             updated_history = list(history)
             updated_history.append({"role": "user", "content": req.message})
-            if full_response:
-                updated_history.append({"role": "assistant", "content": full_response})
+            updated_history.append({"role": "assistant", "content": full_response})
             _save_chat_history(agent_slug, channel_id, updated_history)
 
+        # Signal completion
+        await hermes_task.queue.put(None)
+
+    hermes_task = task_manager.create(task_id)
+    hermes_task.task = asyncio.create_task(_background_execution())
+
+    # 3. SSE generator reads from queue (real-time streaming)
+    async def _sse_from_queue():
+        """Read chunks from background task queue."""
+        while True:
+            chunk = await hermes_task.queue.get()
+            if chunk is None:
+                break
+            yield chunk
+        # Cleanup
+        task_manager.cleanup(task_id)
+
     return StreamingResponse(
-        wrapped_stream(),
+        _sse_from_queue(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

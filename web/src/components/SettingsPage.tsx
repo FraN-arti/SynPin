@@ -546,8 +546,8 @@ function GeneralSection() {
       <div className="settings-divider" />
 
       {/* ─── 🖥 Сервер ─── */}
-      <section className="settings-card">
-        <h2 className="settings-card-title">🖥 Сервер</h2>
+      <section className="settings-card settings-card-disabled">
+        <h2 className="settings-card-title">🖥 Сервер <span className="settings-card-badge">требует перезапуск</span></h2>
         <div className="settings-row-2">
           <div className="settings-field">
             <label>Хост</label>
@@ -685,8 +685,8 @@ function GeneralSection() {
         </section>
 
         {/* ─── 🤖 Настройка моделей ─── */}
-        <section className="settings-card">
-          <h2 className="settings-card-title">Настройка моделей</h2>
+        <section className="settings-card settings-card-disabled">
+          <h2 className="settings-card-title">Настройка моделей <span className="settings-card-badge">скоро</span></h2>
           <p className="settings-card-desc">Модели для специализированных задач</p>
           <div className="settings-field">
             <label>Визион (анализ изображений)</label>
@@ -749,8 +749,8 @@ function GeneralSection() {
       <div className="settings-divider" />
 
       {/* ─── 📡 Лента активности ─── */}
-      <section className="settings-card">
-        <h2 className="settings-card-title">📡 Лента активности</h2>
+      <section className="settings-card settings-card-disabled">
+        <h2 className="settings-card-title">📡 Лента активности <span className="settings-card-badge">скоро</span></h2>
         <div className="settings-row-2">
           <div className="settings-field">
             <label>Макс. записей</label>

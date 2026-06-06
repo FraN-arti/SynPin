@@ -17,10 +17,11 @@
 
 | Документ | Описание |
 |---|---|
-| [**Агенты**](agents.md) | Личность, скиллы, роли, контекст загрузки |
-| [Память и сессии](memory-sessions.md) | MEMORY.md, типы сессий, авто-очистка |
-| [Инструменты](tools.md) | Файлы, команды, web, безопасность |
+| [**Агенты**](agents.md) | Личность, модель combos (provider/model), роли, hot-reload |
+| [Память и сессии](memory-sessions.md) | MEMORY.md, типы сессий, авто-очистка, компакция |
+| [Инструменты](tools.md) | 8 инструментов, security sandbox, web_extract (планируется) |
 | [**Интеграции**](integrations.md) | Hermes ACP, внешние агенты |
+| [**Каналы и иерархия**](channels-hierarchy.md) | Department-based коммуникация, @mentor, visibility rules |
 
 ---
 
@@ -28,9 +29,9 @@
 
 | Документ | Описание |
 |---|---|
-| [Архитектура](architecture.md) | Архитектура системы |
+| [Архитектура](architecture.md) | Архитектура системы (background tasks, task manager, polling recovery) |
 | [Философия](philosophy.md) | Философия проекта |
-| [Roadmap](roadmap.md) | Дорожная карта |
+| [Roadmap](roadmap.md) | Дорожная карта (Фаза 1 ~90% готово) |
 
 ---
 
@@ -42,12 +43,12 @@ wiki/
 ├── index.md                # Навигация
 ├── quickstart.md           # Быстрый старт
 ├── configuration.md        # Конфигурация системы
-├── agents.md               # Агенты: личность, скиллы, роли
-├── tools.md                # Инструменты агентов
+├── agents.md               # Агенты: личность, model combos, роли
+├── tools.md                # Инструменты агентов (8 штук + security sandbox)
 ├── integrations.md         # Hermes, внешние агенты
-├── memory-sessions.md      # Память и сессии
+├── memory-sessions.md      # Память и сессии (компакция, авто-сброс)
 ├── memory-system.md        # Система памяти
-├── channels-hierarchy.md   # Каналы (мессенджеры)
+├── channels-hierarchy.md   # Каналы и коммуникация (мессенджеры)
 ├── dashboard.md            # Web UI (чат + настройки)
 ├── architecture.md         # Архитектура системы
 ├── philosophy.md           # Философия проекта
@@ -70,13 +71,13 @@ wiki/
 ```
 Configuration
     ↓
-Agents (личность + скиллы + роли)
+Agents (личность + model combos + роли)
     ↓
-Channels (где работают агенты)
+Channels (где работают агенты) ← channels-hierarchy.md
     ↓
-Tools (что делают агенты)
+Tools (что делают агенты, security sandbox)
     ↓
-Memory (что запоминают)
+Memory (что запоминают, компакция)
 ```
 
 Каждый документ ссылается на связанные. Начни с Configuration → Agents → Tools.

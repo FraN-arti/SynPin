@@ -7,28 +7,52 @@
 │                  Web UI (React 19)                  │
 │  Chat · Settings · Agent Selection                  │
 └───────────────────────┬─────────────────────────────┘
-                        │ HTTP / SSE Stream
+                        │ HTTP / SSE Stream (polling recovery)
                         ▼
 ┌─────────────────────────────────────────────────────┐
 │              REST API (FastAPI)                     │
 │  /api/agents  /api/chat/stream  /api/memory        │
+│  Polling recovery: client reconnects → resume SSE   │
 └───────────────────────┬─────────────────────────────┘
                         │
           ┌─────────────┴─────────────┐
           ▼                           ▼
 ┌───────────────────┐       ┌───────────────────────┐
-│  Chat Router      │       │     Tools Layer       │
-│  (openai.py)      │       │  terminal · file ·    │
-│  SSE streaming    │       │  web · code · memory  │
-│  Tool execution   │       │  (8 инструментов)     │
-└─────────┬─────────┘       └───────────┬───────────┘
+│  Task Manager     │       │     Tools Layer       │
+│  (Queue + async)  │       │  terminal · file ·    │
+│  ChatTask wraps   │       │  web · code · memory  │
+│  asyncio.Task     │       │  (8 инструментов)     │
+│  + asyncio.Queue  │       │                       │
+│  for SSE chunks   │       │  Security Sandbox:    │
+└─────────┬─────────┘       │  security.yaml        │
+          │                 │  allowed_directories   │
+          ▼                 └───────────┬───────────┘
+┌─────────────────────────┐             │
+│    Chat Router          │             │
+│  (openai.py)            │             │
+│  SSE streaming          │             │
+│  Tool execution loop    │             │
+│  Text fallback parser   │             │
+│  (5 patterns: JSON,     │             │
+│   tool_call, XML, etc)  │             │
+└─────────┬───────────────┘             │
           │                             │
           ▼                             │
+┌───────────────────────────────────────┤
+│  Background Task System               │
+│  asyncio.Task (survives disconnect)   │
+│  Queue-based SSE streaming            │
+│  History saved by background task     │
+└─────────┬─────────────────────────────┘
+          │
+          ▼
 ┌─────────────────────────┐             │
 │    Providers Layer      │             │
-│  OpenAI-compatible      │             │
-│  Anthropic Claude       │             │
-│  (YAML registry)        │             │
+│  9router (hermes, sum)  │             │
+│  Mistral (fallback)     │             │
+│  Model combos:          │             │
+│  provider/model format  │             │
+│  (YAML registry + hot)  │             │
 └─────────────┬───────────┘             │
               │                         │
               ▼                         │
@@ -39,6 +63,9 @@
 │  FrozenSnapshot (system prompt stability)           │
 │  AgentState (bookmarks per channel)                 │
 │  Facts (dated entries)                              │
+│  Compaction (token-based, auto)                     │
+│  Session auto-reset (daily/timer/time)              │
+│  Memory + session context injection in prompt       │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -61,43 +88,65 @@ FastAPI сервер — единая точка входа:
 - `GET /api/providers` — список провайдеров
 - `GET /api/health` — health check
 
-### 3. Chat Router (`core/synpin/chat/`)
+### 3. Task Manager (`core/synpin/chat/task_manager.py`)
+Фоновый менеджер задач чата:
+- **ChatTask** — оборачивает asyncio.Task + asyncio.Queue
+- **SSE streaming** — клиент читает из Queue
+- **Survives disconnect** — LLM работает даже после закрытия браузера
+- **Polling recovery** — клиент переподключается и читает из Queue
+- **History persistence** — история сохраняется фоновой задачей
+
+### 4. Chat Router (`core/synpin/chat/`)
 Основной цикл чата:
 - **SSE streaming** через fetch + ReadableStream
 - **Tool execution loop** (до 5 итераций)
+- **Text fallback tool call parser** — 5 паттернов для моделей без native function calling:
+  1. ```` ```tool_call ``` ```` блоки (старый формат)
+  2. RAW JSON с `"name"` и `"params"` (nemotron-style)
+  3. Nested JSON params (гибкий парсинг)
+  4. `<function=name><parameter=path>...` (Llama.cpp / GGUF XML)
+  5. `<arg_key=name>` формат (некоторые GGUF модели)
 - **History persistence** (JSON per agent+channel)
 - **Compaction** (token-based, configurable)
-- **Memory + session context injection**
+- **Memory + session context injection** в system prompt
+- **Session auto-reset** (daily/timer/time + архивация)
 
-### 4. Providers (`core/synpin/chat/providers/`)
-LLM-провайдеры:
-- **OpenAI-compatible** — SSE streaming + native function calling
-- **Anthropic Claude** — SSE streaming
-- **Provider registry** — YAML конфигурация, hot-reload
+### 5. Providers (`core/synpin/chat/providers/`)
+LLM-провайдеры с combo-системой:
+- **Model combos** — формат `provider/model` (например `9router/general-agent`)
+- **9router** — hermes-agent, summarise-agent (локальный прокси)
+- **Mistral** — fallback через Mistral API
+- **Provider registry** — YAML конфигурация, hot-reload через ConfigWatcher
 - **Mistral** — поддержка через `supports_stream_options: false`
 
-### 5. Agents (`core/synpin/agents/`)
+### 6. Agents (`core/synpin/agents/`)
 Управление агентами:
 - **CRUD** — create, read, update, delete
 - **Roles & Departments** — roles.yaml, departments.yaml
 - **Per-agent config** — agent.yaml (личность, настройки)
 - **External agents** — Hermes Agent detection
+- **Model resolution** — `9router/general-agent` → provider=`9router`, model=`general-agent`
 
-### 6. Tools (`core/synpin/tools/`)
-Инструменты агентов:
-- **Terminal** — async shell exec (bash, 30s timeout)
-- **File read/write** — чтение/запись файлов
-- **Search** — ripgrep + Python fallback
-- **Web search** — DuckDuckGo
-- **Code exec** — sandboxed Python
-- **Memory read/write** — управление памятью
+### 7. Tools (`core/synpin/tools/`)
+Инструменты агентов (8 инструментов):
+- **terminal** — async shell exec (bash, 30s timeout)
+- **file_read** — чтение файлов (offset/limit, 1MB cap)
+- **file_write** — запись файлов (атомарная, mkdir)
+- **search_files** — ripgrep + Python fallback
+- **web_search** — DuckDuckGo поиск
+- **code_exec** — sandboxed Python exec
+- **memory_read** — чтение MEMORY/USER/facts
+- **memory_write** — add/remove/replace entries
+- **Security sandbox** — `security.yaml` с configurable `allowed_directories`
 
-### 7. Memory (`core/synpin/memory/`)
+### 8. Memory (`core/synpin/memory/`)
 Система памяти:
 - **MemoryStore** — bounded curated memory (MEMORY.md + USER.md)
 - **MemorySearch** — FTS5 full-text search
 - **FrozenSnapshot** — system prompt stability
 - **AgentState** — bookmarks per channel
+- **Compaction** — token-based, auto-сжатие при превышении context_window
+- **Session auto-reset** — daily/timer/time с архивацией
 - **File Locking** — безопасный конкурентный доступ
 
 ---
@@ -110,11 +159,16 @@ synpin/
 │   ├── synpin/
 │   │   ├── agents/            ← роли агентов
 │   │   ├── memory/            ← FTS5 + Markdown + frozen snapshot
-│   │   ├── tools/             ← инструменты (8 штук)
+│   │   ├── tools/             ← инструменты (8 штук) + security sandbox
 │   │   ├── chat/              ← чат-роутер + провайдеры
-│   │   ├── router/            ← заглушка (планируется)
-│   │   ├── engine/            ← заглушка (планируется)
-│   │   ├── config/            ← менеджер конфигурации
+│   │   │   ├── router.py      ← основной цикл чата
+│   │   │   ├── task_manager.py← фоновый менеджер задач (Queue + asyncio.Task)
+│   │   │   └── providers/     ← LLM провайдеры (OpenAI, Anthropic)
+│   │   ├── router/            ← заглушка (планируется в Фазе 3)
+│   │   ├── engine/            ← заглушка (планируется в Фазе 3)
+│   │   ├── config/            ← менеджер конфигурации + security.yaml
+│   │   │   ├── security.yaml  ← allowed_directories для sandbox
+│   │   │   └── watcher.py     ← ConfigWatcher (hot-reload)
 │   │   ├── api/               ← FastAPI + WebSocket
 │   │   └── __main__.py        ← CLI точка входа
 │   ├── dev_server.py          ← Dev supervisor (hot-reload)
@@ -151,10 +205,14 @@ synpin/
 | Memory (MEMORY.md, USER.md, FTS5) | ✅ Реализовано |
 | Tools (8 инструментов) | ✅ Реализовано |
 | Chat Router (SSE, tool execution) | ✅ Реализовано |
-| Providers (OpenAI, Anthropic, Mistral) | ✅ Реализовано |
+| Text fallback parser (5 паттернов) | ✅ Реализовано |
+| Providers (9router, Mistral) | ✅ Реализовано |
 | External agents (Hermes) | ✅ Реализовано |
-| **Router (делегат/команда)** | ❌ Заглушка |
-| **Engine (ReAct-луп)** | ❌ Заглушка |
+| Task Manager (background tasks, polling recovery) | ✅ Реализовано |
+| Security sandbox (security.yaml) | ✅ Реализовано |
+| Compaction + session auto-reset | ✅ Реализовано |
+| **Router (делегат/команда)** | 🔮 Планируется в Фазе 3 |
+| **Engine (ReAct-луп)** | 🔮 Планируется в Фазе 3 |
 | **MCP** | ❌ Не реализовано |
 | **Dashboard** | ❌ Не реализовано |
 | **Kanban** | ❌ Не реализовано |

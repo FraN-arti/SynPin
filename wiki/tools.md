@@ -1,6 +1,6 @@
 # 🛠 Инструменты агентов
 
-Инструменты — **что агент может делать** с системой. Реализовано 8 из 16 запланированных.
+Инструменты — **что агент может делать** с системой. Реализовано 8 из 17 запланированных.
 
 ---
 
@@ -10,6 +10,7 @@
 core/synpin/tools/
 ├── base.py              # базовые типы (ToolHandler, ToolResult, make_error)
 ├── registry.py          # реестр — загружает tools.yaml, резолвит handlers
+├── security.py          # security sandbox (allowed_directories из security.yaml)
 ├── terminal.py          # async shell exec
 ├── file_read.py         # чтение файлов с номерами строк
 ├── file_write.py        # атомарная запись файлов
@@ -24,7 +25,7 @@ core/synpin/tools/
 
 ---
 
-## Реализованные инструменты (8/16)
+## Реализованные инструменты (8/17)
 
 ### Базовые (все агенты)
 
@@ -98,15 +99,28 @@ tools:
 
 ## Безопасность
 
-### Песочница
+### Песочница (Security Sandbox)
 
-Инструменты работают в **песочнице**:
+Инструменты работают в **песочнице**, настраиваемой через `security.yaml`:
 
-| Защита | Что делает |
-|---|---|
-| **command_timeout** | Команды не зависают навсегда (30s для shell) |
-| **file_read limits** | Не читает файлы больше 1MB |
-| **code_exec sandbox** | Python exec в изолированном контексте |
+| Защита | Что делает | Конфигурация |
+|---|---|---|
+| **allowed_directories** | Файловые операции только в разрешённых папках | `security.yaml → security.allowed_directories` |
+| **command_timeout** | Команды не зависают навсегда (30s для shell) | `tools.yaml → tools.terminal.timeout` |
+| **file_read limits** | Не читает файлы больше 1MB | `tools.yaml → tools.file_read.max_size` |
+| **code_exec sandbox** | Python exec в изолированном контексте | `tools.yaml → tools.code_exec.timeout` |
+
+### security.yaml
+
+```yaml
+# core/synpin/config/security.yaml
+# Все файловые инструменты (read, write, search, terminal cwd) ограничены этими директориями
+security:
+  allowed_directories:
+    - "D:\\synpin"
+    # - "C:\\Projects"
+    # - "C:\\Games\\l2client"
+```
 
 ### Реализованные ограничения
 
@@ -143,7 +157,7 @@ tools:
    → Выполняет shell-команду
 
 Ограничения:
-- Только директории: ~/.synpin/data/, ~/.synpin/config/
+- Только директории из security.yaml (allowed_directories)
 - Максимум файл: 1MB
 - Запрещено: rm, sudo, curl|bash
 
@@ -154,7 +168,6 @@ tools:
 
 ```
 User: "Найди все файлы где упоминается CORS"
-
 Agent: search_files("CORS", target="content", path="D:\\synpin\\")
 Result: 
   wiki/channels-hierarchy.md:108| Не забыл про CORS middleware
@@ -171,6 +184,7 @@ Agent: Нашёл 2 файла:
 
 | Инструмент | Что делает | Статус |
 |---|---|---|
+| `web_extract` | Извлечение контента с веб-страниц (парсинг HTML) | Фаза 2 |
 | `browser` | Веб-браузер (Puppeteer/Playwright) | Фаза 3 |
 | `vision` | Анализ изображений | Фаза 3 |
 | `message_send` | Отправка сообщений в каналы | Фаза 3 |

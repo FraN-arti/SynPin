@@ -1,6 +1,6 @@
 # 📅 Roadmap
 
-> Актуально: 2026-06-04. Фаза 0-1 (ядро) — 60% готово.
+> Актуально: 2026-06-06. Фаза 0-1 (ядро) — ~90% готово.
 
 ---
 
@@ -54,16 +54,20 @@
 ### Чат ✅
 - [x] SSE стриминг через fetch + ReadableStream
 - [x] Native OpenAI function calling (tool_calls)
+- [x] Text fallback parser (5 паттернов для моделей без native function calling)
 - [x] Tool execution loop (до 5 итераций)
 - [x] Chat history persistence (JSON per agent+channel)
 - [x] Compaction (token-based, configurable)
 - [x] Memory + session context injection
+- [x] Background task system (asyncio.Task + Queue)
+- [x] Polling recovery (после перезагрузки страницы)
 
 ### Провайдеры ✅
 - [x] OpenAI-compatible (SSE streaming + tool_calls)
 - [x] Anthropic Claude (SSE streaming)
-- [x] Provider registry (YAML, hot-reload)
+- [x] Provider registry (YAML, hot-reload через ConfigWatcher)
 - [x] 40+ каталог провайдеров
+- [x] Model combos: `provider/model` формат (9router/hermes-agent и т.д.)
 
 ### Агенты ✅
 - [x] CRUD: create, read, update, delete
@@ -72,13 +76,18 @@
 - [x] External agents (Hermes Agent detection)
 - [x] Tools assignment per agent
 
+### Безопасность ✅
+- [x] Security sandbox: configurable `allowed_directories` через `security.yaml`
+- [x] command_timeout для shell команд
+- [x] file_read limits (1MB cap)
+
 ### Веб-интерфейс ⚠️
 - [x] Chat UI (стриминг, тэги, markdown, emoji)
 - [x] Agent selection (SynPin + external)
 - [x] Memory UI (USER.md просмотр, компакция, сессии)
 - [x] Settings: Providers (каталог, CRUD)
 - [x] Settings: Agents (каталог, CRUD)
-- [ ] **Settings: Channels** — mock данные, нет бэкенда
+- [ ] **Settings: Channels** — планируется
 - [ ] **Settings: General** — UI только, нет сохранения
 - [ ] **Settings: Skills** — placeholder
 - [ ] **Settings: String interpolation bug** — ~15 fetch() с одинарными кавычками
@@ -89,6 +98,10 @@
 
 ### Исправления
 - [x] **Settings bug**: одинарные кавычки в fetch() → backtick interpolation ✅ dd36eed
+- [x] **Duplicate messages fix** — исправлены дублирующиеся сообщения ✅
+- [x] **Background tasks** — asyncio.Task + Queue для фоновых LLM-задач ✅
+- [x] **Polling recovery** — переподключение после перезагрузки страницы ✅
+- [x] **Security sandbox configurable** — allowed_directories через security.yaml ✅
 - [ ] **Settings: Channels** — подключить к бэкенду
 - [ ] **Settings: General** — подключить сохранение
 - [x] **Мёртвый код**: axios, zustand, react-router-dom, react-query → удалён ✅ dd36eed
@@ -103,7 +116,7 @@
 ### Onboarding (первый запуск)
 - [ ] **Стартовое окно**: приветственная страница при первом запуске (нет конфигов)
 - [ ] **Мастер настройки**: пошаговый setup wizard (провайдер, модель, имя пользователя)
-- [ ] **Пропуск**: опция "я уже знаю что делаю" → переход к 기본ным настройкам
+- [ ] **Пропуск**: опция "я уже знаю что делаю" → переход к базовым настройкам
 
 ### Визуальная тема (по аналогии с OpenClaw)
 - [ ] **Тема**: dark/light переключение
@@ -126,6 +139,37 @@
 ---
 
 ## Фаза 3: Мультиагентность
+
+### Командные каналы (Отделы)
+Система department-based коммуникации между агентами.
+
+**Настройки: Каналы связи** — глобальные настройки каналов (Telegram, Discord, Slack):
+- [ ] Каждый тип канала: required_fields (bot_token, webhook, и т.д.)
+- [ ] Modes: polling / webhook
+- [ ] Binding targets: department / agent
+- [ ] Каналы связи: управление подключениями и конфигурацией
+
+**Отделы (Departments)** — кастомные подразделения:
+- [ ] RGB цвета для отделов (визуальное различие)
+- [ ] 18-символьные ID (departmentsid)
+- [ ] Модалка создания отдела: name, description, mentor role, escalation channel
+- [ ] Context injection per department (специфичный контекст для каждого отдела)
+- [ ] Separate chat contexts per department (изолированные беседы)
+
+**Шаблон @mentor** — коммуникация через наставника:
+- [ ] Employees → @mentor: делегирование задач
+- [ ] Mentor → Employee: инструкции и обратная связь
+
+**Правила видимости:**
+- [ ] Head отдела видит все сообщения своего отдела
+- [ ] Employees видят только свои сообщения
+
+**Делегация через Manager:**
+- [ ] Manager создаёт задачи внутри department
+- [ ] Делегирование tasks между агентами отдела
+- [ ] Cross-department delegation (совет отделов)
+
+> 📄 См. также: [channels-hierarchy.md](channels-hierarchy.md) — дизайн-спека Channels (мессенджеры)
 
 ### Router / Delegation
 - [ ] Базовый Router: задача → агент → результат
@@ -202,9 +246,9 @@
 
 ## Технический долг
 
-- [ ] Удалить неиспользуемые зависимости (axios, zustand, react-router-dom, react-query)
-- [ ] Удалить мёртвый код (emoji.ts: convertTextEmojis, sidebar навигация)
-- [ ] Вынести hardcoded `D:\synpin` пути в конфиг
+- [x] ~~Удалить неиспользуемые зависимости (axios, zustand, react-router-dom, react-query)~~ ✅
+- [x] ~~Удалить мёртвый код (emoji.ts: convertTextEmojis, sidebar навигация)~~ ✅
+- [x] ~~Вынести hardcoded `D:\synpin` пути в конфиг~~ ✅ (security.yaml)
 - [ ] Добавить Error Boundaries в React
 - [ ] Исправить logger f-strings → %-форматирование
 - [ ] Очистить wiki от устаревших ссылок

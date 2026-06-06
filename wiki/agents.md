@@ -18,6 +18,7 @@
 │  🎭 Характер     → tone, style, traits          │
 │  🔧 Поведение    → temperature, max_tokens      │
 │  📡 Провайдер    → LLM провайдер и модель       │
+│                      (model combo: provider/m)  │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -60,6 +61,7 @@ name: QA Инженер
 description: ''
 role: управляющий              # slug из roles.yaml
 department: советчик           # slug из departments.yaml
+model: 9router/hermes-agent    # combo формат: provider/model
 
 personality:
   tone: professional
@@ -74,6 +76,51 @@ behavior:
 
 system_prompt: ''
 memory: {}
+```
+
+---
+
+## 📡 Model Combos (provider/model)
+
+Агенты используют **combo-формат** для указания модели:
+
+```yaml
+model: 9router/general-agent   # provider=9router, model=general-agent
+model: mistral/mistral-large-latest
+model: anthropic/claude-3.5-sonnet
+```
+
+**Как это работает:**
+1. В `agent.yaml` указывается `model: provider/model`
+2. Agent Manager парсит: `9router/general-agent` → provider=`9router`, model=`general-agent`
+3. Provider резолвится из `providers.yaml`
+4. Если провайдер не найден — fallback на дефолтный
+
+**9router** — локальный прокси, предоставляющий доступ к моделям:
+- `9router/hermes-agent` — Hermes (по умолчанию)
+- `9router/summarise-agent` — для суммаризации
+
+**Fallback цепочка:**
+- Запрошенный провайдер → Mistral → дефолтный
+
+---
+
+## 🔄 Hot-Reload Config
+
+Конфигурация агентов и провайдеров **автоматически перезагружается** при изменении файлов:
+
+```
+ConfigWatcher (polling 5s)
+    ↓
+providers.yaml изменён → registry.reload()
+agents.yaml изменён → перезагрузка агентов
+tools.yaml изменён → перезагрузка инструментов
+```
+
+**Ручная перезагрузка:**
+```bash
+POST /api/admin/reload
+# → перечитывает providers.yaml
 ```
 
 ---
@@ -227,7 +274,7 @@ POST /api/chat/hermes/stream
 Обязательное поле: **Имя**. Остальное опционально:
 - Роль (выпадающий список)
 - Департамент (выпадающий список)
-- Модель (из подключённых провайдеров)
+- Модель (из подключённых провайдеров, combo формат)
 - Описание
 - System Prompt
 

@@ -84,17 +84,42 @@ export function OtdelSettingsPanel({ otdel, open, onClose, onSaved }: OtdelSetti
     ? agents.filter(a => a.role === fullOtdel.mentor_role)
     : []
 
-  // Agents grouped by department (for "Работники" section), excluding head
+  // Agents grouped by DEPARTMENTS from admin settings (not agent's department field)
+  // This ensures we show the correct department structure
   const agentsByDept = new Map<string, Agent[]>()
+  const validDeptIds = new Set(departments.map(d => d.departmentsid))
+
+  // Initialize all departments (even empty ones)
+  for (const dept of departments) {
+    agentsByDept.set(dept.departmentsid, [])
+  }
+
+  // Place agents under matching departments
+  const unmatched: Agent[] = []
   for (const agent of agents) {
     if (agent.slug === head) continue // Head is not a worker
-    const deptKey = agent.department || 'Без департамента'
-    if (!agentsByDept.has(deptKey)) agentsByDept.set(deptKey, [])
-    agentsByDept.get(deptKey)!.push(agent)
+    if (agent.department && validDeptIds.has(agent.department)) {
+      agentsByDept.get(agent.department)!.push(agent)
+    } else {
+      unmatched.push(agent)
+    }
+  }
+
+  // Agents with no matching department
+  if (unmatched.length > 0) {
+    agentsByDept.set('', unmatched)
+  }
+
+  // Remove empty departments (no agents)
+  for (const [key, list] of agentsByDept) {
+    if (list.length === 0) agentsByDept.delete(key)
   }
 
   // Get department name by id
-  const getDeptName = (id: string) => departments.find(d => d.departmentsid === id)?.name || id
+  const getDeptName = (id: string) => {
+    if (!id) return 'Без департамента'
+    return departments.find(d => d.departmentsid === id)?.name || id
+  }
 
   const toggleWorker = (slug: string) => {
     setWorkers(prev => {

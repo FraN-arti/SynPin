@@ -807,6 +807,10 @@ async def stream_response(
 
     # ── Phase 1: Tool loop (native function calling) ──
     if native_tools:
+        import logging
+        _log = logging.getLogger("synpin.chat")
+        _log.info("Tool loop: %d tools available: %s", len(native_tools),
+                  [t.get("function", {}).get("name", "?") for t in native_tools])
         for iteration in range(MAX_TOOL_ITERATIONS):
             # Call LLM non-streaming with tools
             full_text = ""
@@ -836,6 +840,10 @@ async def stream_response(
             except Exception as e:
                 yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
                 return
+
+            _log.info("LLM response: text=%d chars, tool_calls=%d, finish_reason=%s",
+                      len(full_text), len(model_tool_calls),
+                      "unknown" if not model_tool_calls else "has_calls")
 
             # Determine if tool calls came from native API or text fallback
             is_text_fallback = False

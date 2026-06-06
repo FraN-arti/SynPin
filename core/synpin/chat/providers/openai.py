@@ -112,9 +112,10 @@ class OpenAIProvider(BaseProvider):
                 if content:
                     yield content
 
-                # Tool calls (native)
+                # Tool calls (native) — emit if present, regardless of finish_reason
+                # (Mistral may return "stop" instead of "tool_calls")
                 tool_calls = message.get("tool_calls")
-                if tool_calls and finish_reason == "tool_calls":
+                if tool_calls:
                     yield f"__TOOL_CALLS__:{json.dumps(tool_calls)}"
 
                 # Usage
@@ -186,8 +187,9 @@ class OpenAIProvider(BaseProvider):
                     if chunk.get("usage"):
                         yield f"__USAGE__:{json.dumps(chunk['usage'])}"
 
-            # After stream ends: emit accumulated tool calls
-            if finish_reason == "tool_calls" and accumulated_tool_calls:
+            # After stream ends: emit accumulated tool calls if present
+            # (Mistral may return "stop" instead of "tool_calls" in finish_reason)
+            if accumulated_tool_calls:
                 all_calls = [accumulated_tool_calls[i] for i in sorted(accumulated_tool_calls)]
                 yield f"__TOOL_CALLS__:{json.dumps(all_calls)}"
 

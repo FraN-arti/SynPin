@@ -1,4 +1,4 @@
-primary_agent_slug: hermes-agent
+primary_agent_slug: 8e5tv711
 server:
   host: 0.0.0.0
   port: 2088
@@ -14,7 +14,7 @@ ui:
   theme: dark
   language: ru
   sidebar:
-    default_open: false
+    default_open: true
     show_icons: true
   chat:
     show_metadata: true

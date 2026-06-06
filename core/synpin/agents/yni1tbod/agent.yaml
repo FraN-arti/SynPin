@@ -2,3 +2,10 @@ agentid: yni1tbod
 name: Тестер
 role: сотрудник
 department: поиск
+tools:
+- file_read
+- file_write
+- search_files
+- terminal
+- code_exec
+- web_search

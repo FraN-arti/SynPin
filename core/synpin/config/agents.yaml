@@ -16,7 +16,7 @@ agents:
     name: Архитектор
     role: сотрудник
     department: советчик
-    model: 9router/general-agent
+    model: 9router/hermes-agent
     enabled: true
     is_primary: false
   yni1tbod:

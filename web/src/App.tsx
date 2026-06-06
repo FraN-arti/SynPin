@@ -153,9 +153,11 @@ function App() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const activeAgentRef = useRef<AgentConfig | null>(null)
+  const messagesRef = useRef<Message[]>([])
 
-  // Keep ref in sync with state
+  // Keep refs in sync with state
   activeAgentRef.current = activeAgent
+  messagesRef.current = messages
 
   // Tool display names for badges
   const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -194,52 +196,6 @@ function App() {
         return () => clearTimeout(timer)
       }
     }, [isTyping, messages])
-
-    // ─── Polling: check for background task completion ──────────────────
-    // When SSE is interrupted (browser closed/reloaded), this still gets answers
-    useEffect(() => {
-      if (!activeAgent) return
-
-      // Check if there's an empty assistant placeholder
-      const hasEmptyPlaceholder = messages.some(m => m.role === 'assistant' && !m.content)
-      if (!hasEmptyPlaceholder) return
-
-      const pollInterval = setInterval(async () => {
-        try {
-          const res = await fetch(`${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web`)
-          if (!res.ok) return
-          const data = await res.json()
-          const serverMsgs = data.messages || []
-
-          // Find the latest assistant message from server
-          const lastAssistant = serverMsgs.filter((m: {role: string}) => m.role === 'assistant').pop()
-          if (!lastAssistant) return
-
-          // Check if we already have this content
-          const myLastAssistant = messages.filter(m => m.role === 'assistant').pop()
-          if (!myLastAssistant || myLastAssistant.content !== lastAssistant.content) {
-            // Update the placeholder with server's answer
-            setMessages(prev => {
-              const lastAssistantId = prev.map(m => m.id).reverse().find(id => {
-                const msg = prev.find(m => m.id === id)
-                return msg?.role === 'assistant' && !msg.content
-              })
-              if (lastAssistantId) {
-                return prev.map(m => m.id === lastAssistantId
-                  ? { ...m, content: lastAssistant.content, model: lastAssistant.model, agent_name: lastAssistant.agent_name }
-                  : m
-                )
-              }
-              return prev
-            })
-          }
-        } catch (e) {
-          // Polling failed — silent
-        }
-      }, 3000) // Poll every 3 seconds
-
-      return () => clearInterval(pollInterval)
-    }, [activeAgent, messages])
 
     // Initial load: logo always, sidebar animation if was open
     useEffect(() => {
@@ -396,51 +352,48 @@ function App() {
   }, [activeAgent])
 
   // ─── Polling: check for background task completion ──────────────────
-  // When SSE is interrupted (browser closed/reloaded), this still gets answers
+  // Only runs after page reload when a task was running (history has user without assistant)
   useEffect(() => {
     if (!activeAgent) return
 
-    // Check if there's an empty assistant placeholder
-    const hasEmptyPlaceholder = messages.some(m => m.role === 'assistant' && !m.content)
-    if (!hasEmptyPlaceholder) return
-
     const pollInterval = setInterval(async () => {
+      // Check for empty assistant placeholder using ref (always current)
+      const hasEmptyPlaceholder = messagesRef.current.some(m => m.role === 'assistant' && !m.content)
+      if (!hasEmptyPlaceholder) return
+
       try {
         const res = await fetch(`${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web`)
         if (!res.ok) return
         const data = await res.json()
         const serverMsgs = data.messages || []
 
-        // Find the latest assistant message from server
-        const lastAssistant = serverMsgs.filter((m: {role: string}) => m.role === 'assistant').pop()
-        if (!lastAssistant) return
+        // ONLY fill placeholder when server's LAST message is an assistant response
+        // This means the LLM has completed and we can safely display the answer
+        const lastServerMsg = serverMsgs[serverMsgs.length - 1]
+        if (!lastServerMsg || lastServerMsg.role !== 'assistant') return
 
-        // Check if we already have this content
-        const myLastAssistant = messages.filter(m => m.role === 'assistant').pop()
-        if (!myLastAssistant || myLastAssistant.content !== lastAssistant.content) {
-          // Update the placeholder with server's answer
-          setMessages(prev => {
-            const lastAssistantId = prev.map(m => m.id).reverse().find(id => {
-              const msg = prev.find(m => m.id === id)
-              return msg?.role === 'assistant' && !msg.content
-            })
-            if (lastAssistantId) {
-              setIsTyping(false)
-              return prev.map(m => m.id === lastAssistantId
-                ? { ...m, content: lastAssistant.content, model: lastAssistant.model, agent_name: lastAssistant.agent_name }
-                : m
-              )
-            }
-            return prev
+        // Find the placeholder (empty assistant) and fill it
+        setMessages(prev => {
+          const placeholderId = prev.map(m => m.id).reverse().find(id => {
+            const msg = prev.find(m => m.id === id)
+            return msg?.role === 'assistant' && !msg.content
           })
-        }
+          if (placeholderId) {
+            setIsTyping(false)
+            return prev.map(m => m.id === placeholderId
+              ? { ...m, content: lastServerMsg.content, model: lastServerMsg.model, agent_name: lastServerMsg.agent_name }
+              : m
+            )
+          }
+          return prev
+        })
       } catch (e) {
         // Polling failed — silent
       }
     }, 3000) // Poll every 3 seconds
 
     return () => clearInterval(pollInterval)
-  }, [activeAgent, messages])
+  }, [activeAgent])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -473,26 +426,6 @@ function App() {
       timestamp: new Date(),
     }
 
-    setMessages(prev => {
-      const newMsgs = [...prev, userMsg]
-      // Check if there's already an empty assistant placeholder at the end
-      const lastMsg = newMsgs[newMsgs.length - 1]
-      const hasEmptyPlaceholder = lastMsg?.role === 'assistant' && !lastMsg.content
-      
-      if (hasEmptyPlaceholder) {
-        // Reuse existing placeholder - don't create duplicate
-        return newMsgs
-      }
-      
-      // Create new assistant placeholder
-      return [...newMsgs, {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: '',
-        timestamp: new Date(),
-        tools: [],
-      }]
-    })
     const userInput = input
     setInput('')
 
@@ -502,9 +435,9 @@ function App() {
 
     setIsTyping(true)
 
-    // Create assistant message placeholder with tools array
+    // Create user message + assistant placeholder in one atomic update
     const assistantId = (Date.now() + 1).toString()
-    setMessages(prev => [...prev, {
+    setMessages(prev => [...prev, userMsg, {
       id: assistantId,
       role: 'assistant',
       content: '',
@@ -516,8 +449,8 @@ function App() {
     let toolIndex = 0
 
     try {
-      // Build history: just existing messages (userMsg not included yet — it's in req.message)
-      const history = messages.map(m => ({ role: m.role, content: m.content }))
+      // Build history: existing messages (userMsg not included — it's in req.message)
+      const history = messagesRef.current.map(m => ({ role: m.role, content: m.content }))
 
       // Build merged system prompt from agent config
       let systemPrompt: string | undefined
@@ -684,7 +617,7 @@ function App() {
     } finally {
       setIsTyping(false)
     }
-  }, [input, isTyping, messages, activeAgent])
+  }, [input, isTyping, activeAgent])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {

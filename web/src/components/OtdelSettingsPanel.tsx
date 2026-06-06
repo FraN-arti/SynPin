@@ -84,9 +84,10 @@ export function OtdelSettingsPanel({ otdel, open, onClose, onSaved }: OtdelSetti
     ? agents.filter(a => a.role === fullOtdel.mentor_role)
     : []
 
-  // Agents grouped by department (for "Работники" section)
+  // Agents grouped by department (for "Работники" section), excluding head
   const agentsByDept = new Map<string, Agent[]>()
   for (const agent of agents) {
+    if (agent.slug === head) continue // Head is not a worker
     const deptKey = agent.department || 'Без департамента'
     if (!agentsByDept.has(deptKey)) agentsByDept.set(deptKey, [])
     agentsByDept.get(deptKey)!.push(agent)
@@ -135,12 +136,6 @@ export function OtdelSettingsPanel({ otdel, open, onClose, onSaved }: OtdelSetti
         </div>
 
         <div className="otdel-settings-body">
-          {/* Preview */}
-          <div className="otdel-settings-preview">
-            <span className="otdel-settings-preview-dot" style={{ background: fullOtdel?.color || otdel.color }} />
-            <span className="otdel-settings-preview-name">{fullOtdel?.name || otdel.name}</span>
-          </div>
-
           {/* Глава */}
           <div className="settings-field">
             <label>Глава</label>

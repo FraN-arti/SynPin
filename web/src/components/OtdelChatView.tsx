@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { EmojiPicker } from './EmojiPicker'
 
 interface OtdelData {
   otdelid: string
@@ -59,6 +60,10 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings }: OtdelChatViewPr
     el.style.height = Math.min(el.scrollHeight, 150) + 'px'
   }
 
+  const handleEmojiSelect = (emoji: string) => {
+    setInput(prev => prev + emoji)
+  }
+
   return (
     <div className="otdel-chat-view">
       {/* Header */}
@@ -112,6 +117,7 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings }: OtdelChatViewPr
       {/* Input */}
       <div className="otdel-bottom-input">
         <div className="input-bar">
+          <EmojiPicker onSelect={handleEmojiSelect} />
           <textarea
             className="chat-textarea"
             placeholder="Спроси что-нибудь..."

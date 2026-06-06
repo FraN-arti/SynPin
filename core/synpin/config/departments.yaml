@@ -5,3 +5,9 @@ departments:
   color: '#2b75ee'
   mentor_role: управляющий
   escalation: ''
+- departmentsid: how5jhamq02m
+  name: Вахтан
+  description: ''
+  color: '#f97316'
+  mentor_role: ''
+  escalation: ''

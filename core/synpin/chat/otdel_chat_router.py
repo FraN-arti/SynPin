@@ -105,6 +105,24 @@ def _build_otdel_system_prompt(otdel: dict, agent: dict, is_head: bool) -> str:
     if own_prompt:
         parts.append(own_prompt)
     
+    # Build workers list for Head
+    worker_list = ""
+    if is_head:
+        worker_slugs = otdel.get("workers", [])
+        head_slug = otdel.get("head", "")
+        from ..agents.manager import get_agent
+        worker_names = []
+        for slug in worker_slugs:
+            if slug == head_slug:
+                continue
+            w = get_agent(slug)
+            if w:
+                worker_names.append(f"@{w.get('name', slug)} ({slug})")
+        if worker_names:
+            worker_list = f"\n\nТвоя команда (обращайся через @Имя):\n" + "\n".join(f"- {n}" for n in worker_names)
+        else:
+            worker_list = "\n\nВ отделе пока нет работников."
+    
     # Otdel context
     otdel_name = otdel.get("name", "")
     otdel_desc = otdel.get("description", "")
@@ -115,7 +133,7 @@ def _build_otdel_system_prompt(otdel: dict, agent: dict, is_head: bool) -> str:
 {separator}
 ОТДЕЛ: {otdel_name}
 {otdel_desc}
-Твоя роль: {role_label}
+Твоя роль: {role_label}{worker_list}
 {separator}"""
     parts.append(otdel_block)
     
@@ -136,6 +154,7 @@ def _build_otdel_system_prompt(otdel: dict, agent: dict, is_head: bool) -> str:
 - Управляй командой: ставь задачи, принимай результаты
 - Видишь ВСЕ сообщения в чате отдела
 - Распределяй задачи между работниками через @упоминания
+- ОБЯЗАТЕЛЬНО используй имена из списка выше — других агентов в чате нет
 - Оценивай результаты работы
 - Если работник отчитался — прими работу или запроси исправление
 - Не отвечай "ок, принял" без необходимости — это создаёт лишний шум

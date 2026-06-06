@@ -1466,7 +1466,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
                   </div>
                 </section>
                 {hoveredAgent === agent.slug && (
-                  <div className="agent-expanded-overlay" style={overlayShift[agent.slug] != null ? { marginTop: -overlayShift[agent.slug]! } : undefined}>
+                  <div className="agent-expanded-overlay" onClick={(e) => e.stopPropagation()} style={overlayShift[agent.slug] != null ? { marginTop: -overlayShift[agent.slug]! } : undefined}>
                     <div className="agent-expanded-content">
                       <div className="agent-expanded-header">
                         <span className="agent-expanded-avatar external" style={{ background: agent.color }}>{agent.icon_letter}</span>
@@ -1584,7 +1584,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
                     )}
                   </section>
                   {hoveredAgent === agent.slug && (
-                    <div className="agent-expanded-overlay" style={overlayShift[agent.slug] != null ? { marginTop: -overlayShift[agent.slug]! } : undefined}>
+                    <div className="agent-expanded-overlay" onClick={(e) => e.stopPropagation()} style={overlayShift[agent.slug] != null ? { marginTop: -overlayShift[agent.slug]! } : undefined}>
                       <div className="agent-expanded-content">
                         <div className="agent-expanded-header">
                           <span className="agent-expanded-avatar">{agent.name[0]}</span>

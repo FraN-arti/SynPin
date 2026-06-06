@@ -150,44 +150,90 @@ function App() {
   }
 
   // Tools hidden from UI (run silently in background)
-  const HIDDEN_TOOLS = new Set(['memory_read', 'memory_write'])
+    const HIDDEN_TOOLS = new Set(['memory_read', 'memory_write'])
 
-  // Save sidebar state
-  useEffect(() => {
-    localStorage.setItem('synpin-sidebar', sidebarOpen ? 'open' : 'closed')
-  }, [sidebarOpen])
+    // Save sidebar state
+    useEffect(() => {
+      localStorage.setItem('synpin-sidebar', sidebarOpen ? 'open' : 'closed')
+    }, [sidebarOpen])
 
-  // Reveal metadata 0.5s after streaming completes
-  useEffect(() => {
-    if (!isTyping && messages.length > 0) {
-      const timer = setTimeout(() => {
-        setRevealedMeta(prev => {
-          const next = new Set(prev)
-          // Reveal ALL assistant messages that have model or agent_name (from history or done streaming)
-          for (const msg of messages) {
-            if (msg.role === 'assistant' && (msg.model || msg.agent_name)) {
-              next.add(msg.id)
+    // Reveal metadata 0.5s after streaming completes
+    useEffect(() => {
+      if (!isTyping && messages.length > 0) {
+        const timer = setTimeout(() => {
+          setRevealedMeta(prev => {
+            const next = new Set(prev)
+            // Reveal ALL assistant messages that have model or agent_name (from history or done streaming)
+            for (const msg of messages) {
+              if (msg.role === 'assistant' && (msg.model || msg.agent_name)) {
+                next.add(msg.id)
+              }
             }
-          }
-          return next
-        })
-      }, 500)
-      return () => clearTimeout(timer)
-    }
-  }, [isTyping, messages])
+            return next
+          })
+        }, 500)
+        return () => clearTimeout(timer)
+      }
+    }, [isTyping, messages])
 
-  // Initial load: logo always, sidebar animation if was open
-  useEffect(() => {
-    const logoTimer = setTimeout(() => setLogoVisible(true), 1000)
-    if (sidebarOpen) {
-      const sidebarTimer = setTimeout(() => setSidebarReady(true), 1400)
-      return () => { clearTimeout(logoTimer); clearTimeout(sidebarTimer) }
-    } else {
-      // If closed, still show logo and mark ready
-      setSidebarReady(true)
-      return () => clearTimeout(logoTimer)
-    }
-  }, [])
+    // ─── Polling: check for background task completion ──────────────────
+    // When SSE is interrupted (browser closed/reloaded), this still gets answers
+    useEffect(() => {
+      if (!activeAgent) return
+
+      // Check if there's an empty assistant placeholder
+      const hasEmptyPlaceholder = messages.some(m => m.role === 'assistant' && !m.content)
+      if (!hasEmptyPlaceholder) return
+
+      const pollInterval = setInterval(async () => {
+        try {
+          const res = await fetch(`${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web`)
+          if (!res.ok) return
+          const data = await res.json()
+          const serverMsgs = data.messages || []
+
+          // Find the latest assistant message from server
+          const lastAssistant = serverMsgs.filter((m: {role: string}) => m.role === 'assistant').pop()
+          if (!lastAssistant) return
+
+          // Check if we already have this content
+          const myLastAssistant = messages.filter(m => m.role === 'assistant').pop()
+          if (!myLastAssistant || myLastAssistant.content !== lastAssistant.content) {
+            // Update the placeholder with server's answer
+            setMessages(prev => {
+              const lastAssistantId = prev.map(m => m.id).reverse().find(id => {
+                const msg = prev.find(m => m.id === id)
+                return msg?.role === 'assistant' && !msg.content
+              })
+              if (lastAssistantId) {
+                return prev.map(m => m.id === lastAssistantId
+                  ? { ...m, content: lastAssistant.content, model: lastAssistant.model, agent_name: lastAssistant.agent_name }
+                  : m
+                )
+              }
+              return prev
+            })
+          }
+        } catch (e) {
+          // Polling failed — silent
+        }
+      }, 2000) // Poll every 2 seconds
+
+      return () => clearInterval(pollInterval)
+    }, [activeAgent, messages])
+
+    // Initial load: logo always, sidebar animation if was open
+    useEffect(() => {
+      const logoTimer = setTimeout(() => setLogoVisible(true), 1000)
+      if (sidebarOpen) {
+        const sidebarTimer = setTimeout(() => setSidebarReady(true), 1400)
+        return () => { clearTimeout(logoTimer); clearTimeout(sidebarTimer) }
+      } else {
+        // If closed, still show logo and mark ready
+        setSidebarReady(true)
+        return () => clearTimeout(logoTimer)
+      }
+    }, [])
 
   // Apply saved theme on initial load
   useEffect(() => {

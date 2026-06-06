@@ -378,8 +378,9 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
             
             processed_count += 1
         
-        # Signal completion
+        # Signal completion and cleanup
         await chat_task.queue.put(None)
+        task_manager.cleanup(task_id)
     
     # Start background task
     chat_task.task = asyncio.create_task(_process_agents())
@@ -403,6 +404,7 @@ async def get_otdel_chat_task(otdel_id: str, task_id: str):
     try:
         chunk = await asyncio.wait_for(task.queue.get(), timeout=0.1)
         if chunk is None:
+            task_manager.cleanup(task_id)
             return {"status": "completed", "done": True}
         return {"status": "running", "done": False, "chunk": chunk}
     except asyncio.TimeoutError:

@@ -1,13 +1,7 @@
 departments:
-- departmentsid: кодер
-  name: кодер
-  description: занимается кодом
-  color: '#3b82f6'
-- departmentsid: поиск
-  name: поиск
-  description: поиск информации
-  color: '#929baa'
-- departmentsid: советчик
-  name: советчик
-  description: участвует в переговорах
-  color: '#bb3bf7'
+- departmentsid: vgjr7kcqcf87
+  name: Тест
+  description: Это пробный раздел для улучшения системы и проведения тестов
+  color: '#2b75ee'
+  mentor_role: управляющий
+  escalation: ''

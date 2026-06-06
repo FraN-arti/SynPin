@@ -76,7 +76,8 @@ React SPA — чат и настройки:
 - **Chat UI** — стриминг, tool timeline, markdown, emoji
 - **Settings** — провайдеры, агенты, роли/департаменты
 - **Agent Selection** — выбор агента (SynPin + внешние)
-- **Технологии:** React 19, Vite 6, TypeScript 5.7, Tailwind 4
+- **Widget System** — drag-and-drop панели на основной странице (лево/право)
+- **Технологии:** React 19, Vite 6, TypeScript 5.7, @dnd-kit
 - **Нет:** Zustand, TanStack Query (удалены)
 
 ### 2. REST API (`core/synpin/api/`)
@@ -175,9 +176,10 @@ synpin/
 │   └── pyproject.toml
 ├── web/                       ← React UI
 │   └── src/
-│       ├── App.tsx            ← основной компонент (chat + settings)
+│       ├── App.tsx            ← основной компонент (chat + settings + DndContext)
 │       ├── components/
 │       │   ├── SettingsPage.tsx
+│       │   ├── WidgetDropZone.tsx  ← drag-and-drop виджеты
 │       │   ├── MemorySection.tsx
 │       │   ├── MarkdownRenderer.tsx
 │       │   └── EmojiPicker.tsx
@@ -211,6 +213,7 @@ synpin/
 | Task Manager (background tasks, polling recovery) | ✅ Реализовано |
 | Security sandbox (security.yaml) | ✅ Реализовано |
 | Compaction + session auto-reset | ✅ Реализовано |
+| Widget System (drag-and-drop) | ✅ Реализовано |
 | **Router (делегат/команда)** | 🔮 Планируется в Фазе 3 |
 | **Engine (ReAct-луп)** | 🔮 Планируется в Фазе 3 |
 | **MCP** | ❌ Не реализовано |

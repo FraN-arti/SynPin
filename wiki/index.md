@@ -22,6 +22,7 @@
 | [Инструменты](tools.md) | 8 инструментов, security sandbox, web_extract (планируется) |
 | [**Интеграции**](integrations.md) | Hermes ACP, внешние агенты |
 | [**Каналы и иерархия**](channels-hierarchy.md) | Department-based коммуникация, @mentor, visibility rules |
+| [**Виджеты**](widgets.md) | Drag-and-drop панели, layout persistence, расширяемость |
 
 ---
 
@@ -49,6 +50,7 @@ wiki/
 ├── memory-sessions.md      # Память и сессии (компакция, авто-сброс)
 ├── memory-system.md        # Система памяти
 ├── channels-hierarchy.md   # Каналы и коммуникация (мессенджеры)
+├── widgets.md              # Drag-and-drop виджеты
 ├── dashboard.md            # Web UI (чат + настройки)
 ├── architecture.md         # Архитектура системы
 ├── philosophy.md           # Философия проекта

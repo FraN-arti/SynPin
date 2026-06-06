@@ -131,17 +131,70 @@ async def update_roles(req: dict):
 
 # ─── Departments ──────────────────────────────────────────────────
 
+class DepartmentCreate(BaseModel):
+    name: str
+    description: str = ""
+    color: str = "#f97316"
+    mentor_role: str = ""
+    escalation: str = ""
+
+class DepartmentUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    color: str | None = None
+    mentor_role: str | None = None
+    escalation: str | None = None
+
+
 @router.get("/departments")
 async def get_departments():
-    """Get all departments."""
-    return {"departments": manager.load_departments()}
+    """Get all departments with agent counts."""
+    return {"departments": manager.get_departments_with_agents()}
 
 
-@router.put("/departments")
-async def update_departments(req: dict):
-    """Replace all departments."""
-    departments = req.get("departments", [])
-    return {"departments": manager.save_departments(departments)}
+@router.get("/departments/{dept_id}")
+async def get_department(dept_id: str):
+    """Get a single department by ID."""
+    dept = manager.get_department(dept_id)
+    if not dept:
+        raise HTTPException(404, f"Department not found: {dept_id}")
+    return dept
+
+
+@router.post("/departments")
+async def create_department(req: DepartmentCreate):
+    """Create a new department."""
+    return manager.create_department(
+        name=req.name,
+        description=req.description,
+        color=req.color,
+        mentor_role=req.mentor_role,
+        escalation=req.escalation,
+    )
+
+
+@router.put("/departments/{dept_id}")
+async def update_department(dept_id: str, req: DepartmentUpdate):
+    """Update a department."""
+    updates = req.model_dump(exclude_none=True)
+    if not updates:
+        dept = manager.get_department(dept_id)
+        if not dept:
+            raise HTTPException(404, f"Department not found: {dept_id}")
+        return dept
+    result = manager.update_department(dept_id, updates)
+    if not result:
+        raise HTTPException(404, f"Department not found: {dept_id}")
+    return result
+
+
+@router.delete("/departments/{dept_id}")
+async def delete_department(dept_id: str):
+    """Delete a department and its directory."""
+    ok = manager.delete_department(dept_id)
+    if not ok:
+        raise HTTPException(404, f"Department not found: {dept_id}")
+    return {"ok": True}
 
 
 # ─── Tools ───────────────────────────────────────────────────────

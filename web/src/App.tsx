@@ -4,6 +4,23 @@ import synpinLogo from './images/synpin.png'
 import { MarkdownRenderer } from './components/MarkdownRenderer'
 import { EmojiPicker } from './components/EmojiPicker'
 import { SettingsPage } from './components/SettingsPage'
+import {
+  WidgetDropZone,
+  useWidgetLayout,
+  WIDGET_META,
+  type Department,
+  type WidgetType,
+} from './components/WidgetDropZone'
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+} from '@dnd-kit/core'
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:2088'
 
@@ -149,12 +166,37 @@ function App() {
   const [availableAgents, setAvailableAgents] = useState<AgentConfig[]>([])
   const [agentSearch, setAgentSearch] = useState('')
   const [primarySlug, setPrimarySlug] = useState('')
-  // Departments for sidebar — loaded from new departments API (empty until created)
-  const [sidebarDepartments, setSidebarDepartments] = useState<{ id: string; name: string; color: string; agent_count: number }[]>([])
-  useEffect(() => {
-    // TODO: load from /api/synpin-departments when backend is ready
-    setSidebarDepartments([])
+  // Departments for sidebar — loaded from /api/departments
+  const [sidebarDepartments, setSidebarDepartments] = useState<Department[]>([])
+
+  // Widget layout (left/right zones on main page)
+  const { layout, removeWidget, handleDragEnd } = useWidgetLayout()
+
+  // DndContext sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
+  const [activeDragId, setActiveDragId] = useState<string | null>(null)
+
+  const refreshDepartments = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/departments`)
+      const data = await res.json()
+      const depts = (data.departments || []).map((d: any) => ({
+        id: d.departmentsid,
+        name: d.name,
+        color: d.color || '#f97316',
+        agent_count: d.agent_count || 0,
+      }))
+      setSidebarDepartments(depts)
+    } catch {}
   }, [])
+
+  useEffect(() => {
+    refreshDepartments()
+  }, [refreshDepartments])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -843,20 +885,6 @@ function App() {
             )
           })()}
 
-          {/* Departments — visible when created */}
-          {sidebarDepartments.length > 0 && (
-            <div className="sidebar-departments">
-              <div className="sidebar-section-label">Отделы</div>
-              {sidebarDepartments.map(dept => (
-                <button key={dept.id} className="sidebar-department-item">
-                  <span className="department-color-dot" style={{ background: dept.color }} />
-                  <span className="sidebar-department-name">{dept.name}</span>
-                  <span className="sidebar-department-count">{dept.agent_count}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
           <div className="sidebar-footer">
             <button className="settings-btn" onClick={() => setPage('settings')}>
               <span>⚙️</span> Настройки
@@ -870,10 +898,24 @@ function App() {
         </div>
       </aside>
 
-      {/* Main Area */}
-      <main className="main-area">
+      {/* Main Area with Widget Zones */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={(e) => { setActiveDragId(String(e.active.id)); setSidebarOpen(false) }}
+        onDragEnd={(e) => { setActiveDragId(null); handleDragEnd(e, layout) }}
+      >
+        <div className="main-layout">
+          <WidgetDropZone
+            side="left"
+            widgets={layout.left}
+            departments={sidebarDepartments}
+            onRemove={removeWidget}
+            isDragging={!!activeDragId}
+          />
+          <main className="main-area">
         {page === 'settings' ? (
-          <SettingsPage onBack={() => setPage('chat')} onAgentsChange={refreshAgents} />
+          <SettingsPage onBack={() => setPage('chat')} onAgentsChange={refreshAgents} onDepartmentsChange={refreshDepartments} />
         ) : messages.length === 0 ? (
           <div className="empty-state">
             <img src={synpinLogo} alt="SynPin" className="empty-logo-img" />
@@ -921,7 +963,26 @@ function App() {
             </div>
           </>
         )}
-      </main>
+          </main>
+          <WidgetDropZone
+            side="right"
+            widgets={layout.right}
+            departments={sidebarDepartments}
+            onRemove={removeWidget}
+            isDragging={!!activeDragId}
+          />
+        </div>
+        <DragOverlay>
+          {activeDragId ? (
+            <div className="widget-drag-overlay">
+              {(() => {
+                const meta = WIDGET_META[activeDragId.replace('tab-', '') as WidgetType]
+                return meta ? <><span>{meta.icon}</span> {meta.label}</> : activeDragId
+              })()}
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
     </div>
   )
 }

@@ -3,7 +3,7 @@ roles:
   name: Управляющий
   description: управляющий отделом
   color: '#f59e0b'
-- rolesid: сотрудник
-  name: Сотрудник
-  description: сотрудник отдела
-  color: '#6a4b16'
+- rolesid: совет-директоров
+  name: 'Совет Директоров '
+  description: это почти верхушка айзберга
+  color: '#b60af5'

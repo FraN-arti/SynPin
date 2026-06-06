@@ -422,38 +422,150 @@ def save_roles(roles: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return roles
 
 
+# ─── Departments (full CRUD with directories) ────────────────────
+
+def _get_departments_dir() -> Path:
+    """Get departments directory (~/.synpin/departments/)."""
+    prod = Path.home() / ".synpin" / "departments"
+    dev = Path(__file__).resolve().parent.parent.parent / "departments"
+    return prod if prod.exists() else dev
+
+
 def load_departments() -> list[dict[str, Any]]:
-    """Load departments from config/departments.yaml with migration."""
+    """Load departments from config/departments.yaml."""
     config_path = _get_config_dir() / "departments.yaml"
     data = _load_yaml(config_path)
-    departments = data.get("departments", [])
-
-    # Migration: rename 'id' → 'departmentsid', generate new 12-char ID
-    migrated = False
-    for dept in departments:
-        if "departmentsid" not in dept:
-            if "id" in dept:
-                dept.pop("id")  # Remove old id
-            dept["departmentsid"] = _generate_long_id()
-            migrated = True
-
-    if migrated:
-        _save_yaml(config_path, {"departments": departments})
-
-    return departments
+    return data.get("departments", [])
 
 
 def save_departments(departments: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Save departments list to config/departments.yaml."""
     config_path = _get_config_dir() / "departments.yaml"
-
-    # Ensure each department has departmentsid
     for dept in departments:
         if not dept.get("departmentsid"):
             dept["departmentsid"] = _generate_long_id()
-
     _save_yaml(config_path, {"departments": departments})
     return departments
+
+
+def _count_agents_in_department(dept_id: str) -> int:
+    """Count how many agents belong to a department."""
+    agents_data = _load_yaml(_get_config_dir() / "agents.yaml")
+    agents_cfg = agents_data.get("agents", {})
+    count = 0
+    for slug, cfg in agents_cfg.items():
+        agent_yaml_path = _get_agents_dir() / slug / "agent.yaml"
+        agent_data = _load_yaml(agent_yaml_path)
+        dept = agent_data.get("department", cfg.get("department", ""))
+        if dept == dept_id:
+            count += 1
+    return count
+
+
+def get_departments_with_agents() -> list[dict[str, Any]]:
+    """Load departments with agent counts resolved."""
+    departments = load_departments()
+    for dept in departments:
+        dept_id = dept.get("departmentsid", "")
+        dept["agent_count"] = _count_agents_in_department(dept_id)
+    return departments
+
+
+def get_department(dept_id: str) -> dict[str, Any] | None:
+    """Get a single department by ID."""
+    departments = load_departments()
+    for dept in departments:
+        if dept.get("departmentsid") == dept_id:
+            dept["agent_count"] = _count_agents_in_department(dept_id)
+            return dept
+    return None
+
+
+def create_department(name: str, description: str = "", color: str = "#f97316",
+                      mentor_role: str = "", escalation: str = "") -> dict[str, Any]:
+    """Create a new department: generates ID, creates directory + department.yaml, saves to config."""
+    dept_id = _generate_long_id()
+    departments_dir = _get_departments_dir()
+    dept_dir = departments_dir / dept_id
+    dept_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create department.yaml inside the directory
+    dept_data = {
+        "departmentsid": dept_id,
+        "name": name,
+        "description": description,
+        "color": color,
+        "mentor_role": mentor_role,
+        "escalation": escalation,
+    }
+    _save_yaml(dept_dir / "department.yaml", dept_data)
+
+    # Create subdirectories for future use
+    (dept_dir / "agents").mkdir(exist_ok=True)
+
+    # Add to departments.yaml config
+    config_path = _get_config_dir() / "departments.yaml"
+    data = _load_yaml(config_path)
+    departments = data.get("departments", [])
+    departments.append(dept_data)
+    data["departments"] = departments
+    _save_yaml(config_path, data)
+
+    dept_data["agent_count"] = 0
+    return dept_data
+
+
+def update_department(dept_id: str, updates: dict[str, Any]) -> dict[str, Any] | None:
+    """Update a department's fields. Returns updated department or None if not found."""
+    config_path = _get_config_dir() / "departments.yaml"
+    data = _load_yaml(config_path)
+    departments = data.get("departments", [])
+
+    found = False
+    for dept in departments:
+        if dept.get("departmentsid") == dept_id:
+            dept.update({k: v for k, v in updates.items() if k != "departmentsid"})
+            found = True
+            break
+
+    if not found:
+        return None
+
+    data["departments"] = departments
+    _save_yaml(config_path, data)
+
+    # Also update department.yaml inside directory
+    departments_dir = _get_departments_dir()
+    dept_dir = departments_dir / dept_id
+    if dept_dir.exists():
+        _save_yaml(dept_dir / "department.yaml",
+                   next(d for d in departments if d["departmentsid"] == dept_id))
+
+    return get_department(dept_id)
+
+
+def delete_department(dept_id: str) -> bool:
+    """Delete a department: remove from config + delete directory recursively."""
+    import shutil
+
+    config_path = _get_config_dir() / "departments.yaml"
+    data = _load_yaml(config_path)
+    departments = data.get("departments", [])
+
+    new_departments = [d for d in departments if d.get("departmentsid") != dept_id]
+    if len(new_departments) == len(departments):
+        return False  # Not found
+
+    data["departments"] = new_departments
+    _save_yaml(config_path, data)
+
+    # Remove department directory (department.yaml, agents subdir, etc.)
+    departments_dir = _get_departments_dir()
+    dept_dir = departments_dir / dept_id
+    if dept_dir.exists():
+        shutil.rmtree(str(dept_dir))
+
+    return True
 
 
 # ─── Tools ───────────────────────────────────────────────────────

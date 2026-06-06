@@ -18,6 +18,9 @@ web/*.tsbuildinfo
 
 # OS
 .DS_Store
+
+# Runtime data
+core/departments/
 Thumbs.db
 
 # Environment

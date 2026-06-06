@@ -118,7 +118,8 @@ body {
   display: flex;
   flex-direction: column;
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   opacity: 0;
   transform: translateX(-10px);
   pointer-events: none;
@@ -392,6 +393,8 @@ body {
   display: flex;
   flex-direction: column;
   position: relative;
+  min-height: 0;
+  padding: 0 280px;
 }
 
 /* === Empty State === */
@@ -500,12 +503,13 @@ body {
 .messages-area {
   flex: 1;
   overflow-y: auto;
+  min-height: 0;
   /* Initial load: appear after sidebar is ready (2s delay) */
   animation: mainContentFadeIn 0.5s ease 2s both;
 }
 
 .messages-container {
-  max-width: 768px;
+  max-width: 100%;
   margin: 0 auto;
   padding: 24px 16px;
   display: flex;
@@ -1327,10 +1331,7 @@ body {
   display: flex;
   flex-direction: column;
   padding: 20px 40px;
-  width: 90%;
-  max-width: 1400px;
-  margin: 0 auto;
-  height: 80vh;
+  width: 100%;
   overflow-y: auto;
   opacity: 0;
   transition: opacity 0.3s ease;
@@ -3077,10 +3078,12 @@ body {
   border-radius: 8px;
   width: 90%;
   max-width: 480px;
-  max-height: 80vh;
+  max-height: 85vh;
   overflow-y: auto;
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
   animation: modalSlideIn 0.25s ease;
+  display: flex;
+  flex-direction: column;
 }
 
 @keyframes modalSlideIn {
@@ -3107,6 +3110,10 @@ body {
 }
 
 .modal-footer {
+  position: sticky;
+  bottom: 0;
+  background: var(--gray-900);
+  z-index: 1;
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -3115,6 +3122,10 @@ body {
 }
 
 .modal-header {
+  position: sticky;
+  top: 0;
+  background: var(--gray-900);
+  z-index: 1;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -4373,4 +4384,284 @@ body {
   background: var(--bg-elevated);
   padding: 1px 6px;
   border-radius: 8px;
+}
+
+/* ─── Sidebar Widget Zone ────────────────────────────────────── */
+
+.sidebar-widget-zone {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  min-height: 0;
+}
+
+/* Scrollbar styling for sidebar */
+.sidebar-content::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-content::-webkit-scrollbar-thumb {
+  background: var(--gray-700);
+  border-radius: 2px;
+}
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-600);
+}
+
+/* ─── Main Layout with Widget Zones ──────────────────────────── */
+
+.main-layout {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.widget-drop-zone {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: 280px;
+  padding: 70px 8px 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 10;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.widget-drop-zone.left {
+  left: 0;
+}
+
+.widget-drop-zone.right {
+  right: 0;
+}
+
+.widget-drop-zone > * {
+  pointer-events: auto;
+}
+
+.widget-drop-zone.drop-hover {
+  background: rgba(249, 115, 22, 0.05);
+}
+
+.widget-drop-zone.empty-drag-target {
+  background: rgba(249, 115, 22, 0.03);
+  border: 2px dashed var(--accent);
+  border-radius: 8px;
+  pointer-events: auto;
+}
+
+.drop-zone-placeholder {
+  font-size: 13px;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 20px;
+  opacity: 0.6;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+}
+
+.widget-drop-zone.drop-hover .drop-zone-placeholder {
+  color: var(--accent);
+  opacity: 1;
+}
+
+.widget-drop-zone::-webkit-scrollbar {
+  width: 3px;
+}
+.widget-drop-zone::-webkit-scrollbar-thumb {
+  background: var(--gray-700);
+  border-radius: 2px;
+}
+
+.widget-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 0;
+}
+
+.widget-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.widget-card.dragging {
+  opacity: 0.4;
+}
+
+.widget-card.widget-overlay {
+  background: var(--bg-card);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  max-width: 200px;
+}
+
+.widget-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.widget-drag-handle {
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.widget-drag-handle:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.widget-drag-handle:active {
+  cursor: grabbing;
+}
+
+.widget-grip {
+  font-size: 14px;
+  letter-spacing: -1px;
+}
+
+.widget-icon {
+  font-size: 12px;
+}
+
+.widget-title {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+}
+
+.widget-remove-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.widget-card:hover .widget-remove-btn {
+  opacity: 1;
+}
+
+.widget-remove-btn:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.widget-card-body {
+  padding: 4px 0;
+}
+
+.widget-departments-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.widget-empty {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* ─── Pin button in Settings ─────────────────────────────────── */
+
+.pin-to-sidebar-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-dim);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.pin-to-sidebar-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(249, 115, 22, 0.05);
+}
+
+.pin-to-sidebar-btn.pinned {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(249, 115, 22, 0.08);
+}
+
+/* ─── Draggable Settings Tabs ────────────────────────────────── */
+
+.settings-nav-tab.draggable {
+  cursor: grab;
+  position: relative;
+}
+
+.settings-nav-tab.draggable::after {
+  content: '⋮';
+  margin-left: 4px;
+  font-size: 10px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.settings-nav-tab.draggable:hover::after {
+  opacity: 0.5;
+}
+
+.settings-nav-tab.draggable:active {
+  cursor: grabbing;
+}
+
+.settings-nav-tab.dragging {
+  opacity: 0.3;
+}
+
+/* ─── Drag Overlay ───────────────────────────────────────────── */
+
+.widget-drag-overlay {
+  background: var(--bg-card, #1a1a1a);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--accent);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
 }

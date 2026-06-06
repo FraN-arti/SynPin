@@ -1,12 +1,38 @@
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { PROVIDER_CATALOG, providerKey, providerIconUrl, type ProviderInfo } from '../lib/providers'
 import { MemorySection } from './MemorySection'
+import { useDraggable } from '@dnd-kit/core'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:2088'
+
+// Tabs that can be dragged to widget zones
+const DRAGGABLE_TABS = new Set(['departments', 'skills', 'channels'])
+
+function DraggableTab({ tab, isActive, onClick }: { tab: { id: string; label: string }; isActive: boolean; onClick: () => void }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `tab-${tab.id}`,
+    data: { type: tab.id, source: 'settings-tab' },
+  })
+
+  const isDraggable = DRAGGABLE_TABS.has(tab.id)
+
+  return (
+    <button
+      ref={isDraggable ? setNodeRef : undefined}
+      className={`settings-nav-tab ${isActive ? 'active' : ''} ${isDraggable ? 'draggable' : ''} ${isDragging ? 'dragging' : ''}`}
+      onClick={onClick}
+      {...(isDraggable ? { ...attributes, ...listeners } : {})}
+      title={isDraggable ? 'Перетащить на панель виджетов' : undefined}
+    >
+      {tab.label}
+    </button>
+  )
+}
 
 interface SettingsPageProps {
   onBack: () => void
   onAgentsChange?: () => void
+  onDepartmentsChange?: () => void
 }
 
 type Tab = 'general' | 'agents' | 'providers' | 'memory' | 'channels' | 'departments' | 'skills'
@@ -31,7 +57,7 @@ const SECTION_INFO: Record<Tab, { title: string; description: string }> = {
   skills: { title: 'Скиллы', description: 'База скиллов системы — подходы, шаблоны, процедуры' },
 }
 
-export function SettingsPage({ onBack, onAgentsChange }: SettingsPageProps) {
+export function SettingsPage({ onBack, onAgentsChange, onDepartmentsChange }: SettingsPageProps) {
   const [activeTab, setActiveTab] = useState<Tab>('general')
   const [visible, setVisible] = useState(false)
   const [activeModal, setActiveModal] = useState<string | null>(null)
@@ -126,13 +152,12 @@ export function SettingsPage({ onBack, onAgentsChange }: SettingsPageProps) {
         {/* Horizontal tab navigation */}
         <nav className="settings-nav-tabs">
           {TABS.map(tab => (
-            <button
+            <DraggableTab
               key={tab.id}
-              className={`settings-nav-tab ${activeTab === tab.id ? 'active' : ''}`}
+              tab={tab}
+              isActive={activeTab === tab.id}
               onClick={() => handleTabChange(tab.id)}
-            >
-              {tab.label}
-            </button>
+            />
           ))}
         </nav>
 
@@ -143,7 +168,7 @@ export function SettingsPage({ onBack, onAgentsChange }: SettingsPageProps) {
           {activeTab === 'providers' && <ProvidersSection ref={providersRef} onAddProvider={(type) => setActiveModal(`add-provider-${type}`)} onAddFromCatalog={(p) => setAddingProvider(p)} onEditProvider={(p) => setEditingProvider(p)} />}
           {activeTab === 'memory' && <MemorySection />}
           {activeTab === 'channels' && <ChannelsSection onAddChannel={() => setActiveModal('add-channel')} />}
-          {activeTab === 'departments' && <DepartmentsSection />}
+          {activeTab === 'departments' && <DepartmentsSection onDepartmentsChange={onDepartmentsChange} />}
           {activeTab === 'skills' && <SkillsSection />}
         </div>
       </div>
@@ -2294,7 +2319,7 @@ function ChannelsSection({ onAddChannel }: { onAddChannel: () => void }) {
 // ─── Departments (Отделы) ──────────────────────────────────────
 
 interface Department {
-  id: string
+  departmentsid: string
   name: string
   description: string
   color: string
@@ -2303,50 +2328,150 @@ interface Department {
   agent_count: number
 }
 
-function DepartmentsSection() {
+function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChange?: () => void }) {
   const [departments, setDepartments] = useState<Department[]>([])
   const [showCreate, setShowCreate] = useState(false)
+  const [editing, setEditing] = useState<Department | null>(null)
   const [roles, setRoles] = useState<{ rolesid: string; name: string }[]>([])
   const [form, setForm] = useState({ name: '', description: '', color: '#f97316', mentor_role: '', escalation: '' })
   const [saving, setSaving] = useState(false)
 
+  const loadDepartments = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/departments`)
+      const data = await res.json()
+      setDepartments(data.departments || [])
+    } catch {}
+  }
+
   useEffect(() => {
-    // TODO: load from new departments API when backend is ready
-    // For now start empty — old /api/departments returns agent departments, not ours
-    setDepartments([])
+    loadDepartments()
     fetch(`${API_BASE}/api/roles`).then(r => r.json()).then(d => setRoles(d.roles || [])).catch(() => {})
   }, [])
+
+  const resetForm = () => setForm({ name: '', description: '', color: '#f97316', mentor_role: '', escalation: '' })
+
+  const openCreate = () => { resetForm(); setShowCreate(true) }
+  const openEdit = (dept: Department) => {
+    setForm({ name: dept.name, description: dept.description, color: dept.color || '#f97316', mentor_role: dept.mentor_role || '', escalation: dept.escalation || '' })
+    setEditing(dept)
+  }
 
   const handleCreate = async () => {
     if (!form.name.trim()) return
     setSaving(true)
     try {
-      // TODO: POST to new departments API
-      const newDept: Department = {
-        id: crypto.randomUUID().slice(0, 18),
-        name: form.name.trim(),
-        description: form.description,
-        color: form.color,
-        mentor_role: form.mentor_role,
-        escalation: form.escalation,
-        agent_count: 0,
+      const res = await fetch(`${API_BASE}/api/departments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          description: form.description,
+          color: form.color,
+          mentor_role: form.mentor_role,
+          escalation: form.escalation,
+        }),
+      })
+      if (res.ok) {
+        await loadDepartments()
+        setShowCreate(false)
+        resetForm()
+        onDepartmentsChange?.()
       }
-      setDepartments(prev => [...prev, newDept])
-      setShowCreate(false)
-      setForm({ name: '', description: '', color: '#f97316', mentor_role: '', escalation: '' })
+    } catch {} finally { setSaving(false) }
+  }
+
+  const handleUpdate = async () => {
+    if (!editing || !form.name.trim()) return
+    setSaving(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/departments/${editing.departmentsid}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          description: form.description,
+          color: form.color,
+          mentor_role: form.mentor_role,
+          escalation: form.escalation,
+        }),
+      })
+      if (res.ok) {
+        await loadDepartments()
+        setEditing(null)
+        resetForm()
+        onDepartmentsChange?.()
+      }
     } catch {} finally { setSaving(false) }
   }
 
   const handleDelete = async (id: string) => {
-    // TODO: DELETE from new departments API
-    setDepartments(prev => prev.filter(d => d.id !== id))
+    try {
+      const res = await fetch(`${API_BASE}/api/departments/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        await loadDepartments()
+        onDepartmentsChange?.()
+      }
+    } catch {}
   }
+
+  const isModalOpen = showCreate || !!editing
+
+  const renderModal = () => (
+    <div className="modal-overlay" onClick={() => { setShowCreate(false); setEditing(null); resetForm() }}>
+      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+        <div className="modal-header">
+          <h2>{editing ? 'Настройки отдела' : 'Новый отдел'}</h2>
+          <button className="modal-close" onClick={() => { setShowCreate(false); setEditing(null); resetForm() }}>×</button>
+        </div>
+        <div className="modal-body">
+          <div className="settings-field">
+            <label>Название *</label>
+            <input className="settings-input" placeholder="Backend, Frontend, DevOps..."
+              value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+          </div>
+          <div className="settings-field">
+            <label>Описание</label>
+            <textarea className="settings-input" rows={3} placeholder="Что делает этот отдел..."
+              value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+          </div>
+          <div className="settings-field">
+            <label>Цвет</label>
+            <div className="department-color-row">
+              <input type="color" className="department-color-picker" value={form.color}
+                onChange={e => setForm(f => ({ ...f, color: e.target.value }))} />
+              <span className="department-color-value">{form.color}</span>
+            </div>
+          </div>
+          <div className="settings-field">
+            <label>Ментор (роль)</label>
+            <select className="settings-input" value={form.mentor_role}
+              onChange={e => setForm(f => ({ ...f, mentor_role: e.target.value }))}>
+              <option value="">Не назначен</option>
+              {roles.map(r => <option key={r.rolesid} value={r.rolesid}>{r.name}</option>)}
+            </select>
+          </div>
+          <div className="settings-field">
+            <label>Эскалация</label>
+            <input className="settings-input" placeholder="Пока не реализовано"
+              value={form.escalation} onChange={e => setForm(f => ({ ...f, escalation: e.target.value }))} disabled />
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="settings-btn-secondary" onClick={() => { setShowCreate(false); setEditing(null); resetForm() }}>Отмена</button>
+          <button className="settings-btn-primary" disabled={saving || !form.name.trim()} onClick={editing ? handleUpdate : handleCreate}>
+            {saving ? 'Сохранение...' : editing ? 'Сохранить' : 'Создать'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="settings-sections">
       <div className="section-header-row">
         <span className="section-count">{departments.length} отделов</span>
-        <button className="settings-btn-primary" onClick={() => setShowCreate(true)}>+ Создать отдел</button>
+        <button className="settings-btn-primary" onClick={openCreate}>+ Создать отдел</button>
       </div>
 
       {departments.length === 0 && (
@@ -2357,7 +2482,7 @@ function DepartmentsSection() {
       )}
 
       {departments.map(dept => (
-        <div key={dept.id} className="settings-card department-card">
+        <div key={dept.departmentsid} className="settings-card department-card">
           <div className="department-header">
             <div className="department-identity">
               <span className="department-color-dot" style={{ background: dept.color }} />
@@ -2367,64 +2492,15 @@ function DepartmentsSection() {
               </div>
             </div>
             <div className="department-actions">
-              <button className="settings-btn-secondary">Настройки</button>
-              <button className="settings-btn-danger" onClick={() => handleDelete(dept.id)}>Удалить</button>
+              <button className="settings-btn-secondary" onClick={() => openEdit(dept)}>Настройки</button>
+              <button className="settings-btn-danger" onClick={() => handleDelete(dept.departmentsid)}>Удалить</button>
             </div>
           </div>
           {dept.description && <p className="department-desc">{dept.description}</p>}
         </div>
       ))}
 
-      {/* Create Department modal */}
-      {showCreate && (
-        <div className="modal-overlay" onClick={() => setShowCreate(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
-            <div className="modal-header">
-              <h2>Новый отдел</h2>
-              <button className="modal-close" onClick={() => setShowCreate(false)}>×</button>
-            </div>
-            <div className="modal-body">
-              <div className="settings-field">
-                <label>Название *</label>
-                <input className="settings-input" placeholder="Backend, Frontend, DevOps..."
-                  value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-              </div>
-              <div className="settings-field">
-                <label>Описание</label>
-                <textarea className="settings-input" rows={3} placeholder="Что делает этот отдел..."
-                  value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
-              </div>
-              <div className="settings-field">
-                <label>Цвет</label>
-                <div className="department-color-row">
-                  <input type="color" className="department-color-picker" value={form.color}
-                    onChange={e => setForm(f => ({ ...f, color: e.target.value }))} />
-                  <span className="department-color-value">{form.color}</span>
-                </div>
-              </div>
-              <div className="settings-field">
-                <label>Ментор (роль)</label>
-                <select className="settings-input" value={form.mentor_role}
-                  onChange={e => setForm(f => ({ ...f, mentor_role: e.target.value }))}>
-                  <option value="">Не назначен</option>
-                  {roles.map(r => <option key={r.rolesid} value={r.rolesid}>{r.name}</option>)}
-                </select>
-              </div>
-              <div className="settings-field">
-                <label>Эскалация</label>
-                <input className="settings-input" placeholder="Пока не реализовано"
-                  value={form.escalation} onChange={e => setForm(f => ({ ...f, escalation: e.target.value }))} disabled />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="settings-btn-secondary" onClick={() => setShowCreate(false)}>Отмена</button>
-              <button className="settings-btn-primary" disabled={saving || !form.name.trim()} onClick={handleCreate}>
-                {saving ? 'Создание...' : 'Создать'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {isModalOpen && renderModal()}
     </div>
   )
 }

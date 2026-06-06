@@ -1,0 +1,250 @@
+import { useState, useCallback } from 'react'
+import {
+  useDroppable,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+
+// ─── Types ───────────────────────────────────────────────────────
+
+export type WidgetType = 'departments' | 'skills' | 'channels'
+
+export interface WidgetLayout {
+  left: WidgetType[]
+  right: WidgetType[]
+}
+
+export interface Department {
+  id: string
+  name: string
+  color: string
+  agent_count: number
+}
+
+// ─── Widget metadata ─────────────────────────────────────────────
+
+export const WIDGET_META: Record<WidgetType, { label: string; icon: string }> = {
+  departments: { label: 'Отделы', icon: '🏢' },
+  skills: { label: 'Скиллы', icon: '🧠' },
+  channels: { label: 'Каналы', icon: '📡' },
+}
+
+// ─── Layout persistence ──────────────────────────────────────────
+
+const STORAGE_KEY = 'synpin_widget_layout'
+const EMPTY_LAYOUT: WidgetLayout = { left: [], right: [] }
+
+export function loadWidgetLayout(): WidgetLayout {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      // Migrate old format
+      if (parsed.widgets && Array.isArray(parsed.widgets)) {
+        return { left: parsed.widgets, right: [] }
+      }
+      return parsed
+    }
+  } catch {}
+  return EMPTY_LAYOUT
+}
+
+export function saveWidgetLayout(layout: WidgetLayout) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(layout))
+}
+
+// ─── Widget content renderers ────────────────────────────────────
+
+function DepartmentsWidgetContent({ departments }: { departments: Department[] }) {
+  if (departments.length === 0) {
+    return <div className="widget-empty">Нет отделов</div>
+  }
+  return (
+    <div className="widget-departments-list">
+      {departments.map(dept => (
+        <button key={dept.id} className="sidebar-department-item">
+          <span className="department-color-dot" style={{ background: dept.color }} />
+          <span className="sidebar-department-name">{dept.name}</span>
+          <span className="sidebar-department-count">{dept.agent_count}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ─── Sortable widget card ────────────────────────────────────────
+
+interface SortableWidgetProps {
+  id: WidgetType
+  departments: Department[]
+  onRemove: (id: WidgetType) => void
+}
+
+function SortableWidget({ id, departments, onRemove }: SortableWidgetProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  }
+
+  const meta = WIDGET_META[id as WidgetType] || { label: id, icon: '📦' }
+
+  return (
+    <div ref={setNodeRef} style={style} className={`widget-card ${isDragging ? 'dragging' : ''}`}>
+      <div className="widget-card-header">
+        <div className="widget-drag-handle" {...attributes} {...listeners}>
+          <span className="widget-grip">⠿</span>
+        </div>
+        <span className="widget-icon">{meta.icon}</span>
+        <span className="widget-title">{meta.label}</span>
+        <button className="widget-remove-btn" onClick={() => onRemove(id)} title="Удалить из панели">
+          ×
+        </button>
+      </div>
+      <div className="widget-card-body">
+        {id === 'departments' && <DepartmentsWidgetContent departments={departments} />}
+      </div>
+    </div>
+  )
+}
+
+// ─── Drop Zone ───────────────────────────────────────────────────
+
+interface WidgetDropZoneProps {
+  side: 'left' | 'right'
+  widgets: WidgetType[]
+  departments: Department[]
+  onRemove: (side: 'left' | 'right', id: WidgetType) => void
+  isDragging: boolean
+}
+
+export function WidgetDropZone({ side, widgets, departments, onRemove, isDragging }: WidgetDropZoneProps) {
+  const { isOver, setNodeRef } = useDroppable({ id: `drop-zone-${side}` })
+
+  // Show zone when dragging OR when has widgets
+  if (widgets.length === 0 && !isDragging) return null
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`widget-drop-zone ${side} ${isOver ? 'drop-hover' : ''} ${widgets.length === 0 && isDragging ? 'empty-drag-target' : ''}`}
+    >
+      {widgets.length === 0 && isDragging && (
+        <div className="drop-zone-placeholder">
+          {side === 'left' ? '←' : '→'} Перетащите сюда
+        </div>
+      )}
+      <SortableContext items={widgets} strategy={verticalListSortingStrategy}>
+        <div className="widget-list">
+          {widgets.map(widgetId => (
+            <SortableWidget
+              key={widgetId}
+              id={widgetId}
+              departments={departments}
+              onRemove={(id) => onRemove(side, id)}
+            />
+          ))}
+        </div>
+      </SortableContext>
+    </div>
+  )
+}
+
+// ─── Layout Hook ─────────────────────────────────────────────────
+
+export function useWidgetLayout() {
+  const [layout, setLayout] = useState<WidgetLayout>(loadWidgetLayout)
+
+  const syncLayout = useCallback((next: WidgetLayout) => {
+    setLayout(next)
+    saveWidgetLayout(next)
+    window.dispatchEvent(new Event('synpin-widgets-changed'))
+  }, [])
+
+  const removeWidget = useCallback((side: 'left' | 'right', id: WidgetType) => {
+    setLayout(prev => {
+      const next = {
+        ...prev,
+        [side]: prev[side].filter(w => w !== id),
+      }
+      saveWidgetLayout(next)
+      return next
+    })
+    window.dispatchEvent(new Event('synpin-widgets-changed'))
+  }, [])
+
+  const handleDragEnd = useCallback((event: { active: { id: string | number }; over: { id: string | number } | null } | null, activeLayout: WidgetLayout) => {
+    if (!event || !event.over) return
+    const { active, over } = event
+    const widgetId = String(active.id)
+
+    // New tab from settings — strip "tab-" prefix
+    const widgetType = widgetId.startsWith('tab-') ? widgetId.replace('tab-', '') : widgetId
+    if (!['departments', 'skills', 'channels'].includes(widgetType)) return
+
+    const overId = String(over.id)
+
+    // Drop onto a zone
+    if (overId === 'drop-zone-left' || overId === 'drop-zone-right') {
+      const targetSide = overId === 'drop-zone-left' ? 'left' as const : 'right' as const
+      const fromSide = activeLayout.left.includes(widgetType as WidgetType) ? 'left' as const
+        : activeLayout.right.includes(widgetType as WidgetType) ? 'right' as const : null
+
+      if (fromSide === targetSide && fromSide !== null) return
+      if (fromSide) {
+        syncLayout({
+          ...activeLayout,
+          [fromSide]: activeLayout[fromSide].filter(w => w !== widgetType),
+          [targetSide]: [...activeLayout[targetSide], widgetType as WidgetType],
+        })
+      } else {
+        // New widget from settings tab
+        if (activeLayout.left.includes(widgetType as WidgetType) || activeLayout.right.includes(widgetType as WidgetType)) return
+        syncLayout({
+          ...activeLayout,
+          [targetSide]: [...activeLayout[targetSide], widgetType as WidgetType],
+        })
+      }
+      return
+    }
+
+    // Reorder within zone
+    const leftIdx = activeLayout.left.indexOf(widgetType as WidgetType)
+    const rightIdx = activeLayout.right.indexOf(widgetType as WidgetType)
+    const overWidgetType = String(over.id)
+
+    if (leftIdx !== -1) {
+      const overIdx = activeLayout.left.indexOf(overWidgetType as WidgetType)
+      if (overIdx !== -1 && leftIdx !== overIdx) {
+        syncLayout({
+          ...activeLayout,
+          left: arrayMove(activeLayout.left, leftIdx, overIdx),
+        })
+      }
+    } else if (rightIdx !== -1) {
+      const overIdx = activeLayout.right.indexOf(overWidgetType as WidgetType)
+      if (overIdx !== -1 && rightIdx !== overIdx) {
+        syncLayout({
+          ...activeLayout,
+          right: arrayMove(activeLayout.right, rightIdx, overIdx),
+        })
+      }
+    }
+  }, [syncLayout])
+
+  return { layout, removeWidget, handleDragEnd }
+}

@@ -1078,37 +1078,49 @@ async def chat_stream(req: ChatRequest):
 
     async def _background_execution():
         """Run LLM in background — survives client disconnect."""
-        full_response = ""
-        async for chunk in stream_response(
-            provider_name=provider_name,
-            messages=messages,
-            model=model,
-            temperature=req.temperature,
-            max_tokens=req.max_tokens,
-            system_prompt=system_prompt,
-            agent_name=req.agent_name,
-            agent_slug=req.agent_slug,
-            tool_names=req.tools or [],
-        ):
-            await chat_task.queue.put(chunk)
-            # Capture chunk content for history
-            if '"type": "chunk"' in chunk:
-                try:
-                    payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
-                    if payload.get("type") == "chunk":
-                        full_response += payload.get("content", "")
-                except Exception:
-                    pass
+        try:
+            full_response = ""
+            async for chunk in stream_response(
+                provider_name=provider_name,
+                messages=messages,
+                model=model,
+                temperature=req.temperature,
+                max_tokens=req.max_tokens,
+                system_prompt=system_prompt,
+                agent_name=req.agent_name,
+                agent_slug=req.agent_slug,
+                tool_names=req.tools or [],
+            ):
+                await chat_task.queue.put(chunk)
+                # Capture chunk content for history
+                if '"type": "chunk"' in chunk:
+                    try:
+                        payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
+                        if payload.get("type") == "chunk":
+                            full_response += payload.get("content", "")
+                    except Exception:
+                        pass
 
-        # Save assistant response after streaming completes
-        if agent_slug and channel_id and full_response:
-            new_messages = history_before + [
-                {"role": "user", "content": user_message},
-                {"role": "assistant", "content": full_response},
-            ]
-            _save_chat_history(agent_slug, channel_id, new_messages)
+            # Save assistant response after streaming completes
+            if agent_slug and channel_id and full_response:
+                new_messages = history_before + [
+                    {"role": "user", "content": user_message},
+                    {"role": "assistant", "content": full_response},
+                ]
+                _save_chat_history(agent_slug, channel_id, new_messages)
 
-        # Signal completion
+        except Exception as e:
+            # Save error message to history so polling won't loop forever
+            logger.error("Background task failed for %s/%s: %s", agent_slug, channel_id, e)
+            if agent_slug and channel_id:
+                error_msg = f"\u26a0\ufe0f \u041e\u0448\u0438\u0431\u043a\u0430: \u041c\u043e\u0434\u0435\u043b\u044c \u043d\u0435 \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0430 ({e})"
+                new_messages = history_before + [
+                    {"role": "user", "content": user_message},
+                    {"role": "assistant", "content": error_msg},
+                ]
+                _save_chat_history(agent_slug, channel_id, new_messages)
+
+        # Signal completion (always, even on error)
         await chat_task.queue.put(None)
 
     chat_task = task_manager.create(task_id)

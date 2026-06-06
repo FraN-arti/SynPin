@@ -264,26 +264,37 @@ async def hermes_chat_stream(req: HermesChatRequest):
 
     async def _background_execution():
         """Run Hermes LLM in background — survives client disconnect."""
-        full_response = ""
-        async for chunk in stream_hermes_response(messages, req.temperature, req.max_tokens):
-            await hermes_task.queue.put(chunk)
-            # Capture assistant response for history
-            if '"type": "chunk"' in chunk:
-                try:
-                    payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
-                    if payload.get("type") == "chunk":
-                        full_response += payload.get("content", "")
-                except Exception:
-                    pass
+        try:
+            full_response = ""
+            async for chunk in stream_hermes_response(messages, req.temperature, req.max_tokens):
+                await hermes_task.queue.put(chunk)
+                # Capture assistant response for history
+                if '"type": "chunk"' in chunk:
+                    try:
+                        payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
+                        if payload.get("type") == "chunk":
+                            full_response += payload.get("content", "")
+                    except Exception:
+                        pass
 
-        # Save assistant response after streaming completes
-        if agent_slug and full_response:
-            updated_history = list(history)
-            updated_history.append({"role": "user", "content": req.message})
-            updated_history.append({"role": "assistant", "content": full_response})
-            _save_chat_history(agent_slug, channel_id, updated_history)
+            # Save assistant response after streaming completes
+            if agent_slug and full_response:
+                updated_history = list(history)
+                updated_history.append({"role": "user", "content": req.message})
+                updated_history.append({"role": "assistant", "content": full_response})
+                _save_chat_history(agent_slug, channel_id, updated_history)
 
-        # Signal completion
+        except Exception as e:
+            # Save error message to history so polling won't loop forever
+            logger.error("Hermes background task failed for %s: %s", agent_slug, e)
+            if agent_slug:
+                error_msg = f"\u26a0\ufe0f \u041e\u0448\u0438\u0431\u043a\u0430: Hermes \u043d\u0435 \u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d ({e})"
+                updated_history = list(history)
+                updated_history.append({"role": "user", "content": req.message})
+                updated_history.append({"role": "assistant", "content": error_msg})
+                _save_chat_history(agent_slug, channel_id, updated_history)
+
+        # Signal completion (always, even on error)
         await hermes_task.queue.put(None)
 
     hermes_task = task_manager.create(task_id)

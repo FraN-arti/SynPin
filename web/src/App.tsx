@@ -217,7 +217,7 @@ function App() {
         } catch (e) {
           // Polling failed — silent
         }
-      }, 2000) // Poll every 2 seconds
+      }, 3000) // Poll every 3 seconds
 
       return () => clearInterval(pollInterval)
     }, [activeAgent, messages])
@@ -414,7 +414,7 @@ function App() {
       } catch (e) {
         // Polling failed — silent
       }
-    }, 2000) // Poll every 2 seconds
+    }, 3000) // Poll every 3 seconds
 
     return () => clearInterval(pollInterval)
   }, [activeAgent, messages])

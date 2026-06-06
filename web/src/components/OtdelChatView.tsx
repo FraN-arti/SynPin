@@ -1,5 +1,7 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { EmojiPicker } from './EmojiPicker'
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:2088'
 
 interface OtdelData {
   otdelid: string
@@ -9,6 +11,24 @@ interface OtdelData {
   mentor_role: string
   escalation: string
   agent_count: number
+  head: string
+  workers: string[]
+}
+
+interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  sender: string
+  sender_name?: string
+  content: string
+  is_head?: boolean
+  timestamp: string
+}
+
+interface Agent {
+  slug: string
+  name: string
+  color?: string
 }
 
 interface OtdelChatViewProps {
@@ -18,32 +38,85 @@ interface OtdelChatViewProps {
 }
 
 export function OtdelChatView({ otdel, onBack, onOpenSettings }: OtdelChatViewProps) {
-  const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string; id: string }[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [sending, setSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  // Load agents for @mention autocomplete
+  useEffect(() => {
+    fetch(`${API_BASE}/api/agents`)
+      .then(r => r.json())
+      .then(d => setAgents((d.agents || []).filter((a: Agent & { enabled: boolean }) => a.enabled)))
+      .catch(() => {})
+  }, [])
+
+  // Load chat history
+  const loadHistory = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/otdels/${otdel.otdelid}/chat/history`)
+      if (res.ok) {
+        const data = await res.json()
+        setMessages(data.messages || [])
+      }
+    } catch {}
+  }, [otdel.otdelid])
+
+  useEffect(() => {
+    loadHistory()
+  }, [loadHistory])
+
+  // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
   const handleSend = async () => {
-    if (!input.trim()) return
-    const userMsg = { role: 'user' as const, content: input.trim(), id: `u-${Date.now()}` }
-    setMessages(prev => [...prev, userMsg])
+    if (!input.trim() || sending) return
+    const text = input.trim()
     setInput('')
-    // Reset textarea height
+    setSending(true)
+
+    // Reset textarea
     const textarea = document.querySelector('.otdel-bottom-input .chat-textarea') as HTMLTextAreaElement
     if (textarea) textarea.style.height = 'auto'
 
-    // TODO: connect to department's agent
-    // For now, echo back
-    setTimeout(() => {
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `[${otdel.name}] Чат отдела в разработке. Скоро здесь будет ментор и работники.`,
-        id: `a-${Date.now()}`,
-      }])
-    }, 500)
+    try {
+      const res = await fetch(`${API_BASE}/api/otdels/${otdel.otdelid}/chat/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, sender: 'user' }),
+      })
+
+      if (res.ok) {
+        // Reload history after agents respond
+        // Poll for completion
+        const data = await res.json()
+        if (data.task_id) {
+          await pollTask(data.task_id)
+        }
+        await loadHistory()
+      }
+    } catch (e) {
+      console.error('[otdel-chat] send error:', e)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const pollTask = async (taskId: string) => {
+    // Poll until task completes
+    for (let i = 0; i < 60; i++) {
+      try {
+        const res = await fetch(`${API_BASE}/api/otdels/${otdel.otdelid}/chat/task/${taskId}`)
+        if (res.ok) {
+          const data = await res.json()
+          if (data.done) return
+        }
+      } catch {}
+      await new Promise(r => setTimeout(r, 1000))
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -62,6 +135,14 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings }: OtdelChatViewPr
 
   const handleEmojiSelect = (emoji: string) => {
     setInput(prev => prev + emoji)
+  }
+
+  // Get agent name by slug
+  const getAgentName = (slug: string) => agents.find(a => a.slug === slug)?.name || slug
+
+  // Determine message position: user + head = left, workers = right
+  const isLeftSide = (msg: ChatMessage) => {
+    return msg.role === 'user' || msg.sender === 'user' || msg.is_head === true
   }
 
   return (
@@ -91,24 +172,32 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings }: OtdelChatViewPr
             <div className="otdel-empty-icon">🏢</div>
             <p>Чат отдела «{otdel.name}»</p>
             <p className="otdel-empty-hint">
-              {otdel.mentor_role ? `Ментор: ${otdel.mentor_role}` : 'Ментор не назначен'}
-              {otdel.agent_count > 0 ? ` · ${otdel.agent_count} агентов` : ''}
+              {otdel.description || 'Начните общение, написав сообщение'}
             </p>
           </div>
         ) : (
           <div className="otdel-messages-container">
-            {messages.map(msg => (
-              <div key={msg.id} className={`message-row ${msg.role}`}>
-                <div className={`message-avatar ${msg.role}`}>
-                  {msg.role === 'assistant' ? '🏢' : 'U'}
-                </div>
-                <div className="message-wrapper">
-                  <div className="message-bubble">
-                    <span>{msg.content}</span>
+            {messages.map(msg => {
+              const left = isLeftSide(msg)
+              const senderName = msg.sender === 'user' ? 'Вы' : getAgentName(msg.sender)
+              const isHead = msg.is_head === true
+
+              return (
+                <div key={msg.id} className={`otdel-msg-row ${left ? 'left' : 'right'}`}>
+                  <div className={`otdel-msg-avatar ${left ? 'left' : 'right'}`}>
+                    {left ? '👤' : '🏢'}
+                  </div>
+                  <div className="otdel-msg-body">
+                    <div className={`otdel-msg-name ${left ? 'left' : 'right'} ${isHead ? 'head' : ''}`}>
+                      {senderName}
+                    </div>
+                    <div className={`otdel-msg-bubble ${left ? 'left' : 'right'} ${isHead ? 'head' : ''}`}>
+                      {msg.content}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
             <div ref={messagesEndRef} />
           </div>
         )}
@@ -120,14 +209,15 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings }: OtdelChatViewPr
           <EmojiPicker onSelect={handleEmojiSelect} />
           <textarea
             className="chat-textarea"
-            placeholder="Спроси что-нибудь..."
+            placeholder={sending ? 'Агенты работают...' : 'Спроси что-нибудь...'}
             value={input}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
             rows={1}
+            disabled={sending}
           />
-          <button className="send-btn" onClick={handleSend} disabled={!input.trim()}>
-            →
+          <button className="send-btn" onClick={handleSend} disabled={!input.trim() || sending}>
+            {sending ? '...' : '→'}
           </button>
         </div>
       </div>

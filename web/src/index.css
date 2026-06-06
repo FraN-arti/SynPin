@@ -5088,3 +5088,90 @@ body {
 .otdel-worker-chip.active .otdel-worker-chip-dot {
   background: var(--orange);
 }
+
+/* ── Otdel Chat Messages (left/right layout) ──────────────────── */
+
+.otdel-msg-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+  max-width: 75%;
+}
+
+.otdel-msg-row.left {
+  margin-right: auto;
+}
+
+.otdel-msg-row.right {
+  margin-left: auto;
+  flex-direction: row-reverse;
+}
+
+.otdel-msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.otdel-msg-avatar.left {
+  background: var(--gray-800);
+}
+
+.otdel-msg-avatar.right {
+  background: var(--orange-muted);
+}
+
+.otdel-msg-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.otdel-msg-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.otdel-msg-name.left {
+  text-align: left;
+}
+
+.otdel-msg-name.right {
+  text-align: right;
+}
+
+.otdel-msg-name.head {
+  color: var(--orange);
+}
+
+.otdel-msg-bubble {
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.otdel-msg-bubble.left {
+  background: var(--gray-800);
+  border: 1px solid var(--gray-700);
+  border-top-left-radius: 0;
+}
+
+.otdel-msg-bubble.right {
+  background: var(--orange-muted);
+  border: 1px solid rgba(249, 115, 22, 0.2);
+  border-top-right-radius: 0;
+}
+
+.otdel-msg-bubble.head {
+  border-color: var(--orange);
+  background: rgba(249, 115, 22, 0.08);
+}

@@ -52,3 +52,6 @@ core/synpin/config/providers.yaml
 core/synpin/config/*.yaml
 # But keep templates tracked
 !core/synpin/config/templates/
+
+# Agent runtime data
+core/synpin/agents/*/agent.yaml

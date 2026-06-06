@@ -9,7 +9,7 @@ interface SettingsPageProps {
   onAgentsChange?: () => void
 }
 
-type Tab = 'general' | 'agents' | 'providers' | 'memory' | 'channels' | 'skills'
+type Tab = 'general' | 'agents' | 'providers' | 'memory' | 'channels' | 'departments' | 'skills'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'general', label: 'Основное' },
@@ -17,6 +17,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'providers', label: 'Провайдеры' },
   { id: 'memory', label: 'Память' },
   { id: 'channels', label: 'Каналы' },
+  { id: 'departments', label: 'Отделы' },
   { id: 'skills', label: 'Скиллы' },
 ]
 
@@ -26,6 +27,7 @@ const SECTION_INFO: Record<Tab, { title: string; description: string }> = {
   providers: { title: 'Провайдеры', description: 'Подключённые провайдеры и доступные для подключения' },
   memory: { title: 'Память', description: 'Архитектура памяти: агентская, командная, системная' },
   channels: { title: 'Каналы связи', description: 'Feishu, WhatsApp, Telegram — мультимодальная связь с системой' },
+  departments: { title: 'Отделы', description: 'Организационные единицы для командной работы агентов' },
   skills: { title: 'Скиллы', description: 'База скиллов системы — подходы, шаблоны, процедуры' },
 }
 
@@ -140,12 +142,8 @@ export function SettingsPage({ onBack, onAgentsChange }: SettingsPageProps) {
           {activeTab === 'agents' && <AgentsSection onAgentsChange={onAgentsChange} />}
           {activeTab === 'providers' && <ProvidersSection ref={providersRef} onAddProvider={(type) => setActiveModal(`add-provider-${type}`)} onAddFromCatalog={(p) => setAddingProvider(p)} onEditProvider={(p) => setEditingProvider(p)} />}
           {activeTab === 'memory' && <MemorySection />}
-          {activeTab === 'channels' && (
-            <>
-              <ChannelsSection onAddChannel={() => setActiveModal('add-channel')} />
-              <DepartmentsSection />
-            </>
-          )}
+          {activeTab === 'channels' && <ChannelsSection onAddChannel={() => setActiveModal('add-channel')} />}
+          {activeTab === 'departments' && <DepartmentsSection />}
           {activeTab === 'skills' && <SkillsSection />}
         </div>
       </div>

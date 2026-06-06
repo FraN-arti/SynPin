@@ -146,9 +146,11 @@ function App() {
     search_files: 'Поиск файлов',
     web_search: 'Поиск в интернете',
     code_exec: 'Python',
-    memory_read: 'Чтение памяти',
-    memory_write: 'Запись в память',
+    // memory tools hidden from UI — run silently
   }
+
+  // Tools hidden from UI (run silently in background)
+  const HIDDEN_TOOLS = new Set(['memory_read', 'memory_write'])
 
   // Save sidebar state
   useEffect(() => {
@@ -459,6 +461,7 @@ function App() {
             )
           } else if (parsed.type === 'tool_start') {
             const toolName = String(parsed.tool || '')
+            if (HIDDEN_TOOLS.has(toolName)) { toolIndex++; continue }
             const ti = toolIndex++
             const tc: ToolCall = {
               id: `${assistantId}-tool-${ti}`,
@@ -475,6 +478,7 @@ function App() {
             )
           } else if (parsed.type === 'tool_end') {
             const toolName = String(parsed.tool || '')
+            if (HIDDEN_TOOLS.has(toolName)) { continue }
             const idx = activeTools.findIndex(t => t.name === toolName && t.status === 'running')
             if (idx !== -1) {
               const tc = activeTools[idx]

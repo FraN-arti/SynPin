@@ -13,7 +13,7 @@ from typing import Any
 logger = logging.getLogger("synpin.memory")
 
 # Character limits
-MEMORY_CHAR_LIMIT = 2200
+MEMORY_CHAR_LIMIT = 3000
 USER_CHAR_LIMIT = 1375
 
 DELIM = "\n§\n"

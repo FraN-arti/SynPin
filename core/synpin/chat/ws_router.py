@@ -275,7 +275,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 system_prompt=system_prompt,
                 agent_name=agent_name_val,
                 agent_slug=agent_slug_val,
-                tool_names=[],  # No tools in otdel chat
+                tool_names=agent.get("tools", []),  # Agents in otdel get their tools
             ):
                 try:
                     payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
@@ -295,6 +295,19 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                                 "sender_name": agent_name_val,
                                 "is_head": is_head,
                             })
+                    elif msg_type in ("tool_start", "tool_end"):
+                        # Forward tool events via WS
+                        await ws_manager.send(user_id, {
+                            "type": f"otdel:{msg_type}",
+                            "otdel_id": otdel_id,
+                            "message_id": agent_msg_id,
+                            "tool": payload.get("tool"),
+                            "params": payload.get("params"),
+                            "result": payload.get("result"),
+                            "success": payload.get("success"),
+                            "error": payload.get("error"),
+                            "index": payload.get("index"),
+                        })
                     elif msg_type == "done":
                         streaming = False
                     elif msg_type == "error":
@@ -400,7 +413,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 system_prompt=system_prompt,
                 agent_name=head_name,
                 agent_slug=head_slug,
-                tool_names=[],  # No tools in otdel follow-up
+                tool_names=head_agent.get("tools", []),  # Head gets tools in follow-up too
             ):
                 try:
                     payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
@@ -419,6 +432,19 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                                 "sender_name": head_name,
                                 "is_head": True,
                             })
+                    elif msg_type in ("tool_start", "tool_end"):
+                        # Forward tool events via WS
+                        await ws_manager.send(user_id, {
+                            "type": f"otdel:{msg_type}",
+                            "otdel_id": otdel_id,
+                            "message_id": followup_msg_id,
+                            "tool": payload.get("tool"),
+                            "params": payload.get("params"),
+                            "result": payload.get("result"),
+                            "success": payload.get("success"),
+                            "error": payload.get("error"),
+                            "index": payload.get("index"),
+                        })
                     elif msg_type == "error":
                         full_response = f"⚠️ Ошибка: {payload.get('message', 'Unknown error')}"
                 except Exception:

@@ -25,6 +25,16 @@ interface ChatMessage {
   is_head?: boolean
   timestamp: string
   streaming?: boolean
+  tools?: ToolCall[]
+}
+
+interface ToolCall {
+  id: string
+  name: string
+  params: Record<string, unknown>
+  status: 'running' | 'completed' | 'error'
+  result?: string
+  error?: string
 }
 
 interface Agent {
@@ -150,6 +160,65 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
       })
     })
 
+    // Tool events — update message with tool calls
+    const unsubToolStart = wsOn('otdel:tool_start', (msg) => {
+      if (msg.otdel_id !== otdel.otdelid) return
+      const { message_id, tool, params, index } = msg
+      if (!message_id || !tool) return
+      setMessages(prev => {
+        const idx = prev.findIndex(m => m.id === message_id)
+        if (idx >= 0) {
+          const updated = [...prev]
+          const oldMsg = updated[idx]!
+          const tc: ToolCall = {
+            id: `${message_id}-tool-${index ?? Date.now()}`,
+            name: tool,
+            params: (params as Record<string, unknown>) || {},
+            status: 'running',
+          }
+          updated[idx] = {
+            ...oldMsg,
+            tools: [...(oldMsg.tools || []), tc],
+          }
+          return updated
+        }
+        return prev
+      })
+    })
+
+    const unsubToolEnd = wsOn('otdel:tool_end', (msg) => {
+      if (msg.otdel_id !== otdel.otdelid) return
+      const { message_id, tool, result, success, error } = msg
+      if (!message_id || !tool) return
+      setMessages(prev => {
+        const idx = prev.findIndex(m => m.id === message_id)
+        if (idx >= 0) {
+          const updated = [...prev]
+          const oldMsg = updated[idx]!
+          const toolCalls = oldMsg.tools || []
+          const toolIdx = toolCalls.findIndex(t => t.name === tool && t.status === 'running')
+          if (toolIdx >= 0) {
+            const newTools = [...toolCalls]
+            const oldTool = newTools[toolIdx]!
+            newTools[toolIdx] = {
+              id: oldTool.id,
+              name: oldTool.name,
+              params: oldTool.params,
+              status: success ? 'completed' : 'error',
+              result: result ? String(result) : '',
+              error: error ? String(error) : undefined,
+            }
+            updated[idx] = {
+              ...oldMsg,
+              tools: newTools,
+            }
+          }
+          return updated
+        }
+        return prev
+      })
+    })
+
     // Done — finalize streaming message
     const unsubDone = wsOn('otdel:done', (msg) => {
       if (msg.otdel_id !== otdel.otdelid) return
@@ -187,6 +256,8 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
     return () => {
       unsubMessage()
       unsubChunk()
+      unsubToolStart()
+      unsubToolEnd()
       unsubDone()
       unsubError()
     }
@@ -298,6 +369,33 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
                     >
                       <MarkdownRenderer content={msg.content} isStreaming={isStreaming} />
                     </div>
+                    {msg.tools && msg.tools.length > 0 && (
+                      <div className="otdel-msg-tools">
+                        {msg.tools.map(tc => (
+                          <div key={tc.id} className={`otdel-tool-call ${tc.status}`}>
+                            <div className="otdel-tool-header">
+                              <span className="otdel-tool-icon">
+                                {tc.status === 'running' ? '⏳' : tc.status === 'completed' ? '✅' : '❌'}
+                              </span>
+                              <span className="otdel-tool-name">{tc.name}</span>
+                            </div>
+                            {tc.status === 'running' && (
+                              <div className="otdel-tool-params">Выполняется...</div>
+                            )}
+                            {tc.status === 'completed' && tc.result && (
+                              <div className="otdel-tool-result">
+                                <pre>{tc.result}</pre>
+                              </div>
+                            )}
+                            {tc.status === 'error' && tc.error && (
+                              <div className="otdel-tool-error">
+                                <pre>{tc.error}</pre>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {isStreaming && (
                       <div className="otdel-msg-streaming-dots">
                         <span></span><span></span><span></span>

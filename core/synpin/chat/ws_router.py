@@ -8,6 +8,9 @@ Multiplexed protocol:
 import asyncio
 import json
 import logging
+import uuid
+from dataclasses import dataclass, field
+from typing import Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from .ws_manager import ws_manager
@@ -15,6 +18,51 @@ from .ws_manager import ws_manager
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["ws"])
+
+
+# ─── Head Protocol State ───────────────────────────────────────────────
+
+@dataclass
+class HeadState:
+    """Per-otdel state for Head protocol tools."""
+    otdel_id: str
+    head_slug: str
+    worker_slugs: list[str]
+    
+    # Delegation state
+    active_delegation_id: str | None = None
+    expected_workers: set[str] = field(default_factory=set)
+    responded_workers: dict[str, dict] = field(default_factory=dict)  # slug -> response
+    worker_attempts: dict[str, int] = field(default_factory=dict)  # slug -> attempt count
+    delegation_history: list[dict] = field(default_factory=list)
+    
+    # Current delegation params
+    current_delegation: dict | None = None
+    
+    def reset_delegation(self):
+        self.active_delegation_id = None
+        self.expected_workers.clear()
+        self.responded_workers.clear()
+        # Keep worker_attempts for retry tracking
+        self.current_delegation = None
+
+
+# Global HeadState store per otdel
+_head_states: dict[str, HeadState] = {}
+
+
+def get_head_state(otdel_id: str) -> HeadState | None:
+    return _head_states.get(otdel_id)
+
+
+def create_head_state(otdel_id: str, head_slug: str, worker_slugs: list[str]) -> HeadState:
+    state = HeadState(otdel_id=otdel_id, head_slug=head_slug, worker_slugs=worker_slugs)
+    _head_states[otdel_id] = state
+    return state
+
+
+def clear_head_state(otdel_id: str):
+    _head_states.pop(otdel_id, None)
 
 
 @router.websocket("/ws")
@@ -227,6 +275,9 @@ async def _handle_otdel_send(user_id: str, msg: dict):
     if not agent_queue:
         return
 
+    # Create HeadState for this otdel session
+    head_state = create_head_state(otdel_id, head_slug, worker_slugs)
+
     # Process agents
     processed_count = 0
     head_processed = False
@@ -259,6 +310,15 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         if provider_name and model.startswith(f"{provider_name}/"):
             model = model[len(provider_name) + 1:]
 
+        # Determine tools for this agent
+        if is_head:
+            # Head gets their configured tools + head protocol tools (builtin, otdel-only)
+            agent_tools = list(agent.get("tools", []))
+            head_protocol_tools = ["head_delegate", "head_await", "head_evaluate", "head_retry", "head_decide"]
+            tool_names = agent_tools + head_protocol_tools
+        else:
+            tool_names = agent.get("tools", [])
+
         # Stream LLM response via WebSocket chunks
         agent_msg_id = f"a-{uuid.uuid4().hex[:8]}"
         full_response = ""
@@ -275,7 +335,8 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 system_prompt=system_prompt,
                 agent_name=agent_name_val,
                 agent_slug=agent_slug_val,
-                tool_names=agent.get("tools", []),  # Agents in otdel get their tools
+                tool_names=tool_names,
+                otdel_id=otdel_id,  # Pass otdel context for head protocol tools
             ):
                 try:
                     payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
@@ -398,6 +459,11 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         if provider_name and model.startswith(f"{provider_name}/"):
             model = model[len(provider_name) + 1:]
 
+        # Head gets head protocol tools in follow-up too
+        head_agent_tools = list(head_agent.get("tools", []))
+        head_protocol_tools = ["head_delegate", "head_await", "head_evaluate", "head_retry", "head_decide"]
+        tool_names = head_agent_tools + head_protocol_tools
+
         # Stream follow-up response
         followup_msg_id = f"a-{uuid.uuid4().hex[:8]}"
         full_response = ""
@@ -413,7 +479,8 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 system_prompt=system_prompt,
                 agent_name=head_name,
                 agent_slug=head_slug,
-                tool_names=head_agent.get("tools", []),  # Head gets tools in follow-up too
+                tool_names=tool_names,
+                otdel_id=otdel_id,  # Pass otdel context for head protocol tools
             ):
                 try:
                     payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])

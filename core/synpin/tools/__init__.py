@@ -33,6 +33,11 @@ from .web_search import web_search
 from .code_exec import code_exec
 from .memory_read import memory_read
 from .memory_write import memory_write
+from .head_delegate import head_delegate
+from .head_await import head_await
+from .head_evaluate import head_evaluate
+from .head_retry import head_retry
+from .head_decide import head_decide
 
 # Registry dict mapping tool names to handler functions (loaded lazily)
 _tool_handlers: dict[str, ToolHandler] | None = None
@@ -55,6 +60,11 @@ def get_tool_registry() -> dict[str, ToolHandler]:
             "code_exec": code_exec,
             "memory_read": memory_read,
             "memory_write": memory_write,
+            "head_delegate": head_delegate,
+            "head_await": head_await,
+            "head_evaluate": head_evaluate,
+            "head_retry": head_retry,
+            "head_decide": head_decide,
         }
     return _tool_handlers
 
@@ -74,4 +84,11 @@ __all__ = [
     "search_files",
     "web_search",
     "code_exec",
+    "memory_read",
+    "memory_write",
+    "head_delegate",
+    "head_await",
+    "head_evaluate",
+    "head_retry",
+    "head_decide",
 ]

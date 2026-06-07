@@ -678,7 +678,7 @@ def build_openai_tools(tool_names: list[str]) -> list[dict] | None:
     return tools if tools else None
 
 
-async def execute_tool(tool_name: str, params: dict, agent_slug: str | None = None) -> dict:
+async def execute_tool(tool_name: str, params: dict, agent_slug: str | None = None, otdel_id: str | None = None) -> dict:
     """Execute a tool via the tool registry. Returns result dict."""
     try:
         from ..tools import get_tool_registry
@@ -691,6 +691,11 @@ async def execute_tool(tool_name: str, params: dict, agent_slug: str | None = No
         # Inject agent_id for memory tools
         if agent_slug and tool_name in ("memory_read", "memory_write"):
             params = {**params, "agent_id": agent_slug}
+
+        # Inject otdel_id for head protocol tools
+        head_protocol_tools = ("head_delegate", "head_await", "head_evaluate", "head_retry", "head_decide")
+        if otdel_id and tool_name in head_protocol_tools:
+            params = {**params, "otdel_id": otdel_id}
 
         result = await handler(params)
         return result
@@ -820,6 +825,7 @@ async def stream_response(
     agent_name: str | None = None,
     agent_slug: str | None = None,
     tool_names: list[str] | None = None,
+    otdel_id: str | None = None,
 ):
     """SSE stream generator with native tool execution loop.
 
@@ -938,7 +944,7 @@ async def stream_response(
                     yield f"data: {json.dumps({'type': 'tool_start', 'tool': t_name, 'params': t_params, 'index': tool_count})}\n\n"
 
                     # Execute
-                    tool_result = await execute_tool(t_name, t_params, agent_slug)
+                    tool_result = await execute_tool(t_name, t_params, agent_slug, otdel_id=otdel_id)
 
                     # yield tool_end
                     yield f"data: {json.dumps({'type': 'tool_end', 'tool': t_name, 'result': tool_result.get('output', ''), 'success': tool_result.get('success', False), 'error': tool_result.get('error'), 'index': tool_count})}\n\n"

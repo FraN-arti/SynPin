@@ -423,6 +423,8 @@ async def _handle_otdel_send(user_id: str, msg: dict):
             # No need for otdel:message here
 
             processed_slugs.add(agent_slug_val)
+            if not is_head:
+                responded_workers.add(agent_slug_val)
 
         processed_count += 1
 

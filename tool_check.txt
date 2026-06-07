@@ -1,1 +1,0 @@
-Tool check: file_write works!

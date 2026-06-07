@@ -67,14 +67,14 @@ export function saveWidgetLayout(layout: WidgetLayout) {
 
 // ─── Widget content renderers ────────────────────────────────────
 
-function DepartmentsWidgetContent({ departments, onDepartmentClick }: { departments: Department[]; onDepartmentClick?: (id: string) => void }) {
+function DepartmentsWidgetContent({ departments, onDepartmentClick, activeOtdelId }: { departments: Department[]; onDepartmentClick?: (id: string) => void; activeOtdelId?: string | null }) {
   if (departments.length === 0) {
     return <div className="widget-empty">Нет отделов</div>
   }
   return (
     <div className="widget-departments-list">
       {departments.map(dept => (
-        <button key={dept.id} className="sidebar-department-item" onClick={() => onDepartmentClick?.(dept.id)}>
+        <button key={dept.id} className={`sidebar-department-item ${dept.id === activeOtdelId ? 'active' : ''}`} onClick={() => onDepartmentClick?.(dept.id)}>
           <span className="department-color-dot" style={{ background: dept.color }} />
           <span className="sidebar-department-name">{dept.name}</span>
           <span className="sidebar-department-count">{dept.agent_count}</span>
@@ -91,9 +91,10 @@ interface SortableWidgetProps {
   departments: Department[]
   onRemove: (id: WidgetType) => void
   onDepartmentClick?: (id: string) => void
+  activeOtdelId?: string | null
 }
 
-function SortableWidget({ id, departments, onRemove, onDepartmentClick }: SortableWidgetProps) {
+function SortableWidget({ id, departments, onRemove, onDepartmentClick, activeOtdelId }: SortableWidgetProps) {
   const {
     attributes,
     listeners,
@@ -124,7 +125,7 @@ function SortableWidget({ id, departments, onRemove, onDepartmentClick }: Sortab
         </button>
       </div>
       <div className="widget-card-body">
-        {id === 'departments' && <DepartmentsWidgetContent departments={departments} onDepartmentClick={onDepartmentClick} />}
+        {id === 'departments' && <DepartmentsWidgetContent departments={departments} onDepartmentClick={onDepartmentClick} activeOtdelId={activeOtdelId} />}
       </div>
     </div>
   )
@@ -139,9 +140,10 @@ interface WidgetDropZoneProps {
   onRemove: (side: 'left' | 'right', id: WidgetType) => void
   isDragging: boolean
   onDepartmentClick?: (id: string) => void
+  activeOtdelId?: string | null
 }
 
-export function WidgetDropZone({ side, widgets, departments, onRemove, isDragging, onDepartmentClick }: WidgetDropZoneProps) {
+export function WidgetDropZone({ side, widgets, departments, onRemove, isDragging, onDepartmentClick, activeOtdelId }: WidgetDropZoneProps) {
   const { isOver, setNodeRef } = useDroppable({ id: `drop-zone-${side}` })
 
   // Show zone when dragging OR when has widgets
@@ -166,6 +168,7 @@ export function WidgetDropZone({ side, widgets, departments, onRemove, isDraggin
               departments={departments}
               onRemove={(id) => onRemove(side, id)}
               onDepartmentClick={onDepartmentClick}
+              activeOtdelId={activeOtdelId}
             />
           ))}
         </div>

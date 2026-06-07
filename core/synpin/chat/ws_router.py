@@ -259,8 +259,11 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         if provider_name and model.startswith(f"{provider_name}/"):
             model = model[len(provider_name) + 1:]
 
-        # Call LLM
+        # Stream LLM response via WebSocket chunks
+        agent_msg_id = f"a-{uuid.uuid4().hex[:8]}"
         full_response = ""
+        streaming = True
+
         try:
             from .router import stream_response as base_stream
             async for chunk in base_stream(
@@ -272,22 +275,42 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 system_prompt=system_prompt,
                 agent_name=agent_name_val,
                 agent_slug=agent_slug_val,
-                tool_names=[],  # No tools in otdel chat — agents respond directly
+                tool_names=[],  # No tools in otdel chat
             ):
-                if '"type": "chunk"' in chunk:
-                    try:
-                        payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
-                        if payload.get("type") == "chunk":
-                            full_response += payload.get("content", "")
-                    except Exception:
-                        pass
+                try:
+                    payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
+                    msg_type = payload.get("type", "")
+
+                    if msg_type == "chunk":
+                        content = payload.get("content", "")
+                        if content:
+                            full_response += content
+                            # Push chunk via WS
+                            await ws_manager.send(user_id, {
+                                "type": "otdel:chunk",
+                                "otdel_id": otdel_id,
+                                "message_id": agent_msg_id,
+                                "content": content,
+                                "sender": agent_slug_val,
+                                "sender_name": agent_name_val,
+                                "is_head": is_head,
+                            })
+                    elif msg_type == "done":
+                        streaming = False
+                    elif msg_type == "error":
+                        streaming = False
+                        full_response = f"⚠️ Ошибка: {payload.get('message', 'Unknown error')}"
+                except Exception:
+                    pass
         except Exception as e:
             logger.error("LLM call failed for agent %s in otdel %s: %s", agent_slug_val, otdel_id, e)
             full_response = f"⚠️ Ошибка: {e}"
+            streaming = False
 
+        # Save final message to history
         if full_response:
             agent_msg = {
-                "id": f"a-{uuid.uuid4().hex[:8]}",
+                "id": agent_msg_id,
                 "role": "assistant",
                 "sender": agent_slug_val,
                 "sender_name": agent_name_val,
@@ -297,6 +320,14 @@ async def _handle_otdel_send(user_id: str, msg: dict):
             }
             history.append(agent_msg)
             _save_history(otdel_id, history)
+
+            # Send done event
+            await ws_manager.send(user_id, {
+                "type": "otdel:done",
+                "otdel_id": otdel_id,
+                "message_id": agent_msg_id,
+                "message": agent_msg,
+            })
 
             if is_head:
                 new_mentions = _parse_mentions(full_response)
@@ -314,22 +345,8 @@ async def _handle_otdel_send(user_id: str, msg: dict):
 
                 if expected_workers:
                     head_delegating = True
-
-                # Always push Head's response — user should see it immediately
-                await ws_manager.send(user_id, {
-                    "type": "otdel:message",
-                    "otdel_id": otdel_id,
-                    "message": agent_msg,
-                })
-            else:
-                # Worker response — push immediately
-                responded_workers.add(agent_slug_val)
-                workers_responded += 1
-                await ws_manager.send(user_id, {
-                    "type": "otdel:message",
-                    "otdel_id": otdel_id,
-                    "message": agent_msg,
-                })
+            # Note: agent response already sent via otdel:chunk + otdel:done above
+            # No need for otdel:message here
 
             processed_slugs.add(agent_slug_val)
 
@@ -368,7 +385,10 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         if provider_name and model.startswith(f"{provider_name}/"):
             model = model[len(provider_name) + 1:]
 
+        # Stream follow-up response
+        followup_msg_id = f"a-{uuid.uuid4().hex[:8]}"
         full_response = ""
+
         try:
             from .router import stream_response as base_stream
             async for chunk in base_stream(
@@ -382,20 +402,34 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 agent_slug=head_slug,
                 tool_names=[],  # No tools in otdel follow-up
             ):
-                if '"type": "chunk"' in chunk:
-                    try:
-                        payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
-                        if payload.get("type") == "chunk":
-                            full_response += payload.get("content", "")
-                    except Exception:
-                        pass
+                try:
+                    payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
+                    msg_type = payload.get("type", "")
+
+                    if msg_type == "chunk":
+                        content = payload.get("content", "")
+                        if content:
+                            full_response += content
+                            await ws_manager.send(user_id, {
+                                "type": "otdel:chunk",
+                                "otdel_id": otdel_id,
+                                "message_id": followup_msg_id,
+                                "content": content,
+                                "sender": head_slug,
+                                "sender_name": head_name,
+                                "is_head": True,
+                            })
+                    elif msg_type == "error":
+                        full_response = f"⚠️ Ошибка: {payload.get('message', 'Unknown error')}"
+                except Exception:
+                    pass
         except Exception as e:
             logger.error("Head follow-up failed in otdel %s: %s", otdel_id, e)
-            full_response = ""
+            full_response = f"⚠️ Ошибка: {e}"
 
         if full_response:
             agent_msg = {
-                "id": f"a-{uuid.uuid4().hex[:8]}",
+                "id": followup_msg_id,
                 "role": "assistant",
                 "sender": head_slug,
                 "sender_name": head_name,
@@ -407,8 +441,9 @@ async def _handle_otdel_send(user_id: str, msg: dict):
             _save_history(otdel_id, history)
 
             await ws_manager.send(user_id, {
-                "type": "otdel:message",
+                "type": "otdel:done",
                 "otdel_id": otdel_id,
+                "message_id": followup_msg_id,
                 "message": agent_msg,
             })
 

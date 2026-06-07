@@ -7,6 +7,9 @@
   --orange: #f97316;
   --orange-hover: #ea580c;
   --orange-muted: rgba(249, 115, 22, 0.1);
+  --accent: #f97316;
+  --accent-bg: rgba(249, 115, 22, 0.1);
+  --accent-glow: rgba(249, 115, 22, 0.4);
   --black: #0a0a0a;
   --gray-950: #0a0a0a;
   --gray-900: #171717;
@@ -21,7 +24,6 @@
   --bg-card: #171717;
   --bg-hover: #262626;
   --border: #262626;
-  --accent: #f97316;
   --text-dim: #737373;
   --text-secondary: #a3a3a3;
 }
@@ -31,6 +33,9 @@
   --orange: #ea580c;
   --orange-hover: #c2410c;
   --orange-muted: rgba(234, 88, 12, 0.1);
+  --accent: #ea580c;
+  --accent-bg: rgba(234, 88, 12, 0.1);
+  --accent-glow: rgba(234, 88, 12, 0.4);
   --black: #ffffff;
   --gray-950: #ffffff;
   --gray-900: #f5f5f5;
@@ -44,7 +49,6 @@
   --bg-card: #f5f5f5;
   --bg-hover: #e5e5e5;
   --border: #e5e5e5;
-  --accent: #ea580c;
   --text-dim: #737373;
   --text-secondary: #525252;
 }
@@ -536,7 +540,7 @@ body {
 .message-row {
   display: flex;
   flex-direction: column;
-  animation: avatarFadeIn 0.2s ease forwards;
+  animation: msg-enter 0.25s ease-out forwards;
 }
 
 /* Agent: left-aligned */
@@ -4386,6 +4390,16 @@ body {
   background: var(--bg-hover);
 }
 
+.sidebar-department-item.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.sidebar-department-item.active .department-color-dot {
+  box-shadow: 0 0 0 2px var(--accent), 0 0 8px var(--accent-glow);
+}
+
 .sidebar-department-name {
   flex: 1;
   overflow: hidden;
@@ -5106,11 +5120,23 @@ body {
 
 /* ── Otdel Chat Messages (left/right layout) ──────────────────── */
 
+@keyframes msg-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .otdel-msg-row {
   display: flex;
   gap: 10px;
   margin-bottom: 12px;
   max-width: 75%;
+  animation: msg-enter 0.25s ease-out forwards;
 }
 
 .otdel-msg-row.left {

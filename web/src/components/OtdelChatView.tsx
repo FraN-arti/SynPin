@@ -111,14 +111,84 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
       })
     })
 
+    // Streaming chunks — accumulate into a single message
+    const unsubChunk = wsOn('otdel:chunk', (msg) => {
+      if (msg.otdel_id !== otdel.otdelid) return
+      const { message_id, content, sender, sender_name, is_head } = msg
+      if (!message_id || !content) return
+      setMessages(prev => {
+        const idx = prev.findIndex(m => m.id === message_id)
+        if (idx >= 0) {
+          // Update existing streaming message
+          const updated = [...prev]
+          const oldMsg = updated[idx]!
+          updated[idx] = {
+            id: oldMsg.id,
+            role: oldMsg.role,
+            sender: oldMsg.sender,
+            sender_name: oldMsg.sender_name,
+            content: oldMsg.content + content,
+            is_head: oldMsg.is_head,
+            timestamp: oldMsg.timestamp,
+            streaming: true,
+          }
+          return updated
+        } else {
+          // Create new streaming message
+          const newMsg: ChatMessage = {
+            id: message_id,
+            role: 'assistant',
+            sender: sender || 'unknown',
+            sender_name,
+            content,
+            is_head,
+            streaming: true,
+            timestamp: new Date().toISOString(),
+          }
+          return [...prev, newMsg]
+        }
+      })
+    })
+
+    // Done — finalize streaming message
     const unsubDone = wsOn('otdel:done', (msg) => {
       if (msg.otdel_id !== otdel.otdelid) return
+      const { message_id, message: finalMsg } = msg
+      if (message_id && finalMsg) {
+        setMessages(prev => {
+          const idx = prev.findIndex(m => m.id === message_id)
+          if (idx >= 0) {
+            const updated = [...prev]
+            const oldMsg = updated[idx]!
+            updated[idx] = {
+              id: oldMsg.id,
+              role: oldMsg.role,
+              sender: oldMsg.sender,
+              sender_name: oldMsg.sender_name,
+              content: finalMsg.content,
+              is_head: oldMsg.is_head,
+              timestamp: finalMsg.timestamp,
+              streaming: false,
+            }
+            return updated
+          }
+          return prev
+        })
+      }
       setSending(false)
+    })
+
+    const unsubError = wsOn('otdel:error', (msg) => {
+      if (msg.otdel_id !== otdel.otdelid) return
+      setSending(false)
+      // Could show error toast
     })
 
     return () => {
       unsubMessage()
+      unsubChunk()
       unsubDone()
+      unsubError()
     }
   }, [wsOn, otdel.otdelid])
 

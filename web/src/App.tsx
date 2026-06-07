@@ -916,6 +916,7 @@ function App() {
             onRemove={removeWidget}
             isDragging={!!activeDragId}
             onDepartmentClick={(id) => { setActiveOtdelId(id); setPage('chat') }}
+            activeOtdelId={activeOtdelId}
           />
           <main className="main-area">
         {page === 'settings' ? (
@@ -998,6 +999,7 @@ function App() {
             onRemove={removeWidget}
             isDragging={!!activeDragId}
             onDepartmentClick={(id) => { setActiveOtdelId(id); setPage('chat') }}
+            activeOtdelId={activeOtdelId}
           />
         </div>
         <DragOverlay>

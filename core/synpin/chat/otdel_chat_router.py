@@ -5,6 +5,7 @@ Flow:
 2. @mentions parsed → Head always sees everything, workers only when @mentioned
 3. Each agent gets: otdel system prompt + own prompt + relevant history
 4. LLM called for each responding agent → response saved to history
+5. After workers respond, Head gets a follow-up turn to acknowledge/summarize
 """
 import json
 import asyncio
@@ -78,16 +79,28 @@ def _save_history(otdel_id: str, messages: list[dict]):
         json.dump(trimmed, f, ensure_ascii=False, indent=1)
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────
+
+def _get_agent_name(slug: str, head_slug: str = "", head_agent: dict | None = None) -> str:
+    """Get display name for an agent by slug."""
+    if slug == "user":
+        return "Пользователь"
+    if head_agent and slug == head_slug:
+        return head_agent.get("name", slug)
+    from ..agents.manager import get_agent
+    agent = get_agent(slug)
+    return agent.get("name", slug) if agent else slug
+
+
 # ── @Mention Parsing ───────────────────────────────────────────────────────
 
 def _parse_mentions(text: str) -> list[str]:
     """Extract @mentions from message text.
     
-    Supports: @AgentName, @Agent Name (with space)
+    Matches @Name (single word only — agent names are single words).
     Returns list of mentioned agent names (lowercased for matching).
     """
-    # Match @name or @name surname (up to next @ or end of line)
-    matches = re.findall(r'@([A-Za-zА-Яа-яЁё0-9_]+(?:\s+[A-Za-zА-Яа-яЁё0-9_]+)*)', text)
+    matches = re.findall(r'@([A-Za-zА-Яа-яЁё0-9_]+)', text)
     return [m.strip().lower() for m in matches]
 
 
@@ -100,7 +113,7 @@ def _build_otdel_system_prompt(otdel: dict, agent: dict, is_head: bool) -> str:
     """
     parts = []
     
-    # Agent's own system prompt (FIRST - this is their identity)
+    # Agent's own system prompt (FIRST — this is their identity)
     own_prompt = agent.get("system_prompt", "")
     if own_prompt:
         parts.append(own_prompt)
@@ -146,7 +159,8 @@ def _build_otdel_system_prompt(otdel: dict, agent: dict, is_head: bool) -> str:
 - Глава отдела управляет командой — подчиняйся его указаниям
 - Не начинай работу самостоятельно пока тебя не попросят
 - Отвечай кратко и по делу
-- Если задача выполнена — отчитайся через @Глава"""
+- Если задача выполнена — отчитайся через @Глава
+- НИКОГДА не притворяйся другим агентом — ты только свой персонаж"""
     
     if is_head:
         rules = """
@@ -159,11 +173,75 @@ def _build_otdel_system_prompt(otdel: dict, agent: dict, is_head: bool) -> str:
 - Если работник отчитался — прими работу или запроси исправление
 - Не отвечай "ок, принял" без необходимости — это создаёт лишний шум
 - Если нужно — передавай информацию наверх (пользователю)
-- Не выполняй работу за работников — делегируй"""
+- Не выполняй работу за работников — делегируй
+- НИКОГДА не притворяйся работником — ты Глава, отвечай от своего имени
+- Не используй формат [slug] или [имя] в своих ответах — просто общайся
+
+ВАЖНО: когда ты упоминаешь работников через @Имя — ты делегируешь им задачи.
+Система автоматически дождётся ответов ВСЕХ упомянутых работников,
+и только потом ты получишь сводку для подведения итогов.
+Поэтому смело ставь задачи нескольким работникам сразу — все ответят."""
     
     parts.append(rules)
     
     return "\n\n".join(parts)
+
+
+# ── Context Building ───────────────────────────────────────────────────────
+
+def _build_head_context(history: list[dict], agent_slug: str, exclude_last: bool = True) -> list[dict]:
+    """Build context messages for Head agent.
+    
+    Head sees everything:
+    - User messages → role: user
+    - Head's own previous messages → role: assistant
+    - Worker messages → role: user with name label
+    
+    exclude_last: True when building context for the NEXT agent call (exclude current trigger).
+                  False for follow-up (need ALL messages including last worker response).
+    """
+    context = []
+    source = history[:-1] if exclude_last else history
+    for m in source:
+        sender = m.get("sender", "")
+        content = m.get("content", "")
+        
+        if sender == "user":
+            context.append({"role": "user", "content": content})
+        elif sender == agent_slug:
+            # Head's own previous messages
+            context.append({"role": "assistant", "content": content})
+        else:
+            # Worker message — present as context from another person
+            name = _get_agent_name(sender)
+            context.append({"role": "user", "content": f"[Ответ от {name}]: {content}"})
+    
+    return context
+
+
+def _build_worker_context(history: list[dict], agent_slug: str, head_slug: str, head_name: str) -> list[dict]:
+    """Build context messages for worker agent.
+    
+    Worker sees:
+    - User messages → role: user
+    - Head's messages → role: user with name
+    - Own previous messages → role: assistant
+    """
+    context = []
+    for m in history[:-1]:  # Exclude current trigger
+        sender = m.get("sender", "")
+        content = m.get("content", "")
+        
+        if sender == "user":
+            context.append({"role": "user", "content": content})
+        elif sender == agent_slug:
+            # Worker's own previous messages
+            context.append({"role": "assistant", "content": content})
+        elif sender == head_slug:
+            # Head's messages — present as instructions
+            context.append({"role": "user", "content": f"[{head_name}]: {content}"})
+    
+    return context
 
 
 # ── API Endpoints ──────────────────────────────────────────────────────────
@@ -189,7 +267,7 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
     2. Parse @mentions
     3. Head always processes (sees everything)
     4. Mentioned workers process their mentions
-    5. Each agent's response is saved to history
+    5. After workers respond, Head gets a follow-up turn
     """
     if registry is None:
         raise HTTPException(500, "Chat provider not configured")
@@ -218,6 +296,7 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
     # Find head agent
     head_slug = otdel.get("head", "")
     head_agent = get_agent(head_slug) if head_slug else None
+    head_name = head_agent.get("name", head_slug) if head_agent else head_slug
     
     # Find worker agents
     worker_slugs = otdel.get("workers", [])
@@ -246,16 +325,16 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
             "responses": [],
         }
     
-    # Process agents iteratively: user message -> Head -> @mentions in Head response -> Workers -> etc.
+    # Process agents iteratively: user message -> Head -> @mentions -> Workers -> Head follow-up
     task_id = f"otdel_{otdel_id}_{uuid.uuid4().hex[:8]}"
     chat_task = task_manager.create(task_id)
     
     async def _process_agents():
         """Process agents iteratively until no new @mentions."""
+        log = logging.getLogger("synpin.otdel")
         responses = []
         
-        # Queue of agents to process: (agent, is_head, triggering_message)
-        # triggering_message is the message content that caused this agent to be called
+        # Queue of agents to process: (agent, is_head, trigger_message)
         agent_queue = [(agent, True, req.message) for agent in [head_agent] if agent]
         
         # Add workers mentioned in user message
@@ -264,18 +343,27 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                 continue
             agent = get_agent(slug)
             if not agent:
+                log.warning("Worker agent %s NOT FOUND in otdel %s", slug, otdel_id)
                 continue
             agent_name_lower = agent.get("name", "").lower()
             if agent_name_lower in user_mentions:
                 agent_queue.append((agent, False, req.message))
         
+        log.info("Otdel %s agent_queue: %s", otdel_id, [(a.get("name"), h) for a, h, _ in agent_queue])
+        
         processed_count = 0
+        head_processed = False
+        workers_responded = 0
         max_iterations = 10  # Prevent infinite loops
+        expected_workers = set()   # Slugs of workers Head @mentioned (gather targets)
+        responded_workers = set()  # Slugs of workers who actually responded
+        head_delegating = False    # True when Head delegated (suppress first response)
+        processed_slugs = set()    # Deduplication — don't process same agent twice
         
         while agent_queue and processed_count < max_iterations:
             agent, is_head, trigger_message = agent_queue.pop(0)
-            agent_slug = agent.get("slug", "")
-            agent_name = agent.get("name", "")
+            agent_slug_val = agent.get("slug", "")
+            agent_name_val = agent.get("name", "")
             
             # Build system prompt
             system_prompt = _build_otdel_system_prompt(otdel, agent, is_head)
@@ -283,30 +371,12 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
             # Reload history to get all messages so far
             history = _load_history(otdel_id)
             
-            # Build context
+            # Build context based on role
             if is_head:
-                # Head sees everything
-                context_messages = [
-                    {"role": m.get("role", "user"), "content": f"[{m.get('sender', '?')}] {m.get('content', '')}"}
-                    for m in history[:-1]  # Exclude current trigger message
-                ]
+                context_messages = _build_head_context(history, agent_slug_val)
+                head_processed = True
             else:
-                # Worker sees: user messages, head messages mentioning them, own messages
-                context_messages = []
-                for m in history[:-1]:
-                    sender = m.get("sender", "")
-                    content = m.get("content", "")
-                    if sender == "user" or sender == agent_slug:
-                        context_messages.append({
-                            "role": "user" if sender != agent_slug else "assistant",
-                            "content": f"[{sender}] {content}" if sender != agent_slug else content,
-                        })
-                    elif sender == head_slug:
-                        # Include head messages (they may contain @mentions to this worker)
-                        context_messages.append({
-                            "role": "user",
-                            "content": f"[{agent_name}] {content}",
-                        })
+                context_messages = _build_worker_context(history, agent_slug_val, head_slug, head_name)
             
             # Build messages for LLM
             messages = [ChatMessage(role=m["role"], content=m["content"]) for m in context_messages]
@@ -322,6 +392,7 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
             
             # Call LLM
             full_response = ""
+            log.info("Otdel %s calling LLM for %s (model=%s, provider=%s)", otdel_id, agent_name_val, model, provider_name)
             try:
                 from .router import stream_response as base_stream
                 async for chunk in base_stream(
@@ -331,8 +402,8 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                     temperature=agent.get("temperature", 0.7),
                     max_tokens=agent.get("max_tokens", 4096),
                     system_prompt=system_prompt,
-                    agent_name=agent_name,
-                    agent_slug=agent_slug,
+                    agent_name=agent_name_val,
+                    agent_slug=agent_slug_val,
                     tool_names=agent.get("tools", []),
                 ):
                     # Capture content from SSE chunks
@@ -344,16 +415,18 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                         except Exception:
                             pass
             except Exception as e:
-                logger.error("LLM call failed for agent %s in otdel %s: %s", agent_slug, otdel_id, e)
+                logger.error("LLM call failed for agent %s in otdel %s: %s", agent_slug_val, otdel_id, e)
                 full_response = f"⚠️ Ошибка: {e}"
+            
+            log.info("Otdel %s %s responded: %d chars", otdel_id, agent_name_val, len(full_response))
             
             # Save agent response
             if full_response:
                 agent_msg = {
                     "id": f"a-{uuid.uuid4().hex[:8]}",
                     "role": "assistant",
-                    "sender": agent_slug,
-                    "sender_name": agent_name,
+                    "sender": agent_slug_val,
+                    "sender_name": agent_name_val,
                     "content": full_response,
                     "is_head": is_head,
                     "timestamp": datetime.now().isoformat(),
@@ -362,21 +435,121 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                 _save_history(otdel_id, history)
                 responses.append(agent_msg)
                 
-                # Check for NEW @mentions in this response
-                new_mentions = _parse_mentions(full_response)
-                if new_mentions and not is_head:
-                    # Head mentioned someone - add them to queue
+                if is_head:
+                    # Head's first response — check for @mentions (delegation)
+                    new_mentions = _parse_mentions(full_response)
+                    log.info("Otdel %s Head response mentions=%s", otdel_id, new_mentions)
+                    
                     for slug in worker_slugs:
-                        if slug == head_slug or slug == agent_slug:
+                        if slug == head_slug or slug == agent_slug_val:
                             continue
                         mentioned_agent = get_agent(slug)
                         if not mentioned_agent:
                             continue
                         mentioned_name_lower = mentioned_agent.get("name", "").lower()
                         if mentioned_name_lower in new_mentions:
-                            agent_queue.append((mentioned_agent, False, full_response))
+                            expected_workers.add(slug)
+                            # Add to queue only if not already processed/queued
+                            if slug not in processed_slugs:
+                                agent_queue.append((mentioned_agent, False, full_response))
+                                log.info("Otdel %s gather: expecting %s", otdel_id, mentioned_agent.get("name"))
+                    
+                    if expected_workers:
+                        head_delegating = True
+                        log.info("Otdel %s Head delegating to %d workers: %s", otdel_id, len(expected_workers), expected_workers)
+                    else:
+                        # Head responded directly (no delegation) — show immediately
+                        event_data = json.dumps(agent_msg, ensure_ascii=False)
+                        await chat_task.queue.put(event_data)
+                else:
+                    # Worker response — always show to user
+                    responded_workers.add(agent_slug_val)
+                    workers_responded += 1
+                    event_data = json.dumps(agent_msg, ensure_ascii=False)
+                    await chat_task.queue.put(event_data)
+                
+                processed_slugs.add(agent_slug_val)
             
             processed_count += 1
+        
+        # ── Head follow-up (gather pattern) ──────────────────────────────
+        # If Head delegated: wait for ALL expected workers, then follow-up
+        # If Head didn't delegate but workers responded: follow-up anyway
+        should_followup = False
+        if head_delegating and expected_workers:
+            missing = expected_workers - responded_workers
+            if not missing:
+                should_followup = True
+                log.info("Otdel %s all %d workers responded — running Head follow-up", otdel_id, len(expected_workers))
+            else:
+                log.warning("Otdel %s missing responses from %s", otdel_id, missing)
+        elif head_processed and workers_responded > 0 and not head_delegating:
+            # Workers were @mentioned by user directly (not by Head)
+            should_followup = True
+        
+        if should_followup and processed_count < max_iterations:
+            history = _load_history(otdel_id)
+            context_messages = _build_head_context(history, head_slug, exclude_last=False)
+            
+            if head_delegating:
+                acknowledge_trigger = (
+                    "Все работники отдела ответили. "
+                    "Проанализируй их ответы и сформируй итог для пользователя. "
+                    "Кратко — что сделано, есть ли проблемы."
+                )
+            else:
+                acknowledge_trigger = "Работники отдела ответили. Посмотри их ответы и прокомментируй, если нужно."
+            
+            messages = [ChatMessage(role=m["role"], content=m["content"]) for m in context_messages]
+            messages.append(ChatMessage(role="user", content=acknowledge_trigger))
+            
+            system_prompt = _build_otdel_system_prompt(otdel, head_agent, True)
+            model = head_agent.get("model", "default")
+            provider_name = head_agent.get("provider")
+            if provider_name and model.startswith(f"{provider_name}/"):
+                model = model[len(provider_name) + 1:]
+            
+            full_response = ""
+            try:
+                from .router import stream_response as base_stream
+                async for chunk in base_stream(
+                    provider_name=provider_name,
+                    messages=messages,
+                    model=model,
+                    temperature=head_agent.get("temperature", 0.7),
+                    max_tokens=head_agent.get("max_tokens", 4096),
+                    system_prompt=system_prompt,
+                    agent_name=head_name,
+                    agent_slug=head_slug,
+                    tool_names=head_agent.get("tools", []),
+                ):
+                    if '"type": "chunk"' in chunk:
+                        try:
+                            payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
+                            if payload.get("type") == "chunk":
+                                full_response += payload.get("content", "")
+                        except Exception:
+                            pass
+            except Exception as e:
+                logger.error("Head follow-up failed in otdel %s: %s", otdel_id, e)
+                full_response = ""
+            
+            if full_response:
+                agent_msg = {
+                    "id": f"a-{uuid.uuid4().hex[:8]}",
+                    "role": "assistant",
+                    "sender": head_slug,
+                    "sender_name": head_name,
+                    "content": full_response,
+                    "is_head": True,
+                    "timestamp": datetime.now().isoformat(),
+                }
+                history.append(agent_msg)
+                _save_history(otdel_id, history)
+                responses.append(agent_msg)
+                
+                event_data = json.dumps(agent_msg, ensure_ascii=False)
+                await chat_task.queue.put(event_data)
         
         # Signal completion and cleanup
         await chat_task.queue.put(None)
@@ -406,6 +579,11 @@ async def get_otdel_chat_task(otdel_id: str, task_id: str):
         if chunk is None:
             task_manager.cleanup(task_id)
             return {"status": "completed", "done": True}
-        return {"status": "running", "done": False, "chunk": chunk}
+        # Try to parse as agent response JSON
+        try:
+            message = json.loads(chunk)
+            return {"status": "running", "done": False, "message": message}
+        except (json.JSONDecodeError, TypeError):
+            return {"status": "running", "done": False}
     except asyncio.TimeoutError:
         return {"status": "running", "done": False}

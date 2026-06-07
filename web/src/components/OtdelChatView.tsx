@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { EmojiPicker } from './EmojiPicker'
 import { MarkdownRenderer } from './MarkdownRenderer'
 
@@ -30,7 +30,13 @@ interface ChatMessage {
 interface Agent {
   slug: string
   name: string
-  color?: string
+  department?: string
+}
+
+interface Department {
+  departmentsid: string
+  name: string
+  color: string
 }
 
 interface OtdelChatViewProps {
@@ -43,16 +49,35 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings }: OtdelChatViewPr
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [agents, setAgents] = useState<Agent[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
   const [sending, setSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Load agents for @mention autocomplete
+  // Load agents and departments for color mapping
   useEffect(() => {
-    fetch(`${API_BASE}/api/agents`)
-      .then(r => r.json())
-      .then(d => setAgents((d.agents || []).filter((a: Agent & { enabled: boolean }) => a.enabled)))
-      .catch(() => {})
+    Promise.all([
+      fetch(`${API_BASE}/api/agents`).then(r => r.json()),
+      fetch(`${API_BASE}/api/departments`).then(r => r.json()),
+    ]).then(([agentsData, deptsData]) => {
+      setAgents((agentsData.agents || []).filter((a: Agent & { enabled: boolean }) => a.enabled))
+      setDepartments(deptsData.departments || [])
+    }).catch(() => {})
   }, [])
+
+  // Map: agent slug → department color
+  const agentColorMap = useMemo(() => {
+    const map = new Map<string, string>()
+    const deptMap = new Map<string, string>()
+    for (const d of departments) {
+      deptMap.set(d.departmentsid, d.color)
+    }
+    for (const a of agents) {
+      if (a.department && deptMap.has(a.department)) {
+        map.set(a.slug, deptMap.get(a.department)!)
+      }
+    }
+    return map
+  }, [agents, departments])
 
   // Load chat history
   const loadHistory = useCallback(async () => {
@@ -67,6 +92,13 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings }: OtdelChatViewPr
 
   useEffect(() => {
     loadHistory()
+
+    // Catch up with in-flight background tasks after page reload.
+    const timers: ReturnType<typeof setTimeout>[] = []
+    for (const delay of [2000, 4000, 7000, 12000, 20000]) {
+      timers.push(setTimeout(() => loadHistory(), delay))
+    }
+    return () => timers.forEach(clearTimeout)
   }, [loadHistory])
 
   // Auto-scroll
@@ -80,9 +112,17 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings }: OtdelChatViewPr
     setInput('')
     setSending(true)
 
-    // Reset textarea
     const textarea = document.querySelector('.otdel-bottom-input .chat-textarea') as HTMLTextAreaElement
     if (textarea) textarea.style.height = 'auto'
+
+    const userMsg: ChatMessage = {
+      id: `u-${Date.now()}`,
+      role: 'user',
+      sender: 'user',
+      content: text,
+      timestamp: new Date().toISOString(),
+    }
+    setMessages(prev => [...prev, userMsg])
 
     try {
       const res = await fetch(`${API_BASE}/api/otdels/${otdel.otdelid}/chat/send`, {
@@ -106,16 +146,47 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings }: OtdelChatViewPr
   }
 
   const pollTask = async (taskId: string) => {
-    // Poll until task completes
-    for (let i = 0; i < 60; i++) {
+    let lastMsgId: string | null = null
+
+    for (let i = 0; i < 120; i++) {
       try {
         const res = await fetch(`${API_BASE}/api/otdels/${otdel.otdelid}/chat/task/${taskId}`)
         if (res.ok) {
           const data = await res.json()
-          if (data.done) return
+
+          if (data.message) {
+            const msg: ChatMessage = {
+              id: data.message.id,
+              role: data.message.role,
+              sender: data.message.sender,
+              sender_name: data.message.sender_name,
+              content: data.message.content,
+              is_head: data.message.is_head,
+              timestamp: data.message.timestamp,
+              streaming: true,
+            }
+
+            setMessages(prev => {
+              // Remove streaming from previous message, add new one
+              const updated = prev.map(m =>
+                m.id === lastMsgId ? { ...m, streaming: false } : m
+              )
+              if (updated.some(m => m.id === msg.id)) return updated
+              return [...updated, msg]
+            })
+            lastMsgId = msg.id
+          }
+
+          if (data.done) {
+            // Stop streaming on last message
+            setMessages(prev => prev.map(m =>
+              m.id === lastMsgId ? { ...m, streaming: false } : m
+            ))
+            return
+          }
         }
       } catch {}
-      await new Promise(r => setTimeout(r, 1000))
+      await new Promise(r => setTimeout(r, 500))
     }
   }
 
@@ -137,10 +208,8 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings }: OtdelChatViewPr
     setInput(prev => prev + emoji)
   }
 
-  // Get agent name by slug
   const getAgentName = (slug: string) => agents.find(a => a.slug === slug)?.name || slug
 
-  // Determine message position: user + head = left, workers = right
   const isLeftSide = (msg: ChatMessage) => {
     return msg.role === 'user' || msg.sender === 'user' || msg.is_head === true
   }
@@ -179,23 +248,38 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings }: OtdelChatViewPr
           <div className="otdel-messages-container">
             {messages.map(msg => {
               const left = isLeftSide(msg)
-              const senderName = msg.sender === 'user' ? 'Вы' : getAgentName(msg.sender)
+              const senderName = msg.sender === 'user' ? 'Вы' : (msg.sender_name || getAgentName(msg.sender))
               const isHead = msg.is_head === true
               const isStreaming = msg.streaming === true
 
+              const workerColor = !left && !isHead ? agentColorMap.get(msg.sender) : undefined
+
               return (
                 <div key={msg.id} className={`otdel-msg-row ${left ? 'left' : 'right'} ${isStreaming ? 'streaming' : ''}`}>
-                  <div className={`otdel-msg-avatar ${left ? 'left' : 'right'}`}>
+                  <div
+                    className={`otdel-msg-avatar ${left ? 'left' : 'right'}`}
+                    style={workerColor ? { background: workerColor + '20' } : undefined}
+                  >
                     {left ? '👤' : '🏢'}
-                    {isStreaming && <div className="otdel-msg-streaming-dots"><span></span><span></span><span></span></div>}
                   </div>
                   <div className="otdel-msg-body">
                     <div className={`otdel-msg-name ${left ? 'left' : 'right'} ${isHead ? 'head' : ''}`}>
                       {senderName}
                     </div>
-                    <div className={`otdel-msg-bubble ${left ? 'left' : 'right'} ${isHead ? 'head' : ''}`}>
-                      <MarkdownRenderer content={msg.content} />
+                    <div
+                      className={`otdel-msg-bubble ${left ? 'left' : 'right'} ${isHead ? 'head' : ''}`}
+                      style={workerColor ? {
+                        borderColor: workerColor,
+                        background: workerColor + '12',
+                      } : undefined}
+                    >
+                      <MarkdownRenderer content={msg.content} isStreaming={isStreaming} />
                     </div>
+                    {isStreaming && (
+                      <div className="otdel-msg-streaming-dots">
+                        <span></span><span></span><span></span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )

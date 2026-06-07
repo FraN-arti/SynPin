@@ -616,17 +616,12 @@ def save_otdels(otdels: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return otdels
 
 
-def _count_agents_in_otdel(otdel_id: str) -> int:
-    """Count how many agents belong to an otdel."""
-    agents_data = _load_yaml(_get_config_dir() / "agents.yaml")
-    agents_cfg = agents_data.get("agents", {})
+def _count_agents_in_otdel(otdel: dict) -> int:
+    """Count agents in an otdel: head (if set) + workers."""
     count = 0
-    for slug, cfg in agents_cfg.items():
-        agent_yaml_path = _get_agents_dir() / slug / "agent.yaml"
-        agent_data = _load_yaml(agent_yaml_path)
-        otdel = agent_data.get("otdel", cfg.get("otdel", ""))
-        if otdel == otdel_id:
-            count += 1
+    if otdel.get("head"):
+        count += 1
+    count += len(otdel.get("workers", []))
     return count
 
 
@@ -634,8 +629,7 @@ def get_otdels_with_agents() -> list[dict[str, Any]]:
     """Load otdels with agent counts resolved."""
     otdels = load_otdels()
     for otdel in otdels:
-        otdel_id = otdel.get("otdelid", "")
-        otdel["agent_count"] = _count_agents_in_otdel(otdel_id)
+        otdel["agent_count"] = _count_agents_in_otdel(otdel)
     return otdels
 
 
@@ -644,7 +638,7 @@ def get_otdel(otdel_id: str) -> dict[str, Any] | None:
     otdels = load_otdels()
     for otdel in otdels:
         if otdel.get("otdelid") == otdel_id:
-            otdel["agent_count"] = _count_agents_in_otdel(otdel_id)
+            otdel["agent_count"] = _count_agents_in_otdel(otdel)
             return otdel
     return None
 

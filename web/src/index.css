@@ -18,6 +18,12 @@
   --gray-300: #d4d4d4;
   --white: #fafafa;
   --radius: 2px;
+  --bg-card: #171717;
+  --bg-hover: #262626;
+  --border: #262626;
+  --accent: #f97316;
+  --text-dim: #737373;
+  --text-secondary: #a3a3a3;
 }
 
 /* Light Theme */
@@ -35,6 +41,12 @@
   --gray-400: #525252;
   --gray-300: #262626;
   --white: #171717;
+  --bg-card: #f5f5f5;
+  --bg-hover: #e5e5e5;
+  --border: #e5e5e5;
+  --accent: #ea580c;
+  --text-dim: #737373;
+  --text-secondary: #525252;
 }
 
 /* OLED Theme - pure black */
@@ -4489,7 +4501,7 @@ body {
 .widget-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
   margin-top: 0;
 }
 
@@ -4498,6 +4510,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 6px;
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
 .widget-card.dragging {
@@ -4891,19 +4904,21 @@ body {
   max-width: 90vw;
   max-height: 85vh;
   overflow: hidden;
-  background: #111;
+  background: var(--black);
   border: 1px solid var(--gray-800);
   border-radius: 8px;
   z-index: 201;
   display: flex;
   flex-direction: column;
   opacity: 0;
+  pointer-events: none;
   transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 .otdel-settings-panel.open {
   transform: translate(-50%, -50%) scale(1);
   opacity: 1;
+  pointer-events: auto;
 }
 
 .otdel-settings-header {
@@ -5008,7 +5023,7 @@ body {
   padding: 16px 24px;
   border-top: 1px solid var(--gray-800);
   flex-shrink: 0;
-  background: #111;
+  background: var(--black);
 }
 
 /* ── Workers list (grouped by department) ──────────────────────── */
@@ -5133,7 +5148,7 @@ body {
 }
 
 .otdel-msg-name {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-dim);
 }
@@ -5155,7 +5170,6 @@ body {
   border-radius: var(--radius);
   font-size: 14px;
   line-height: 1.5;
-  white-space: pre-wrap;
   word-break: break-word;
 }
 
@@ -5178,6 +5192,39 @@ body {
 
 /* ── Streaming animation ─────────────────────────────────────────────── */
 
+/* Avatar pulse */
+.otdel-msg-row.streaming .otdel-msg-avatar {
+  animation: otdel-avatar-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes otdel-avatar-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.5);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.3);
+    opacity: 0.7;
+  }
+}
+
+/* Animated gradient border on bubble */
+.otdel-msg-row.streaming .otdel-msg-bubble {
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--gray-800), var(--gray-800)) padding-box,
+    conic-gradient(
+      from var(--border-angle),
+      transparent 70%,
+      #f97316 80%,
+      #fb923c 85%,
+      #fdba74 90%,
+      transparent 100%
+    ) border-box;
+  animation: borderFlow 2s linear infinite;
+}
+
+/* Streaming dots */
 .otdel-msg-row.streaming .otdel-msg-streaming-dots {
   display: flex;
   gap: 2px;

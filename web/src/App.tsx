@@ -932,11 +932,13 @@ function App() {
           return (
             <>
               <OtdelChatView
+                key={otdel.id}
                 otdel={{ ...otdel, otdelid: otdel.id }}
                 onBack={() => setActiveOtdelId(null)}
                 onOpenSettings={() => setOtdelSettingsOpen(true)}
               />
               <OtdelSettingsPanel
+                key={`settings-${otdel.id}`}
                 otdel={{ ...otdel, otdelid: otdel.id }}
                 open={otdelSettingsOpen}
                 onClose={() => setOtdelSettingsOpen(false)}

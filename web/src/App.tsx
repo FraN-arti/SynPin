@@ -23,6 +23,7 @@ import {
   closestCenter,
 } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
+import { useWebSocket } from './hooks/useWebSocket'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:2088'
 
@@ -181,6 +182,9 @@ function App() {
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
+
+  // WebSocket — single connection for all real-time messaging
+  const { send: wsSend, on: wsOn, connected: wsConnected } = useWebSocket()
 
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
 
@@ -472,7 +476,7 @@ function App() {
     el.style.height = Math.min(el.scrollHeight, 150) + 'px'
   }
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim() || isTyping) return
 
@@ -504,177 +508,167 @@ function App() {
 
     const activeTools: ToolCall[] = []
     let toolIndex = 0
+    let fullContent = ''
 
-    try {
-      // Build history: existing messages (userMsg not included — it's in req.message)
-      const history = messagesRef.current.map(m => ({ role: m.role, content: m.content }))
+    // Build system prompt from agent config
+    let systemPrompt: string | undefined
+    let agentName: string | undefined
 
-      // Build merged system prompt from agent config
-      let systemPrompt: string | undefined
-      let agentName: string | undefined
-      let model = 'general-agent'
-      let temperature = 0.7
-      let maxTokens: number | undefined
-      let chatEndpoint = `${API_BASE}/api/chat/stream`
-      let enabledTools: string[] = []
+    // Check if this is a Hermes external agent — use SSE fallback
+    const isHermesAgent = activeAgent?.is_external && activeAgent?.type === 'hermes'
 
-      if (activeAgent) {
-        agentName = activeAgent.name
-        temperature = activeAgent.temperature || 0.7
-        maxTokens = activeAgent.max_tokens
-        enabledTools = activeAgent.tools || []
-
-        // Route to Hermes endpoint if external agent
-        if (activeAgent.is_external && activeAgent.type === 'hermes') {
-          chatEndpoint = `${API_BASE}/api/chat/hermes/stream`
-          // Build SynPin context for external agent
-          const ctx: string[] = [
-            `Ты работаешь внутри платформы SynPin — системы управления агентами (agent-driven organization).`,
-            `Ты подключён как внешний агент (external agent) в организации SynPin.`,
-          ]
-          if (activeAgent.name) ctx.push(`Твоё имя в SynPin: ${activeAgent.name}`)
-          if (activeAgent.role_name) ctx.push(`Твоя роль: ${activeAgent.role_name}`)
-          if (activeAgent.department_name) ctx.push(`Твой департамент: ${activeAgent.department_name}`)
-          if (activeAgent.system_prompt) ctx.push(activeAgent.system_prompt)
-          ctx.push(`Если тебя спрашивают где ты или что ты — ты внутри SynPin и можешь помогать с задачами организации.`)
-          systemPrompt = ctx.join('\n')
-        } else {
-          // SynPin agent — build system prompt
-          model = activeAgent.model
-          const parts: string[] = []
-          if (activeAgent.name) parts.push(`Имя: ${activeAgent.name}`)
-          if (activeAgent.description) parts.push(activeAgent.description)
-          if (activeAgent.role_name) parts.push(`Роль: ${activeAgent.role_name}`)
-          if (activeAgent.department_name) parts.push(`Департамент: ${activeAgent.department_name}`)
-          if (activeAgent.system_prompt) parts.push(activeAgent.system_prompt)
-          if (activeAgent.tone) parts.push(`Тон общения: ${activeAgent.tone}`)
-          if (activeAgent.style) parts.push(`Стиль ответов: ${activeAgent.style}`)
-          if (activeAgent.traits && activeAgent.traits.length > 0) parts.push(`Характеристики: ${activeAgent.traits.join(', ')}`)
-          if (parts.length > 0) systemPrompt = parts.join('\n\n')
-        }
+    if (activeAgent) {
+      agentName = activeAgent.name
+      if (isHermesAgent) {
+        const ctx: string[] = [
+          `Ты работаешь внутри платформы SynPin — системы управления агентами (agent-driven organization).`,
+          `Ты подключён как внешний агент (external agent) в организации SynPin.`,
+        ]
+        if (activeAgent.name) ctx.push(`Твоё имя в SynPin: ${activeAgent.name}`)
+        if (activeAgent.role_name) ctx.push(`Твоя роль: ${activeAgent.role_name}`)
+        if (activeAgent.department_name) ctx.push(`Твой департамент: ${activeAgent.department_name}`)
+        if (activeAgent.system_prompt) ctx.push(activeAgent.system_prompt)
+        ctx.push(`Если тебя спрашивают где ты или что ты — ты внутри SynPin и можешь помогать с задачами организации.`)
+        systemPrompt = ctx.join('\n')
+      } else {
+        const parts: string[] = []
+        if (activeAgent.name) parts.push(`Имя: ${activeAgent.name}`)
+        if (activeAgent.description) parts.push(activeAgent.description)
+        if (activeAgent.role_name) parts.push(`Роль: ${activeAgent.role_name}`)
+        if (activeAgent.department_name) parts.push(`Департамент: ${activeAgent.department_name}`)
+        if (activeAgent.system_prompt) parts.push(activeAgent.system_prompt)
+        if (activeAgent.tone) parts.push(`Тон общения: ${activeAgent.tone}`)
+        if (activeAgent.style) parts.push(`Стиль ответов: ${activeAgent.style}`)
+        if (activeAgent.traits && activeAgent.traits.length > 0) parts.push(`Характеристики: ${activeAgent.traits.join(', ')}`)
+        if (parts.length > 0) systemPrompt = parts.join('\n\n')
       }
+    }
 
-      const response = await fetch(chatEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: userInput,
-          model,
-          provider: activeAgent?.provider || undefined,
-          history,
-          system_prompt: systemPrompt,
-          agent_name: agentName,
-          agent_slug: activeAgent?.slug || undefined,
-          channel_id: 'web',
-
-          temperature,
-          max_tokens: maxTokens,
-          tools: enabledTools,
-        }),
-      })
-
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      const reader = response.body?.getReader()
-      if (!reader) throw new Error('No response body')
-
-      const decoder = new TextDecoder()
-      let buffer = ''
-      let fullContent = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        buffer += decoder.decode(value, { stream: true })
-
-        // Parse SSE lines
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || '' // keep incomplete line in buffer
-
-        let streamDone = false
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          const data = line.slice(6)
-          let parsed: Record<string, unknown>
-          try {
-            parsed = JSON.parse(data)
-          } catch {
-            continue
+    // ── Hermes agents: keep SSE (separate endpoint) ──────────────
+    if (isHermesAgent) {
+      try {
+        const history = messagesRef.current.map(m => ({ role: m.role, content: m.content }))
+        const response = await fetch(`${API_BASE}/api/chat/hermes/stream`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: userInput,
+            model: activeAgent?.model || 'general-agent',
+            provider: activeAgent?.provider,
+            history,
+            system_prompt: systemPrompt,
+            agent_name: agentName,
+            agent_slug: activeAgent?.slug,
+            channel_id: 'web',
+            temperature: activeAgent?.temperature || 0.7,
+            max_tokens: activeAgent?.max_tokens,
+            tools: activeAgent?.tools || [],
+          }),
+        })
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        const reader = response.body?.getReader()
+        if (!reader) throw new Error('No response body')
+        const decoder = new TextDecoder()
+        let buffer = ''
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+          let streamDone = false
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue
+            let parsed: Record<string, unknown>
+            try { parsed = JSON.parse(line.slice(6)) } catch { continue }
+            if (parsed.type === 'chunk' && typeof parsed.content === 'string') {
+              fullContent += parsed.content
+              setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: fullContent } : m))
+            } else if (parsed.type === 'tool_start') {
+              const toolName = String(parsed.tool || '')
+              if (HIDDEN_TOOLS.has(toolName)) { toolIndex++; continue }
+              const tc: ToolCall = { id: `${assistantId}-tool-${toolIndex++}`, name: toolName, params: (parsed.params as Record<string, unknown>) || {}, status: 'running' }
+              activeTools.push(tc)
+              setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, tools: [...(m.tools || []), tc] } : m))
+            } else if (parsed.type === 'tool_end') {
+              const toolName = String(parsed.tool || '')
+              if (HIDDEN_TOOLS.has(toolName)) { continue }
+              const idx = activeTools.findIndex(t => t.name === toolName && t.status === 'running')
+              if (idx !== -1 && activeTools[idx]) { activeTools[idx].status = parsed.success ? 'completed' : 'error'; activeTools[idx].result = String(parsed.result || '') }
+              setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, tools: [...activeTools] } : m))
+            } else if (parsed.type === 'done') {
+              setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, model: parsed.model as string, agent_name: parsed.agent_name as string } : m))
+              streamDone = true; break
+            } else if (parsed.type === 'error') { throw new Error(String(parsed.message || 'Stream error')) }
           }
-
-          if (parsed.type === 'chunk' && typeof parsed.content === 'string') {
-            fullContent += parsed.content
-            setMessages(prev =>
-              prev.map(m => m.id === assistantId ? { ...m, content: fullContent } : m)
-            )
-          } else if (parsed.type === 'tool_start') {
-            const toolName = String(parsed.tool || '')
-            if (HIDDEN_TOOLS.has(toolName)) { toolIndex++; continue }
-            const ti = toolIndex++
-            const tc: ToolCall = {
-              id: `${assistantId}-tool-${ti}`,
-              name: toolName,
-              params: (parsed.params as Record<string, unknown>) || {},
-              status: 'running',
-            }
-            activeTools.push(tc)
-            setMessages(prev =>
-              prev.map(m => m.id === assistantId
-                ? { ...m, tools: [...(m.tools || []), tc] }
-                : m
-              )
-            )
-          } else if (parsed.type === 'tool_end') {
-            const toolName = String(parsed.tool || '')
-            if (HIDDEN_TOOLS.has(toolName)) { continue }
-            const idx = activeTools.findIndex(t => t.name === toolName && t.status === 'running')
-            if (idx !== -1) {
-              const tc = activeTools[idx]
-              if (tc) {
-                tc.status = parsed.success ? 'completed' : 'error'
-                tc.result = String(parsed.result || '')
-                tc.error = parsed.error ? String(parsed.error) : undefined
-                setMessages(prev =>
-                  prev.map(m => m.id === assistantId
-                    ? { ...m, tools: [...activeTools] }
-                    : m
-                  )
-                )
-              }
-            }
-          } else if (parsed.type === 'done') {
-            const model = parsed.model as string | undefined
-            const agentName = parsed.agent_name as string | undefined
-            setMessages(prev =>
-              prev.map(m => m.id === assistantId
-                ? { ...m, model: model || 'assistant', agent_name: agentName }
-                : m
-              )
-            )
-            streamDone = true
-            break
-          } else if (parsed.type === 'error') {
-            throw new Error(String(parsed.message || 'Stream error'))
-          }
+          if (streamDone) break
         }
-        if (streamDone) break
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error'
+        setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: m.content || `⚠️ Ошибка: ${errorMsg}` } : m))
+      } finally {
+        setIsTyping(false)
       }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Unknown error'
-      setMessages(prev =>
-        prev.map(m => m.id === assistantId
-          ? { ...m, content: m.content || `⚠️ Ошибка: ${errorMsg}` }
-          : m
-        )
-      )
-    } finally {
+      return
+    }
+
+    // ── SynPin agents: WebSocket ─────────────────────────────────
+    const cleanupFns: (() => void)[] = []
+
+    const onChunk = wsOn('chat:chunk', (msg) => {
+      if (msg.agent_slug !== activeAgent?.slug) return
+      fullContent += msg.content
+      setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: fullContent } : m))
+    })
+
+    const onToolStart = wsOn('chat:tool_start', (msg) => {
+      if (msg.agent_slug !== activeAgent?.slug) return
+      const toolName = String(msg.tool || '')
+      if (HIDDEN_TOOLS.has(toolName)) { toolIndex++; return }
+      const tc: ToolCall = { id: `${assistantId}-tool-${toolIndex++}`, name: toolName, params: (msg.params as Record<string, unknown>) || {}, status: 'running' }
+      activeTools.push(tc)
+      setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, tools: [...(m.tools || []), tc] } : m))
+    })
+
+    const onToolEnd = wsOn('chat:tool_end', (msg) => {
+      if (msg.agent_slug !== activeAgent?.slug) return
+      const toolName = String(msg.tool || '')
+      if (HIDDEN_TOOLS.has(toolName)) { return }
+      const idx = activeTools.findIndex(t => t.name === toolName && t.status === 'running')
+      if (idx !== -1 && activeTools[idx]) {
+        activeTools[idx].status = msg.success ? 'completed' : 'error'
+        activeTools[idx].result = String(msg.result || '')
+        activeTools[idx].error = msg.error ? String(msg.error) : undefined
+      }
+      setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, tools: [...activeTools] } : m))
+    })
+
+    const onDone = wsOn('chat:done', (msg) => {
+      if (msg.agent_slug !== activeAgent?.slug) return
+      setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, model: msg.model || 'assistant', agent_name: msg.agent_name } : m))
+      cleanup()
+    })
+
+    const onError = wsOn('chat:error', (msg) => {
+      cleanup()
+      setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: m.content || `⚠️ Ошибка: ${msg.message || 'Stream error'}` } : m))
+    })
+
+    const cleanup = () => {
+      cleanupFns.forEach(fn => fn())
       setIsTyping(false)
     }
-  }, [input, isTyping, activeAgent])
+
+    cleanupFns.push(onChunk, onToolStart, onToolEnd, onDone, onError)
+
+    // Send via WebSocket
+    wsSend('chat:send', {
+      agent_slug: activeAgent?.slug || '',
+      message: userInput,
+      system_prompt: systemPrompt,
+      channel_id: 'web',
+    })
+  }, [input, isTyping, activeAgent, wsSend, wsOn])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -936,6 +930,9 @@ function App() {
                 otdel={{ ...otdel, otdelid: otdel.id }}
                 onBack={() => setActiveOtdelId(null)}
                 onOpenSettings={() => setOtdelSettingsOpen(true)}
+                wsSend={wsSend}
+                wsOn={wsOn}
+                wsConnected={wsConnected}
               />
               <OtdelSettingsPanel
                 key={`settings-${otdel.id}`}

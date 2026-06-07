@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="SynPin",
     description="Agent-Driven Organization Platform",
-    version="0.2.2",
+    version="0.2.3",
 )
 
 # Allow Vite dev server to reach the API
@@ -59,6 +59,10 @@ from ..chat import otdel_chat_router
 otdel_chat_router.registry = _loaded_registry
 app.include_router(otdel_chat_router.router)
 
+# WebSocket router
+from ..chat import ws_router
+app.include_router(ws_router.router)
+
 # Providers config management API
 from .providers_router import router as providers_router
 app.include_router(providers_router)
@@ -94,7 +98,7 @@ app.include_router(themes_router)
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "version": "0.2.2"}
+    return {"status": "ok", "version": "0.2.3"}
 
 
 @app.post("/api/admin/reload")

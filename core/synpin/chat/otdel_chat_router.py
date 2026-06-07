@@ -404,7 +404,7 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                     system_prompt=system_prompt,
                     agent_name=agent_name_val,
                     agent_slug=agent_slug_val,
-                    tool_names=agent.get("tools", []),
+                    tool_names=[],  # No tools in otdel chat
                 ):
                     # Capture content from SSE chunks
                     if '"type": "chunk"' in chunk:
@@ -521,7 +521,7 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                     system_prompt=system_prompt,
                     agent_name=head_name,
                     agent_slug=head_slug,
-                    tool_names=head_agent.get("tools", []),
+                    tool_names=[],  # No tools in otdel chat follow-up
                 ):
                     if '"type": "chunk"' in chunk:
                         try:
@@ -568,7 +568,11 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
 
 @router.get("/{otdel_id}/chat/task/{task_id}")
 async def get_otdel_chat_task(otdel_id: str, task_id: str):
-    """Poll task status for streaming responses."""
+    """Poll task status for streaming responses.
+    
+    DEPRECATED: Use WebSocket /ws with type='otdel:send' instead.
+    This endpoint is kept for backward compatibility.
+    """
     task = task_manager.get(task_id)
     if not task:
         return {"status": "completed", "done": True}

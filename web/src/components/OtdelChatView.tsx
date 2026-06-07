@@ -39,13 +39,19 @@ interface Department {
   color: string
 }
 
+type WsSend = (type: string, payload?: Record<string, any>) => boolean
+type WsOn = (type: string, handler: (data: any) => void) => () => void
+
 interface OtdelChatViewProps {
   otdel: OtdelData
   onBack: () => void
   onOpenSettings: () => void
+  wsSend: WsSend
+  wsOn: WsOn
+  wsConnected: boolean
 }
 
-export function OtdelChatView({ otdel, onBack, onOpenSettings }: OtdelChatViewProps) {
+export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: OtdelChatViewProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [agents, setAgents] = useState<Agent[]>([])
@@ -92,14 +98,29 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings }: OtdelChatViewPr
 
   useEffect(() => {
     loadHistory()
-
-    // Catch up with in-flight background tasks after page reload.
-    const timers: ReturnType<typeof setTimeout>[] = []
-    for (const delay of [2000, 4000, 7000, 12000, 20000]) {
-      timers.push(setTimeout(() => loadHistory(), delay))
-    }
-    return () => timers.forEach(clearTimeout)
   }, [loadHistory])
+
+  // WebSocket message handlers for this otdel
+  useEffect(() => {
+    const unsubMessage = wsOn('otdel:message', (msg) => {
+      if (msg.otdel_id !== otdel.otdelid) return
+      const chatMsg = msg.message as ChatMessage
+      setMessages(prev => {
+        if (prev.some(m => m.id === chatMsg.id)) return prev
+        return [...prev, chatMsg]
+      })
+    })
+
+    const unsubDone = wsOn('otdel:done', (msg) => {
+      if (msg.otdel_id !== otdel.otdelid) return
+      setSending(false)
+    })
+
+    return () => {
+      unsubMessage()
+      unsubDone()
+    }
+  }, [wsOn, otdel.otdelid])
 
   // Auto-scroll
   useEffect(() => {
@@ -115,79 +136,11 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings }: OtdelChatViewPr
     const textarea = document.querySelector('.otdel-bottom-input .chat-textarea') as HTMLTextAreaElement
     if (textarea) textarea.style.height = 'auto'
 
-    const userMsg: ChatMessage = {
-      id: `u-${Date.now()}`,
-      role: 'user',
-      sender: 'user',
-      content: text,
-      timestamp: new Date().toISOString(),
-    }
-    setMessages(prev => [...prev, userMsg])
-
-    try {
-      const res = await fetch(`${API_BASE}/api/otdels/${otdel.otdelid}/chat/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, sender: 'user' }),
-      })
-
-      if (res.ok) {
-        const data = await res.json()
-        if (data.task_id) {
-          await pollTask(data.task_id)
-        }
-        await loadHistory()
-      }
-    } catch (e) {
-      console.error('[otdel-chat] send error:', e)
-    } finally {
-      setSending(false)
-    }
-  }
-
-  const pollTask = async (taskId: string) => {
-    let lastMsgId: string | null = null
-
-    for (let i = 0; i < 120; i++) {
-      try {
-        const res = await fetch(`${API_BASE}/api/otdels/${otdel.otdelid}/chat/task/${taskId}`)
-        if (res.ok) {
-          const data = await res.json()
-
-          if (data.message) {
-            const msg: ChatMessage = {
-              id: data.message.id,
-              role: data.message.role,
-              sender: data.message.sender,
-              sender_name: data.message.sender_name,
-              content: data.message.content,
-              is_head: data.message.is_head,
-              timestamp: data.message.timestamp,
-              streaming: true,
-            }
-
-            setMessages(prev => {
-              // Remove streaming from previous message, add new one
-              const updated = prev.map(m =>
-                m.id === lastMsgId ? { ...m, streaming: false } : m
-              )
-              if (updated.some(m => m.id === msg.id)) return updated
-              return [...updated, msg]
-            })
-            lastMsgId = msg.id
-          }
-
-          if (data.done) {
-            // Stop streaming on last message
-            setMessages(prev => prev.map(m =>
-              m.id === lastMsgId ? { ...m, streaming: false } : m
-            ))
-            return
-          }
-        }
-      } catch {}
-      await new Promise(r => setTimeout(r, 500))
-    }
+    // Send via WebSocket — backend will push the message back with its own id
+    wsSend('otdel:send', {
+      otdel_id: otdel.otdelid,
+      message: text,
+    })
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

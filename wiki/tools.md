@@ -1,6 +1,6 @@
 # 🛠 Инструменты агентов
 
-Инструменты — **что агент может делать** с системой. Реализовано 8 из 17 запланированных.
+Инструменты — **что агент может делать** с системой. Реализовано 13 инструментов из запланированных.
 
 ---
 
@@ -11,6 +11,8 @@ core/synpin/tools/
 ├── base.py              # базовые типы (ToolHandler, ToolResult, make_error)
 ├── registry.py          # реестр — загружает tools.yaml, резолвит handlers
 ├── security.py          # security sandbox (allowed_directories из security.yaml)
+│
+├── # Базовые инструменты (8 штук)
 ├── terminal.py          # async shell exec
 ├── file_read.py         # чтение файлов с номерами строк
 ├── file_write.py        # атомарная запись файлов
@@ -18,31 +20,38 @@ core/synpin/tools/
 ├── web_search.py        # DuckDuckGo поиск
 ├── code_exec.py         # sandboxed Python exec
 ├── memory_read.py       # чтение MEMORY/USER/facts
-└── memory_write.py      # add/remove/replace entries
+├── memory_write.py      # add/remove/replace entries
+│
+└── # Head Protocol — инструменты управляющего отдела (5 штук)
+    head_delegate.py     # делегирование задач воркерам
+    head_await.py        # ожидание ответов от воркеров
+    head_evaluate.py     # quality gate — оценка результатов
+    head_retry.py        # ретрай упавшего воркера
+    head_decide.py       # стратегическое решение
 ```
 
 Каждый инструмент — async функция с описанием, параметрами и результатом.
 
 ---
 
-## Реализованные инструменты (8/17)
+## Базовые инструменты (8)
 
-### Базовые (все агенты)
+### Файловые операции
 
 | Инструмент | Что делает | Параметры |
 |---|---|---|
 | `file_read` | Читает файл с номерами строк | `path`, `offset=1`, `limit=500` |
+| `file_write` | Создаёт/перезаписывает файл | `path`, `content` |
 | `search_files` | Ищет по имени или содержимому | `pattern`, `target="content"`, `path="."` |
 
-### Для разработчиков
+### Код и терминал
 
 | Инструмент | Что делает | Параметры |
 |---|---|---|
-| `file_write` | Создаёт/перезаписывает файл | `path`, `content` |
 | `terminal` | Выполняет shell-команду | `command`, `timeout=180`, `workdir` |
-| `code_exec` | Выполняет Python-код | `code`, `timeout=30` |
+| `code_exec` | Выполняет Python-код в sandbox | `code`, `timeout=30` |
 
-### Для исследователей
+### Веб
 
 | Инструмент | Что делает | Параметры |
 |---|---|---|
@@ -57,9 +66,93 @@ core/synpin/tools/
 
 ---
 
+## Head Protocol — инструменты управляющего (5)
+
+**Head Protocol** — набор инструментов для Главы отдела, автоматически добавляемых в otdel-чате.
+
+> ⚡ Все 5 инструментов **builtin** (встроены), используются только в контексте otdel-чата и **автоматически добавляются** к списку инструментов Главы.
+
+### head_delegate
+
+Структурированное делегирование задач воркерам.
+
+```
+Параметры:
+  workers:    [{slug: str, task: str}]  — кто и что делает
+  strategy:   "parallel" | "sequential" | "pipeline" (по умолчанию "parallel")
+  context:    str — дополнительный контекст для воркеров
+  timeout_ms: int (по умолчанию 120000)
+
+Возвращает: {delegation_id, expected_workers, timeout_ms, guidance}
+```
+
+### head_await
+
+Ожидание ответов от делегированных воркеров с таймаутом и фолбэком.
+
+```
+Параметры:
+  delegation_id: str (опционально, берёт активный)
+  timeout_ms:    int (по умолчанию 120000)
+
+Возвращает: {status: "all_responded"|"timeout"|"partial", results: [...], missing: [...]}
+```
+
+### head_evaluate
+
+Quality gate — проверяет, удовлетворяют ли результаты задаче.
+
+```
+Параметры:
+  task_description: str — описание задачи
+  criteria:         list[str] — критерии оценки (опционально)
+
+Возвращает: {satisfied: bool, issues: [], suggestions: []}
+```
+
+### head_retry
+
+Фолбэк при падении воркера — повторная отправка с контекстом ошибки.
+
+```
+Параметры:
+  worker_slug:  str — какой воркер повторить
+  error_context: str — что пошло не так
+  attempt:      int (автоинкремент)
+
+Возвращает: {retry_message: str, guidance: str, attempt: int}
+```
+
+### head_decide
+
+Стратегическое решение: продолжить, остановить, взять самому, эскалировать.
+
+```
+Параметры:
+  situation: "continue" | "stop" | "takeover" | "escalate"
+  reasoning: str — почему принято это решение
+  context:   dict — дополнительный контекст
+
+Возвращает: {action: str, reasoning: str, next_prompt: str}
+```
+
+### Как работает Head Protocol
+
+```
+1. Глава получает запрос от пользователя
+2. Глава вызывает head_delegate(workers=[...], task="...")
+3. Глава вызывает head_await() — ждёт ответов воркеров
+4. Если воркер упал → head_retry(worker_slug, error_context)
+5. После ответов → head_evaluate() — проверяет качество
+6. head_decide("continue"|"stop"|"takeover"|"escalate")
+7. Глава формирует итог для пользователя
+```
+
+---
+
 ## Реестр инструментов
 
-Инструменты загружаются из `~/.synpin/config/tools.yaml`. Реестр динамически импортирует handlers:
+Инструменты загружаются из `~/.synpin/config/tools.yaml`. Реестр динамически импортирует handlers базовых инструментов:
 
 ```python
 # core/synpin/tools/registry.py
@@ -75,24 +168,95 @@ _MODULE_MAP = {
 }
 ```
 
-### Список инструментов агента
+> **Примечание:** Head Protocol инструменты (head_delegate, head_await и т.д.) **не в MODULE_MAP** — они импортируются напрямую в ws_router.py и otdel_chat_router.py при обработке otdel-чата.
+
+### tools.yaml — реестр всех инструментов
 
 ```yaml
 # ~/.synpin/config/tools.yaml
 tools:
-  terminal:
-    description: "Execute a shell command"
-    parameters:
-      command: "Shell command to execute"
-      timeout: "Max seconds (default: 180)"
-      workdir: "Working directory"
-  
+  # ─── Файловые операции ──────────────────────────
   file_read:
-    description: "Read a text file with line numbers"
-    parameters:
-      path: "Path to the file"
-      offset: "Start line (default: 1)"
-      limit: "Max lines (default: 500)"
+    display: "Чтение файлов"
+    category: files
+    implemented: true
+  file_write:
+    display: "Запись файлов"
+    category: files
+    implemented: true
+  search_files:
+    display: "Поиск по файлам"
+    category: files
+    implemented: true
+
+  # ─── Код и терминал ─────────────────────────────
+  terminal:
+    display: "Терминал"
+    category: code
+    implemented: true
+  code_exec:
+    display: "Запуск кода"
+    category: code
+    implemented: true
+
+  # ─── Веб ────────────────────────────────────────
+  web_search:
+    display: "Поиск в интернете"
+    category: web
+    implemented: true
+
+  # ─── Память ─────────────────────────────────────
+  memory_read:
+    display: "Чтение памяти"
+    category: memory
+    implemented: true
+    builtin: true
+  memory_write:
+    display: "Запись в память"
+    category: memory
+    implemented: true
+    builtin: true
+
+  # ─── Head Protocol (builtin, otdel-only) ────────
+  head_delegate:
+    display: "Делегирование Главы"
+    category: head_protocol
+    implemented: true
+    builtin: true
+  head_await:
+    display: "Ожидание ответов"
+    category: head_protocol
+    implemented: true
+    builtin: true
+  head_evaluate:
+    display: "Оценка результатов"
+    category: head_protocol
+    implemented: true
+    builtin: true
+  head_retry:
+    display: "Ретрай воркера"
+    category: head_protocol
+    implemented: true
+    builtin: true
+  head_decide:
+    display: "Стратегическое решение"
+    category: head_protocol
+    implemented: true
+    builtin: true
+```
+
+### Группировка для UI
+
+```yaml
+categories:
+  files: "Файлы"
+  code: "Код и терминал"
+  web: "Веб"
+  memory: "Память"
+  communication: "Коммуникация"
+  tasks: "Задачи"
+  skills: "Скиллы"
+  head_protocol: "Протокол Главы"
 ```
 
 ---
@@ -120,19 +284,6 @@ security:
     - "D:\\synpin"
     # - "C:\\Projects"
     # - "C:\\Games\\l2client"
-```
-
-### Реализованные ограничения
-
-```yaml
-# tools.yaml — пример
-tools:
-  terminal:
-    timeout: 30
-  file_read:
-    max_size: 1048576  # 1MB
-  code_exec:
-    timeout: 30
 ```
 
 ---
@@ -164,20 +315,6 @@ tools:
 Используй инструменты когда нужно. Не используй когда можешь ответить напрямую.
 ```
 
-### Пример использования
-
-```
-User: "Найди все файлы где упоминается CORS"
-Agent: search_files("CORS", target="content", path="D:\\synpin\\")
-Result: 
-  wiki/channels-hierarchy.md:108| Не забыл про CORS middleware
-  core/main.py:45| app.add_middleware(CORSMiddleware, ...)
-
-Agent: Нашёл 2 файла:
-  - wiki/channels-hierarchy.md (упоминание в документации)
-  - core/main.py (реализация middleware)
-```
-
 ---
 
 ## Нереализованные инструменты (планируются)
@@ -189,7 +326,7 @@ Agent: Нашёл 2 файла:
 | `vision` | Анализ изображений | Фаза 3 |
 | `message_send` | Отправка сообщений в каналы | Фаза 3 |
 | `agent_call` | Вызов другого агента | Фаза 3 |
-| `task_create` | Управление задачами | Фаза 6 |
+| `task_create` | Создание задачи на канбан-доске | Фаза 6 |
 | `task_update` | Обновление задач | Фаза 6 |
 | `skill_use` | Использование навыков | Фаза 3 |
 
@@ -198,6 +335,7 @@ Agent: Нашёл 2 файла:
 ## Связь с другими документами
 
 - [Агенты](agents.md) — личность, роли, директивы
+- [Отделы](otdels.md) — структура департаментов и отделов, Head Protocol
 - [Конфигурация](configuration.md) — общие настройки системы
 - [Память](memory-sessions.md) — как агент хранит знания
 

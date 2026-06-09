@@ -13,12 +13,14 @@
 │  🆔 Agent ID     → уникальный 8-символьный ID   │
 │  👤 Имя          → отображаемое имя             │
 │  📋 Роль         → rolesid (ссылка на роль)     │
-│  🏢 Департамент  → departmentsid (ссылка на отд)│
+│  🏢 Департамент  → departmentsid                │
+│  🏗️ Отдел       → otdels.yaml (head/workers)   │
 │  🧠 Память       → system prompt, описание      │
 │  🎭 Характер     → tone, style, traits          │
 │  🔧 Поведение    → temperature, max_tokens      │
 │  📡 Провайдер    → LLM провайдер и модель       │
-│                      (model combo: provider/m)  │
+│                      (model combo: provider/model)│
+│  🔧 Инструменты  → tools: [terminal, file...]   │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -61,7 +63,7 @@ name: QA Инженер
 description: ''
 role: управляющий              # slug из roles.yaml
 department: советчик           # slug из departments.yaml
-model: 9router/hermes-agent    # combo формат: provider/model
+model: 9router/summarise-agent # combo формат: provider/model
 
 personality:
   tone: professional
@@ -86,19 +88,25 @@ memory: {}
 
 ```yaml
 model: 9router/general-agent   # provider=9router, model=general-agent
+model: 9router/hermes-agent    # Hermes
+model: 9router/summarise-agent # Для суммаризации
+model: 9router/thinking-agent  # Thinking модель
+model: 9router/code-agent      # Кодинг
 model: mistral/mistral-large-latest
 model: anthropic/claude-3.5-sonnet
 ```
 
 **Как это работает:**
-1. В `agent.yaml` указывается `model: provider/model`
-2. Agent Manager парсит: `9router/general-agent` → provider=`9router`, model=`general-agent`
+1. В `agents.yaml` или `agent.yaml` указывается `model: provider/model`
+2. Agent Manager парсит: `9router/hermes-agent` → provider=`9router`, model=`hermes-agent`
 3. Provider резолвится из `providers.yaml`
 4. Если провайдер не найден — fallback на дефолтный
 
 **9router** — локальный прокси, предоставляющий доступ к моделям:
 - `9router/hermes-agent` — Hermes (по умолчанию)
 - `9router/summarise-agent` — для суммаризации
+- `9router/thinking-agent` — thinking модель
+- `9router/code-agent` — модель для кода
 
 **Fallback цепочка:**
 - Запрошенный провайдер → Mistral → дефолтный
@@ -132,24 +140,29 @@ POST /api/admin/reload
 ```yaml
 # ~/.synpin/config/roles.yaml
 roles:
-  - rolesid: управляющий      # slug-идентификатор
+  - rolesid: управляющий
     name: Управляющий
     description: управляющий отделом
     color: '#f59e0b'
 
-  - rolesid: сотрудник
-    name: Сотрудник
-    description: сотрудник отдела
-    color: '#6a4b16'
+  - rolesid: совет-директоров
+    name: Совет Директоров
+    description: это почти верхушка айзберга
+    color: '#b60af5'
+
+  - rolesid: работник-отдела
+    name: Работник отдела
+    description: Стандартный агент
+    color: '#595245'
 ```
 
 ### Типы ролей
 
 | Роль | Описание | Кто может делегировать |
 |---|---|---|
-| **Worker** | Исполнитель задач | Глава отдела |
-| **Head** | Глава канала/отдела | Совет директоров |
-| **Director** | Стратег, член совета | Пользователь |
+| **Работник отдела** | Исполнитель задач | Глава отдела |
+| **Управляющий** | Глава канала/отдела | Совет директоров |
+| **Совет Директоров** | Стратег, член совета | Пользователь |
 
 ---
 
@@ -160,21 +173,56 @@ roles:
 ```yaml
 # ~/.synpin/config/departments.yaml
 departments:
-  - departmentsid: кодер
-    name: кодер
-    description: занимается кодом
-    color: '#3b82f6'
+  - departmentsid: how5jhamq02m
+    name: Вахтан
+    color: '#f97316'
 
-  - departmentsid: поиск
-    name: поиск
-    description: поиск информации
-    color: '#929baa'
+  - departmentsid: cmpfmu9lsoz0
+    name: Сузумебачи
+    color: '#7cf915'
 
-  - departmentsid: советчик
-    name: советчик
-    description: участвует в переговорах
-    color: '#bb3bf7'
+  - departmentsid: h0d8udk4wxio
+    name: Волокита
+    description: департамент отвечающий за обдумывание решений
+    color: '#27166a'
+
+  - departmentsid: t8rbmlmz7mps
+    name: Разработка
+    description: Отдел разработки
+    color: '#bbf73b'
 ```
+
+---
+
+## 🏗️ Отделы (otdels.yaml)
+
+Агенты принадлежат к **отделам** — изолированным командам с Главой и работниками.
+
+```yaml
+# ~/.synpin/config/otdels.yaml
+otdels:
+  - otdelid: h1urnetgjr5q
+    name: Грахатули
+    description: Самый радостный отдел в мире для общения
+    color: '#f915db'
+    mentor_role: управляющий
+    head: ix13aox3          # slug агента-Главы
+    workers:                 # slug'ы работников
+      - k493rqqz
+      - 8e5tv711
+      - nukf4tc0
+```
+
+> Подробнее: [Отделы](otdels.md)
+
+### Глава vs Работник
+
+| | Глава (Head) | Работник (Worker) |
+|---|---|---|
+| **Видит** | Все сообщения отдела | Только свои + указания Главы |
+| **Инструменты** | Базовые + Head Protocol | Только базовые |
+| **Делегирует** | Да (через @mention) | Нет |
+| **Отчитывается** | Пользователю | Главе |
 
 ---
 
@@ -195,8 +243,8 @@ departments:
 ```json
 {
   "name": "Маркетолог",
-  "role": "сотрудник",
-  "department": "кодер",
+  "role": "работник-отдела",
+  "department": "how5jhamq02m",
   "model": "9router/general-agent",
   "description": "Продвижение продукта",
   "system_prompt": "Ты — Маркетолог...",
@@ -216,6 +264,14 @@ departments:
 | `PUT` | `/api/roles` | Заменить все роли |
 | `GET` | `/api/departments` | Список департаментов |
 | `PUT` | `/api/departments` | Заменить все департаменты |
+
+### Отделы
+
+| Метод | URL | Описание |
+|---|---|---|
+| `GET` | `/api/otdels` | Список всех отделов |
+| `GET` | `/api/otdels/{otdelid}` | Получить отдел |
+| `PUT` | `/api/otdels/{otdelid}` | Обновить отдел (head, workers, compaction) |
 
 ---
 
@@ -262,7 +318,7 @@ POST /api/chat/hermes/stream
 
 ## Управление через UI
 
-### Вкладка "AI Агенты" в Настройках
+### Вкладка "Агенты" в Настройках
 
 1. **Роли и департаменты** — верхняя секция с добавлением/удалением
 2. **Кнопка "＋ Создать агента"** — откроет модалку создания
@@ -274,7 +330,7 @@ POST /api/chat/hermes/stream
 Обязательное поле: **Имя**. Остальное опционально:
 - Роль (выпадающий список)
 - Департамент (выпадающий список)
-- Модель (из подключённых провайдеров, combo формат)
+- Модель (из подключённых провайдеров, combo формат: provider/model)
 - Описание
 - System Prompt
 
@@ -289,6 +345,7 @@ POST /api/chat/hermes/stream
 
 ## Связь с другими документами
 
+- [Отделы](otdels.md) — структура отделов, Head Protocol
 - [Память и сессии](memory-sessions.md) — как агент хранит знания
 - [Каналы и иерархия](channels-hierarchy.md) — где агент работает
 - [Конфигурация](configuration.md) — YAML-конфиги системы

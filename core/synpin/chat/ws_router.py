@@ -137,7 +137,17 @@ async def _handle_chat_send(user_id: str, msg: dict):
     history.append({"role": "user", "content": message, "timestamp": datetime.now().isoformat()})
     _save_chat_history(agent_slug, channel_id, history)
 
-    messages = [ChatMessage(role=m["role"], content=m["content"]) for m in history]
+    # Compaction: trim old messages if context exceeds limit (internal agents only)
+    from .router import compact_messages
+    compacted_history, compaction_notice = compact_messages(
+        history,
+        system_prompt=full_system_prompt,
+        agent_slug=agent_slug,
+    )
+    if compaction_notice:
+        logger.info("WS chat compaction for %s: %s", agent_slug, compaction_notice)
+
+    messages = [ChatMessage(role=m["role"], content=m["content"]) for m in compacted_history]
 
     # Get provider/model
     from ..agents.manager import get_agent
@@ -207,7 +217,7 @@ async def _handle_chat_send(user_id: str, msg: dict):
 
 async def _handle_otdel_send(user_id: str, msg: dict):
     """Handle otdel chat message — process agents and push responses via WS."""
-    from .otdel_chat_router import (
+    from .otdel_helpers import (
         _load_history, _save_history, _parse_mentions,
         _build_otdel_system_prompt, _build_head_context, _build_worker_context,
     )
@@ -240,7 +250,14 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         "timestamp": datetime.now().isoformat(),
     }
     history.append(user_msg)
-    _save_history(otdel_id, history)
+    save_stats = _save_history(otdel_id, history)
+    if save_stats.get("was_compacted"):
+        await ws_manager.send(user_id, {
+            "type": "otdel:compacting",
+            "otdel_id": otdel_id,
+            "before": save_stats["before"],
+            "after": save_stats["after"],
+        })
 
     # Push user message to client
     await ws_manager.send(user_id, {
@@ -269,7 +286,8 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         if not agent:
             continue
         agent_name_lower = agent.get("name", "").lower()
-        if agent_name_lower in user_mentions:
+        agent_slug_lower = slug.lower()
+        if agent_name_lower in user_mentions or agent_slug_lower in user_mentions:
             agent_queue.append((agent, False, message))
 
     if not agent_queue:
@@ -323,6 +341,15 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         agent_msg_id = f"a-{uuid.uuid4().hex[:8]}"
         full_response = ""
         streaming = True
+
+        # Notify client that this agent is thinking
+        await ws_manager.send(user_id, {
+            "type": "otdel:thinking",
+            "otdel_id": otdel_id,
+            "agent_slug": agent_slug_val,
+            "agent_name": agent_name_val,
+            "is_head": is_head,
+        })
 
         try:
             from .router import stream_response as base_stream
@@ -393,7 +420,14 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 "timestamp": datetime.now().isoformat(),
             }
             history.append(agent_msg)
-            _save_history(otdel_id, history)
+            save_stats = _save_history(otdel_id, history)
+            if save_stats.get("was_compacted"):
+                await ws_manager.send(user_id, {
+                    "type": "otdel:compacting",
+                    "otdel_id": otdel_id,
+                    "before": save_stats["before"],
+                    "after": save_stats["after"],
+                })
 
             # Send done event
             await ws_manager.send(user_id, {
@@ -412,10 +446,13 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                     if not mentioned_agent:
                         continue
                     mentioned_name_lower = mentioned_agent.get("name", "").lower()
-                    if mentioned_name_lower in new_mentions:
+                    mentioned_slug_lower = slug.lower()
+                    if mentioned_name_lower in new_mentions or mentioned_slug_lower in new_mentions:
                         expected_workers.add(slug)
                         if slug not in processed_slugs:
-                            agent_queue.append((mentioned_agent, False, full_response))
+                            # Clean trigger: strip [Name]: prefix so worker doesn't echo it
+                            trigger = re.sub(r'^\[.*?\]:\s*', '', full_response.strip())
+                            agent_queue.append((mentioned_agent, False, trigger))
 
                 if expected_workers:
                     head_delegating = True
@@ -425,6 +462,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
             processed_slugs.add(agent_slug_val)
             if not is_head:
                 responded_workers.add(agent_slug_val)
+                workers_responded += 1
 
         processed_count += 1
 
@@ -533,7 +571,14 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 "timestamp": datetime.now().isoformat(),
             }
             history.append(agent_msg)
-            _save_history(otdel_id, history)
+            save_stats = _save_history(otdel_id, history)
+            if save_stats.get("was_compacted"):
+                await ws_manager.send(user_id, {
+                    "type": "otdel:compacting",
+                    "otdel_id": otdel_id,
+                    "before": save_stats["before"],
+                    "after": save_stats["after"],
+                })
 
             await ws_manager.send(user_id, {
                 "type": "otdel:done",

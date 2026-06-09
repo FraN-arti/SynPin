@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 
 // ─── Memory Section ──────────────────────────────────────────
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:2088'
+import { API_BASE as API } from '../config'
 
 // Parse entry into structured {key, value} or return raw text
 function parseEntry(entry: string): { key: string; value: string } {

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { EmojiPicker } from './EmojiPicker'
 import { MarkdownRenderer } from './MarkdownRenderer'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:2088'
+import { API_BASE } from '../config'
 
 interface OtdelData {
   otdelid: string
@@ -26,6 +26,7 @@ interface ChatMessage {
   timestamp: string
   streaming?: boolean
   tools?: ToolCall[]
+  compaction?: boolean
 }
 
 interface ToolCall {
@@ -67,6 +68,8 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
   const [agents, setAgents] = useState<Agent[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [sending, setSending] = useState(false)
+  const [thinkingAgents, setThinkingAgents] = useState<Map<string, string>>(new Map()) // slug → name
+  const [compacting, setCompacting] = useState<{ before: number; after: number } | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Load agents and departments for color mapping
@@ -121,11 +124,36 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
       })
     })
 
+    // Thinking indicator — agent started processing
+    const unsubThinking = wsOn('otdel:thinking', (msg) => {
+      if (msg.otdel_id !== otdel.otdelid) return
+      setThinkingAgents(prev => {
+        const next = new Map(prev)
+        next.set(msg.agent_slug, msg.agent_name)
+        return next
+      })
+    })
+
+    // Compaction indicator — history was compacted
+    const unsubCompacting = wsOn('otdel:compacting', (msg) => {
+      if (msg.otdel_id !== otdel.otdelid) return
+      setCompacting({ before: msg.before, after: msg.after })
+      // Auto-clear after 3 seconds
+      setTimeout(() => setCompacting(null), 3000)
+    })
+
     // Streaming chunks — accumulate into a single message
     const unsubChunk = wsOn('otdel:chunk', (msg) => {
       if (msg.otdel_id !== otdel.otdelid) return
       const { message_id, content, sender, sender_name, is_head } = msg
       if (!message_id || !content) return
+      // Clear thinking for this agent when first chunk arrives
+      setThinkingAgents(prev => {
+        if (!prev.has(sender)) return prev
+        const next = new Map(prev)
+        next.delete(sender)
+        return next
+      })
       setMessages(prev => {
         const idx = prev.findIndex(m => m.id === message_id)
         if (idx >= 0) {
@@ -223,6 +251,8 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
     const unsubDone = wsOn('otdel:done', (msg) => {
       if (msg.otdel_id !== otdel.otdelid) return
       const { message_id, message: finalMsg } = msg
+      // Clear all thinking for this otdel when done
+      setThinkingAgents(new Map())
       if (message_id && finalMsg) {
         setMessages(prev => {
           const idx = prev.findIndex(m => m.id === message_id)
@@ -255,6 +285,8 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
 
     return () => {
       unsubMessage()
+      unsubThinking()
+      unsubCompacting()
       unsubChunk()
       unsubToolStart()
       unsubToolEnd()
@@ -269,7 +301,7 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
   }, [messages])
 
   const handleSend = async () => {
-    if (!input.trim() || sending) return
+    if (!input.trim()) return
     const text = input.trim()
     setInput('')
     setSending(true)
@@ -341,6 +373,14 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
         ) : (
           <div className="otdel-messages-container">
             {messages.map(msg => {
+              // Compaction marker — render as system message
+              if (msg.compaction) {
+                return (
+                  <div key={msg.id} className="otdel-compaction-marker">
+                    <span>🗜️ {msg.content}</span>
+                  </div>
+                )
+              }
               const left = isLeftSide(msg)
               const senderName = msg.sender === 'user' ? 'Вы' : (msg.sender_name || getAgentName(msg.sender))
               const isHead = msg.is_head === true
@@ -405,6 +445,29 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
                 </div>
               )
             })}
+            {/* Typing indicator — agents thinking before first chunk */}
+            {thinkingAgents.size > 0 && Array.from(thinkingAgents.entries()).map(([slug, name]) => (
+              <div key={`typing-${slug}`} className="otdel-msg-row left">
+                <div className="otdel-msg-avatar left">🏢</div>
+                <div className="otdel-msg-body">
+                  <div className="otdel-msg-name left">{name}</div>
+                  <div className="otdel-msg-bubble left typing-indicator">
+                    <div className="typing-dots">
+                      <span></span><span></span><span></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {/* Compaction indicator */}
+            {compacting && (
+              <div className="otdel-compaction-banner">
+                <span className="compaction-icon">🗜️</span>
+                <span className="compaction-text">
+                  Компакция: {compacting.before} → {compacting.after} сообщений
+                </span>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
         )}
@@ -416,15 +479,14 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
           <EmojiPicker onSelect={handleEmojiSelect} />
           <textarea
             className="chat-textarea"
-            placeholder={sending ? 'Агенты работают...' : 'Спроси что-нибудь...'}
+            placeholder={sending ? 'Агенты работают... (Enter — отправить ещё)' : 'Спроси что-нибудь...'}
             value={input}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
             rows={1}
-            disabled={sending}
           />
-          <button className="send-btn" onClick={handleSend} disabled={!input.trim() || sending}>
-            {sending ? '...' : '→'}
+          <button className="send-btn" onClick={handleSend} disabled={!input.trim()}>
+            →
           </button>
         </div>
       </div>

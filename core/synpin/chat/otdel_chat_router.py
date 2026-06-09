@@ -29,219 +29,16 @@ router = APIRouter(prefix="/api/otdels", tags=["otdel-chat"])
 # Global registry — set during app startup
 registry: ProviderRegistry | None = None
 
-# Shared data dir
-_DATA_DIR: Path | None = None
-
-MAX_HISTORY_MESSAGES = 200
-
-
-def _get_data_dir() -> Path:
-    global _DATA_DIR
-    if _DATA_DIR is not None:
-        return _DATA_DIR
-    candidates = [
-        Path.home() / ".synpin" / "data",
-        Path(__file__).resolve().parent.parent.parent / "data",
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            _DATA_DIR = candidate
-            return _DATA_DIR
-    _DATA_DIR = candidates[0]
-    _DATA_DIR.mkdir(parents=True, exist_ok=True)
-    return _DATA_DIR
-
-
-# ── History Storage ────────────────────────────────────────────────────────
-
-def _get_otdel_chat_path(otdel_id: str) -> Path:
-    data_dir = _get_data_dir()
-    return data_dir / "otdels" / otdel_id / "chat.json"
-
-
-def _load_history(otdel_id: str) -> list[dict]:
-    path = _get_otdel_chat_path(otdel_id)
-    if not path.exists():
-        return []
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as e:
-        logger.warning("Failed to load otdel chat history for %s: %s", otdel_id, e)
-        return []
-
-
-def _save_history(otdel_id: str, messages: list[dict]):
-    path = _get_otdel_chat_path(otdel_id)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    trimmed = messages[-MAX_HISTORY_MESSAGES:]
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(trimmed, f, ensure_ascii=False, indent=1)
-
-
-# ── Helpers ───────────────────────────────────────────────────────────────
-
-def _get_agent_name(slug: str, head_slug: str = "", head_agent: dict | None = None) -> str:
-    """Get display name for an agent by slug."""
-    if slug == "user":
-        return "Пользователь"
-    if head_agent and slug == head_slug:
-        return head_agent.get("name", slug)
-    from ..agents.manager import get_agent
-    agent = get_agent(slug)
-    return agent.get("name", slug) if agent else slug
-
-
-# ── @Mention Parsing ───────────────────────────────────────────────────────
-
-def _parse_mentions(text: str) -> list[str]:
-    """Extract @mentions from message text.
-    
-    Matches @Name (single word only — agent names are single words).
-    Returns list of mentioned agent names (lowercased for matching).
-    """
-    matches = re.findall(r'@([A-Za-zА-Яа-яЁё0-9_]+)', text)
-    return [m.strip().lower() for m in matches]
-
-
-# ── System Prompt Building ─────────────────────────────────────────────────
-
-def _build_otdel_system_prompt(otdel: dict, agent: dict, is_head: bool) -> str:
-    """Build system prompt for an agent in otdel chat.
-    
-    Combines: agent's own prompt + otdel context + role in otdel.
-    """
-    parts = []
-    
-    # Agent's own system prompt (FIRST — this is their identity)
-    own_prompt = agent.get("system_prompt", "")
-    if own_prompt:
-        parts.append(own_prompt)
-    
-    # Build workers list for Head
-    worker_list = ""
-    if is_head:
-        worker_slugs = otdel.get("workers", [])
-        head_slug = otdel.get("head", "")
-        from ..agents.manager import get_agent
-        worker_names = []
-        for slug in worker_slugs:
-            if slug == head_slug:
-                continue
-            w = get_agent(slug)
-            if w:
-                worker_names.append(f"@{w.get('name', slug)} ({slug})")
-        if worker_names:
-            worker_list = f"\n\nТвоя команда (обращайся через @Имя):\n" + "\n".join(f"- {n}" for n in worker_names)
-        else:
-            worker_list = "\n\nВ отделе пока нет работников."
-    
-    # Otdel context
-    otdel_name = otdel.get("name", "")
-    otdel_desc = otdel.get("description", "")
-    role_label = "Глава отдела" if is_head else "Работник отдела"
-    
-    separator = "═" * 46
-    otdel_block = f"""
-{separator}
-ОТДЕЛ: {otdel_name}
-{otdel_desc}
-Твоя роль: {role_label}{worker_list}
-{separator}"""
-    parts.append(otdel_block)
-    
-    # Chat rules
-    rules = """
-Правила общения в чате отдела:
-- Ты работаешь в команде отдела
-- Обращаются к тебе через @ТвоёИмя
-- Если к тебе обратились — выполняй задачу
-- Глава отдела управляет командой — подчиняйся его указаниям
-- Не начинай работу самостоятельно пока тебя не попросят
-- Отвечай кратко и по делу
-- Если задача выполнена — отчитайся через @Глава
-- НИКОГДА не притворяйся другим агентом — ты только свой персонаж"""
-    
-    if is_head:
-        rules = """
-Ты — Глава отдела. Твоя роль:
-- Управляй командой: ставь задачи, принимай результаты
-- Видишь ВСЕ сообщения в чате отдела
-- Распределяй задачи между работниками через @упоминания
-- ОБЯЗАТЕЛЬНО используй имена из списка выше — других агентов в чате нет
-- Оценивай результаты работы
-- Если работник отчитался — прими работу или запроси исправление
-- Не отвечай "ок, принял" без необходимости — это создаёт лишний шум
-- Если нужно — передавай информацию наверх (пользователю)
-- Не выполняй работу за работников — делегируй
-- НИКОГДА не притворяйся работником — ты Глава, отвечай от своего имени
-- Не используй формат [slug] или [имя] в своих ответах — просто общайся
-
-ВАЖНО: когда ты упоминаешь работников через @Имя — ты делегируешь им задачи.
-Система автоматически дождётся ответов ВСЕХ упомянутых работников,
-и только потом ты получишь сводку для подведения итогов.
-Поэтому смело ставь задачи нескольким работникам сразу — все ответят."""
-    
-    parts.append(rules)
-    
-    return "\n\n".join(parts)
-
-
-# ── Context Building ───────────────────────────────────────────────────────
-
-def _build_head_context(history: list[dict], agent_slug: str, exclude_last: bool = True) -> list[dict]:
-    """Build context messages for Head agent.
-    
-    Head sees everything:
-    - User messages → role: user
-    - Head's own previous messages → role: assistant
-    - Worker messages → role: user with name label
-    
-    exclude_last: True when building context for the NEXT agent call (exclude current trigger).
-                  False for follow-up (need ALL messages including last worker response).
-    """
-    context = []
-    source = history[:-1] if exclude_last else history
-    for m in source:
-        sender = m.get("sender", "")
-        content = m.get("content", "")
-        
-        if sender == "user":
-            context.append({"role": "user", "content": content})
-        elif sender == agent_slug:
-            # Head's own previous messages
-            context.append({"role": "assistant", "content": content})
-        else:
-            # Worker message — present as context from another person
-            name = _get_agent_name(sender)
-            context.append({"role": "user", "content": f"[Ответ от {name}]: {content}"})
-    
-    return context
-
-
-def _build_worker_context(history: list[dict], agent_slug: str, head_slug: str, head_name: str) -> list[dict]:
-    """Build context messages for worker agent.
-    
-    Worker sees:
-    - User messages → role: user
-    - Head's messages → role: user with name
-    - Own previous messages → role: assistant
-    """
-    context = []
-    for m in history[:-1]:  # Exclude current trigger
-        sender = m.get("sender", "")
-        content = m.get("content", "")
-        
-        if sender == "user":
-            context.append({"role": "user", "content": content})
-        elif sender == agent_slug:
-            # Worker's own previous messages
-            context.append({"role": "assistant", "content": content})
-        elif sender == head_slug:
-            # Head's messages — present as instructions
-            context.append({"role": "user", "content": f"[{head_name}]: {content}"})
-    
-    return context
+# Import shared history + helpers from otdel_helpers (single source of truth)
+from .otdel_helpers import (
+    _load_history,
+    _save_history,
+    _parse_mentions,
+    _build_otdel_system_prompt,
+    _build_head_context,
+    _build_worker_context,
+    _get_agent_name,
+)
 
 
 # ── API Endpoints ──────────────────────────────────────────────────────────
@@ -314,7 +111,8 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
         if not agent:
             continue
         agent_name_lower = agent.get("name", "").lower()
-        if agent_name_lower in user_mentions:
+        agent_slug_lower = slug.lower()
+        if agent_name_lower in user_mentions or agent_slug_lower in user_mentions:
             agents_to_process.append((agent, False))
     
     # If no agents to process, just return
@@ -346,7 +144,8 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                 log.warning("Worker agent %s NOT FOUND in otdel %s", slug, otdel_id)
                 continue
             agent_name_lower = agent.get("name", "").lower()
-            if agent_name_lower in user_mentions:
+            agent_slug_lower = slug.lower()
+            if agent_name_lower in user_mentions or agent_slug_lower in user_mentions:
                 agent_queue.append((agent, False, req.message))
         
         log.info("Otdel %s agent_queue: %s", otdel_id, [(a.get("name"), h) for a, h, _ in agent_queue])
@@ -390,6 +189,13 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
             if provider_name and model.startswith(f"{provider_name}/"):
                 model = model[len(provider_name) + 1:]
             
+            # Determine tools for this agent
+            if is_head:
+                head_protocol_tools = ["head_delegate", "head_await", "head_evaluate", "head_retry", "head_decide"]
+                tool_names = list(agent.get("tools", [])) + head_protocol_tools
+            else:
+                tool_names = agent.get("tools", [])
+
             # Call LLM
             full_response = ""
             log.info("Otdel %s calling LLM for %s (model=%s, provider=%s)", otdel_id, agent_name_val, model, provider_name)
@@ -404,7 +210,8 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                     system_prompt=system_prompt,
                     agent_name=agent_name_val,
                     agent_slug=agent_slug_val,
-                    tool_names=[],  # No tools in otdel chat
+                    tool_names=tool_names,
+                    otdel_id=otdel_id,
                 ):
                     # Capture content from SSE chunks
                     if '"type": "chunk"' in chunk:
@@ -447,11 +254,14 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                         if not mentioned_agent:
                             continue
                         mentioned_name_lower = mentioned_agent.get("name", "").lower()
-                        if mentioned_name_lower in new_mentions:
+                        mentioned_slug_lower = slug.lower()
+                        if mentioned_name_lower in new_mentions or mentioned_slug_lower in new_mentions:
                             expected_workers.add(slug)
                             # Add to queue only if not already processed/queued
                             if slug not in processed_slugs:
-                                agent_queue.append((mentioned_agent, False, full_response))
+                                # Clean trigger: strip [Name]: prefix so worker doesn't echo it
+                                trigger = re.sub(r'^\[.*?\]:\s*', '', full_response.strip())
+                                agent_queue.append((mentioned_agent, False, trigger))
                                 log.info("Otdel %s gather: expecting %s", otdel_id, mentioned_agent.get("name"))
                     
                     if expected_workers:
@@ -521,7 +331,8 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                     system_prompt=system_prompt,
                     agent_name=head_name,
                     agent_slug=head_slug,
-                    tool_names=[],  # No tools in otdel chat follow-up
+                    tool_names=["head_delegate", "head_await", "head_evaluate", "head_retry", "head_decide"],
+                    otdel_id=otdel_id,
                 ):
                     if '"type": "chunk"' in chunk:
                         try:

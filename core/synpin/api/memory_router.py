@@ -136,160 +136,231 @@ class SetSessionRequest(BaseModel):
 @router.get("/user")
 async def read_global_user():
     """Read the global shared USER.md profile."""
-    path = _get_shared_user_path()
-    if not path.exists():
-        return {"success": True, "target": "user", "entries": [], "usage": "0% — 0/1,375 chars", "entry_count": 0}
-    content = path.read_text(encoding="utf-8")
-    entries = [e.strip() for e in content.split("\n§\n") if e.strip()]
-    current = len(content)
-    limit = USER_CHAR_LIMIT
-    pct = min(100, int((current / limit) * 100)) if limit > 0 else 0
-    return {"success": True, "target": "user", "entries": entries, "usage": f"{pct}% — {current:,}/{limit:,} chars", "entry_count": len(entries)}
+    try:
+        path = _get_shared_user_path()
+        if not path.exists():
+            return {"success": True, "target": "user", "entries": [], "usage": "0% — 0/1,375 chars", "entry_count": 0}
+        content = path.read_text(encoding="utf-8")
+        entries = [e.strip() for e in content.split("\n§\n") if e.strip()]
+        current = len(content)
+        limit = USER_CHAR_LIMIT
+        pct = min(100, int((current / limit) * 100)) if limit > 0 else 0
+        return {"success": True, "target": "user", "entries": entries, "usage": f"{pct}% — {current:,}/{limit:,} chars", "entry_count": len(entries)}
+    except Exception as e:
+        logger.error("Failed to read user profile: %s", e)
+        raise HTTPException(500, "Failed to read user profile")
+
 @router.post("/user/add")
 async def add_user_entry(req: AddRequest):
     """Add entry to global shared USER.md."""
-    path = _get_shared_user_path()
-    if not path.exists():
-        path.write_text(req.content.strip() + "\n", encoding="utf-8")
-        return {"success": True, "message": "Entry added.", "entries": [req.content.strip()]}
-    import re
-    content = path.read_text(encoding="utf-8")
-    entries = [e.strip() for e in content.split("\n§\n") if e.strip()]
-    if req.content.strip() in entries:
-        return {"success": True, "message": "Entry already exists.", "entries": entries}
-    new_content = content.rstrip("\n") + "\n§\n" + req.content.strip() + "\n"
-    path.write_text(new_content, encoding="utf-8")
-    return {"success": True, "message": "Entry added.", "entries": entries + [req.content.strip()]}
+    try:
+        path = _get_shared_user_path()
+        if not path.exists():
+            path.write_text(req.content.strip() + "\n", encoding="utf-8")
+            return {"success": True, "message": "Entry added.", "entries": [req.content.strip()]}
+        import re
+        content = path.read_text(encoding="utf-8")
+        entries = [e.strip() for e in content.split("\n§\n") if e.strip()]
+        if req.content.strip() in entries:
+            return {"success": True, "message": "Entry already exists.", "entries": entries}
+        new_content = content.rstrip("\n") + "\n§\n" + req.content.strip() + "\n"
+        path.write_text(new_content, encoding="utf-8")
+        return {"success": True, "message": "Entry added.", "entries": entries + [req.content.strip()]}
+    except Exception as e:
+        logger.error("Failed to add user entry: %s", e)
+        raise HTTPException(500, "Failed to add user entry")
+
 @router.post("/user/remove")
 async def remove_user_entry(req: RemoveRequest):
     """Remove entry from global shared USER.md."""
-    path = _get_shared_user_path()
-    if not path.exists():
-        return {"success": False, "error": "USER.md does not exist."}
-    content = path.read_text(encoding="utf-8")
-    entries = [e.strip() for e in content.split("\n§\n") if e.strip()]
-    matches = [e for e in entries if req.old_text in e]
-    if not matches:
-        return {"success": False, "error": f"No entry matched '{req.old_text}'."}
-    if len(matches) > 1 and len({e: 1 for e in matches}) > 1:
-        return {"success": False, "error": "Multiple entries matched. Be more specific.", "matches": [e[:80] for e in matches]}
-    entries.remove(matches[0])
-    path.write_text("\n§\n".join(entries) + "\n", encoding="utf-8")
-    return {"success": True, "message": "Entry removed."}
+    try:
+        path = _get_shared_user_path()
+        if not path.exists():
+            return {"success": False, "error": "USER.md does not exist."}
+        content = path.read_text(encoding="utf-8")
+        entries = [e.strip() for e in content.split("\n§\n") if e.strip()]
+        matches = [e for e in entries if req.old_text in e]
+        if not matches:
+            return {"success": False, "error": f"No entry matched '{req.old_text}'."}
+        if len(matches) > 1 and len({e: 1 for e in matches}) > 1:
+            return {"success": False, "error": "Multiple entries matched. Be more specific.", "matches": [e[:80] for e in matches]}
+        entries.remove(matches[0])
+        path.write_text("\n§\n".join(entries) + "\n", encoding="utf-8")
+        return {"success": True, "message": "Entry removed."}
+    except Exception as e:
+        logger.error("Failed to remove user entry: %s", e)
+        raise HTTPException(500, "Failed to remove user entry")
+
 @router.post("/user/replace")
 async def replace_user_entry(req: ReplaceRequest):
     """Replace entry in global shared USER.md."""
-    path = _get_shared_user_path()
-    if not path.exists():
-        return {"success": False, "error": "USER.md does not exist."}
-    content = path.read_text(encoding="utf-8")
-    entries = [e.strip() for e in content.split("\n§\n") if e.strip()]
-    matches = [i for i, e in enumerate(entries) if req.old_text in e]
-    if not matches:
-        return {"success": False, "error": f"No entry matched '{req.old_text}'."}
-    entries[matches[0]] = req.new_content.strip()
-    path.write_text("\n§\n".join(entries) + "\n", encoding="utf-8")
-    return {"success": True, "message": "Entry replaced."}
+    try:
+        path = _get_shared_user_path()
+        if not path.exists():
+            return {"success": False, "error": "USER.md does not exist."}
+        content = path.read_text(encoding="utf-8")
+        entries = [e.strip() for e in content.split("\n§\n") if e.strip()]
+        matches = [i for i, e in enumerate(entries) if req.old_text in e]
+        if not matches:
+            return {"success": False, "error": f"No entry matched '{req.old_text}'."}
+        entries[matches[0]] = req.new_content.strip()
+        path.write_text("\n§\n".join(entries) + "\n", encoding="utf-8")
+        return {"success": True, "message": "Entry replaced."}
+    except Exception as e:
+        logger.error("Failed to replace user entry: %s", e)
+        raise HTTPException(500, "Failed to replace user entry")
 
 
 @router.get("/{agent_id}")
 async def read_agent_memory(agent_id: str, target: str = "memory"):
     """Read agent memory (memory only). USER.md is global."""
-    manager = get_manager(agent_id)
-    return manager.read(target)
+    try:
+        manager = get_manager(agent_id)
+        return manager.read(target)
+    except Exception as e:
+        logger.error("Failed to read memory for %s: %s", agent_id, e)
+        raise HTTPException(500, "Failed to read agent memory")
 
 
 @router.post("/{agent_id}/add")
 async def add_entry(agent_id: str, req: AddRequest):
     """Add entry to agent memory."""
-    manager = get_manager(agent_id)
-    return manager.add(req.target, req.content)
+    try:
+        manager = get_manager(agent_id)
+        return manager.add(req.target, req.content)
+    except Exception as e:
+        logger.error("Failed to add entry for %s: %s", agent_id, e)
+        raise HTTPException(500, "Failed to add entry")
 
 
 @router.post("/{agent_id}/replace")
 async def replace_entry(agent_id: str, req: ReplaceRequest):
     """Replace entry in agent memory."""
-    manager = get_manager(agent_id)
-    return manager.replace(req.target, req.old_text, req.new_content)
+    try:
+        manager = get_manager(agent_id)
+        return manager.replace(req.target, req.old_text, req.new_content)
+    except Exception as e:
+        logger.error("Failed to replace entry for %s: %s", agent_id, e)
+        raise HTTPException(500, "Failed to replace entry")
 
 
 @router.post("/{agent_id}/remove")
 async def remove_entry(agent_id: str, req: RemoveRequest):
     """Remove entry from agent memory."""
-    manager = get_manager(agent_id)
-    return manager.remove(req.target, req.old_text)
+    try:
+        manager = get_manager(agent_id)
+        return manager.remove(req.target, req.old_text)
+    except Exception as e:
+        logger.error("Failed to remove entry for %s: %s", agent_id, e)
+        raise HTTPException(500, "Failed to remove entry")
 
 
 @router.get("/{agent_id}/facts")
 async def list_facts(agent_id: str, limit: int = 50):
     """List fact files for an agent."""
-    manager = get_manager(agent_id)
-    return manager.list_facts(limit)
+    try:
+        manager = get_manager(agent_id)
+        return manager.list_facts(limit)
+    except Exception as e:
+        logger.error("Failed to list facts for %s: %s", agent_id, e)
+        raise HTTPException(500, "Failed to list facts")
 
 
 @router.post("/{agent_id}/facts")
 async def add_fact(agent_id: str, req: AddFactRequest):
     """Add a dated fact."""
-    manager = get_manager(agent_id)
-    return manager.add_fact(req.topic, req.content, req.date)
+    try:
+        manager = get_manager(agent_id)
+        return manager.add_fact(req.topic, req.content, req.date)
+    except Exception as e:
+        logger.error("Failed to add fact for %s: %s", agent_id, e)
+        raise HTTPException(500, "Failed to add fact")
 
 
 @router.get("/{agent_id}/facts/{filename}")
 async def read_fact(agent_id: str, filename: str):
     """Read a specific fact."""
-    manager = get_manager(agent_id)
-    return manager.read_fact(filename)
+    try:
+        manager = get_manager(agent_id)
+        return manager.read_fact(filename)
+    except Exception as e:
+        logger.error("Failed to read fact for %s: %s", agent_id, e)
+        raise HTTPException(500, "Failed to read fact")
 
 
 @router.delete("/{agent_id}/facts/{filename}")
 async def remove_fact(agent_id: str, filename: str):
     """Remove a fact."""
-    manager = get_manager(agent_id)
-    return manager.remove_fact(filename)
+    try:
+        manager = get_manager(agent_id)
+        return manager.remove_fact(filename)
+    except Exception as e:
+        logger.error("Failed to remove fact for %s: %s", agent_id, e)
+        raise HTTPException(500, "Failed to remove fact")
 
 
 @router.post("/{agent_id}/search")
 async def search_memory(agent_id: str, req: SearchRequest):
     """Search across agent memory."""
-    manager = get_manager(agent_id)
-    results = manager.search(req.query, req.file_type, req.limit)
-    return {"results": results, "count": len(results)}
+    try:
+        manager = get_manager(agent_id)
+        results = manager.search(req.query, req.file_type, req.limit)
+        return {"results": results, "count": len(results)}
+    except Exception as e:
+        logger.error("Failed to search memory for %s: %s", agent_id, e)
+        raise HTTPException(500, "Failed to search memory")
 
 
 @router.get("/{agent_id}/state")
 async def get_state(agent_id: str):
     """Get agent state (active sessions)."""
-    manager = get_manager(agent_id)
-    return {
-        "active_sessions": manager.get_all_active_sessions(),
-        "last_compaction": manager.get_last_compaction(),
-    }
+    try:
+        manager = get_manager(agent_id)
+        return {
+            "active_sessions": manager.get_all_active_sessions(),
+            "last_compaction": manager.get_last_compaction(),
+        }
+    except Exception as e:
+        logger.error("Failed to get state for %s: %s", agent_id, e)
+        raise HTTPException(500, "Failed to get agent state")
 
 
 @router.post("/{agent_id}/state")
 async def set_session(agent_id: str, req: SetSessionRequest):
     """Set active session for a channel."""
-    manager = get_manager(agent_id)
-    manager.set_active_session(
-        req.channel,
-        req.session_id,
-        req.last_position,
-        req.last_action,
-        req.waiting_for,
-    )
-    return {"success": True}
+    try:
+        manager = get_manager(agent_id)
+        manager.set_active_session(
+            req.channel,
+            req.session_id,
+            req.last_position,
+            req.last_action,
+            req.waiting_for,
+        )
+        return {"success": True}
+    except Exception as e:
+        logger.error("Failed to set session for %s: %s", agent_id, e)
+        raise HTTPException(500, "Failed to set session")
 
 
 @router.get("/{agent_id}/stats")
 async def get_stats(agent_id: str):
     """Get memory statistics."""
-    manager = get_manager(agent_id)
-    return manager.get_stats()
+    try:
+        manager = get_manager(agent_id)
+        return manager.get_stats()
+    except Exception as e:
+        logger.error("Failed to get stats for %s: %s", agent_id, e)
+        raise HTTPException(500, "Failed to get stats")
 
 
 @router.post("/{agent_id}/reindex")
 async def reindex(agent_id: str):
     """Re-index memory for search."""
-    manager = get_manager(agent_id)
-    manager.reindex()
-    return {"success": True, "message": "Re-indexed"}
+    try:
+        manager = get_manager(agent_id)
+        manager.reindex()
+        return {"success": True, "message": "Re-indexed"}
+    except Exception as e:
+        logger.error("Failed to reindex for %s: %s", agent_id, e)
+        raise HTTPException(500, "Failed to reindex")

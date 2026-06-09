@@ -3,7 +3,7 @@ import { PROVIDER_CATALOG, providerKey, providerIconUrl, type ProviderInfo } fro
 import { MemorySection } from './MemorySection'
 import { useDraggable } from '@dnd-kit/core'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:2088'
+import { API_BASE } from '../config'
 
 // Tabs that can be dragged to widget zones
 const DRAGGABLE_TABS = new Set(['departments'])

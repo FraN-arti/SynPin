@@ -652,6 +652,141 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
             },
         },
     },
+    # ── Head Protocol tools (otdel delegation) ──
+    "head_delegate": {
+        "type": "function",
+        "function": {
+            "name": "head_delegate",
+            "description": "Делегировать задачи работникам отдела. Ставит задачи агентам и инициирует их выполнение. После вызова ОБЯЗАТЕЛЬНО вызови head_await чтобы дождаться ответов.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "workers": {
+                        "type": "array",
+                        "description": "Список работников с задачами",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "slug": {
+                                    "type": "string",
+                                    "description": "Slug работника (например 'k493rqqz')",
+                                },
+                                "task": {
+                                    "type": "string",
+                                    "description": "Задача для работника",
+                                },
+                            },
+                            "required": ["slug", "task"],
+                        },
+                    },
+                    "strategy": {
+                        "type": "string",
+                        "enum": ["parallel", "sequential", "pipeline"],
+                        "description": "Стратегия выполнения (по умолчанию parallel)",
+                    },
+                    "context": {
+                        "type": "string",
+                        "description": "Дополнительный контекст для работников",
+                    },
+                    "timeout_ms": {
+                        "type": "integer",
+                        "description": "Таймаут ожидания в миллисекундах (по умолчанию 120000)",
+                    },
+                },
+                "required": ["workers"],
+            },
+        },
+    },
+    "head_await": {
+        "type": "function",
+        "function": {
+            "name": "head_await",
+            "description": "Ждать ответов от всех делегированных работников. Вызывай ПОСЛЕ head_delegate. Возвращает результаты когда все ответили или таймаут.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "delegation_id": {
+                        "type": "string",
+                        "description": "ID делегации (опционально, используется текущая если не указан)",
+                    },
+                    "timeout_ms": {
+                        "type": "integer",
+                        "description": "Таймаут ожидания в миллисекундах (по умолчанию 120000)",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    "head_evaluate": {
+        "type": "function",
+        "function": {
+            "name": "head_evaluate",
+            "description": "Оценить результаты работников по критериям. Проверяет удовлетворяют ли ответы поставленной задаче.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task_description": {
+                        "type": "string",
+                        "description": "Описание исходной задачи для оценки",
+                    },
+                    "criteria": {
+                        "type": "array",
+                        "description": "Критерии оценки",
+                        "items": {"type": "string"},
+                    },
+                },
+                "required": ["task_description"],
+            },
+        },
+    },
+    "head_retry": {
+        "type": "function",
+        "function": {
+            "name": "head_retry",
+            "description": "Повторно отправить задачу работнику если он не ответил или ответил с ошибкой.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "worker_slug": {
+                        "type": "string",
+                        "description": "Slug работника для повторной попытки",
+                    },
+                    "error_context": {
+                        "type": "string",
+                        "description": "Описание ошибки или причины повтора",
+                    },
+                    "attempt": {
+                        "type": "integer",
+                        "description": "Номер попытки (автоинкремент если не указан)",
+                    },
+                },
+                "required": ["worker_slug"],
+            },
+        },
+    },
+    "head_decide": {
+        "type": "function",
+        "function": {
+            "name": "head_decide",
+            "description": "Принять стратегическое решение по делегации: продолжить, остановить, взять на себя или эскалировать пользователю.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "situation": {
+                        "type": "string",
+                        "enum": ["continue", "stop", "takeover", "escalate"],
+                        "description": "Решение: continue=продолжить, stop=остановить, takeover=взять на себя, escalate=эскалировать",
+                    },
+                    "reasoning": {
+                        "type": "string",
+                        "description": "Обоснование решения",
+                    },
+                },
+                "required": ["situation", "reasoning"],
+            },
+        },
+    },
 }
 
 

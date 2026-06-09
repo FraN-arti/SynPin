@@ -20,6 +20,8 @@
   --gray-400: #a3a3a3;
   --gray-300: #d4d4d4;
   --white: #fafafa;
+  --text: #fafafa;
+  --bg-elevated: #1e1e1e;
   --radius: 2px;
   --bg-card: #171717;
   --bg-hover: #262626;
@@ -46,6 +48,8 @@
   --gray-400: #525252;
   --gray-300: #262626;
   --white: #171717;
+  --text: #171717;
+  --bg-elevated: #f5f5f5;
   --bg-card: #f5f5f5;
   --bg-hover: #e5e5e5;
   --border: #e5e5e5;
@@ -80,6 +84,7 @@ body {
   height: 100vh;
   background: var(--black);
   color: var(--white);
+  overflow: hidden;
 }
 
 /* === Fixed Logo — always visible, never moves === */
@@ -1823,6 +1828,8 @@ body {
   border: 1px solid var(--gray-800);
   border-radius: var(--radius);
   padding: 16px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .roles-depts-title {
@@ -1898,9 +1905,8 @@ body {
 .roles-depts-desc {
   font-size: 11px;
   color: var(--gray-500);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .roles-depts-add {
@@ -2663,10 +2669,6 @@ body {
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
 .connected-providers-empty {
   display: flex;
   flex-direction: column;
@@ -2956,11 +2958,6 @@ body {
   animation: spin 1s linear infinite;
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
 /* Search bar */
 .providers-search-bar {
   display: flex;
@@ -3126,6 +3123,7 @@ body {
   flex-direction: column;
   gap: 12px;
   margin-bottom: 20px;
+  padding: 16px 20px;
 }
 
 .modal-footer {
@@ -3173,10 +3171,6 @@ body {
 .modal-close:hover {
   background: var(--gray-700);
   color: var(--white);
-}
-
-.modal-body {
-  padding: 16px 20px;
 }
 
 /* Create Agent button */
@@ -4709,6 +4703,7 @@ body {
   position: relative;
   background: var(--black);
   animation: fadeIn 0.3s ease;
+  overflow: hidden;
 }
 
 .otdel-chat-header {
@@ -5116,6 +5111,77 @@ body {
 
 .otdel-worker-chip.active .otdel-worker-chip-dot {
   background: var(--orange);
+}
+
+/* ── Compaction Settings ─────────────────────────────────────── */
+.otdel-compaction-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.compaction-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.compaction-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.compaction-input {
+  width: 80px;
+  text-align: center;
+}
+
+.compaction-hint {
+  font-size: 11px;
+  color: var(--gray-500);
+  margin-top: 4px;
+}
+
+/* ── Compaction Banner (in chat) ─────────────────────────────── */
+.otdel-compaction-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  margin: 8px 0;
+  background: var(--gray-800);
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-700);
+  animation: fadeIn 0.3s ease;
+}
+
+.compaction-icon {
+  font-size: 14px;
+}
+
+.compaction-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.otdel-compaction-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  margin: 4px 0;
+  background: var(--gray-800);
+  border-radius: var(--radius);
+  border: 1px dashed var(--gray-600);
+}
+
+.otdel-compaction-marker span {
+  font-size: 11px;
+  color: var(--gray-400);
+  font-style: italic;
 }
 
 /* ── Otdel Chat Messages (left/right layout) ──────────────────── */

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:2088'
+import { API_BASE } from '../config'
 
 interface OtdelData {
   otdelid: string
@@ -12,6 +12,8 @@ interface OtdelData {
   agent_count: number
   head: string
   workers: string[]
+  compaction_limit?: number
+  keep_recent?: number
 }
 
 interface Agent {
@@ -46,6 +48,8 @@ export function OtdelSettingsPanel({ otdel, open, onClose, onSaved }: OtdelSetti
   const [agents, setAgents] = useState<Agent[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [saving, setSaving] = useState(false)
+  const [compactionLimit, setCompactionLimit] = useState<number>(100)
+  const [keepRecent, setKeepRecent] = useState<number>(10)
 
   // Load full otdel data + agents + departments when opened
   const loadData = useCallback(async () => {
@@ -61,6 +65,8 @@ export function OtdelSettingsPanel({ otdel, open, onClose, onSaved }: OtdelSetti
         setFullOtdel(data)
         setHead(data.head || '')
         setWorkers(new Set(data.workers || []))
+        setCompactionLimit(data.compaction_limit ?? 100)
+        setKeepRecent(data.keep_recent ?? 10)
       }
 
       if (agentsRes.ok) {
@@ -139,6 +145,8 @@ export function OtdelSettingsPanel({ otdel, open, onClose, onSaved }: OtdelSetti
         body: JSON.stringify({
           head,
           workers: Array.from(workers),
+          compaction_limit: compactionLimit,
+          keep_recent: keepRecent,
         }),
       })
       if (res.ok) {
@@ -217,6 +225,38 @@ export function OtdelSettingsPanel({ otdel, open, onClose, onSaved }: OtdelSetti
                   </div>
                 ))
               )}
+            </div>
+          </div>
+
+          {/* Компакция */}
+          <div className="settings-field">
+            <label>Компакция</label>
+            <div className="otdel-compaction-settings">
+              <div className="compaction-row">
+                <span className="compaction-label">Лимит сообщений</span>
+                <input
+                  type="number"
+                  className="settings-input compaction-input"
+                  value={compactionLimit}
+                  onChange={e => setCompactionLimit(Math.max(10, parseInt(e.target.value) || 10))}
+                  min={10}
+                  max={500}
+                />
+              </div>
+              <div className="compaction-row">
+                <span className="compaction-label">Сохранять последних</span>
+                <input
+                  type="number"
+                  className="settings-input compaction-input"
+                  value={keepRecent}
+                  onChange={e => setKeepRecent(Math.max(1, parseInt(e.target.value) || 1))}
+                  min={1}
+                  max={50}
+                />
+              </div>
+              <div className="compaction-hint">
+                При превышении лимита старые сообщения заменяются summaries
+              </div>
             </div>
           </div>
         </div>

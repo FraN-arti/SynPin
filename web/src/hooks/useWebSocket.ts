@@ -8,8 +8,7 @@
  */
 import { useEffect, useRef, useCallback, useState } from 'react'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:2088'
-const WS_URL = API_BASE.replace(/^http/, 'ws') + '/ws'
+import { WS_URL } from '../config'
 const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000]
 
 type MessageHandler = (data: any) => void

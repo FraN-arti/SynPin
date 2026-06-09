@@ -1,6 +1,6 @@
 # 📅 Roadmap
 
-> Актуально: 2026-06-06. Фаза 0-1 (ядро) — ~90% готово.
+> Актуально: 2026-06-10. Фаза 0-1 (ядро) — ~95% готово. Фаза 2 — в процессе.
 
 ---
 
@@ -35,7 +35,7 @@
 - [x] FTS5 full-text search по памяти
 - [x] Memory API: 14+ REST эндпоинтов
 
-### Инструменты ✅ (8/16)
+### Инструменты ✅ (13/20)
 - [x] `terminal` — async shell exec (bash, 30s timeout)
 - [x] `file_read` — чтение файлов (offset/limit, 1MB cap)
 - [x] `file_write` — запись файлов (атомарная, mkdir)
@@ -44,6 +44,11 @@
 - [x] `code_exec` — sandboxed Python exec
 - [x] `memory_read` — чтение MEMORY/USER/facts
 - [x] `memory_write` — add/remove/replace entries
+- [x] `head_delegate` — делегирование задач воркерам ✅ (Head Protocol)
+- [x] `head_await` — ожидание ответов от воркеров ✅ (Head Protocol)
+- [x] `head_evaluate` — quality gate ✅ (Head Protocol)
+- [x] `head_retry` — ретрай упавшего воркера ✅ (Head Protocol)
+- [x] `head_decide` — стратегическое решение ✅ (Head Protocol)
 - [ ] `browser` — веб-браузер (Puppeteer/Playwright)
 - [ ] `vision` — анализ изображений
 - [ ] `message_send` — отправка сообщений в каналы
@@ -62,6 +67,13 @@
 - [x] Background task system (asyncio.Task + Queue)
 - [x] Polling recovery (после перезагрузки страницы)
 
+### WebSocket ✅
+- [x] Single `/ws` endpoint (мультиплексированный)
+- [x] chat:send / chat:chunk протокол
+- [x] otdel:send / otdel:chunk / otdel:thinking / otdel:done
+- [x] ws_manager (connection manager)
+- [x] useWebSocket React hook (reconnect, events)
+
 ### Провайдеры ✅
 - [x] OpenAI-compatible (SSE streaming + tool_calls)
 - [x] Anthropic Claude (SSE streaming)
@@ -76,21 +88,43 @@
 - [x] External agents (Hermes Agent detection)
 - [x] Tools assignment per agent
 
+### Отделы (Otdels) ✅
+- [x] departments.yaml — Вахтан, Сузумебачи, Волокита, Разработка
+- [x] otdels.yaml — Грахатули, Обсуждение аниме
+- [x] Head (управляющий) / Worker (работник) roles
+- [x] @mention routing — Глава видит всё, работники при упоминании
+- [x] Otdel Chat Router (HTTP + WebSocket)
+- [x] Compaction per otdel (compaction_limit, keep_recent)
+- [x] OtdelChatView + OtdelSettingsPanel (React)
+
 ### Безопасность ✅
 - [x] Security sandbox: configurable `allowed_directories` через `security.yaml`
 - [x] command_timeout для shell команд
 - [x] file_read limits (1MB cap)
 
-### Веб-интерфейс ⚠️
+### Stats API ✅
+- [x] `/api/stats/overview` — summary cards (агенты, сообщения, uptime)
+- [x] `/api/stats/usage` — статистика по моделям и агентам
+- [x] `/api/stats/tools` — использование инструментов
+- [x] `/api/stats/sessions` — список сессий
+
+### Themes ✅
+- [x] `/api/themes/*` — tweakcn интеграция
+- [x] Импорт тем из tweakcn JSON формата
+- [x] Конвертация CSS → JSON переменные
+
+### Веб-интерфейс ✅
 - [x] Chat UI (стриминг, тэги, markdown, emoji)
 - [x] Agent selection (SynPin + external)
 - [x] Memory UI (USER.md просмотр, компакция, сессии)
 - [x] Settings: Providers (каталог, CRUD)
 - [x] Settings: Agents (каталог, CRUD)
-- [ ] **Settings: Channels** — планируется
+- [x] Settings: Departments (отделы, drag-and-drop в виджет-зону)
+- [x] Settings: Channels (Feishu подключён)
+- [x] Otdel Chat UI (WebSocket streaming, thinking, compaction)
+- [x] WidgetDropZone (drag-and-drop departments)
 - [ ] **Settings: General** — UI только, нет сохранения
 - [ ] **Settings: Skills** — placeholder
-- [ ] **Settings: String interpolation bug** — ~15 fetch() с одинарными кавычками
 
 ---
 
@@ -102,6 +136,11 @@
 - [x] **Background tasks** — asyncio.Task + Queue для фоновых LLM-задач ✅
 - [x] **Polling recovery** — переподключение после перезагрузки страницы ✅
 - [x] **Security sandbox configurable** — allowed_directories через security.yaml ✅
+- [x] **WebSocket** — single /ws endpoint, multiplexed protocol ✅
+- [x] **Otdels** — departments + otdels + Head/Worker flow ✅
+- [x] **Head Protocol** — 5 инструментов для Главы ✅
+- [x] **Stats API** — overview, usage, tools, sessions ✅
+- [x] **Themes** — tweakcn import/export ✅
 - [ ] **Settings: Channels** — подключить к бэкенду
 - [ ] **Settings: General** — подключить сохранение
 - [x] **Мёртвый код**: axios, zustand, react-router-dom, react-query → удалён ✅ dd36eed
@@ -118,7 +157,7 @@
 - [ ] **Мастер настройки**: пошаговый setup wizard (провайдер, модель, имя пользователя)
 - [ ] **Пропуск**: опция "я уже знаю что делаю" → переход к базовым настройкам
 
-### Визуальная тема (по аналогии с OpenClaw)
+### Визуальная тема
 - [ ] **Тема**: dark/light переключение
 - [ ] **Custom Theme Studio**: hue slider → 60+ CSS переменных через OKLCH
 - [ ] **6 пресетов**: Ocean, Spring, Sunset, Forest, Purple, Mocha
@@ -141,35 +180,21 @@
 ## Фаза 3: Мультиагентность
 
 ### Командные каналы (Отделы)
-Система department-based коммуникации между агентами.
+> 📌 **Отделы реализованы** (otdels.yaml, otdel_chat_router.py, Head Protocol).
+> Осталось:
 
-**Настройки: Каналы связи** — глобальные настройки каналов (Telegram, Discord, Slack):
-- [ ] Каждый тип канала: required_fields (bot_token, webhook, и т.д.)
-- [ ] Modes: polling / webhook
-- [ ] Binding targets: department / agent
-- [ ] Каналы связи: управление подключениями и конфигурацией
-
-**Отделы (Departments)** — кастомные подразделения:
-- [ ] RGB цвета для отделов (визуальное различие)
-- [ ] 18-символьные ID (departmentsid)
-- [ ] Модалка создания отдела: name, description, mentor role, escalation channel
-- [ ] Context injection per department (специфичный контекст для каждого отдела)
-- [ ] Separate chat contexts per department (изолированные беседы)
-
-**Шаблон @mentor** — коммуникация через наставника:
-- [ ] Employees → @mentor: делегирование задач
-- [ ] Mentor → Employee: инструкции и обратная связь
-
-**Правила видимости:**
-- [ ] Head отдела видит все сообщения своего отдела
-- [ ] Employees видят только свои сообщения
-
-**Делегация через Manager:**
-- [ ] Manager создаёт задачи внутри department
-- [ ] Делегирование tasks между агентами отдела
+- [x] departments.yaml — RGB цвета, slug ID
+- [x] otdels.yaml — head, workers, compaction
+- [x] @mention routing — Head видит всё, Workers при упоминании
+- [x] Head Protocol — delegate, await, evaluate, retry, decide
+- [x] Otdel Chat UI — WebSocket streaming
+- [ ] Context injection per department (специфичный контекст для каждого департамента)
 - [ ] Cross-department delegation (совет отделов)
 
-> 📄 См. также: [channels-hierarchy.md](channels-hierarchy.md) — дизайн-спека Channels (мессенджеры)
+**Настройки: Каналы связи** — глобальные настройки каналов:
+- [x] channels.yaml — Feishu подключён (WebSocket)
+- [ ] Каждый тип канала: required_fields (bot_token, webhook, и т.д.)
+- [ ] Modes: polling / webhook для Telegram, Discord и т.д.
 
 ### Router / Delegation
 - [ ] Базовый Router: задача → агент → результат

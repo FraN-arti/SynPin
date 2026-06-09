@@ -29,9 +29,9 @@ router = APIRouter(prefix="/api/chat", tags=["hermes-chat"])
 HERMES_API_URL = "http://127.0.0.1:8642"
 HERMES_API_KEY = ""  # Will be loaded from config
 
-# History storage
+# History storage — Hermes keeps long history for context continuity
 _DATA_DIR = None
-MAX_HISTORY_MESSAGES = 100
+MAX_HISTORY_MESSAGES = 1000  # Large limit — Hermes manages its own context
 
 
 def _get_data_dir():
@@ -224,19 +224,9 @@ async def hermes_chat_stream(req: HermesChatRequest):
         if len(persisted) > len(history):
             history = persisted
 
-    # Compact history if too long (same logic as internal agents)
-    if agent_slug and history:
-        try:
-            from ..chat.router import compact_messages
-            history, compaction_notice = compact_messages(
-                history,
-                system_prompt=req.system_prompt or "",
-                agent_slug=agent_slug,
-            )
-            if compaction_notice:
-                logger.info("Hermes compaction for %s: %s", agent_slug, compaction_notice)
-        except Exception as e:
-            logger.warning("Compaction failed for Hermes %s: %s", agent_slug, e)
+    # NOTE: No compaction for Hermes — it manages its own context/memory.
+    # History is persisted to disk with a large limit (MAX_HISTORY_MESSAGES=1000)
+    # so context survives browser/system restarts.
 
     # Build messages for Hermes
     messages = []

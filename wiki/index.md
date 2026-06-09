@@ -9,7 +9,7 @@
 | Документ | Описание |
 |---|---|
 | [Quick Start](quickstart.md) | Установка, запуск, первые шаги |
-| [Configuration](configuration.md) | YAML-конфиги: провайдеры, агенты, система |
+| [Configuration](configuration.md) | YAML-конфиги: провайдеры, агенты, отделы, каналы, память |
 
 ---
 
@@ -18,10 +18,11 @@
 | Документ | Описание |
 |---|---|
 | [**Агенты**](agents.md) | Личность, модель combos (provider/model), роли, hot-reload |
+| [**Отделы**](otdels.md) | Департаменты → Отделы, Head Protocol, @mentions |
 | [Память и сессии](memory-sessions.md) | MEMORY.md, типы сессий, авто-очистка, компакция |
-| [Инструменты](tools.md) | 8 инструментов, security sandbox, web_extract (планируется) |
+| [Инструменты](tools.md) | 13 инструментов (8 базовых + 5 Head Protocol) |
 | [**Интеграции**](integrations.md) | Hermes ACP, внешние агенты |
-| [**Каналы и иерархия**](channels-hierarchy.md) | Department-based коммуникация, @mentor, visibility rules |
+| [**Каналы и иерархия**](channels-hierarchy.md) | Department-based коммуникация, @mention, visibility rules |
 | [**Виджеты**](widgets.md) | Drag-and-drop панели, layout persistence, расширяемость |
 
 ---
@@ -30,9 +31,9 @@
 
 | Документ | Описание |
 |---|---|
-| [Архитектура](architecture.md) | Архитектура системы (background tasks, task manager, polling recovery) |
+| [Архитектура](architecture.md) | Архитектура системы (WebSocket, Head Protocol, Stats, Themes) |
 | [Философия](philosophy.md) | Философия проекта |
-| [Roadmap](roadmap.md) | Дорожная карта (Фаза 1 ~90% готово) |
+| [Roadmap](roadmap.md) | Дорожная карта (Фаза 1 ~95% готово) |
 
 ---
 
@@ -43,15 +44,16 @@ wiki/
 ├── README.md               # Wiki-оглавление (этот файл)
 ├── index.md                # Навигация
 ├── quickstart.md           # Быстрый старт
-├── configuration.md        # Конфигурация системы
+├── configuration.md        # Конфигурация системы (11 YAML файлов)
 ├── agents.md               # Агенты: личность, model combos, роли
-├── tools.md                # Инструменты агентов (8 штук + security sandbox)
+├── otdels.md               # Отделы: департаменты, Head Protocol
+├── tools.md                # Инструменты агентов (13 штук + Head Protocol)
 ├── integrations.md         # Hermes, внешние агенты
 ├── memory-sessions.md      # Память и сессии (компакция, авто-сброс)
 ├── memory-system.md        # Система памяти
 ├── channels-hierarchy.md   # Каналы и коммуникация (мессенджеры)
 ├── widgets.md              # Drag-and-drop виджеты
-├── dashboard.md            # Web UI (чат + настройки)
+├── dashboard.md            # Web UI (чат + otdel-чат + настройки)
 ├── architecture.md         # Архитектура системы
 ├── philosophy.md           # Философия проекта
 ├── roadmap.md              # Дорожная карта
@@ -75,14 +77,16 @@ Configuration
     ↓
 Agents (личность + model combos + роли)
     ↓
-Channels (где работают агенты) ← channels-hierarchy.md
+Otdels (департаменты → отделы, Head Protocol)
     ↓
-Tools (что делают агенты, security sandbox)
+Channels (где работают агенты, внешние мессенджеры)
+    ↓
+Tools (что делают агенты, security sandbox, head tools)
     ↓
 Memory (что запоминают, компакция)
 ```
 
-Каждый документ ссылается на связанные. Начни с Configuration → Agents → Tools.
+Каждый документ ссылается на связанные. Начни с Configuration → Agents → Otdels → Tools.
 
 ---
 

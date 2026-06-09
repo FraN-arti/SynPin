@@ -25,7 +25,7 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useWebSocket } from './hooks/useWebSocket'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:2088'
+import { API_BASE } from './config'
 
 interface AgentConfig {
   slug: string
@@ -789,7 +789,7 @@ function App() {
             return (
               <div className="primary-agent">
                 <button
-                  className="agent-list-item active"
+                  className={`agent-list-item ${activeAgent?.slug === primary.slug ? 'active' : ''}`}
                   onClick={() => {
                     setActiveAgent(primary)
                     setMessages([])

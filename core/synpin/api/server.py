@@ -7,8 +7,33 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 import os
+import yaml
 
 logger = logging.getLogger(__name__)
+
+# ── CORS Origins — read from settings.yaml or use dev defaults ───────
+_default_origins = [
+    "http://localhost:2099", "http://localhost:2100",
+    "http://127.0.0.1:2099", "http://127.0.0.1:2100",
+]
+
+_cors_origins = _default_origins
+_settings_candidates = [
+    Path.home() / ".synpin" / "config" / "settings.yaml",
+    Path(__file__).resolve().parent.parent / "config" / "settings.yaml",
+]
+for _sp in _settings_candidates:
+    if _sp.exists():
+        try:
+            with open(_sp, encoding="utf-8") as _sf:
+                _settings = yaml.safe_load(_sf) or {}
+            _custom = _settings.get("server", {}).get("cors_origins")
+            if _custom and isinstance(_custom, list):
+                _cors_origins = _custom
+                logger.info("CORS origins loaded from settings.yaml: %s", _cors_origins)
+        except Exception:
+            pass
+        break
 
 app = FastAPI(
     title="SynPin",
@@ -19,7 +44,7 @@ app = FastAPI(
 # Allow Vite dev server to reach the API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:2099", "http://localhost:2100", "http://127.0.0.1:2099", "http://127.0.0.1:2100"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

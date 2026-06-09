@@ -94,68 +94,74 @@ class MemoryConfigUpdate(BaseModel):
 @router.get("/memory")
 async def get_memory_config():
     """Read global memory configuration."""
-    path = CONFIG_DIR / "memory.yaml"
-    full = _load_yaml(path)
+    try:
+        path = CONFIG_DIR / "memory.yaml"
+        full = _load_yaml(path)
 
-    # Return only the sections we expose for editing
-    return {
-        "context_window": full.get("context_window", {"default": 128000}),
-        "compaction": full.get("compaction", {
-            "enabled": True,
-            "trigger_percent": 80,
-            "keep_recent": 10,
-            "strategy": "truncate",
-            "summary_max_tokens": 500,
-        }),
-        "sessions": full.get("sessions", {
-            "auto_reset": {"enabled": True, "mode": "daily", "reset_time": "00:00", "interval_hours": 24},
-            "archive_on_reset": True,
-            "max_history": 100,
-        }),
-    }
+        # Return only the sections we expose for editing
+        return {
+            "context_window": full.get("context_window", {"default": 128000}),
+            "compaction": full.get("compaction", {
+                "enabled": True,
+                "trigger_percent": 80,
+                "keep_recent": 10,
+                "strategy": "truncate",
+                "summary_max_tokens": 500,
+            }),
+            "sessions": full.get("sessions", {
+                "auto_reset": {"enabled": True, "mode": "daily", "reset_time": "00:00", "interval_hours": 24},
+                "archive_on_reset": True,
+                "max_history": 100,
+            }),
+        }
+    except Exception as e:
+        logger.error("Failed to read memory config: %s", e)
+        raise HTTPException(500, "Failed to read memory config")
 
 
 @router.put("/memory")
 async def update_memory_config(req: MemoryConfigUpdate):
     """Update global memory configuration (partial deep merge)."""
-    path = CONFIG_DIR / "memory.yaml"
-    full = _load_yaml(path)
+    try:
+        path = CONFIG_DIR / "memory.yaml"
+        full = _load_yaml(path)
 
-    # Deep merge each section that was provided
-    if req.context_window is not None:
-        full["context_window"] = _deep_merge(
-            full.get("context_window", {"default": 128000}),
-            req.context_window,
-        )
+        if req.context_window is not None:
+            full["context_window"] = _deep_merge(
+                full.get("context_window", {"default": 128000}),
+                req.context_window,
+            )
 
-    if req.compaction is not None:
-        full["compaction"] = _deep_merge(
-            full.get("compaction", {
-                "enabled": True, "trigger_percent": 80,
-                "keep_recent": 10, "strategy": "truncate",
-            }),
-            req.compaction,
-        )
+        if req.compaction is not None:
+            full["compaction"] = _deep_merge(
+                full.get("compaction", {
+                    "enabled": True, "trigger_percent": 80,
+                    "keep_recent": 10, "strategy": "truncate",
+                }),
+                req.compaction,
+            )
 
-    if req.sessions is not None:
-        full["sessions"] = _deep_merge(
-            full.get("sessions", {
-                "auto_reset": {"enabled": True, "mode": "daily"},
-                "archive_on_reset": True, "max_history": 100,
-            }),
-            req.sessions,
-        )
+        if req.sessions is not None:
+            full["sessions"] = _deep_merge(
+                full.get("sessions", {
+                    "auto_reset": {"enabled": True, "mode": "daily"},
+                    "archive_on_reset": True, "max_history": 100,
+                }),
+                req.sessions,
+            )
 
-    _save_yaml(path, full)
-    logger.info("memory.yaml updated via API")
+        _save_yaml(path, full)
+        logger.info("memory.yaml updated via API")
 
-    # Return updated config
-    return {
-        "success": True,
-        "context_window": full.get("context_window"),
-        "compaction": full.get("compaction"),
-        "sessions": full.get("sessions"),
-    }
+        return {
+            "success": True,
+            "context_window": full.get("context_window"),
+            "compaction": full.get("compaction"),
+            "sessions": full.get("sessions"),
+        }
+    except Exception as e:
+        logger.error("Failed to update memory config: %s", e)
+        raise HTTPException(500, "Failed to update memory config")
 
 
 # ── Primary Agent ───────────────────────────────────────────────────
@@ -167,20 +173,28 @@ class PrimaryAgentUpdate(BaseModel):
 @router.get("/primary-agent")
 async def get_primary_agent():
     """Get the primary agent slug."""
-    path = CONFIG_DIR / "settings.yaml"
-    full = _load_yaml(path)
-    return {"slug": full.get("primary_agent_slug", "")}
+    try:
+        path = CONFIG_DIR / "settings.yaml"
+        full = _load_yaml(path)
+        return {"slug": full.get("primary_agent_slug", "")}
+    except Exception as e:
+        logger.error("Failed to get primary agent: %s", e)
+        raise HTTPException(500, "Failed to get primary agent")
 
 
 @router.put("/primary-agent")
 async def set_primary_agent(req: PrimaryAgentUpdate):
     """Set the primary agent slug. Empty string clears it."""
-    path = CONFIG_DIR / "settings.yaml"
-    full = _load_yaml(path)
-    full["primary_agent_slug"] = req.slug
-    _save_yaml(path, full)
-    logger.info("Primary agent set to: %s", req.slug or "(none)")
-    return {"success": True, "slug": req.slug}
+    try:
+        path = CONFIG_DIR / "settings.yaml"
+        full = _load_yaml(path)
+        full["primary_agent_slug"] = req.slug
+        _save_yaml(path, full)
+        logger.info("Primary agent set to: %s", req.slug or "(none)")
+        return {"success": True, "slug": req.slug}
+    except Exception as e:
+        logger.error("Failed to set primary agent: %s", e)
+        raise HTTPException(500, "Failed to set primary agent")
 
 
 # ── General Settings CRUD ────────────────────────────────────────────────────
@@ -197,26 +211,34 @@ class SettingsUpdate(BaseModel):
 @router.get("/settings")
 async def get_settings():
     """Read full settings.yaml."""
-    path = CONFIG_DIR / "settings.yaml"
-    full = _load_yaml(path)
-    return full
+    try:
+        path = CONFIG_DIR / "settings.yaml"
+        full = _load_yaml(path)
+        return full
+    except Exception as e:
+        logger.error("Failed to read settings: %s", e)
+        raise HTTPException(500, "Failed to read settings")
 
 
 @router.put("/settings")
 async def update_settings(req: SettingsUpdate):
     """Update settings.yaml (partial deep merge)."""
-    path = CONFIG_DIR / "settings.yaml"
-    full = _load_yaml(path)
+    try:
+        path = CONFIG_DIR / "settings.yaml"
+        full = _load_yaml(path)
 
-    if req.server is not None:
-        full["server"] = _deep_merge(full.get("server", {}), req.server)
-    if req.ui is not None:
-        full["ui"] = _deep_merge(full.get("ui", {}), req.ui)
-    if req.feed is not None:
-        full["feed"] = _deep_merge(full.get("feed", {}), req.feed)
-    if req.kanban is not None:
-        full["kanban"] = _deep_merge(full.get("kanban", {}), req.kanban)
+        if req.server is not None:
+            full["server"] = _deep_merge(full.get("server", {}), req.server)
+        if req.ui is not None:
+            full["ui"] = _deep_merge(full.get("ui", {}), req.ui)
+        if req.feed is not None:
+            full["feed"] = _deep_merge(full.get("feed", {}), req.feed)
+        if req.kanban is not None:
+            full["kanban"] = _deep_merge(full.get("kanban", {}), req.kanban)
 
-    _save_yaml(path, full)
-    logger.info("settings.yaml updated via API")
-    return {"success": True, "settings": full}
+        _save_yaml(path, full)
+        logger.info("settings.yaml updated via API")
+        return {"success": True, "settings": full}
+    except Exception as e:
+        logger.error("Failed to update settings: %s", e)
+        raise HTTPException(500, "Failed to update settings")

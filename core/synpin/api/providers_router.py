@@ -73,7 +73,7 @@ async def update_provider(name: str, req: ProviderUpdate):
         existing["type"] = req.type
     if req.base_url is not None:
         existing["base_url"] = req.base_url
-    if req.api_key is not None:
+    if req.api_key is not None and req.api_key != "":
         existing["api_key"] = req.api_key
     if req.models is not None:
         existing["models"] = req.models

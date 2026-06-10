@@ -30,6 +30,7 @@ router = APIRouter(prefix="/api/otdels", tags=["otdel-chat"])
 registry: ProviderRegistry | None = None
 
 # Import shared history + helpers from otdel_helpers (single source of truth)
+from .ws_router import create_head_state
 from .otdel_helpers import (
     _load_history,
     _save_history,
@@ -151,6 +152,13 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
         log.info("Otdel %s agent_queue: %s", otdel_id, [(a.get("name"), h) for a, h, _ in agent_queue])
         
         processed_count = 0
+        
+        # Create HeadState for this otdel session (needed for head_delegate tool)
+        try:
+            create_head_state(otdel_id, head_slug, worker_slugs)
+            log.info("Created HeadState for otdel %s", otdel_id)
+        except Exception as e:
+            log.warning("Failed to create HeadState for otdel %s: %s", otdel_id, e)
         head_processed = False
         workers_responded = 0
         max_iterations = 10  # Prevent infinite loops

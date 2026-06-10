@@ -6,6 +6,7 @@ Multiplexed protocol:
 """
 
 import asyncio
+import re
 import json
 import logging
 import uuid

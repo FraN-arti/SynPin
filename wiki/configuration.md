@@ -32,12 +32,12 @@
 │       ├── settings.yaml
 │       └── tools.yaml
 ├── agents/
-│   ├── 85n1yo4x/             # agentid = имя директории
+│   ├── agent-001/              # agentid = имя директории
 │   │   ├── agent.yaml        # Личность и настройки
 │   │   └── avatar.png        # Аватар (опционально)
-│   ├── 1f39sqld/
+│   ├── agent-002/
 │   │   └── agent.yaml
-│   └── ix13aox3/
+│   └── agent-001/
 │       └── agent.yaml
 ├── themes/
 │   └── custom.json           # Пользовательские темы (tweakcn)
@@ -56,7 +56,7 @@
 Общие настройки сервера, UI, фида, канбана и форума.
 
 ```yaml
-primary_agent_slug: 8e5tv711
+primary_agent_slug: agent-001
 
 server:
   host: 0.0.0.0
@@ -212,10 +212,10 @@ providers:
 
 ```yaml
 agents:
-  ix13aox3:
-    name: QA Инженер
+  agent-001:
+    name: Backend Lead
     role: управляющий
-    department: советчик
+    department: backend
     model: 9router/summarise-agent
     personality:
       tone: professional
@@ -226,15 +226,15 @@ agents:
     enabled: true
     is_primary: false
 
-  8e5tv711:
-    name: Архитектор
-    role: сотрудник
-    department: советчик
+  agent-002:
+    name: Frontend Developer
+    role: работник-отдела
+    department: frontend
     model: 9router/hermes-agent
     enabled: true
     is_primary: false
 
-  nukf4tc0:
+  agent-003:
     model: 9router/thinking-agent
     enabled: true
 ```
@@ -283,22 +283,22 @@ roles:
 
 ```yaml
 departments:
-  - departmentsid: how5jhamq02m
-    name: Вахтан
+  - departmentsid: dept-001
+    name: Backend
     color: '#f97316'
 
-  - departmentsid: cmpfmu9lsoz0
-    name: Сузумебачи
+  - departmentsid: dept-002
+    name: Frontend
     color: '#7cf915'
 
-  - departmentsid: h0d8udk4wxio
-    name: Волокита
-    description: департамент отвечающий за обдумывание решений
+  - departmentsid: dept-003
+    name: Analytics
+    description: Департамент аналитики и отчётов
     color: '#27166a'
 
-  - departmentsid: t8rbmlmz7mps
-    name: Разработка
-    description: Отдел разработки
+  - departmentsid: dept-004
+    name: DevOps
+    description: Инфраструктура и деплой
     color: '#bbf73b'
 ```
 
@@ -310,28 +310,28 @@ departments:
 
 ```yaml
 otdels:
-  - otdelid: pw6flsdgw48m
-    name: Обсуждение аниме
-    description: группа обсуждает аниме
+  - otdelid: otdel-001
+    name: Web Team
+    description: Команда веб-разработки
     color: '#15f9a2'
     mentor_role: управляющий
-    head: ix13aox3
+    head: agent-001
     workers:
-      - k493rqqz
-      - 8e5tv711
+      - agent-002
+      - agent-003
 
-  - otdelid: h1urnetgjr5q
-    name: Грахатули
-    description: Самый радостный отдел в мире для общения
+  - otdelid: otdel-002
+    name: Mobile Team
+    description: Мобильная разработка
     color: '#f915db'
     mentor_role: управляющий
-    head: ix13aox3
+    head: agent-001
     workers:
-      - k493rqqz
-      - 8e5tv711
-      - nukf4tc0
-      - ezu8oolt
-      - 75ecwopd
+      - agent-002
+      - agent-003
+      - agent-004
+      - agent-005
+      - agent-006
     compaction_limit: 100
     keep_recent: 10
 ```
@@ -525,12 +525,12 @@ agents:
 Личность и настройки конкретного агента.
 
 ```yaml
-# agents/ix13aox3/agent.yaml
-agentid: ix13aox3
-name: QA Инженер
+# agents/agent-001/agent.yaml
+agentid: agent-001
+name: Backend Lead
 description: ''
 role: управляющий
-department: советчик
+department: backend
 
 personality:
   tone: professional

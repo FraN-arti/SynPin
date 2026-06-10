@@ -37,12 +37,12 @@
 
 ```
 agents/
-├── 85n1yo4x/          ← agentid = slug
+├── dept-001/          ← agentid = slug
 │   ├── agent.yaml     ← личность и настройки
 │   └── avatar.png     ← опционально
-├── 1f39sqld/
+├── dept-002/
 │   └── agent.yaml
-└── ix13aox3/
+└── agent-001/
     └── agent.yaml
 ```
 
@@ -57,12 +57,12 @@ agents/
 ## Структура agent.yaml
 
 ```yaml
-# agents/ix13aox3/agent.yaml
-agentid: ix13aox3
-name: QA Инженер
+# agents/agent-001/agent.yaml
+agentid: agent-001
+name: Backend Lead
 description: ''
 role: управляющий              # slug из roles.yaml
-department: советчик           # slug из departments.yaml
+department: backend            # slug из departments.yaml
 model: 9router/summarise-agent # combo формат: provider/model
 
 personality:
@@ -173,22 +173,22 @@ roles:
 ```yaml
 # ~/.synpin/config/departments.yaml
 departments:
-  - departmentsid: how5jhamq02m
-    name: Вахтан
+  - departmentsid: dept-001
+    name: Backend
     color: '#f97316'
 
-  - departmentsid: cmpfmu9lsoz0
-    name: Сузумебачи
+  - departmentsid: dept-002
+    name: Frontend
     color: '#7cf915'
 
-  - departmentsid: h0d8udk4wxio
-    name: Волокита
-    description: департамент отвечающий за обдумывание решений
+  - departmentsid: dept-003
+    name: Analytics
+    description: Департамент аналитики и отчётов
     color: '#27166a'
 
-  - departmentsid: t8rbmlmz7mps
-    name: Разработка
-    description: Отдел разработки
+  - departmentsid: dept-004
+    name: DevOps
+    description: Инфраструктура и деплой
     color: '#bbf73b'
 ```
 
@@ -201,16 +201,16 @@ departments:
 ```yaml
 # ~/.synpin/config/otdels.yaml
 otdels:
-  - otdelid: h1urnetgjr5q
-    name: Грахатули
-    description: Самый радостный отдел в мире для общения
+  - otdelid: otdel-001
+    name: Web Team
+    description: Веб-разработка и фронтенд
     color: '#f915db'
     mentor_role: управляющий
-    head: ix13aox3          # slug агента-Главы
+    head: agent-001          # slug агента-Главы
     workers:                 # slug'ы работников
-      - k493rqqz
-      - 8e5tv711
-      - nukf4tc0
+      - agent-002
+      - agent-003
+      - agent-004
 ```
 
 > Подробнее: [Отделы](otdels.md)
@@ -244,7 +244,7 @@ otdels:
 {
   "name": "Маркетолог",
   "role": "работник-отдела",
-  "department": "how5jhamq02m",
+  "department": "dept-001",
   "model": "9router/general-agent",
   "description": "Продвижение продукта",
   "system_prompt": "Ты — Маркетолог...",

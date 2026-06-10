@@ -89,8 +89,8 @@
 - [x] Tools assignment per agent
 
 ### Отделы (Otdels) ✅
-- [x] departments.yaml — Вахтан, Сузумебачи, Волокита, Разработка
-- [x] otdels.yaml — Грахатули, Обсуждение аниме
+- [x] departments.yaml — Backend, Frontend, Analytics, DevOps
+- [x] otdels.yaml — Web Team, Mobile Team
 - [x] Head (управляющий) / Worker (работник) roles
 - [x] @mention routing — Глава видит всё, работники при упоминании
 - [x] Otdel Chat Router (HTTP + WebSocket)

@@ -11,9 +11,9 @@ SynPin подключает **внешние агентские системы**
 │           SynPin Organization                │
 │                                              │
 │  Все агенты (в UI одним списком):            │
-│    ├── 85n1yo4x (Архитектор) — SynPin       │
-│    ├── 1f39sqld (Разработчик) — SynPin      │
-│    ├── ix13aox3 (QA Инженер) — SynPin       │
+│    ├── agent-001 (Backend Lead) — SynPin     │
+│    ├── agent-002 (Frontend Developer) — SynPin│
+│    ├── agent-003 (QA Engineer) — SynPin      │
 │    └── hermes (Hermes) — внешний ←──────┐   │
 │                                          │   │
 │  Hermes Gateway (localhost:8642) ────────┘   │
@@ -164,7 +164,7 @@ curl -X PUT http://localhost:2088/api/external-agents/hermes \
 # Сменить роль
 curl -X PUT http://localhost:2088/api/external-agents/hermes \
   -H "Content-Type: application/json" \
-  -d '{"role": "t0wy3h5qcd9m"}'
+  -d '{"role": "управляющий"}'
 ```
 
 ---

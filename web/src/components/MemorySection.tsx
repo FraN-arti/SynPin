@@ -74,10 +74,10 @@ export function MemorySection() {
     enabled: true, trigger_percent: 80, keep_recent: 10, strategy: 'truncate',
   })
   const [providerForm, setProviderForm] = useState<MemoryProviderConfig>({
-    provider: 'built-in', api_key: '', endpoint: '', max_chars: 50000, auto_refactor: false,
+    provider: 'built-in', api_key: '', endpoint: '', max_chars: 10000, auto_refactor: false,
   })
   const [memorySettings, setMemorySettings] = useState<MemorySettingsConfig>({
-    enabled: true, max_chars: 100000, auto_refactor: false,
+    enabled: true, max_chars: 10000, auto_refactor: false,
   })
 
   // Load data on mount
@@ -343,22 +343,6 @@ export function MemorySection() {
                 </div>
               </>
             )}
-
-            <div className="settings-field">
-              <div className="settings-field-label">
-                <label>Макс. символов на запись</label>
-                <span className="settings-field-hint">Лимит длины одной записи памяти</span>
-              </div>
-              <input
-                type="number"
-                className="settings-input"
-                min={1000}
-                max={500000}
-                value={providerForm.max_chars}
-                onChange={e => setProviderForm({ ...providerForm, max_chars: Math.min(500000, Math.max(1000, Number(e.target.value))) })}
-                onBlur={() => saveConfig({ memory_provider: providerForm })}
-              />
-            </div>
           </div>
         </section>
 

@@ -19,10 +19,10 @@ memory_provider:
   api_key: ""           # API key for cloud providers (if needed)
   endpoint: ""          # Custom endpoint for self-hosted providers
   max_chars: 50000      # Max characters per memory entry
+  max_chars: 10000      # Max characters per memory entry
   auto_refactor: false  # Auto-refactor memory entries (coming soon)
-
 # Memory settings
 memory:
   enabled: true
-  max_chars: 100000     # Total memory limit per agent
+  max_chars: 10000      # Total memory limit per agent
   auto_refactor: false  # Automatically refactor/merge similar memories

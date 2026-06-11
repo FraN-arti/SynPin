@@ -483,28 +483,12 @@ async def _handle_otdel_send(user_id: str, msg: dict):
             })
 
             if is_head:
-                new_mentions = _parse_mentions(full_response)
-                for slug in worker_slugs:
-                    if slug == head_slug or slug == agent_slug_val:
-                        continue
-                    mentioned_agent = get_agent(slug)
-                    if not mentioned_agent:
-                        continue
-                    mentioned_name_lower = mentioned_agent.get("name", "").lower()
-                    mentioned_slug_lower = slug.lower()
-                    if mentioned_name_lower in new_mentions or mentioned_slug_lower in new_mentions:
-                        expected_workers.add(slug)
-                        if slug not in processed_slugs:
-                            # Clean trigger: strip [Name]: prefix so worker doesn't echo it
-                            trigger = re.sub(r'^\[.*?\]:\s*', '', full_response.strip())
-                            agent_queue.append((mentioned_agent, False, trigger))
+                # Workers are triggered ONLY via head_delegate tool (HeadState),
+                # NOT via @mentions in text. This prevents accidental triggering
+                # when the head mentions worker names in passing.
+                # Example: "Архитектор — хороший специалист" should NOT trigger Архитектор.
 
-                if expected_workers:
-                    head_delegating = True
-
-                # Also check HeadState for workers from head_delegate tool
-                # The tool updates HeadState.expected_workers but the @mention
-                # check above might miss them if Head didn't @mention in text
+                # Check HeadState for workers from head_delegate tool
                 hs = get_head_state(otdel_id)
                 if hs and hs.expected_workers:
                     for slug in hs.expected_workers:

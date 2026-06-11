@@ -511,7 +511,10 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
               }
               // Skip empty messages (no content and no tools)
               const hasTools = msg.tools && msg.tools.length > 0
-              if ((!msg.content || !msg.content.trim()) && !hasTools) return null
+              const hasContent = msg.content && msg.content.trim()
+              const hasValidSender = msg.sender_name && msg.sender_name !== '?'
+              if (!hasContent && !hasTools) return null
+              if (!hasValidSender && !hasContent) return null
               const left = isLeftSide(msg)
               const senderName = msg.sender === 'user' ? 'Вы' : (msg.sender_name || getAgentName(msg.sender))
               const isHead = msg.is_head === true

@@ -1,8 +1,43 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 // ─── Memory Section ──────────────────────────────────────────
 
 import { API_BASE as API } from '../config'
+
+// Local dropdown (same CSS as SettingsPage CustomDropdown)
+interface DropdownOption { value: string; label: string; disabled?: boolean; badge?: string }
+function SmallDropdown({ value, options, onChange }: { value: string; options: DropdownOption[]; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const selected = options.find(o => o.value === value)
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+  return (
+    <div className="custom-dropdown" ref={ref} style={{ width: '100%' }}>
+      <button className={`custom-dropdown-trigger ${open ? 'open' : ''}`} onClick={() => setOpen(!open)} type="button">
+        <span className="dropdown-selected">{selected?.label || value}</span>
+        <svg className="dropdown-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6" /></svg>
+      </button>
+      <div className={`custom-dropdown-menu ${open ? 'open' : ''}`}>
+        {options.map(option => (
+          <button
+            key={option.value}
+            className={`custom-dropdown-item ${option.value === value ? 'selected' : ''} ${option.disabled ? 'disabled' : ''}`}
+            onClick={() => { if (!option.disabled) { onChange(option.value); setOpen(false) } }}
+            disabled={option.disabled}
+          >
+            <span>{option.label}</span>
+            {option.badge && <span className="settings-card-badge" style={{ marginLeft: 6, fontSize: 9 }}>{option.badge}</span>}
+            {option.value === value && <svg className="dropdown-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12l5 5L20 7" /></svg>}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 // Parse entry into structured {key, value} or return raw text
 function parseEntry(entry: string): { key: string; value: string } {
@@ -263,18 +298,18 @@ export function MemorySection() {
                 <label>Стратегия</label>
                 <span className="settings-field-hint">Truncate — обрезка, Summarize — саммари</span>
               </div>
-              <select
-                className="settings-input"
+              <SmallDropdown
                 value={compactionForm.strategy}
-                onChange={e => {
-                  const next = { ...compactionForm, strategy: e.target.value }
+                options={[
+                  { value: 'truncate', label: 'Truncate — обрезка' },
+                  { value: 'summarize', label: 'Summarize — через LLM', disabled: true, badge: 'скоро' },
+                ]}
+                onChange={v => {
+                  const next = { ...compactionForm, strategy: v }
                   setCompactionForm(next)
                   saveConfig({ compaction: next })
                 }}
-              >
-                <option value="truncate">Truncate — обрезка</option>
-                <option value="summarize" disabled>Summarize — через LLM (скоро)</option>
-              </select>
+              />
             </div>
           </div>
         </section>
@@ -290,25 +325,25 @@ export function MemorySection() {
                 <label>Провайдер</label>
                 <span className="settings-field-hint">Выберите провайдер памяти для агентов</span>
               </div>
-              <select
-                className="settings-input"
+              <SmallDropdown
                 value={providerForm.provider}
-                onChange={e => {
-                  const next = { ...providerForm, provider: e.target.value }
+                options={[
+                  { value: 'built-in', label: 'Built-in (MEMORY.md / USER.md)' },
+                  { value: 'hindsight', label: 'Hindsight', disabled: true, badge: 'скоро' },
+                  { value: 'holographic', label: 'Holographic', disabled: true, badge: 'скоро' },
+                  { value: 'honcho', label: 'Honcho', disabled: true, badge: 'скоро' },
+                  { value: 'mem0', label: 'Mem0', disabled: true, badge: 'скоро' },
+                  { value: 'openviking', label: 'OpenViking', disabled: true, badge: 'скоро' },
+                  { value: 'retaindb', label: 'RetainDB', disabled: true, badge: 'скоро' },
+                  { value: 'supermemory', label: 'SuperMemory', disabled: true, badge: 'скоро' },
+                  { value: 'byterover', label: 'ByteRover', disabled: true, badge: 'скоро' },
+                ]}
+                onChange={v => {
+                  const next = { ...providerForm, provider: v }
                   setProviderForm(next)
                   saveConfig({ memory_provider: next })
                 }}
-              >
-                <option value="built-in">Built-in (MEMORY.md / USER.md)</option>
-                <option value="hindsight" disabled>Hindsight — скоро</option>
-                <option value="holographic" disabled>Holographic — скоро</option>
-                <option value="honcho" disabled>Honcho — скоро</option>
-                <option value="mem0" disabled>Mem0 — скоро</option>
-                <option value="openviking" disabled>OpenViking — скоро</option>
-                <option value="retaindb" disabled>RetainDB — скоро</option>
-                <option value="supermemory" disabled>SuperMemory — скоро</option>
-                <option value="byterover" disabled>ByteRover — скоро</option>
-              </select>
+              />
             </div>
 
             {providerForm.provider !== 'built-in' && (

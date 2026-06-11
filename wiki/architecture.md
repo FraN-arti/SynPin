@@ -296,7 +296,7 @@ synpin/
 | Tools (8 базовых + 5 Head Protocol = 13) | ✅ Реализовано |
 | Chat Router (SSE, tool execution) | ✅ Реализовано |
 | Text fallback parser (5 паттернов) | ✅ Реализовано |
-| WebSocket (single /ws, multiplexed) | ✅ Реализовано |
+| WebSocket Layer (single /ws, multiplexed, keepalive) | ✅ Реализовано |
 | Providers (9router, Mistral) | ✅ Реализовано |
 | External agents (Hermes) | ✅ Реализовано |
 | Task Manager (background tasks, polling recovery) | ✅ Реализовано |
@@ -306,6 +306,9 @@ synpin/
 | Stats API (overview, usage, tools, sessions) | ✅ Реализовано |
 | Themes (tweakcn import/export) | ✅ Реализовано |
 | Head Protocol (delegate, await, evaluate, retry, decide) | ✅ Реализовано |
+| Otdel Chat Router (@mentions, Head/Worker flow) | ✅ Реализовано |
+| ErrorBoundary (React error handling) | ✅ Реализовано |
+| Dynamic Vite proxy (API/WS routing) | ✅ Реализовано |
 | **Router (делегат/команда)** | 🔮 Планируется в Фазе 3 |
 | **Engine (ReAct-луп)** | 🔮 Планируется в Фазе 3 |
 | **MCP** | ❌ Не реализовано |
@@ -317,3 +320,5 @@ synpin/
 ---
 
 *Архитектура модульная — каждый слой можно заменить или расширить без трогания остальных.*
+
+Последнее обновление: 11 июня 2026

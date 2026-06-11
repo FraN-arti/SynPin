@@ -159,19 +159,24 @@ SynPin/
 
 ## Текущий статус
 
-**Фаза 0-1 (Ядро):** ~95% готово ✅
-**Фаза 2 (Стабилизация):** в процессе
+**Фаза 0-1 (Ядро):** ✅ Завершена
+**Фаза 2 (Стабилизация):** В процессе (~60%)
 
-### Готово:
-- ✅ Multi-agent чат со стримингом
-- ✅ Отделы с Head Protocol (делегирование)
-- ✅ Память агентов (MEMORY.md + FTS5)
-- ✅ 13 инструментов
-- ✅ WebSocket (/ws) с keepalive
-- ✅ Виджеты (drag & drop)
-- ✅ Статистика API
-- ✅ Темы (tweakcn)
-- ✅ Настройки (agents, providers, otdels)
+### Реализованные возможности:
+- ✅ Multi-agent otdels с Head Protocol
+- ✅ WebSocket стриминг в реальном времени
+- ✅ Auto-compaction
+- ✅ Worker Status Panel
+- ✅ Delegation chips
+- ✅ Typing indicators
+- ✅ ErrorBoundary
+- ✅ Система памяти с FTS5
+- ✅ 13 инструментов (8 базовых + 5 Head Protocol)
+- ✅ Hot-reload конфигурация
+
+### Известные проблемы:
+- ⚠️ Нестабильный tool calling у модели главы
+- ⚠️ Тесты пока отсутствуют
 
 ### В плане:
 - 🔄 Тесты (pytest + Vitest)
@@ -180,6 +185,8 @@ SynPin/
 - 🔄 Docker / CI/CD
 - 🔄 Браузер (Puppeteer/Playwright)
 - 🔄 Каналы (Telegram, Discord)
+
+Последнее обновление: 11 июня 2026
 
 ---
 

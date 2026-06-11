@@ -1,6 +1,7 @@
 # 📅 Roadmap
 
-> Актуально: 2026-06-10. Фаза 0-1 (ядро) — ~95% готово. Фаза 2 — в процессе.
+> Последнее обновление: 11 июня 2026
+> Фаза 0-1 (ядро) — ✅ завершена. Фаза 2 (стабилизация) — в процессе.
 
 ---
 
@@ -15,10 +16,11 @@
 - [x] Install script: `scripts/install.ps1`
 - [x] Конфигурация: `~/.synpin/config/` (YAML, hot-reload)
 - [x] Wiki: философия, архитектура, конфигурация
+- [x] Dynamic Vite proxy port (авто-определение порта бэкенда)
 
 ---
 
-## Фаза 1: Ядро (MVP)
+## Фаза 1: Ядро (MVP) ✅
 
 ### Память ✅
 - [x] MEMORY.md + USER.md per agent
@@ -34,6 +36,7 @@
 - [x] Авто-запись памяти: агент proactively сохраняет
 - [x] FTS5 full-text search по памяти
 - [x] Memory API: 14+ REST эндпоинтов
+- [x] Auto-compaction of chat history
 
 ### Инструменты ✅ (13/20)
 - [x] `terminal` — async shell exec (bash, 30s timeout)
@@ -66,6 +69,7 @@
 - [x] Memory + session context injection
 - [x] Background task system (asyncio.Task + Queue)
 - [x] Polling recovery (после перезагрузки страницы)
+- [x] Filtering пустых сообщений
 
 ### WebSocket ✅
 - [x] Single `/ws` endpoint (мультиплексированный)
@@ -73,6 +77,8 @@
 - [x] otdel:send / otdel:chunk / otdel:thinking / otdel:done
 - [x] ws_manager (connection manager)
 - [x] useWebSocket React hook (reconnect, events)
+- [x] WebSocket keepalive (15s ping)
+- [x] Otdel chat с WebSocket streaming
 
 ### Провайдеры ✅
 - [x] OpenAI-compatible (SSE streaming + tool_calls)
@@ -87,6 +93,7 @@
 - [x] Per-agent config (agent.yaml)
 - [x] External agents (Hermes Agent detection)
 - [x] Tools assignment per agent
+- [x] Agent cleanup (orphaned memberships)
 
 ### Отделы (Otdels) ✅
 - [x] departments.yaml — Backend, Frontend, Analytics, DevOps
@@ -96,6 +103,9 @@
 - [x] Otdel Chat Router (HTTP + WebSocket)
 - [x] Compaction per otdel (compaction_limit, keep_recent)
 - [x] OtdelChatView + OtdelSettingsPanel (React)
+- [x] Delegation Cards (compact chips)
+- [x] Typing indicators (animated dots)
+- [x] Worker Status Panel с динамическими анимациями
 
 ### Безопасность ✅
 - [x] Security sandbox: configurable `allowed_directories` через `security.yaml`
@@ -121,16 +131,17 @@
 - [x] Settings: Agents (каталог, CRUD)
 - [x] Settings: Departments (отделы, drag-and-drop в виджет-зону)
 - [x] Settings: Channels (Feishu подключён)
+- [x] Settings: General (дефолтные значения)
 - [x] Otdel Chat UI (WebSocket streaming, thinking, compaction)
 - [x] WidgetDropZone (drag-and-drop departments)
-- [ ] **Settings: General** — UI только, нет сохранения
+- [x] ErrorBoundary в React
 - [ ] **Settings: Skills** — placeholder
 
 ---
 
-## Фаза 2: Стабилизация (ближайшее)
+## Фаза 2: Стабилизация (в процессе)
 
-### Исправления
+### Исправления ✅
 - [x] **Settings bug**: одинарные кавычки в fetch() → backtick interpolation ✅ dd36eed
 - [x] **Duplicate messages fix** — исправлены дублирующиеся сообщения ✅
 - [x] **Background tasks** — asyncio.Task + Queue для фоновых LLM-задач ✅
@@ -141,9 +152,16 @@
 - [x] **Head Protocol** — 5 инструментов для Главы ✅
 - [x] **Stats API** — overview, usage, tools, sessions ✅
 - [x] **Themes** — tweakcn import/export ✅
-- [ ] **Settings: Channels** — подключить к бэкенду
-- [ ] **Settings: General** — подключить сохранение
 - [x] **Мёртвый код**: axios, zustand, react-router-dom, react-query → удалён ✅ dd36eed
+
+### Улучшения Head ✅ (11 июня 2026)
+- [x] **Head prompt improvements** — self-execution, selective delegation, internal workflow
+- [x] **Remove @mention auto-triggering** — только head_delegate запускает воркеров (убрана автотриггерация по @mention)
+- [x] **Empty message filtering** — фильтрация пустых сообщений на бэкенде
+- [x] **README updated** — актуальная документация
+
+### В ожидании
+- [ ] **Settings: Channels** — подключить к бэкенду
 - [ ] **memory_write tool**: memory_read инжект в промпт (агент не знает когда вызывать)
 - [ ] **Search shared**: FTS5 индексация shared/USER.md
 
@@ -271,10 +289,19 @@
 
 ## Технический долг
 
+### Устранено ✅
 - [x] ~~Удалить неиспользуемые зависимости (axios, zustand, react-router-dom, react-query)~~ ✅
 - [x] ~~Удалить мёртвый код (emoji.ts: convertTextEmojis, sidebar навигация)~~ ✅
 - [x] ~~Вынести hardcoded `D:\synpin` пути в конфиг~~ ✅ (security.yaml)
-- [ ] Добавить Error Boundaries в React
+- [x] ~~Добавить Error Boundaries в React~~ ✅
+
+### Известные проблемы
+- [ ] **Несогласованность модели Head** — tool calling работает на ~60-70% надёжности; модель не всегда вызывает инструменты делегирования при необходимости
+- [ ] **Нет Python тестов** — pytest конфигурация и unit-тесты не написаны
+- [ ] **Нет React тестов** — Vitest + component tests отсутствуют
+- [ ] **Нет Docker/CI/CD** — нет контейнеризации, нет автоматического тестирования/деплоя
+
+### Остальное
 - [ ] Исправить logger f-strings → %-форматирование
 - [ ] Очистить wiki от устаревших ссылок
 

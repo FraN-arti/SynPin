@@ -1,3 +1,24 @@
 # Agents configuration
 # Created on first run or by user in Settings
+#
+# Each agent has: name, role, model, personality, tools
+# Agents are identified by 8-char slug (auto-generated)
+
 agents: {}
+# Example:
+# agents:
+#   abc12345:
+#     name: My Agent
+#     role: работник-отдела
+#     department: my-department
+#     model: provider/model-name
+#     personality:
+#       tone: professional
+#       style: analytical
+#       traits:
+#         - helpful
+#         - precise
+#     tools: []
+#     context_window: 128000
+#     temperature: 0.7
+#     max_tokens: 4096

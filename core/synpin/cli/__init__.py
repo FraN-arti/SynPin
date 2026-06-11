@@ -1,0 +1,1 @@
+"""SynPin CLI module."""

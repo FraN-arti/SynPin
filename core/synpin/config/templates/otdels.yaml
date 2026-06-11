@@ -1,4 +1,18 @@
 # Otdels — organizational units with chat channels
-# Each otdel has its own mentor, workers, and chat
-# NOT the same as Departments (agent groupings)
+# Each otdel has its own head, workers, and chat
+#
+# NOT the same as Departments (agent groupings in Agents tab)
+
 otdels: []
+# Example:
+# otdels:
+#   - otdelid: unique-id
+#     name: Department Name
+#     description: What this department does
+#     color: '#00ff88'
+#     mentor_role: управляющий
+#     escalation: ''
+#     head: head-agent-slug
+#     workers:
+#       - worker-agent-slug-1
+#       - worker-agent-slug-2

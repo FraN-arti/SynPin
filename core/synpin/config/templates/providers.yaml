@@ -1,0 +1,20 @@
+# Providers configuration
+# API keys and model endpoints
+# Copy to ../providers.yaml and add your API keys
+#
+# NEVER commit providers.yaml to git — it contains API keys!
+
+providers: []
+# Example:
+# providers:
+#   - name: openai
+#     base_url: https://api.openai.com/v1
+#     api_key: sk-your-key-here
+#     models:
+#       - gpt-4
+#       - gpt-3.5-turbo
+#   - name: anthropic
+#     base_url: https://api.anthropic.com
+#     api_key: sk-ant-your-key-here
+#     models:
+#       - claude-sonnet-4-20250514

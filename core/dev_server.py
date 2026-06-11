@@ -185,12 +185,17 @@ def main():
         print(f"  {Fore.RED}❌  Web not found: {WEB_DIR}{Fore.RESET}")
         sys.exit(1)
 
-    # Check node_modules
+    # Check node_modules — auto-install if missing
     if not (WEB_DIR / "node_modules").exists():
-        print(f"  {Fore.YELLOW}⚠️   Web dependencies not installed.{Fore.RESET}")
-        print(f"  {Fore.YELLOW}    Run: cd web && npm install{Fore.RESET}")
+        print(f"  {Fore.YELLOW}Installing web dependencies...{Fore.RESET}")
+        npm_cmd = ["npm", "install"] if os.name != "nt" else ["cmd", "/c", "npm", "install"]
+        result = subprocess.run(npm_cmd, cwd=str(WEB_DIR), capture_output=True, text=True, shell=(os.name == "nt"))
+        if result.returncode != 0:
+            print(f"  {Fore.RED}ERROR: npm install failed:{Fore.RESET}")
+            print(result.stderr)
+            sys.exit(1)
+        print(f"  {Fore.GREEN}OK: Web dependencies installed{Fore.RESET}")
         print()
-        sys.exit(1)
 
     # Find free ports
     core_port = find_free_port(CORE_PORT)

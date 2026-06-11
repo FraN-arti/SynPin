@@ -125,13 +125,17 @@ def start_core(port: int) -> subprocess.Popen:
     )
 
 
-def start_web(port: int) -> subprocess.Popen:
+def start_web(port: int, backend_port: int) -> subprocess.Popen:
     """Start Vite dev server."""
     cmd = ["npm", "run", "dev", "--", "--port", str(port)]
+
+    env = os.environ.copy()
+    env["BACKEND_PORT"] = str(backend_port)
 
     return subprocess.Popen(
         cmd,
         cwd=str(WEB_DIR),
+        env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -212,7 +216,7 @@ def main():
 
     # Start Web
     print(f"  {Fore.CYAN}Starting Web...{Fore.RESET}")
-    web_proc = start_web(web_port)
+    web_proc = start_web(web_port, core_port)
     processes.append(web_proc)
     stream_output(web_proc, "WEB", Fore.BLUE, output_queue)
 

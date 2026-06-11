@@ -49,17 +49,18 @@ interface CompactionConfig {
   strategy: string
 }
 
-interface SessionAutoResetConfig {
-  enabled: boolean
-  mode: string
-  reset_time: string
-  interval_hours: number
+interface MemoryProviderConfig {
+  provider: string
+  api_key: string
+  endpoint: string
+  max_chars: number
+  auto_refactor: boolean
 }
 
-interface SessionsConfig {
-  auto_reset: SessionAutoResetConfig
-  archive_on_reset: boolean
-  max_history: number
+interface MemorySettingsConfig {
+  enabled: boolean
+  max_chars: number
+  auto_refactor: boolean
 }
 
 export function MemorySection() {
@@ -68,14 +69,15 @@ export function MemorySection() {
   // User profile state (read-only display)
   const [userData, setUserData] = useState<MemoryEntry | null>(null)
 
-  // Config state (compaction & sessions)
+  // Config state (compaction & memory)
   const [compactionForm, setCompactionForm] = useState<CompactionConfig>({
     enabled: true, trigger_percent: 80, keep_recent: 10, strategy: 'truncate',
   })
-  const [sessionsForm, setSessionsForm] = useState<SessionsConfig>({
-    auto_reset: { enabled: true, mode: 'daily', reset_time: '00:00', interval_hours: 24 },
-    archive_on_reset: true,
-    max_history: 100,
+  const [providerForm, setProviderForm] = useState<MemoryProviderConfig>({
+    provider: 'built-in', api_key: '', endpoint: '', max_chars: 50000, auto_refactor: false,
+  })
+  const [memorySettings, setMemorySettings] = useState<MemorySettingsConfig>({
+    enabled: true, max_chars: 100000, auto_refactor: false,
   })
 
   // Load data on mount
@@ -102,7 +104,8 @@ export function MemorySection() {
       if (res.ok) {
         const data = await res.json()
         if (data.compaction) setCompactionForm(data.compaction)
-        if (data.sessions) setSessionsForm(data.sessions)
+        if (data.memory_provider) setProviderForm(data.memory_provider)
+        if (data.memory) setMemorySettings(data.memory)
       }
     } catch (e) {
       console.error('[memory] config load error:', e)
@@ -269,135 +272,147 @@ export function MemorySection() {
                   saveConfig({ compaction: next })
                 }}
               >
-                <option value="truncate">Truncate</option>
-                <option value="summarize">Summarize</option>
+                <option value="truncate">Truncate — обрезка</option>
+                <option value="summarize" disabled>Summarize — через LLM (скоро)</option>
               </select>
             </div>
           </div>
         </section>
 
-        {/* Block 3: Sessions */}
+        {/* Block 3: Memory Provider */}
         <section className="settings-card memory-settings-half">
-          <h2 className="settings-card-title">💬 Сессии</h2>
-          <p className="memory-card-desc">Периодическая очистка контекста сессии. Старые диалоги архивируются, начинается чистый разговор.</p>
+          <h2 className="settings-card-title">🧠 Memory Provider</h2>
+          <p className="memory-card-desc">Где агенты хранят долгосрочную память. Built-in использует MEMORY.md / USER.md файлы.</p>
+
+          <div className="memory-config-form">
+            <div className="settings-field">
+              <div className="settings-field-label">
+                <label>Провайдер</label>
+                <span className="settings-field-hint">Выберите провайдер памяти для агентов</span>
+              </div>
+              <select
+                className="settings-input"
+                value={providerForm.provider}
+                onChange={e => {
+                  const next = { ...providerForm, provider: e.target.value }
+                  setProviderForm(next)
+                  saveConfig({ memory_provider: next })
+                }}
+              >
+                <option value="built-in">Built-in (MEMORY.md / USER.md)</option>
+                <option value="hindsight" disabled>Hindsight — скоро</option>
+                <option value="holographic" disabled>Holographic — скоро</option>
+                <option value="honcho" disabled>Honcho — скоро</option>
+                <option value="mem0" disabled>Mem0 — скоро</option>
+                <option value="openviking" disabled>OpenViking — скоро</option>
+                <option value="retaindb" disabled>RetainDB — скоро</option>
+                <option value="supermemory" disabled>SuperMemory — скоро</option>
+                <option value="byterover" disabled>ByteRover — скоро</option>
+              </select>
+            </div>
+
+            {providerForm.provider !== 'built-in' && (
+              <>
+                <div className="settings-field">
+                  <div className="settings-field-label">
+                    <label>API Key</label>
+                    <span className="settings-field-hint">Ключ доступа к провайдеру</span>
+                  </div>
+                  <input
+                    type="password"
+                    className="settings-input"
+                    placeholder="sk-..."
+                    value={providerForm.api_key}
+                    onChange={e => setProviderForm({ ...providerForm, api_key: e.target.value })}
+                    onBlur={() => saveConfig({ memory_provider: providerForm })}
+                  />
+                </div>
+                <div className="settings-field">
+                  <div className="settings-field-label">
+                    <label>Endpoint</label>
+                    <span className="settings-field-hint">Кастомный URL (если self-hosted)</span>
+                  </div>
+                  <input
+                    type="text"
+                    className="settings-input"
+                    placeholder="https://..."
+                    value={providerForm.endpoint}
+                    onChange={e => setProviderForm({ ...providerForm, endpoint: e.target.value })}
+                    onBlur={() => saveConfig({ memory_provider: providerForm })}
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="settings-field">
+              <div className="settings-field-label">
+                <label>Макс. символов на запись</label>
+                <span className="settings-field-hint">Лимит длины одной записи памяти</span>
+              </div>
+              <input
+                type="number"
+                className="settings-input"
+                min={1000}
+                max={500000}
+                value={providerForm.max_chars}
+                onChange={e => setProviderForm({ ...providerForm, max_chars: Math.min(500000, Math.max(1000, Number(e.target.value))) })}
+                onBlur={() => saveConfig({ memory_provider: providerForm })}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Block 4: Memory Settings */}
+        <section className="settings-card memory-settings-half">
+          <h2 className="settings-card-title">⚙️ Настройка памяти</h2>
+          <p className="memory-card-desc">Параметры работы долгосрочной памяти агентов.</p>
 
           <div className="memory-config-form">
             <div className="settings-field-row">
               <label className="settings-toggle">
                 <input
                   type="checkbox"
-                  checked={sessionsForm.auto_reset.enabled}
+                  checked={memorySettings.enabled}
                   onChange={e => {
-                    const next = { ...sessionsForm, auto_reset: { ...sessionsForm.auto_reset, enabled: e.target.checked } }
-                    setSessionsForm(next)
-                    saveConfig({ sessions: next })
+                    const next = { ...memorySettings, enabled: e.target.checked }
+                    setMemorySettings(next)
+                    saveConfig({ memory: next })
                   }}
                 />
-                <span>Авто-сброс</span>
+                <span>Память включена</span>
               </label>
             </div>
+
             <div className="settings-field">
               <div className="settings-field-label">
-                <label>Режим</label>
-                <span className="settings-field-hint">Daily — раз в сутки, Timer — по интервалу, Time — в указанное время</span>
-              </div>
-              <select
-                className="settings-input"
-                value={sessionsForm.auto_reset.mode}
-                onChange={e => {
-                  const next = { ...sessionsForm, auto_reset: { ...sessionsForm.auto_reset, mode: e.target.value } }
-                  setSessionsForm(next)
-                  saveConfig({ sessions: next })
-                }}
-              >
-                <option value="daily">Daily</option>
-                <option value="timer">Timer</option>
-                <option value="time">Time</option>
-              </select>
-            </div>
-            {sessionsForm.auto_reset.mode === 'time' && (
-              <div className="settings-field">
-                <div className="settings-field-label">
-                  <label>Время (HH:MM)</label>
-                  <span className="settings-field-hint">Конкретное время сброса сессии</span>
-                </div>
-                <input
-                  type="text"
-                  className="settings-input"
-                  placeholder="00:00"
-                  value={sessionsForm.auto_reset.reset_time}
-                  onChange={e => {
-                    const next = { ...sessionsForm, auto_reset: { ...sessionsForm.auto_reset, reset_time: e.target.value } }
-                    setSessionsForm(next)
-                  }}
-                  onBlur={() => saveConfig({ sessions: sessionsForm })}
-                />
-              </div>
-            )}
-            {sessionsForm.auto_reset.mode === 'timer' && (
-              <div className="settings-field">
-                <div className="settings-field-label">
-                  <label>Интервал (ч)</label>
-                  <span className="settings-field-hint">Сброс каждые N часов</span>
-                </div>
-                <input
-                  type="number"
-                  className="settings-input"
-                  min={1}
-                  value={sessionsForm.auto_reset.interval_hours}
-                  onChange={e => {
-                    const next = { ...sessionsForm, auto_reset: { ...sessionsForm.auto_reset, interval_hours: Math.max(1, Number(e.target.value)) } }
-                    setSessionsForm(next)
-                  }}
-                  onBlur={() => saveConfig({ sessions: sessionsForm })}
-                />
-              </div>
-            )}
-            <div className="settings-field-row">
-              <label className="settings-toggle">
-                <input
-                  type="checkbox"
-                  checked={sessionsForm.archive_on_reset}
-                  onChange={e => {
-                    const next = { ...sessionsForm, archive_on_reset: e.target.checked }
-                    setSessionsForm(next)
-                    saveConfig({ sessions: next })
-                  }}
-                />
-                <span>Архивировать</span>
-              </label>
-              <span className="settings-field-hint-inline">Перед сбросом сохранять историю в архив, чтобы ничего не потерялось</span>
-            </div>
-            <div className="settings-field">
-              <div className="settings-field-label">
-                <label>Макс. сообщений</label>
-                <span className="settings-field-hint">Лимит сообщений в активной сессии — при достижении контекст начнёт сжиматься</span>
+                <label>Макс. символов (всего)</label>
+                <span className="settings-field-hint">Общий лимит памяти на агента — при достижении начнёт забывать старое</span>
               </div>
               <input
                 type="number"
                 className="settings-input"
-                min={10}
-                max={1000}
-                value={sessionsForm.max_history}
-                onChange={e => {
-                  const next = { ...sessionsForm, max_history: Math.min(1000, Math.max(10, Number(e.target.value))) }
-                  setSessionsForm(next)
-                }}
-                onBlur={() => saveConfig({ sessions: sessionsForm })}
+                min={10000}
+                max={1000000}
+                value={memorySettings.max_chars}
+                onChange={e => setMemorySettings({ ...memorySettings, max_chars: Math.min(1000000, Math.max(10000, Number(e.target.value))) })}
+                onBlur={() => saveConfig({ memory: memorySettings })}
               />
             </div>
-            <div className="settings-field" style={{ marginTop: 12 }}>
-              <button
-                className="settings-btn settings-btn-secondary"
-                onClick={async () => {
-                  if (!confirm('Сбросить все активные сессии? Архив будет сохранён.')) return
-                  const API = import.meta.env.VITE_API_URL || ''
-                  const res = await fetch(`${API}/api/config/memory/sessions/reset`, { method: 'POST' })
-                  if (res.ok) alert('Сессии сброшены!')
-                }}
-              >
-                🔄 Сбросить сессии сейчас
-              </button>
+
+            <div className="settings-field-row">
+              <label className="settings-toggle">
+                <input
+                  type="checkbox"
+                  checked={memorySettings.auto_refactor}
+                  onChange={e => {
+                    const next = { ...memorySettings, auto_refactor: e.target.checked }
+                    setMemorySettings(next)
+                    saveConfig({ memory: next })
+                  }}
+                />
+                <span>Авто-рефакторинг</span>
+              </label>
+              <span className="settings-field-hint-inline">Автоматически объединять дублирующие записи (скоро)</span>
             </div>
           </div>
         </section>

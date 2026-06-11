@@ -1,6 +1,28 @@
 # Memory configuration
+# Global settings for agent memory system
+
 context_window:
-  default: 128000
+  default: 128000  # Default context window size in tokens
+
+# Compaction — when context exceeds limit, compress old messages
 compaction:
   enabled: true
-  trigger_percent: 80
+  trigger_percent: 80   # Compact when context is 80% full
+  keep_recent: 10       # Keep last N messages intact
+  strategy: truncate    # "truncate" (fast) or "summarize" (LLM-powered, coming soon)
+  summary_max_tokens: 500  # Max tokens for summarize strategy
+
+# Memory Provider — where agents store long-term memory
+# Options: built-in | byterover | hindsight | holographic | honcho | mem0 | openviking | retaindb | supermemory
+memory_provider:
+  provider: built-in    # Default: MEMORY.md + USER.md files
+  api_key: ""           # API key for cloud providers (if needed)
+  endpoint: ""          # Custom endpoint for self-hosted providers
+  max_chars: 50000      # Max characters per memory entry
+  auto_refactor: false  # Auto-refactor memory entries (coming soon)
+
+# Memory settings
+memory:
+  enabled: true
+  max_chars: 100000     # Total memory limit per agent
+  auto_refactor: false  # Automatically refactor/merge similar memories

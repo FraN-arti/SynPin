@@ -291,14 +291,3 @@ async def update_settings(req: SettingsUpdate):
     except Exception as e:
         logger.error("Failed to update settings: %s", e)
         raise HTTPException(500, "Failed to update settings")
-
-
-# ── Session Reset ──────────────────────────────────────────────────────────
-
-
-@router.post("/memory/sessions/reset")
-def reset_sessions():
-    """Manually trigger session reset — archives active sessions."""
-    from ..chat.session_reset import _reset_sessions
-    _reset_sessions()
-    return {"success": True, "message": "Sessions reset complete"}

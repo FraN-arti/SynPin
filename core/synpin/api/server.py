@@ -152,10 +152,6 @@ if _loaded_config_path:
 _config_watcher.start()
 print(f"  [config] ConfigWatcher active (polling every 5s)")
 
-# --- Session auto-reset daemon ---
-from ..chat.session_reset import start_session_reset_daemon
-start_session_reset_daemon(interval=60)
-
 
 # Serve React SPA (built static files) — ONLY in production
 # In dev mode: use Vite dev server on port 2099

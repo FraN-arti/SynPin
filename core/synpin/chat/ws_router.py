@@ -509,22 +509,6 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                                 logger.info("Otdel %s head_delegate: queueing %s (task=%s)", otdel_id, agent.get("name"), task_text[:60])
                     if expected_workers:
                         head_delegating = True
-
-                # ── Hallucination detection ──────────────────────────────
-                # If head claims to have delegated but didn't call head_delegate,
-                # it's a hallucination. Log warning.
-                if not head_delegating and worker_slugs:
-                    delegation_keywords = [
-                        "отправил", "отправила", "отправляем", "делегир",
-                        "задача улетела", "задача отправлена", "взялись за",
-                        "поручил", "поручила", "передал", "передала",
-                    ]
-                    text_lower = full_response.lower()
-                    if any(kw in text_lower for kw in delegation_keywords):
-                        logger.warning(
-                            "Otdel %s HEAD HALLUCINATION: head claimed delegation but did NOT call head_delegate tool. Text: %s",
-                            otdel_id, full_response[:150]
-                        )
             # Note: agent response already sent via otdel:chunk + otdel:done above
             # No need for otdel:message here
 

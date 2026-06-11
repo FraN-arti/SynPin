@@ -321,7 +321,7 @@ def create_agent(name: str, role: str = "", department: str = "",
 
 
 def delete_agent(slug: str) -> bool:
-    """Remove an agent: delete from agents.yaml and remove agent directory."""
+    """Remove an agent: delete from agents.yaml, remove directory, and clean up memberships."""
     config_path = _get_config_dir() / "agents.yaml"
     data = _load_yaml(config_path)
     agents = data.get("agents", {})
@@ -337,7 +337,174 @@ def delete_agent(slug: str) -> bool:
     if agent_dir.exists():
         shutil.rmtree(agent_dir)
 
+    # Clean up agent from all departments and otdels
+    _remove_agent_from_groups(slug)
+
     return True
+
+
+def _remove_agent_from_groups(slug: str) -> None:
+    """Remove an agent slug from all department and otdel memberships."""
+    changed = False
+
+    # Clean departments.yaml
+    departments_path = _get_config_dir() / "departments.yaml"
+    if departments_path.exists():
+        dept_data = _load_yaml(departments_path)
+        departments = dept_data.get("departments", [])
+        for dept in departments:
+            members = dept.get("members", [])
+            if isinstance(members, list) and slug in members:
+                dept["members"] = [m for m in members if m != slug]
+                changed = True
+        if changed:
+            dept_data["departments"] = departments
+            _save_yaml(departments_path, dept_data)
+            # Also update department.yaml inside each department directory
+            for dept in departments:
+                dept_id = dept.get("departmentsid")
+                if not dept_id:
+                    continue
+                dept_dir = _get_departments_dir() / dept_id
+                if dept_dir.exists():
+                    _save_yaml(dept_dir / "department.yaml", dept)
+
+    # Clean otdels.yaml
+    otdels_path = _get_config_dir() / "otdels.yaml"
+    if otdels_path.exists():
+        otdel_data = _load_yaml(otdels_path)
+        otdels = otdel_data.get("otdels", [])
+        for otdel in otdels:
+            # Remove from workers array
+            workers = otdel.get("workers", [])
+            if isinstance(workers, list) and slug in workers:
+                otdel["workers"] = [w for w in workers if w != slug]
+                changed = True
+            # If this agent was the head, remove head reference
+            if otdel.get("head") == slug:
+                otdel["head"] = ""
+                changed = True
+            # Recalculate agent_count
+            head = otdel.get("head")
+            workers = otdel.get("workers", [])
+            otdel["agent_count"] = (1 if head else 0) + len(workers)
+            changed = True
+        if changed:
+            otdel_data["otdels"] = otdels
+            _save_yaml(otdels_path, otdel_data)
+            # Also update otdel.yaml inside each otdel directory
+            for otdel in otdels:
+                otdel_id = otdel.get("otdelid")
+                if not otdel_id:
+                    continue
+                otdel_dir = _get_otdels_dir() / otdel_id
+                if otdel_dir.exists():
+                    _save_yaml(otdel_dir / "otdel.yaml", otdel)
+
+
+def cleanup_orphaned_agent_memberships() -> dict[str, Any]:
+    """Remove non-existent agents from all department/otdel memberships."""
+    existing_agents = set(_load_yaml(_get_config_dir() / "agents.yaml").get("agents", {}).keys())
+    # Also include agents from individual directories
+    agents_dir = _get_agents_dir()
+    if agents_dir.exists():
+        for agent_dir in agents_dir.iterdir():
+            if agent_dir.is_dir() and (agent_dir / "agent.yaml").exists():
+                existing_agents.add(agent_dir.name)
+    cleaned_otdels = []
+    cleaned_departments = []
+
+    # Clean otdels from config + individual directories
+    otdels_path = _get_config_dir() / "otdels.yaml"
+    if otdels_path.exists():
+        otdel_data = _load_yaml(otdels_path)
+        otdels = otdel_data.get("otdels", [])
+        for otdel in otdels:
+            otdel_id = otdel.get("otdelid")
+            changed = False
+            # Clean head
+            if otdel.get("head") and otdel["head"] not in existing_agents:
+                otdel["head"] = ""
+                changed = True
+            # Clean workers
+            workers = [w for w in otdel.get("workers", []) if w in existing_agents]
+            if len(workers) != len(otdel.get("workers", [])):
+                otdel["workers"] = workers
+                changed = True
+            # Recalculate agent_count
+            new_count = (1 if otdel.get("head") else 0) + len(otdel.get("workers", []))
+            if otdel.get("agent_count") != new_count:
+                otdel["agent_count"] = new_count
+                changed = True
+            if changed and otdel_id:
+                cleaned_otdels.append(otdel_id)
+        if cleaned_otdels:
+            otdel_data["otdels"] = otdels
+            _save_yaml(otdels_path, otdel_data)
+            for otdel in otdels:
+                otdel_id = otdel.get("otdelid")
+                if not otdel_id:
+                    continue
+                otdel_dir = _get_otdels_dir() / otdel_id
+                if otdel_dir.exists():
+                    _save_yaml(otdel_dir / "otdel.yaml", otdel)
+
+    # Also clean individual otdel directories (fallback for directory-based otdels)
+    otdels_dir = _get_otdels_dir()
+    if otdels_dir.exists():
+        for otdel_dir in otdels_dir.iterdir():
+            if not otdel_dir.is_dir():
+                continue
+            otdel_file = otdel_dir / "otdel.yaml"
+            if not otdel_file.exists():
+                continue
+            otdel = _load_yaml(otdel_file)
+            otdel_id = otdel.get("otdelid")
+            changed = False
+            # Clean head
+            if otdel.get("head") and otdel["head"] not in existing_agents:
+                otdel["head"] = ""
+                changed = True
+            # Clean workers
+            workers = [w for w in otdel.get("workers", []) if w in existing_agents]
+            if len(workers) != len(otdel.get("workers", [])):
+                otdel["workers"] = workers
+                changed = True
+            # Recalculate agent_count
+            new_count = (1 if otdel.get("head") else 0) + len(otdel.get("workers", []))
+            if otdel.get("agent_count") != new_count:
+                otdel["agent_count"] = new_count
+                changed = True
+            if changed and otdel_id:
+                _save_yaml(otdel_file, otdel)
+                cleaned_otdels.append(otdel_id)
+
+    # Clean departments from config + individual directories
+    departments_path = _get_config_dir() / "departments.yaml"
+    if departments_path.exists():
+        dept_data = _load_yaml(departments_path)
+        departments = dept_data.get("departments", [])
+        for dept in departments:
+            dept_id = dept.get("departmentsid")
+            members = dept.get("members", [])
+            if isinstance(members, list):
+                new_members = [m for m in members if m in existing_agents]
+                if len(new_members) != len(members):
+                    dept["members"] = new_members
+                    if dept_id:
+                        cleaned_departments.append(dept_id)
+        if cleaned_departments:
+            dept_data["departments"] = departments
+            _save_yaml(departments_path, dept_data)
+            for dept in departments:
+                dept_id = dept.get("departmentsid")
+                if not dept_id:
+                    continue
+                dept_dir = _get_departments_dir() / dept_id
+                if dept_dir.exists():
+                    _save_yaml(dept_dir / "department.yaml", dept)
+
+    return {"otdels": cleaned_otdels, "departments": cleaned_departments}
 
 
 def save_agent(slug: str, updates: dict[str, Any]) -> dict[str, Any]:

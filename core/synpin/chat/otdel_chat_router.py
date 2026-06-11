@@ -142,23 +142,23 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                 continue
             agent = get_agent(slug)
             if not agent:
-                log.warning("Worker agent %s NOT FOUND in otdel %s", slug, otdel_id)
+                logger.warning("Worker agent %s NOT FOUND in otdel %s", slug, otdel_id)
                 continue
             agent_name_lower = agent.get("name", "").lower()
             agent_slug_lower = slug.lower()
             if agent_name_lower in user_mentions or agent_slug_lower in user_mentions:
                 agent_queue.append((agent, False, req.message))
         
-        log.info("Otdel %s agent_queue: %s", otdel_id, [(a.get("name"), h) for a, h, _ in agent_queue])
+        logger.info("Otdel %s agent_queue: %s", otdel_id, [(a.get("name"), h) for a, h, _ in agent_queue])
         
         processed_count = 0
         
         # Create HeadState for this otdel session (needed for head_delegate tool)
         try:
             create_head_state(otdel_id, head_slug, worker_slugs)
-            log.info("Created HeadState for otdel %s", otdel_id)
+            logger.info("Created HeadState for otdel %s", otdel_id)
         except Exception as e:
-            log.warning("Failed to create HeadState for otdel %s: %s", otdel_id, e)
+            logger.warning("Failed to create HeadState for otdel %s: %s", otdel_id, e)
         head_processed = False
         workers_responded = 0
         max_iterations = 10  # Prevent infinite loops
@@ -199,14 +199,14 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
             
             # Determine tools for this agent
             if is_head:
-                head_protocol_tools = ["head_delegate", "head_await", "head_evaluate", "head_retry", "head_decide"]
+                head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_decide"]
                 tool_names = list(agent.get("tools", [])) + head_protocol_tools
             else:
                 tool_names = agent.get("tools", [])
 
             # Call LLM
             full_response = ""
-            log.info("Otdel %s calling LLM for %s (model=%s, provider=%s)", otdel_id, agent_name_val, model, provider_name)
+            logger.info("Otdel %s calling LLM for %s (model=%s, provider=%s)", otdel_id, agent_name_val, model, provider_name)
             try:
                 from .router import stream_response as base_stream
                 async for chunk in base_stream(
@@ -233,7 +233,7 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                 logger.error("LLM call failed for agent %s in otdel %s: %s", agent_slug_val, otdel_id, e)
                 full_response = f"⚠️ Ошибка: {e}"
             
-            log.info("Otdel %s %s responded: %d chars", otdel_id, agent_name_val, len(full_response))
+            logger.info("Otdel %s %s responded: %d chars", otdel_id, agent_name_val, len(full_response))
             
             # Save agent response
             if full_response:
@@ -253,7 +253,7 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                 if is_head:
                     # Head's first response — check for @mentions (delegation)
                     new_mentions = _parse_mentions(full_response)
-                    log.info("Otdel %s Head response mentions=%s", otdel_id, new_mentions)
+                    logger.info("Otdel %s Head response mentions=%s", otdel_id, new_mentions)
                     
                     for slug in worker_slugs:
                         if slug == head_slug or slug == agent_slug_val:
@@ -270,11 +270,11 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                                 # Clean trigger: strip [Name]: prefix so worker doesn't echo it
                                 trigger = re.sub(r'^\[.*?\]:\s*', '', full_response.strip())
                                 agent_queue.append((mentioned_agent, False, trigger))
-                                log.info("Otdel %s gather: expecting %s", otdel_id, mentioned_agent.get("name"))
+                                logger.info("Otdel %s gather: expecting %s", otdel_id, mentioned_agent.get("name"))
                     
                     if expected_workers:
                         head_delegating = True
-                        log.info("Otdel %s Head delegating to %d workers: %s", otdel_id, len(expected_workers), expected_workers)
+                        logger.info("Otdel %s Head delegating to %d workers: %s", otdel_id, len(expected_workers), expected_workers)
                     else:
                         # Head responded directly (no delegation) — show immediately
                         event_data = json.dumps(agent_msg, ensure_ascii=False)
@@ -298,9 +298,9 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
             missing = expected_workers - responded_workers
             if not missing:
                 should_followup = True
-                log.info("Otdel %s all %d workers responded — running Head follow-up", otdel_id, len(expected_workers))
+                logger.info("Otdel %s all %d workers responded — running Head follow-up", otdel_id, len(expected_workers))
             else:
-                log.warning("Otdel %s missing responses from %s", otdel_id, missing)
+                logger.warning("Otdel %s missing responses from %s", otdel_id, missing)
         elif head_processed and workers_responded > 0 and not head_delegating:
             # Workers were @mentioned by user directly (not by Head)
             should_followup = True

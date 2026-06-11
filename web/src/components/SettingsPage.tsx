@@ -138,7 +138,7 @@ export function SettingsPage({ onBack, onAgentsChange, onDepartmentsChange }: Se
       <div className={`settings-page ${visible ? 'visible' : ''}`}>
         {/* Header */}
         <div className="settings-top-bar">
-          <button className="settings-back-btn" onClick={handleBack}>
+          <button className="nav-back-btn" onClick={handleBack}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>

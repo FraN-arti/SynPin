@@ -657,7 +657,7 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
         "type": "function",
         "function": {
             "name": "head_delegate",
-            "description": "Делегировать задачи работникам отдела. Ставит задачи агентам и инициирует их выполнение. После вызова ОБЯЗАТЕЛЬНО вызови head_await чтобы дождаться ответов.",
+            "description": "Делегировать задачи работникам отдела. Ставит задачи агентам и инициирует их выполнение. Ответы придут автоматически — backend сам обработает workers и вернёт итог.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -701,7 +701,7 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
         "type": "function",
         "function": {
             "name": "head_await",
-            "description": "Ждать ответов от всех делегированных работников. Вызывай ПОСЛЕ head_delegate. Возвращает результаты когда все ответили или таймаут.",
+            "description": "УСТАРЕЛО: НЕ используй этот инструмент. Ответы работников приходят автоматически после head_delegate.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -828,7 +828,7 @@ async def execute_tool(tool_name: str, params: dict, agent_slug: str | None = No
             params = {**params, "agent_id": agent_slug}
 
         # Inject otdel_id for head protocol tools
-        head_protocol_tools = ("head_delegate", "head_await", "head_evaluate", "head_retry", "head_decide")
+        head_protocol_tools = ("head_delegate", "head_evaluate", "head_retry", "head_decide")
         if otdel_id and tool_name in head_protocol_tools:
             params = {**params, "otdel_id": otdel_id}
 

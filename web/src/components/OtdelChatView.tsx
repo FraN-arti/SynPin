@@ -70,6 +70,8 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
   const [sending, setSending] = useState(false)
   const [thinkingAgents, setThinkingAgents] = useState<Map<string, string>>(new Map()) // slug → name
   const [compacting, setCompacting] = useState<{ before: number; after: number } | null>(null)
+  const [workerStatuses, setWorkerStatuses] = useState<Map<string, 'idle' | 'thinking' | 'done'>>(new Map())
+  const [delegations, setDelegations] = useState<Array<{id: string; worker: string; workerName: string; task: string; status: 'pending' | 'done'}>>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Load agents and departments for color mapping
@@ -104,7 +106,20 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
       const res = await fetch(`${API_BASE}/api/otdels/${otdel.otdelid}/chat/history`)
       if (res.ok) {
         const data = await res.json()
-        setMessages(data.messages || [])
+        const msgs = data.messages || []
+        setMessages(msgs)
+        // Rebuild worker statuses from chat history (survives F5 refresh)
+        const respondedSlugs = new Set<string>()
+        for (const m of msgs) {
+          if (m.role === 'assistant' && m.sender && m.sender !== 'user') {
+            respondedSlugs.add(m.sender)
+          }
+        }
+        const restoredStatuses = new Map<string, 'idle' | 'thinking' | 'done'>()
+        for (const slug of respondedSlugs) {
+          restoredStatuses.set(slug, 'done')
+        }
+        setWorkerStatuses(restoredStatuses)
       }
     } catch {}
   }, [otdel.otdelid])
@@ -112,6 +127,15 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
   useEffect(() => {
     loadHistory()
   }, [loadHistory])
+
+  // Periodic history refresh — catch missed WS messages
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!sending) return // Only refresh when idle
+      loadHistory()
+    }, 5000) // Check every 5 seconds when sending
+    return () => clearInterval(interval)
+  }, [loadHistory, sending])
 
   // WebSocket message handlers for this otdel
   useEffect(() => {
@@ -130,6 +154,12 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
       setThinkingAgents(prev => {
         const next = new Map(prev)
         next.set(msg.agent_slug, msg.agent_name)
+        return next
+      })
+      // Update worker status panel
+      setWorkerStatuses(prev => {
+        const next = new Map(prev)
+        next.set(msg.agent_slug, 'thinking')
         return next
       })
     })
@@ -193,6 +223,31 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
       if (msg.otdel_id !== otdel.otdelid) return
       const { message_id, tool, params, index } = msg
       if (!message_id || !tool) return
+
+      // Track delegation cards
+      if (tool === 'head_delegate') {
+        // Reset statuses when a NEW delegation round starts
+        setWorkerStatuses(new Map())
+        setDelegations([])
+        // head_delegate sends workers as an ARRAY of {slug, task} objects
+        const workersParam = params?.workers || []
+        const taskForAll = params?.task || params?.instruction || ''
+        const workersList = Array.isArray(workersParam) && workersParam.length > 0
+          ? workersParam
+          : [{ slug: params?.worker || params?.target || '', task: taskForAll }]
+        for (const w of workersList) {
+          if (!w?.slug) continue
+          const workerAgent = agents.find(a => a.slug === w.slug)
+          setDelegations(prev => [...prev, {
+            id: `${message_id}-del-${w.slug}-${index ?? Date.now()}`,
+            worker: w.slug,
+            workerName: workerAgent?.name || w.slug,
+            task: typeof w.task === 'string' ? w.task : taskForAll,
+            status: 'pending',
+          }])
+        }
+      }
+
       setMessages(prev => {
         const idx = prev.findIndex(m => m.id === message_id)
         if (idx >= 0) {
@@ -254,9 +309,25 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
       // Clear all thinking for this otdel when done
       setThinkingAgents(new Map())
       if (message_id && finalMsg) {
+        // Mark this agent as done in worker status panel
+        setWorkerStatuses(prev => {
+          const next = new Map(prev)
+          next.set(finalMsg.sender, 'done')
+          return next
+        })
+        // Mark delegation as done if this worker was delegated to
+        if (finalMsg.is_head) {
+          // Head is summarizing — mark ALL remaining pending delegations as done
+          setDelegations(prev => prev.map(d => ({...d, status: 'done' as const})))
+        } else {
+          setDelegations(prev => prev.map(d =>
+            d.worker === finalMsg.sender ? { ...d, status: 'done' as const } : d
+          ))
+        }
         setMessages(prev => {
           const idx = prev.findIndex(m => m.id === message_id)
           if (idx >= 0) {
+            // Update existing streaming message
             const updated = [...prev]
             const oldMsg = updated[idx]!
             updated[idx] = {
@@ -271,7 +342,17 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
             }
             return updated
           }
-          return prev
+          // Message not found (no chunks received) — add it as new
+          return [...prev, {
+            id: message_id,
+            role: 'assistant',
+            sender: finalMsg.sender,
+            sender_name: finalMsg.sender_name,
+            content: finalMsg.content,
+            is_head: finalMsg.is_head,
+            timestamp: finalMsg.timestamp,
+            streaming: false,
+          }]
         })
       }
       setSending(false)
@@ -305,6 +386,9 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
     const text = input.trim()
     setInput('')
     setSending(true)
+    // Reset worker statuses for new round
+    setWorkerStatuses(new Map())
+    setDelegations([])
 
     const textarea = document.querySelector('.otdel-bottom-input .chat-textarea') as HTMLTextAreaElement
     if (textarea) textarea.style.height = 'auto'
@@ -344,8 +428,10 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
     <div className="otdel-chat-view">
       {/* Header */}
       <div className="otdel-chat-header">
-        <button className="otdel-back-btn" onClick={onBack} title="Назад">
-          ←
+        <button className="nav-back-btn" onClick={onBack} title="Назад">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>
         </button>
         <div className="otdel-header-info">
           <span className="otdel-header-dot" style={{ background: otdel.color }} />
@@ -359,6 +445,54 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
           <span>Настроить</span>
         </button>
       </div>
+
+      {/* Worker Status Panel */}
+      {(() => {
+        const headSlug = otdel.head
+        const workerSlugs = otdel.workers.filter(w => w !== headSlug)
+        const allSlugs = [headSlug, ...workerSlugs]
+        if (allSlugs.length === 0) return null
+
+        const getWorkerInfo = (slug: string) => {
+          const agent = agents.find(a => a.slug === slug)
+          return { name: agent?.name || slug, slug }
+        }
+        return (
+          <div className="otdel-worker-status-bar">
+            {allSlugs.map(slug => {
+              const { name } = getWorkerInfo(slug)
+              const status = workerStatuses.get(slug) || 'idle'
+              const isHead = slug === headSlug
+              return (
+                <div key={slug} className={`otdel-worker-chip ${status} ${isHead ? 'head-chip' : ''}`}>
+                  <span className={`otdel-worker-dot ${status} ${isHead ? 'head-dot' : ''}`} />
+                  <span className="otdel-worker-name">{isHead ? '👑 ' : ''}{name}</span>
+                  {status === 'thinking' && <span className="otdel-worker-status-text">думает...</span>}
+                  {status === 'done' && <span className="otdel-worker-status-text">✓</span>}
+                </div>
+              )
+            })}
+          </div>
+        )
+      })()}
+
+      {/* Delegation Cards */}
+      {delegations.length > 0 && (
+        <div className="otdel-delegations">
+          {delegations.map(d => (
+            <div key={d.id} className={`otdel-delegation-card ${d.status}`}>
+              <span className="otdel-delegation-icon">{d.status === 'done' ? '✅' : '📋'}</span>
+              <div className="otdel-delegation-info">
+                <span className="otdel-delegation-label">
+                  Глава → <strong>{d.workerName}</strong>
+                </span>
+                {d.task && <span className="otdel-delegation-task">{d.task}</span>}
+              </div>
+              {d.status === 'pending' && <span className="otdel-delegation-spinner" />}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Messages */}
       <div className="otdel-messages-area">
@@ -381,6 +515,9 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
                   </div>
                 )
               }
+              // Skip empty messages (no content and no tools)
+              const hasTools = msg.tools && msg.tools.length > 0
+              if ((!msg.content || !msg.content.trim()) && !hasTools) return null
               const left = isLeftSide(msg)
               const senderName = msg.sender === 'user' ? 'Вы' : (msg.sender_name || getAgentName(msg.sender))
               const isHead = msg.is_head === true
@@ -446,19 +583,23 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
               )
             })}
             {/* Typing indicator — agents thinking before first chunk */}
-            {thinkingAgents.size > 0 && Array.from(thinkingAgents.entries()).map(([slug, name]) => (
-              <div key={`typing-${slug}`} className="otdel-msg-row left">
-                <div className="otdel-msg-avatar left">🏢</div>
-                <div className="otdel-msg-body">
-                  <div className="otdel-msg-name left">{name}</div>
-                  <div className="otdel-msg-bubble left typing-indicator">
-                    <div className="typing-dots">
-                      <span></span><span></span><span></span>
+            {thinkingAgents.size > 0 && Array.from(thinkingAgents.entries()).map(([slug, name]) => {
+              const isHeadAgent = slug === otdel.head
+              const side = isHeadAgent ? 'left' : 'right'
+              return (
+                <div key={`typing-${slug}`} className={`otdel-msg-row ${side}`}>
+                  <div className={`otdel-msg-avatar ${side}`}>{isHeadAgent ? '🏢' : '👤'}</div>
+                  <div className="otdel-msg-body">
+                    <div className={`otdel-msg-name ${side}`}>{name}</div>
+                    <div className={`otdel-msg-bubble ${side} typing-indicator`}>
+                      <div className="typing-dots">
+                        <span></span><span></span><span></span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
             {/* Compaction indicator */}
             {compacting && (
               <div className="otdel-compaction-banner">

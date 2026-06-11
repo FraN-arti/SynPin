@@ -333,7 +333,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         if is_head:
             # Head gets their configured tools + head protocol tools (builtin, otdel-only)
             agent_tools = list(agent.get("tools", []))
-            head_protocol_tools = ["head_delegate", "head_await", "head_evaluate", "head_retry", "head_decide"]
+            head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_decide"]
             tool_names = agent_tools + head_protocol_tools
         else:
             tool_names = agent.get("tools", [])
@@ -342,6 +342,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         agent_msg_id = f"a-{uuid.uuid4().hex[:8]}"
         full_response = ""
         streaming = True
+        tools_called = []  # Track tool calls made during streaming
 
         # Notify client that this agent is thinking
         await ws_manager.send(user_id, {
@@ -397,6 +398,12 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                             "error": payload.get("error"),
                             "index": payload.get("index"),
                         })
+                        # Track tool calls for placeholder generation
+                        if msg_type == "tool_start":
+                            tools_called.append({
+                                "name": payload.get("tool", ""),
+                                "params": payload.get("params", {}),
+                            })
                     elif msg_type == "done":
                         streaming = False
                     elif msg_type == "error":
@@ -410,6 +417,43 @@ async def _handle_otdel_send(user_id: str, msg: dict):
             streaming = False
 
         # Save final message to history
+        # Strip leaked text-based tool calls from response (e.g. <tool_call>...</tool_call>)
+        full_response = re.sub(
+            r'<tool_call>.*?</tool_call>', '', full_response, flags=re.DOTALL
+        ).strip()
+        # Also strip ```tool_call...``` blocks
+        full_response = re.sub(
+            r'```tool_call.*?```', '', full_response, flags=re.DOTALL
+        ).strip()
+        # If empty response but tools were called, generate a placeholder
+        if not full_response and tools_called:
+            # Build placeholder from tool calls
+            delegate_targets = []
+            for tc in tools_called:
+                if tc["name"] == "head_delegate":
+                    target = tc["params"].get("worker", tc["params"].get("target", ""))
+                    task = tc["params"].get("task", tc["params"].get("instruction", ""))
+                    if target:
+                        target_agent = get_agent(target) if target else None
+                        target_name = target_agent.get("name", target) if target_agent else target
+                        delegate_targets.append(target_name)
+                    if task:
+                        delegate_targets.append(f"«{task[:80]}»")
+            if delegate_targets:
+                full_response = f"📋 Делегирую: {', '.join(delegate_targets)}"
+            else:
+                full_response = "📋 Обрабатываю задачу..."
+            # Send placeholder as chunk so frontend can display it
+            await ws_manager.send(user_id, {
+                "type": "otdel:chunk",
+                "otdel_id": otdel_id,
+                "message_id": agent_msg_id,
+                "content": full_response,
+                "sender": agent_slug_val,
+                "sender_name": agent_name_val,
+                "is_head": is_head,
+            })
+
         if full_response:
             agent_msg = {
                 "id": agent_msg_id,
@@ -457,6 +501,30 @@ async def _handle_otdel_send(user_id: str, msg: dict):
 
                 if expected_workers:
                     head_delegating = True
+
+                # Also check HeadState for workers from head_delegate tool
+                # The tool updates HeadState.expected_workers but the @mention
+                # check above might miss them if Head didn't @mention in text
+                hs = get_head_state(otdel_id)
+                if hs and hs.expected_workers:
+                    for slug in hs.expected_workers:
+                        if slug not in processed_slugs and slug not in expected_workers:
+                            agent = get_agent(slug)
+                            if agent:
+                                expected_workers.add(slug)
+                                # Use delegation task from HeadState as trigger
+                                delegation = hs.current_delegation or {}
+                                workers_list = delegation.get("workers", [])
+                                task_text = ""
+                                for w in workers_list:
+                                    if w.get("slug") == slug:
+                                        task_text = w.get("task", "")
+                                        break
+                                trigger = task_text or full_response.strip()
+                                agent_queue.append((agent, False, trigger))
+                                logger.info("Otdel %s head_delegate: queueing %s (task=%s)", otdel_id, agent.get("name"), task_text[:60])
+                    if expected_workers:
+                        head_delegating = True
             # Note: agent response already sent via otdel:chunk + otdel:done above
             # No need for otdel:message here
 
@@ -502,7 +570,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
 
         # Head gets head protocol tools in follow-up too
         head_agent_tools = list(head_agent.get("tools", []))
-        head_protocol_tools = ["head_delegate", "head_await", "head_evaluate", "head_retry", "head_decide"]
+        head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_decide"]
         tool_names = head_agent_tools + head_protocol_tools
 
         # Stream follow-up response
@@ -560,6 +628,14 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         except Exception as e:
             logger.error("Head follow-up failed in otdel %s: %s", otdel_id, e)
             full_response = f"⚠️ Ошибка: {e}"
+
+        # Strip leaked text-based tool calls from follow-up response too
+        full_response = re.sub(
+            r'<tool_call>.*?</tool_call>', '', full_response, flags=re.DOTALL
+        ).strip()
+        full_response = re.sub(
+            r'```tool_call.*?```', '', full_response, flags=re.DOTALL
+        ).strip()
 
         if full_response:
             agent_msg = {

@@ -208,13 +208,62 @@ class SettingsUpdate(BaseModel):
     kanban: Optional[Dict[str, Any]] = None
 
 
+_SETTINGS_DEFAULTS: dict[str, Any] = {
+    "primary_agent_slug": "",
+    "server": {"host": "0.0.0.0", "port": 2088, "dev_port": 2099},
+    "ui": {
+        "theme": "dark",
+        "language": "ru",
+        "sidebar": {"default_open": True, "show_icons": True},
+        "chat": {
+            "show_metadata": True,
+            "metadata_delay_ms": 500,
+            "max_message_length": 4000,
+            "auto_scroll": True,
+            "streaming_border": True,
+        },
+    },
+    "models": {
+        "vision": "",
+        "image_gen": "",
+        "web_search": "",
+        "web_extract": "",
+        "summarization": "",
+    },
+    "feed": {
+        "enabled": True,
+        "max_items": 50,
+        "time_range": "24h",
+        "filters": {
+            "new_ideas": True,
+            "task_updates": True,
+            "memory_updates": True,
+            "board_updates": True,
+        },
+        "sort": "newest",
+        "group_by": "none",
+    },
+}
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Recursively merge *override* into a copy of *base*."""
+    out = {**base}
+    for k, v in override.items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = _deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
 @router.get("/settings")
 async def get_settings():
-    """Read full settings.yaml."""
+    """Read full settings.yaml, merged with defaults."""
     try:
         path = CONFIG_DIR / "settings.yaml"
         full = _load_yaml(path)
-        return full
+        return _deep_merge(_SETTINGS_DEFAULTS, full)
     except Exception as e:
         logger.error("Failed to read settings: %s", e)
         raise HTTPException(500, "Failed to read settings")

@@ -23,8 +23,26 @@ export function useWebSocket() {
   const handlersRef = useRef<Map<string, Set<MessageHandler>>>(new Map())
   const reconnectAttempt = useRef(0)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pingTimer = useRef<ReturnType<typeof setInterval> | null>(null)
   const [state, setState] = useState<WebSocketState>({ connected: false, reconnecting: false })
   const mountedRef = useRef(true)
+
+  const startPing = useCallback(() => {
+    stopPing()
+    pingTimer.current = setInterval(() => {
+      const ws = wsRef.current
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ping' }))
+      }
+    }, 15000) // Ping every 15 seconds
+  }, [])
+
+  const stopPing = useCallback(() => {
+    if (pingTimer.current) {
+      clearInterval(pingTimer.current)
+      pingTimer.current = null
+    }
+  }, [])
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return
@@ -36,6 +54,7 @@ export function useWebSocket() {
       ws.onopen = () => {
         reconnectAttempt.current = 0
         if (mountedRef.current) setState({ connected: true, reconnecting: false })
+        startPing()
         console.log('[ws] connected')
       }
 
@@ -59,6 +78,7 @@ export function useWebSocket() {
 
       ws.onclose = () => {
         wsRef.current = null
+        stopPing()
         if (!mountedRef.current) return
         setState({ connected: false, reconnecting: true })
         scheduleReconnect()
@@ -82,6 +102,7 @@ export function useWebSocket() {
   }, [connect])
 
   const disconnect = useCallback(() => {
+    stopPing()
     if (reconnectTimer.current) {
       clearTimeout(reconnectTimer.current)
       reconnectTimer.current = null

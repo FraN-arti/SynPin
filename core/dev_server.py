@@ -15,6 +15,7 @@ import signal
 import socket
 import subprocess
 import threading
+import time
 from pathlib import Path
 from queue import Queue, Empty
 
@@ -218,6 +219,23 @@ def main():
     core_proc = start_core(core_port)
     processes.append(core_proc)
     stream_output(core_proc, "CORE", Fore.GREEN, output_queue)
+
+    # Wait for backend to be ready before starting Vite
+    import urllib.request
+    print(f"  {Fore.YELLOW}Waiting for backend on port {core_port}...{Fore.RESET}")
+    for _ in range(30):  # max 30 seconds
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{core_port}/api/health", timeout=2)
+            print(f"  {Fore.GREEN}Backend ready!{Fore.RESET}")
+            break
+        except Exception:
+            if core_proc.poll() is not None:
+                print(f"  {Fore.RED}Core process died — aborting{Fore.RESET}")
+                cleanup()
+                sys.exit(1)
+            time.sleep(1)
+    else:
+        print(f"  {Fore.YELLOW}Backend not ready after 30s — starting Web anyway{Fore.RESET}")
 
     # Start Web
     print(f"  {Fore.CYAN}Starting Web...{Fore.RESET}")

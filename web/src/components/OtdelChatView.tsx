@@ -476,19 +476,13 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
         )
       })()}
 
-      {/* Delegation Cards */}
+      {/* Delegation Cards — compact one-line blocks */}
       {delegations.length > 0 && (
         <div className="otdel-delegations">
           {delegations.map(d => (
-            <div key={d.id} className={`otdel-delegation-card ${d.status}`}>
-              <span className="otdel-delegation-icon">{d.status === 'done' ? '✅' : '📋'}</span>
-              <div className="otdel-delegation-info">
-                <span className="otdel-delegation-label">
-                  Глава → <strong>{d.workerName}</strong>
-                </span>
-                {d.task && <span className="otdel-delegation-task">{d.task}</span>}
-              </div>
-              {d.status === 'pending' && <span className="otdel-delegation-spinner" />}
+            <div key={d.id} className={`otdel-delegation-chip ${d.status}`}>
+              <span className={`otdel-delegation-dot ${d.status}`} />
+              <span className="otdel-delegation-name">{d.workerName}</span>
             </div>
           ))}
         </div>

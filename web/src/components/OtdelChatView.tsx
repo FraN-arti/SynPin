@@ -591,11 +591,9 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
                   <div className={`otdel-msg-avatar ${side}`}>{isHeadAgent ? '🏢' : '👤'}</div>
                   <div className="otdel-msg-body">
                     <div className={`otdel-msg-name ${side}`}>{name}</div>
-                    <div className={`otdel-msg-bubble ${side} typing-indicator`}>
-                      <div className="typing-dots">
+                      <div className="otdel-typing-dots">
                         <span></span><span></span><span></span>
                       </div>
-                    </div>
                   </div>
                 </div>
               )

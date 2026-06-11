@@ -386,6 +386,19 @@ export function MemorySection() {
                 onBlur={() => saveConfig({ sessions: sessionsForm })}
               />
             </div>
+            <div className="settings-field" style={{ marginTop: 12 }}>
+              <button
+                className="settings-btn settings-btn-secondary"
+                onClick={async () => {
+                  if (!confirm('Сбросить все активные сессии? Архив будет сохранён.')) return
+                  const API = import.meta.env.VITE_API_URL || ''
+                  const res = await fetch(`${API}/api/config/memory/sessions/reset`, { method: 'POST' })
+                  if (res.ok) alert('Сессии сброшены!')
+                }}
+              >
+                🔄 Сбросить сессии сейчас
+              </button>
+            </div>
           </div>
         </section>
       </div>

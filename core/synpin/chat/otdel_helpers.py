@@ -75,15 +75,25 @@ def _save_history(otdel_id: str, messages: list[dict]) -> dict:
     path = _get_otdel_chat_path(otdel_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     
-    # Check if compaction is configured for this otdel
+    # Read global compaction settings from memory.yaml
+    compaction_limit = None
+    keep_recent = None
     try:
-        from ..agents.manager import get_otdel
-        otdel = get_otdel(otdel_id)
-        compaction_limit = otdel.get("compaction_limit") if otdel else None
-        keep_recent = otdel.get("keep_recent") if otdel else None
+        from ..api.config_router import _get_config_dir, _load_yaml
+        config_dir = _get_config_dir()
+        if config_dir:
+            mem_cfg = _load_yaml(config_dir / "memory.yaml")
+            compaction = mem_cfg.get("compaction", {})
+            if compaction.get("enabled", True):
+                # Convert trigger_percent to message count
+                # trigger_percent=80 means compact at 80% of context_window
+                # For message-based compaction, use a reasonable default
+                # based on trigger_percent: 80% → ~100 messages
+                trigger_pct = compaction.get("trigger_percent", 80)
+                compaction_limit = max(20, int(200 * trigger_pct / 100))
+                keep_recent = compaction.get("keep_recent", 10)
     except Exception:
-        compaction_limit = None
-        keep_recent = None
+        pass
     
     # Compact if needed
     trimmed, was_compacted = _compact_history(messages, compaction_limit, keep_recent)

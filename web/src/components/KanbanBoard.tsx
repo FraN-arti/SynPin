@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { API_BASE } from '../config'
 import { DndContext, closestCenter } from '@dnd-kit/core'
 import { SortableContext, useSortable, arrayMove, horizontalListSortingStrategy } from '@dnd-kit/sortable'
@@ -455,15 +455,108 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
 
 // ── Create Task Modal ──────────────────────────────────────────────────────
 
+interface DepartmentItem {
+  id: string
+  name: string
+  head?: string
+}
+
 function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [department, setDepartment] = useState('')
   const [priority, setPriority] = useState('medium')
   const [deadline, setDeadline] = useState('')
-  const [tags, setTags] = useState('')
+  const [tags, setTags] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
 
+  // Auto-expanding textarea
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Department searchable dropdown
+  const [departments, setDepartments] = useState<DepartmentItem[]>([])
+  const [deptSearch, setDeptSearch] = useState('')
+  const [deptOpen, setDeptOpen] = useState(false)
+  const deptDropdownRef = useRef<HTMLDivElement>(null)
+  const deptSearchInputRef = useRef<HTMLInputElement>(null)
+
+  // Tag picker
+  const [availableLabels, setAvailableLabels] = useState<LabelConfig[]>([])
+  const [tagsOpen, setTagsOpen] = useState(false)
+  const tagsPopupRef = useRef<HTMLDivElement>(null)
+  const tagsTriggerRef = useRef<HTMLDivElement>(null)
+
+  // ── Fetch departments & labels ──
+  useEffect(() => {
+    fetch(`${API_BASE}/api/departments`)
+      .then(r => r.json())
+      .then(data => setDepartments(Array.isArray(data) ? data : data.departments || []))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/kanban/config/labels`)
+      .then(r => r.json())
+      .then(data => setAvailableLabels(Array.isArray(data) ? data : data.labels || []))
+      .catch(() => {})
+  }, [])
+
+  // ── Click outside handlers ──
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (deptDropdownRef.current && !deptDropdownRef.current.contains(e.target as Node)) {
+        setDeptOpen(false)
+      }
+    }
+    if (deptOpen) document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [deptOpen])
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        tagsPopupRef.current && !tagsPopupRef.current.contains(e.target as Node) &&
+        tagsTriggerRef.current && !tagsTriggerRef.current.contains(e.target as Node)
+      ) {
+        setTagsOpen(false)
+      }
+    }
+    if (tagsOpen) document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [tagsOpen])
+
+  // ── Filtered departments ──
+  const filteredDepts = departments.filter(d =>
+    d.name.toLowerCase().includes(deptSearch.toLowerCase())
+  )
+
+  const selectedDept = departments.find(d => d.id === department || d.name === department)
+
+  // ── Auto-resize textarea ──
+  const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const el = e.target
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 160) + 'px'
+    setDescription(el.value)
+  }
+
+  // ── Toggle department ──
+  const selectDept = (d: DepartmentItem) => {
+    setDepartment(d.id || d.name)
+    // Task 6: auto-assign responsible from department head (structured for future)
+    // if (d.head) setResponsible(d.head)
+    setDeptOpen(false)
+    setDeptSearch('')
+  }
+
+  // ── Toggle tag ──
+  const toggleTag = (name: string) => {
+    setTags(prev =>
+      prev.includes(name) ? prev.filter(t => t !== name) : [...prev, name]
+    )
+  }
+
+  // ── Submit ──
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) return
@@ -478,7 +571,7 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
           department: department.trim(),
           priority,
           deadline: deadline || null,
-          tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+          tags,
         }),
       })
       if (res.ok) onCreated()
@@ -497,6 +590,7 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
           <button className="kanban-modal-close" onClick={onClose}>✕</button>
         </div>
         <form onSubmit={handleSubmit}>
+          {/* Title */}
           <div className="kanban-form-group">
             <label>Название *</label>
             <input
@@ -506,35 +600,87 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
               autoFocus
             />
           </div>
+
+          {/* Description — auto-expanding textarea */}
           <div className="kanban-form-group">
             <label>Описание</label>
             <textarea
+              ref={textareaRef}
               value={description}
-              onChange={e => setDescription(e.target.value)}
+              onChange={handleTextareaInput}
               placeholder="Подробное описание задачи..."
-              rows={3}
+              rows={1}
+              className="auto-grow-textarea"
             />
           </div>
-          <div className="kanban-form-row">
-            <div className="kanban-form-group">
-              <label>Отдел</label>
-              <input
-                value={department}
-                onChange={e => setDepartment(e.target.value)}
-                placeholder="реализации"
-              />
-            </div>
-            <div className="kanban-form-group">
-              <label>Приоритет</label>
-              <select value={priority} onChange={e => setPriority(e.target.value)}>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
-              </select>
+
+          {/* Priority buttons */}
+          <div className="kanban-form-group">
+            <label>Приоритет</label>
+            <div className="priority-buttons">
+              {[
+                { value: 'low', label: 'Низкий', color: 'var(--text-dim)' },
+                { value: 'medium', label: 'Средний', color: '#f59e0b' },
+                { value: 'high', label: 'Высокий', color: '#ef4444' },
+              ].map(p => (
+                <button
+                  key={p.value}
+                  type="button"
+                  className={`priority-btn ${priority === p.value ? 'active' : ''}`}
+                  style={{ '--priority-color': p.color } as React.CSSProperties}
+                  onClick={() => setPriority(p.value)}
+                >
+                  {p.label}
+                </button>
+              ))}
             </div>
           </div>
+
+          {/* Department searchable dropdown */}
           <div className="kanban-form-row">
+            <div className="kanban-form-group" style={{ position: 'relative' }} ref={deptDropdownRef}>
+              <label>Отдел</label>
+              <div
+                className="kanban-dept-trigger"
+                onClick={() => {
+                  setDeptOpen(prev => !prev)
+                  setTimeout(() => deptSearchInputRef.current?.focus(), 0)
+                }}
+              >
+                <span className={selectedDept ? '' : 'kanban-dept-placeholder'}>
+                  {selectedDept?.name || 'Не указан'}
+                </span>
+                <span className="kanban-dept-arrow">{deptOpen ? '▴' : '▾'}</span>
+              </div>
+              {deptOpen && (
+                <div className="kanban-dept-dropdown">
+                  <input
+                    ref={deptSearchInputRef}
+                    className="kanban-dept-search"
+                    value={deptSearch}
+                    onChange={e => setDeptSearch(e.target.value)}
+                    placeholder="Поиск отдела..."
+                  />
+                  <div className="kanban-dept-list">
+                    {filteredDepts.length === 0 && (
+                      <div className="kanban-dept-empty">Нет результатов</div>
+                    )}
+                    {filteredDepts.map(d => (
+                      <div
+                        key={d.id || d.name}
+                        className={`kanban-dept-item ${department === (d.id || d.name) ? 'active' : ''}`}
+                        onClick={() => selectDept(d)}
+                      >
+                        <span>{d.name}</span>
+                        {d.head && <span className="kanban-dept-head">👤 {d.head}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Deadline */}
             <div className="kanban-form-group">
               <label>Дедлайн</label>
               <input
@@ -543,15 +689,63 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
                 onChange={e => setDeadline(e.target.value)}
               />
             </div>
-            <div className="kanban-form-group">
-              <label>Теги (через запятую)</label>
-              <input
-                value={tags}
-                onChange={e => setTags(e.target.value)}
-                placeholder="mcp, integration"
-              />
-            </div>
           </div>
+
+          {/* Tags as clickable chips + popup */}
+          <div className="kanban-form-group" style={{ position: 'relative' }}>
+            <label>Теги</label>
+            <div className="kanban-tags-row">
+              {/* Selected tags as chips */}
+              {tags.map(tagName => {
+                const label = availableLabels.find(l => l.name === tagName)
+                return (
+                  <span
+                    key={tagName}
+                    className="kanban-tag-chip"
+                    style={label ? { background: label.color, color: label.text_color } : undefined}
+                    onClick={() => toggleTag(tagName)}
+                    title="Нажмите чтобы убрать"
+                  >
+                    {tagName} ✕
+                  </span>
+                )
+              })}
+              {/* Add button */}
+              <div
+                ref={tagsTriggerRef}
+                className="kanban-tag-add"
+                onClick={() => setTagsOpen(prev => !prev)}
+                title="Добавить тег"
+              >
+                +
+              </div>
+            </div>
+            {/* Tag picker popup */}
+            {tagsOpen && (
+              <div
+                ref={tagsPopupRef}
+                className="tag-picker-popup"
+                onMouseLeave={() => setTagsOpen(false)}
+              >
+                {availableLabels.length === 0 && (
+                  <div className="tag-picker-empty">Нет тегов</div>
+                )}
+                {availableLabels.map(label => (
+                  <div
+                    key={label.id}
+                    className={`tag-block ${tags.includes(label.name) ? 'selected' : ''}`}
+                    style={{ background: label.color, color: label.text_color }}
+                    onClick={() => toggleTag(label.name)}
+                  >
+                    {tags.includes(label.name) && <span className="tag-check">✓</span>}
+                    {label.name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Actions */}
           <div className="kanban-form-actions">
             <button type="button" className="kanban-btn-cancel" onClick={onClose}>Отмена</button>
             <button type="submit" className="kanban-btn-submit" disabled={!title.trim() || saving}>

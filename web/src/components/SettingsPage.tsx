@@ -2873,8 +2873,11 @@ interface KanbanColumnItem {
 }
 
 function KanbanColumnsConfig() {
+  const DEFAULT_COLUMN_AUTO = '__auto__'
   const [columns, setColumns] = useState<KanbanColumnItem[]>([])
+  const [defaultColumn, setDefaultColumn] = useState<string>(DEFAULT_COLUMN_AUTO)
   const [saving, setSaving] = useState(false)
+  const [widgetSaving, setWidgetSaving] = useState(false)
   const [savedId, setSavedId] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [pendingDelete, setPendingDelete] = useState<{ id: string; label: string; index: number } | null>(null)
@@ -2886,6 +2889,13 @@ function KanbanColumnsConfig() {
     fetch(`${API_BASE}/api/kanban/config/columns`)
       .then(r => r.json())
       .then(data => setColumns(Array.isArray(data) ? data : data.columns || []))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/kanban/config/widget`)
+      .then(r => r.json())
+      .then(data => setDefaultColumn(data?.default_column || DEFAULT_COLUMN_AUTO))
       .catch(() => {})
   }, [])
 
@@ -3068,6 +3078,36 @@ function KanbanColumnsConfig() {
     setPendingDelete(null)
   }
 
+  const saveDefaultColumn = useCallback(async (value: string | null) => {
+    setWidgetSaving(true)
+    try {
+      await fetch(`${API_BASE}/api/kanban/config/widget`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ default_column: value }),
+      })
+    } catch (e) {
+      console.error('[kanban] save default column error:', e)
+    } finally {
+      setWidgetSaving(false)
+    }
+  }, [])
+
+  const enabledColumns = columns.filter(c => c.enabled)
+  const firstEnabledColumn = enabledColumns[0] ?? null
+  const defaultColumnValue = defaultColumn && enabledColumns.some(c => c.id === defaultColumn)
+    ? defaultColumn
+    : DEFAULT_COLUMN_AUTO
+  const defaultColumnOptions = [
+    { value: DEFAULT_COLUMN_AUTO, label: `Первая активная (${firstEnabledColumn?.label || 'нет колонок'})` },
+    ...enabledColumns.map(c => ({ value: c.id, label: c.label })),
+  ]
+  const handleDefaultColumnChange = (value: string) => {
+    const next = value === DEFAULT_COLUMN_AUTO ? null : value
+    setDefaultColumn(value)
+    saveDefaultColumn(next)
+  }
+
   return (
     <section className="settings-card">
       <h2 className="settings-card-title">📊 Конфигурация колонок</h2>
@@ -3128,6 +3168,17 @@ function KanbanColumnsConfig() {
         <button className="kanban-create-btn" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={addColumn}>
           + Добавить колонку
         </button>
+      </div>
+      <div className="kanban-config-row" style={{ paddingTop: '12px', borderTop: '1px solid var(--border, rgba(255,255,255,0.06))' }}>
+        <label style={{ color: 'var(--text-secondary)', fontSize: '13px', width: '150px' }}>Дэфолтная колонка</label>
+        <CustomDropdown
+          value={defaultColumnValue}
+          options={defaultColumnOptions}
+          onChange={handleDefaultColumnChange}
+          disabled={enabledColumns.length === 0}
+          width="min(320px, 100%)"
+        />
+        {widgetSaving && <span style={{ color: '#22c55e', fontSize: '12px' }}>✓</span>}
       </div>
       {/* Undo Toast */}
       {pendingDelete && (

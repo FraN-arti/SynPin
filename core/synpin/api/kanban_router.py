@@ -30,6 +30,7 @@ class CreateTaskRequest(BaseModel):
     department: str = ""
     description: str = ""
     priority: str = "medium"
+    status: str | None = None
     deadline: str | None = None
     tags: list[str] = Field(default_factory=list)
     required_skills: list[str] = Field(default_factory=list)
@@ -150,11 +151,19 @@ def create_task(req: CreateTaskRequest) -> dict:
     except ValueError:
         pass
 
+    initial_status = TaskStatus.BACKLOG
+    if req.status:
+        try:
+            initial_status = TaskStatus(req.status)
+        except ValueError:
+            raise HTTPException(400, f"Invalid status: {req.status}")
+
     task = svc.create_task(
         title=req.title,
         department=req.department,
         description=req.description,
         priority=priority,
+        status=initial_status,
         deadline=_parse_deadline(req.deadline),
         tags=req.tags,
         required_skills=req.required_skills,

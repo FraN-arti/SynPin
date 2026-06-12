@@ -66,6 +66,7 @@ class WidgetRequest(BaseModel):
     mode: str | None = None
     max_items: int | None = None
     show_columns: list[str] | None = None
+    default_column: str | None = None
     show_deadline: bool | None = None
     show_department: bool | None = None
     compact: bool | None = None
@@ -144,7 +145,9 @@ def delete_column(column_id: str) -> dict:
     widget = load_widget()
     if column_id in widget.show_columns:
         widget.show_columns.remove(column_id)
-        save_widget(widget)
+    if widget.default_column == column_id:
+        widget.default_column = None
+    save_widget(widget)
 
     # Clean task references — move orphans to first enabled column
     try:
@@ -305,6 +308,8 @@ def set_widget(req: WidgetRequest) -> dict:
         widget.max_items = req.max_items
     if req.show_columns is not None:
         widget.show_columns = req.show_columns
+    if req.default_column is not None:
+        widget.default_column = req.default_column
     if req.show_deadline is not None:
         widget.show_deadline = req.show_deadline
     if req.show_department is not None:

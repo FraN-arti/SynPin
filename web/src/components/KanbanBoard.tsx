@@ -39,6 +39,10 @@ interface LabelConfig {
   text_color: string
 }
 
+interface WidgetConfig {
+  default_column?: string | null
+}
+
 interface KanbanBoardProps {
   onBack: () => void
   wsOn?: (type: string, handler: (data: any) => void) => () => void
@@ -163,6 +167,7 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [columns, setColumns] = useState<ColumnConfig[]>([])
   const [labels, setLabels] = useState<LabelConfig[]>([])
+  const [defaultColumn, setDefaultColumn] = useState<string | null>(null)
 
   // Build label lookup map
   const labelMap: Record<string, LabelConfig> = {}
@@ -224,11 +229,24 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
     }
   }, [])
 
+  const loadWidgetConfig = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/kanban/config/widget`)
+      if (res.ok) {
+        const data = (await res.json()) as WidgetConfig
+        setDefaultColumn(data.default_column ?? null)
+      }
+    } catch (e) {
+      console.error('[kanban] load widget config error:', e)
+    }
+  }, [])
+
   useEffect(() => {
     loadBoard()
     loadColumns()
     loadLabels()
-  }, [loadBoard, loadColumns, loadLabels])
+    loadWidgetConfig()
+  }, [loadBoard, loadColumns, loadLabels, loadWidgetConfig])
 
   // WebSocket live updates
   useEffect(() => {
@@ -248,8 +266,7 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
       loadBoard()
     })
     const unsub5 = wsOn('kanban:widget_updated', () => {
-      // Widget config changed — reload board if needed
-      loadBoard()
+      loadWidgetConfig()
     })
     return () => {
       unsub1()
@@ -292,6 +309,7 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
 
   // If no columns loaded from config, show loading
   const effectiveColumns = columns.length > 0 ? columns : []
+  const defaultTaskStatus = defaultColumn || columns.find(c => c.enabled)?.id || null
 
   return (
     <div className="kanban-page">
@@ -447,6 +465,7 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
         <CreateTaskModal
           onClose={() => setShowCreateModal(false)}
           onCreated={() => { setShowCreateModal(false); loadBoard() }}
+          defaultStatus={defaultTaskStatus}
         />
       )}
     </div>
@@ -463,7 +482,11 @@ interface DepartmentItem {
   head?: string
 }
 
-function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function CreateTaskModal({ onClose, onCreated, defaultStatus }: {
+  onClose: () => void
+  onCreated: () => void
+  defaultStatus?: string | null
+}) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [department, setDepartment] = useState('')
@@ -575,6 +598,7 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
           title: title.trim(),
           description: description.trim(),
           department: department.trim(),
+          status: defaultStatus || undefined,
           priority,
           deadline: deadline || null,
           tags,

@@ -49,6 +49,7 @@ class WidgetConfig(BaseModel):
     mode: str = "active"          # active | all | my | blocked
     max_items: int = 5            # Max items to show
     show_columns: list[str] = Field(default_factory=lambda: ["in_progress", "review", "blocked"])
+    default_column: str | None = None
     show_deadline: bool = True
     show_department: bool = True
     compact: bool = True          # Compact vs detailed view

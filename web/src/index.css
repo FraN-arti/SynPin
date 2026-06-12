@@ -5813,8 +5813,8 @@ body {
 }
 
 .kanban-create-btn {
-  background: var(--accent, #f97316);
-  color: white;
+  background: var(--accent);
+  color: var(--white);
   border: none;
   padding: 6px 14px;
   border-radius: 6px;
@@ -6428,18 +6428,20 @@ body {
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%) translateY(100px);
-  background: var(--bg-secondary, #1a1a2e);
-  border: 1px solid var(--border, #333);
+  background: var(--glass-bg-heavy);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 12px 20px;
   display: flex;
   align-items: center;
   gap: 12px;
   z-index: 1000;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   opacity: 0;
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   overflow: hidden;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .undo-toast.visible {
@@ -6449,13 +6451,13 @@ body {
 
 .undo-toast-text {
   font-size: 13px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
 .undo-toast-btn {
-  background: var(--accent, #f97316);
-  color: white;
+  background: var(--accent);
+  color: var(--white);
   border: none;
   padding: 4px 12px;
   border-radius: 6px;
@@ -6476,7 +6478,7 @@ body {
   bottom: 0;
   left: 0;
   height: 3px;
-  background: var(--accent, #f97316);
+  background: var(--accent);
   border-radius: 0 0 12px 12px;
   transition: width linear;
 }
@@ -6486,7 +6488,7 @@ body {
 .kanban-move-btn {
   background: none;
   border: 1px solid transparent;
-  color: var(--text-muted, #666);
+  color: var(--text-dim);
   cursor: pointer;
   font-size: 12px;
   padding: 2px 4px;
@@ -6502,9 +6504,9 @@ body {
 
 .kanban-move-btn:hover {
   opacity: 1 !important;
-  color: var(--text, #fff);
-  border-color: var(--border, #333);
-  background: var(--bg-hover, rgba(255,255,255,0.05));
+  color: var(--text);
+  border-color: var(--border);
+  background: var(--bg-hover);
 }
 
 .kanban-move-btn:disabled {

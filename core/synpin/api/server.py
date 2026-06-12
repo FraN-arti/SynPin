@@ -38,7 +38,7 @@ for _sp in _settings_candidates:
 app = FastAPI(
     title="SynPin",
     description="Agent-Driven Organization Platform",
-    version="0.2.3",
+    version="0.2.5.2",
 )
 
 # Allow Vite dev server to reach the API

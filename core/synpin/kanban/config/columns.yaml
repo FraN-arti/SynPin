@@ -16,3 +16,9 @@
   color: '#f59e0b'
   order: 3
   enabled: true
+- id: p0gysg6mos5n3x
+  label: Новая колонка
+  description: Новая тестовая колонка.фывфывфывфывфыв
+  color: '#3b82f6'
+  order: 3
+  enabled: true

@@ -63,8 +63,8 @@ interface KanbanBoardProps {
 const PRIORITY_COLORS: Record<string, string> = {
   low: '#22c55e',
   medium: '#f59e0b',
-  high: '#f97316',
-  critical: '#ef4444',
+  high: '#ef4444',
+  critical: '#dc2626',
 }
 
 const PRIORITY_LABELS: Record<string, string> = {
@@ -143,7 +143,7 @@ function DraggableTaskCard({
         {...attributes}
         title="Перетащить"
       >⠿</span>
-      {/* Task: compact view — priority dot + title + desc + dept */}
+      {/* Task: compact view — priority dot + title + dept */}
       <div className="kanban-card-top">
         <span
           className="kanban-card-priority"
@@ -152,9 +152,6 @@ function DraggableTaskCard({
         />
         <span className="kanban-card-title">{task.title}</span>
       </div>
-      {task.description && (
-        <div className="kanban-card-desc">{task.description}</div>
-      )}
       {deptName && (
         <div className="kanban-card-dept">{deptName}</div>
       )}
@@ -554,8 +551,9 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
             )}
 
             {/* Task 2: Show department NAME, not ID. Removed status line. */}
+            <div className="kanban-modal-divider" />
             <div className="kanban-modal-meta">
-              {selectedDeptName && <span>📂 {selectedDeptName}</span>}
+              {selectedDeptName && <span>{selectedDeptName}</span>}
               {selectedTask.assigned_head && <span>👤 {selectedTask.assigned_head}</span>}
               {selectedTask.deadline && <span>⏰ {formatDate(selectedTask.deadline)}</span>}
             </div>
@@ -597,6 +595,7 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
 
             {/* History */}
             <div className="kanban-modal-section">
+              <div className="kanban-modal-divider" />
               <h4>История действий ({selectedTask.history.length})</h4>
               <div className="kanban-history">
                 {selectedTask.history.map((h, i) => (
@@ -618,6 +617,7 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
             {/* Tags */}
             {selectedTask.tags.length > 0 && (
               <div className="kanban-modal-section">
+                <div className="kanban-modal-divider" />
                 <h4>Теги</h4>
                 <div className="kanban-card-tags">
                   {selectedTask.tags.map(t => {

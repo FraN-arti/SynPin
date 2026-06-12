@@ -7,7 +7,7 @@
   status: todo
 - id: 424s3qetorrta2
   label: Blocked
-  description: ''
+  description: заблокированные таски
   color: '#dc2626'
   order: 1
   enabled: true

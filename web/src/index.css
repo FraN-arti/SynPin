@@ -5964,6 +5964,12 @@ body {
   border-color: var(--accent, #f97316);
 }
 
+.kanban-modal-divider {
+  height: 1px;
+  background: var(--border, rgba(255,255,255,0.1));
+  margin: 12px 0;
+}
+
 .kanban-card-drag-handle {
   position: absolute;
   top: 4px;

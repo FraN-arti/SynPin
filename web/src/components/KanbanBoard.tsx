@@ -61,17 +61,10 @@ interface KanbanBoardProps {
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const PRIORITY_COLORS: Record<string, string> = {
-  low: '#6b7280',
+  low: '#22c55e',
   medium: '#f59e0b',
   high: '#f97316',
   critical: '#ef4444',
-}
-
-const PRIORITY_ORDER: Record<string, number> = {
-  critical: 0,
-  high: 1,
-  medium: 2,
-  low: 3,
 }
 
 const PRIORITY_LABELS: Record<string, string> = {
@@ -79,6 +72,13 @@ const PRIORITY_LABELS: Record<string, string> = {
   medium: 'Средний',
   high: 'Высокий',
   critical: 'Критический',
+}
+
+const PRIORITY_ORDER: Record<string, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
 }
 
 /** Sort tasks: critical → high → medium → low */
@@ -121,7 +121,7 @@ function DraggableTaskCard({
     transition: 'opacity 0.2s ease, transform 0.15s ease',
     opacity: isDragging ? 0.4 : 1,
     zIndex: isDragging ? 50 : 0,
-    borderLeft: `3px solid ${PRIORITY_COLORS[task.priority] || '#6b7280'}`,
+    borderLeft: `3px solid ${PRIORITY_COLORS[task.priority] || '#22c55e'}`,
     position: isDragging ? 'relative' as const : undefined,
   }
 
@@ -132,18 +132,23 @@ function DraggableTaskCard({
       ref={setNodeRef}
       style={style}
       className={`kanban-card ${isDragging ? 'kanban-card-dragging' : ''}`}
-      {...listeners}
-      {...attributes}
       onClick={() => {
         if (!isDragging) onSelect(task)
       }}
     >
-      {/* Task 1: compact view — priority dot + title + desc + dept only */}
+      {/* Drag handle — only the grip icon initiates drag */}
+      <span
+        className="kanban-card-drag-handle"
+        {...listeners}
+        {...attributes}
+        title="Перетащить"
+      >⠿</span>
+      {/* Task: compact view — priority dot + title + desc + dept */}
       <div className="kanban-card-top">
         <span
           className="kanban-card-priority"
-          style={{ background: PRIORITY_COLORS[task.priority] || '#6b7280' }}
-          title={task.priority}
+          style={{ background: PRIORITY_COLORS[task.priority] || '#22c55e' }}
+          title={PRIORITY_LABELS[task.priority] || task.priority}
         />
         <span className="kanban-card-title">{task.title}</span>
       </div>

@@ -5950,6 +5950,7 @@ body {
   border-radius: 8px;
   padding: 10px 12px;
   cursor: pointer;
+  position: relative;
   transition: border-color 0.15s, box-shadow 0.15s, opacity 0.2s, transform 0.15s;
   touch-action: none;
   user-select: none;
@@ -5961,6 +5962,30 @@ body {
 .kanban-card-dragging {
   box-shadow: 0 8px 32px rgba(0,0,0,0.3);
   border-color: var(--accent, #f97316);
+}
+
+.kanban-card-drag-handle {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  cursor: grab;
+  color: var(--text-dim, rgba(255,255,255,0.3));
+  font-size: 12px;
+  padding: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 5;
+  user-select: none;
+  line-height: 1;
+}
+
+.kanban-card:hover .kanban-card-drag-handle {
+  opacity: 1;
+}
+
+.kanban-card-drag-handle:active {
+  cursor: grabbing;
+  color: var(--accent, #f97316);
 }
 
 .kanban-card-top {

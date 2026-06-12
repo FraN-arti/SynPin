@@ -3168,14 +3168,14 @@ function KanbanColumnsConfig() {
         <button className="kanban-create-btn" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={addColumn}>
           + Добавить колонку
         </button>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
           <label style={{ color: 'var(--text-secondary)', fontSize: '13px', whiteSpace: 'nowrap' }}>Стандартно в</label>
           <CustomDropdown
             value={defaultColumnValue}
             options={defaultColumnOptions}
             onChange={handleDefaultColumnChange}
             disabled={enabledColumns.length === 0}
-            width="min(320px, 100%)"
+            width="220px"
           />
         </div>
         {widgetSaving && <span style={{ color: '#22c55e', fontSize: '12px' }}>✓</span>}

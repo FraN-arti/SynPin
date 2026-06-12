@@ -1,28 +1,28 @@
-- color: '#dc2626'
-  description: ''
-  enabled: true
-  id: 424s3qetorrta2
-  label: Blocked
-  order: 0
-  status: blocked
-- color: '#6b7280'
-  description: ''
-  enabled: true
-  id: p0gysg6mos5n3x
+- id: p0gysg6mos5n3x
   label: Новая колонка
-  order: 1
+  description: ''
+  color: '#6b7280'
+  order: 0
+  enabled: true
   status: todo
-- color: '#f59e0b'
+- id: 424s3qetorrta2
+  label: Blocked
   description: ''
+  color: '#dc2626'
+  order: 1
   enabled: true
-  id: t2vi3ub8iwt9gk
+  status: blocked
+- id: t2vi3ub8iwt9gk
   label: Review
-  order: 2
-  status: review
-- color: '#f97316'
   description: ''
+  color: '#f59e0b'
+  order: 2
   enabled: true
-  id: n4dvlbbses8z85
+  status: review
+- id: n4dvlbbses8z85
   label: In Progress
+  description: ''
+  color: '#f97316'
   order: 3
+  enabled: true
   status: in_progress

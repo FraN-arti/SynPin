@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { API_BASE } from '../config'
-import { DndContext, closestCenter } from '@dnd-kit/core'
+import { DndContext, closestCenter, useDraggable, useDroppable, DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, arrayMove, horizontalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
@@ -38,10 +38,19 @@ interface LabelConfig {
   name: string
   color: string
   text_color: string
+  description?: string
 }
 
 interface WidgetConfig {
   default_column?: string | null
+}
+
+interface DepartmentItem {
+  id: string
+  otdelid?: string
+  departmentsid?: string
+  name: string
+  head?: string
 }
 
 interface KanbanBoardProps {
@@ -49,116 +58,208 @@ interface KanbanBoardProps {
   wsOn?: (type: string, handler: (data: any) => void) => () => void
 }
 
-// ── Sortable Column ──────────────────────────────────────────────────────────
-
-function SortableColumn({
-  col,
-  tasks,
-  labelMap,
-  onSelectTask,
-}: {
-  col: ColumnConfig
-  tasks: Task[]
-  labelMap: Record<string, LabelConfig>
-  onSelectTask: (task: Task) => void
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: col.id })
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 10 : 0,
-  }
-
-  const PRIORITY_COLORS: Record<string, string> = {
-    low: '#6b7280',
-    medium: '#f59e0b',
-    high: '#f97316',
-    critical: '#ef4444',
-  }
-
-  const formatDate = (s: string) => {
-    if (!s) return ''
-    const d = new Date(s)
-    return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })
-  }
-
-  return (
-    <div ref={setNodeRef} style={style} className={`kanban-column ${isDragging ? 'dragging' : ''}`}>
-      <div className="kanban-column-header" {...attributes} {...listeners}>
-        <span className="kanban-col-drag-handle">⠿</span>
-        <span className="kanban-col-indicator" style={{ background: col.color }} />
-        <span>{col.label}</span>
-        <span className="kanban-column-count">{tasks.length}</span>
-      </div>
-      <div
-        ref={el => {
-          if (!el) return
-          const check = () => {
-            if (el.scrollHeight > el.clientHeight + 5) {
-              el.classList.add('has-overflow')
-            } else {
-              el.classList.remove('has-overflow')
-            }
-          }
-          check()
-          const obs = new MutationObserver(check)
-          obs.observe(el, { childList: true, subtree: true })
-        }}
-        className="kanban-column-body"
-      >
-        {tasks.map(task => (
-          <div
-            key={task.id}
-            className="kanban-card"
-            onClick={() => onSelectTask(task)}
-          >
-            <div className="kanban-card-header">
-              <span className="kanban-card-id">{task.id}</span>
-              <span
-                className="kanban-card-priority"
-                style={{ background: PRIORITY_COLORS[task.priority] || '#6b7280' }}
-                title={task.priority}
-              />
-            </div>
-            <div className="kanban-card-title">{task.title}</div>
-            {task.department && (
-              <div className="kanban-card-dept">{task.department}</div>
-            )}
-            {task.tags.length > 0 && (
-              <div className="kanban-card-tags">
-                {task.tags.map(t => {
-                  const label = labelMap[t.toLowerCase()]
-                  return (
-                    <span
-                      key={t}
-                      className="kanban-tag"
-                      style={label ? { background: label.color, color: label.text_color } : undefined}
-                    >
-                      {t}
-                    </span>
-                  )
-                })}
-              </div>
-            )}
-            {task.deadline && (
-              <div className="kanban-card-deadline">⏰ {formatDate(task.deadline)}</div>
-            )}
-          </div>
-        ))}
-        {tasks.length === 0 && (
-          <div className="kanban-column-empty">Пусто</div>
-        )}
-      </div>
-    </div>
-  )
-}
+// ── Constants ──────────────────────────────────────────────────────────────
 
 const PRIORITY_COLORS: Record<string, string> = {
   low: '#6b7280',
   medium: '#f59e0b',
   high: '#f97316',
   critical: '#ef4444',
+}
+
+const PRIORITY_ORDER: Record<string, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+}
+
+const PRIORITY_LABELS: Record<string, string> = {
+  low: 'Низкий',
+  medium: 'Средний',
+  high: 'Высокий',
+  critical: 'Критический',
+}
+
+/** Sort tasks: critical → high → medium → low */
+function sortByPriority(tasks: Task[]): Task[] {
+  return [...tasks].sort(
+    (a, b) => (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3),
+  )
+}
+
+const formatDate = (s: string) => {
+  if (!s) return ''
+  const d = new Date(s)
+  return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })
+}
+
+const formatTime = (s: string) => {
+  if (!s) return ''
+  const d = new Date(s)
+  return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+}
+
+// ── Draggable Task Card ────────────────────────────────────────────────────
+
+function DraggableTaskCard({
+  task,
+  deptMap,
+  onSelect,
+}: {
+  task: Task
+  deptMap: Record<string, string>
+  onSelect: (task: Task) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `task-${task.id}`,
+    data: { type: 'task', task },
+  })
+
+  const style: React.CSSProperties = {
+    transform: CSS.Translate.toString(transform),
+    transition: 'opacity 0.2s ease, transform 0.15s ease',
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 50 : 0,
+    borderLeft: `3px solid ${PRIORITY_COLORS[task.priority] || '#6b7280'}`,
+    position: isDragging ? 'relative' as const : undefined,
+  }
+
+  const deptName = deptMap[task.department] || task.department || ''
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`kanban-card ${isDragging ? 'kanban-card-dragging' : ''}`}
+      {...listeners}
+      {...attributes}
+      onClick={() => {
+        if (!isDragging) onSelect(task)
+      }}
+    >
+      {/* Task 1: compact view — priority dot + title + desc + dept only */}
+      <div className="kanban-card-top">
+        <span
+          className="kanban-card-priority"
+          style={{ background: PRIORITY_COLORS[task.priority] || '#6b7280' }}
+          title={task.priority}
+        />
+        <span className="kanban-card-title">{task.title}</span>
+      </div>
+      {task.description && (
+        <div className="kanban-card-desc">{task.description}</div>
+      )}
+      {deptName && (
+        <div className="kanban-card-dept">{deptName}</div>
+      )}
+      {task.deadline && (
+        <div className="kanban-card-deadline">⏰ {formatDate(task.deadline)}</div>
+      )}
+    </div>
+  )
+}
+
+// ── Sortable Column ────────────────────────────────────────────────────────
+
+function SortableColumn({
+  col,
+  tasks,
+  deptMap,
+  onSelectTask,
+}: {
+  col: ColumnConfig
+  tasks: Task[]
+  deptMap: Record<string, string>
+  onSelectTask: (task: Task) => void
+}) {
+  const {
+    attributes: sortableAttrs,
+    listeners: sortableListeners,
+    setNodeRef: setSortableRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: col.id })
+
+  const {
+    setNodeRef: setDroppableRef,
+    isOver,
+  } = useDroppable({
+    id: `col-body-${col.status || col.id}`,
+    data: { type: 'column-body', status: col.status || col.id },
+  })
+
+  const containerRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      setSortableRef(el)
+    },
+    [setSortableRef],
+  )
+
+  const bodyRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      setDroppableRef(el)
+      if (!el) return
+      const check = () => {
+        if (el.scrollHeight > el.clientHeight + 5) {
+          el.classList.add('has-overflow')
+        } else {
+          el.classList.remove('has-overflow')
+        }
+      }
+      check()
+      const obs = new MutationObserver(check)
+      obs.observe(el, { childList: true, subtree: true })
+    },
+    [setDroppableRef],
+  )
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : 0,
+  }
+
+  // Task 6: sort tasks by priority
+  const sortedTasks = sortByPriority(tasks)
+
+  return (
+    <div
+      ref={containerRef}
+      style={style}
+      className={`kanban-column ${isDragging ? 'dragging' : ''} ${isOver ? 'drop-target' : ''}`}
+    >
+      {/* Task 8: column header with gradient background */}
+      <div
+        className="kanban-column-header"
+        style={{ background: `linear-gradient(135deg, ${col.color}22, ${col.color}08)` }}
+        {...sortableAttrs}
+        {...sortableListeners}
+      >
+        <span className="kanban-col-drag-handle">⠿</span>
+        <span>{col.label}</span>
+        <span className="kanban-column-count">{tasks.length}</span>
+      </div>
+      <div
+        ref={bodyRef}
+        className={`kanban-column-body ${isOver ? 'drag-over' : ''}`}
+      >
+        {sortedTasks.map(task => (
+          <DraggableTaskCard
+            key={task.id}
+            task={task}
+            deptMap={deptMap}
+            onSelect={onSelectTask}
+          />
+        ))}
+        {sortedTasks.length === 0 && (
+          <div className="kanban-column-empty">Пусто</div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
@@ -169,6 +270,7 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
   const [columns, setColumns] = useState<ColumnConfig[]>([])
   const [labels, setLabels] = useState<LabelConfig[]>([])
   const [defaultColumn, setDefaultColumn] = useState<string | null>(null)
+  const [departments, setDepartments] = useState<DepartmentItem[]>([])
 
   // Build label lookup map
   const labelMap: Record<string, LabelConfig> = {}
@@ -176,21 +278,13 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
     labelMap[l.name.toLowerCase()] = l
   }
 
-  const handleDragEnd = (event: { active: { id: string | number }; over: { id: string | number } | null }) => {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-    const oldIndex = columns.findIndex(c => c.id === active.id)
-    const newIndex = columns.findIndex(c => c.id === over.id)
-    if (oldIndex === -1 || newIndex === -1) return
-    const newCols = arrayMove(columns, oldIndex, newIndex)
-    newCols.forEach((c, i) => c.order = i)
-    setColumns(newCols)
-    // Save to backend
-    fetch(`${API_BASE}/api/kanban/config/columns`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newCols),
-    }).catch(e => console.error('[kanban] save column order error:', e))
+  // Build department name lookup map (id → name)
+  const deptMap: Record<string, string> = {}
+  for (const d of departments) {
+    const id = d.id || d.otdelid || d.departmentsid
+    if (id) deptMap[id] = d.name
+    // Also map by name in case tasks store the name directly
+    deptMap[d.name] = d.name
   }
 
   const loadBoard = useCallback(async () => {
@@ -211,7 +305,11 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
       if (res.ok) {
         const data = await res.json()
         const cols = Array.isArray(data) ? data : data.columns || []
-        setColumns(cols.filter((c: ColumnConfig) => c.enabled).sort((a: ColumnConfig, b: ColumnConfig) => a.order - b.order))
+        setColumns(
+          cols
+            .filter((c: ColumnConfig) => c.enabled)
+            .sort((a: ColumnConfig, b: ColumnConfig) => a.order - b.order),
+        )
       }
     } catch (e) {
       console.error('[kanban] load columns error:', e)
@@ -242,12 +340,25 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
     }
   }, [])
 
+  const loadDepartments = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/otdels`)
+      if (res.ok) {
+        const data = await res.json()
+        setDepartments(Array.isArray(data) ? data : data.otdels || data.departments || [])
+      }
+    } catch (e) {
+      console.error('[kanban] load departments error:', e)
+    }
+  }, [])
+
   useEffect(() => {
     loadBoard()
     loadColumns()
     loadLabels()
     loadWidgetConfig()
-  }, [loadBoard, loadColumns, loadLabels, loadWidgetConfig])
+    loadDepartments()
+  }, [loadBoard, loadColumns, loadLabels, loadWidgetConfig, loadDepartments])
 
   // WebSocket live updates
   useEffect(() => {
@@ -276,7 +387,7 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
       unsub4()
       unsub5()
     }
-  }, [wsOn, loadBoard, loadColumns, loadLabels])
+  }, [wsOn, loadBoard, loadColumns, loadLabels, loadWidgetConfig])
 
   // Refresh when a task is selected (fallback polling if WS not available)
   useEffect(() => {
@@ -294,27 +405,74 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
     return () => clearInterval(interval)
   }, [selectedTask, loadBoard])
 
-  const formatDate = (s: string) => {
-    if (!s) return ''
-    const d = new Date(s)
-    return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })
-  }
-
-  const formatTime = (s: string) => {
-    if (!s) return ''
-    const d = new Date(s)
-    return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-  }
-
   const totalTasks = Object.values(board).reduce((sum, col) => sum + col.length, 0)
 
   // Resolve default column ID → status for task creation
   const defaultColId = defaultColumn || columns.find(c => c.enabled)?.id || null
   const defaultTaskStatus = defaultColId
-    ? (columns.find(c => c.id === defaultColId)?.status || 'backlog')
+    ? columns.find(c => c.id === defaultColId)?.status || 'backlog'
     : 'backlog'
 
   const effectiveColumns = columns.length > 0 ? columns : []
+
+  // Task 4: Handle drag end — supports both column reorder and task move between columns
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const activeData = (active.data as any).current
+    const overData = (over.data as any).current
+
+    // Task drag between columns
+    if (activeData?.type === 'task') {
+      const task = activeData.task as Task
+      const newStatus = overData?.type === 'column-body' ? overData.status : null
+
+      if (newStatus && newStatus !== task.status) {
+        // Optimistic update: move task locally
+        setBoard(prev => {
+          const next = { ...prev }
+          // Remove from old status
+          if (next[task.status]) {
+            next[task.status] = (next[task.status] || []).filter(t => t.id !== task.id)
+          }
+          // Add to new status
+          const movedTask = { ...task, status: newStatus }
+          next[newStatus] = [...(next[newStatus] || []), movedTask]
+          return next
+        })
+
+        // PATCH to backend
+        fetch(`${API_BASE}/api/kanban/tasks/${task.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus }),
+        }).catch(e => {
+          console.error('[kanban] task move error:', e)
+          loadBoard() // Revert on error
+        })
+      }
+      return
+    }
+
+    // Column reorder
+    const oldIndex = columns.findIndex(c => c.id === active.id)
+    const newIndex = columns.findIndex(c => c.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+    const newCols = arrayMove(columns, oldIndex, newIndex)
+    newCols.forEach((c, i) => (c.order = i))
+    setColumns(newCols)
+    fetch(`${API_BASE}/api/kanban/config/columns`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newCols),
+    }).catch(e => console.error('[kanban] save column order error:', e))
+  }
+
+  // Resolve department name for selected task
+  const selectedDeptName = selectedTask
+    ? deptMap[selectedTask.department] || selectedTask.department || ''
+    : ''
 
   return (
     <div className="kanban-page">
@@ -327,7 +485,8 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
         </button>
         <h2 className="kanban-title">Глобальный Канбан</h2>
         <div className="kanban-header-right">
-          <span className="kanban-count">{totalTasks} задач</span>
+          {/* Task 9: task count badge as pill */}
+          <span className="kanban-task-count-badge">{totalTasks}</span>
           <button className="kanban-create-btn" onClick={() => setShowCreateModal(true)}>
             + Создать задачу
           </button>
@@ -339,14 +498,17 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
         <div className="kanban-loading">Загрузка доски...</div>
       ) : (
         <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={effectiveColumns.map(c => c.id)} strategy={horizontalListSortingStrategy}>
+          <SortableContext
+            items={effectiveColumns.map(c => c.id)}
+            strategy={horizontalListSortingStrategy}
+          >
             <div className="kanban-columns">
               {effectiveColumns.map(col => (
                 <SortableColumn
                   key={col.id}
                   col={col}
                   tasks={board[col.status || col.id] || []}
-                  labelMap={labelMap}
+                  deptMap={deptMap}
                   onSelectTask={setSelectedTask}
                 />
               ))}
@@ -363,31 +525,32 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
         </div>
       </div>
 
-      {/* Task Detail Modal */}
+      {/* Task Detail Modal — Task 2: cleaned up */}
       {selectedTask && (
         <div className="kanban-modal-overlay" onClick={() => setSelectedTask(null)}>
+          {/* Task 7: max-height 90vh with scroll */}
           <div className="kanban-modal" onClick={e => e.stopPropagation()}>
             <div className="kanban-modal-header">
-              <div>
-                <span className="kanban-modal-id">{selectedTask.id}</span>
+              {/* Task 2: Move title to right side of priority block */}
+              <div className="kanban-modal-header-left">
                 <span
                   className="kanban-modal-priority"
                   style={{ background: PRIORITY_COLORS[selectedTask.priority] || '#6b7280' }}
                 >
-                  {selectedTask.priority}
+                  {PRIORITY_LABELS[selectedTask.priority] || selectedTask.priority}
                 </span>
+                <h3 className="kanban-modal-title">{selectedTask.title}</h3>
               </div>
               <button className="kanban-modal-close" onClick={() => setSelectedTask(null)}>✕</button>
             </div>
-            <h3 className="kanban-modal-title">{selectedTask.title}</h3>
+
             {selectedTask.description && (
               <p className="kanban-modal-desc">{selectedTask.description}</p>
             )}
 
-            {/* Meta */}
+            {/* Task 2: Show department NAME, not ID. Removed status line. */}
             <div className="kanban-modal-meta">
-              <span>📂 {selectedTask.department || 'Не назначен'}</span>
-              <span>📊 {selectedTask.status}</span>
+              {selectedDeptName && <span>📂 {selectedDeptName}</span>}
               {selectedTask.assigned_head && <span>👤 {selectedTask.assigned_head}</span>}
               {selectedTask.deadline && <span>⏰ {formatDate(selectedTask.deadline)}</span>}
             </div>
@@ -413,12 +576,16 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
                 <div className="kanban-summon-chain">
                   {selectedTask.summon_chain.map((dept, i) => (
                     <span key={i}>
-                      <span className="kanban-summon-dept">{dept}</span>
-                      {i < selectedTask.summon_chain.length - 1 && <span className="kanban-summon-arrow"> → </span>}
+                      <span className="kanban-summon-dept">{deptMap[dept] || dept}</span>
+                      {i < selectedTask.summon_chain.length - 1 && (
+                        <span className="kanban-summon-arrow"> → </span>
+                      )}
                     </span>
                   ))}
                   <span className="kanban-summon-arrow"> → </span>
-                  <span className="kanban-summon-dept current">{selectedTask.current_department}</span>
+                  <span className="kanban-summon-dept current">
+                    {deptMap[selectedTask.current_department] || selectedTask.current_department}
+                  </span>
                 </div>
               </div>
             )}
@@ -434,7 +601,9 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
                     <span className="kanban-history-action">{h.action}</span>
                     <span className="kanban-history-detail">{h.detail}</span>
                     {h.target_department && (
-                      <span className="kanban-history-target">→ {h.target_department}</span>
+                      <span className="kanban-history-target">
+                        → {deptMap[h.target_department] || h.target_department}
+                      </span>
                     )}
                   </div>
                 ))}
@@ -469,7 +638,10 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
       {showCreateModal && (
         <CreateTaskModal
           onClose={() => setShowCreateModal(false)}
-          onCreated={() => { setShowCreateModal(false); loadBoard() }}
+          onCreated={() => {
+            setShowCreateModal(false)
+            loadBoard()
+          }}
           defaultStatus={defaultTaskStatus}
         />
       )}
@@ -479,15 +651,11 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
 
 // ── Create Task Modal ──────────────────────────────────────────────────────
 
-interface DepartmentItem {
-  id: string
-  otdelid?: string
-  departmentsid?: string
-  name: string
-  head?: string
-}
-
-function CreateTaskModal({ onClose, onCreated, defaultStatus }: {
+function CreateTaskModal({
+  onClose,
+  onCreated,
+  defaultStatus,
+}: {
   onClose: () => void
   onCreated: () => void
   defaultStatus?: string | null
@@ -499,6 +667,7 @@ function CreateTaskModal({ onClose, onCreated, defaultStatus }: {
   const [deadline, setDeadline] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
+  const [deptError, setDeptError] = useState(false)
 
   // Auto-expanding textarea
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -520,7 +689,9 @@ function CreateTaskModal({ onClose, onCreated, defaultStatus }: {
   useEffect(() => {
     fetch(`${API_BASE}/api/otdels`)
       .then(r => r.json())
-      .then(data => setDepartments(Array.isArray(data) ? data : data.otdels || data.departments || []))
+      .then(data =>
+        setDepartments(Array.isArray(data) ? data : data.otdels || data.departments || []),
+      )
       .catch(() => {})
   }, [])
 
@@ -545,8 +716,10 @@ function CreateTaskModal({ onClose, onCreated, defaultStatus }: {
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (
-        tagsPopupRef.current && !tagsPopupRef.current.contains(e.target as Node) &&
-        tagsTriggerRef.current && !tagsTriggerRef.current.contains(e.target as Node)
+        tagsPopupRef.current &&
+        !tagsPopupRef.current.contains(e.target as Node) &&
+        tagsTriggerRef.current &&
+        !tagsTriggerRef.current.contains(e.target as Node)
       ) {
         setTagsOpen(false)
       }
@@ -557,7 +730,7 @@ function CreateTaskModal({ onClose, onCreated, defaultStatus }: {
 
   // ── Filtered departments ──
   const filteredDepts = departments.filter(d =>
-    d.name.toLowerCase().includes(deptSearch.toLowerCase())
+    d.name.toLowerCase().includes(deptSearch.toLowerCase()),
   )
 
   const selectedDept = departments.find(d => {
@@ -577,23 +750,24 @@ function CreateTaskModal({ onClose, onCreated, defaultStatus }: {
   const selectDept = (d: DepartmentItem) => {
     const id = d.id || d.otdelid || d.departmentsid
     setDepartment(id || d.name)
-    // Task 6: auto-assign responsible from department head (structured for future)
-    // if (d.head) setResponsible(d.head)
     setDeptOpen(false)
     setDeptSearch('')
+    setDeptError(false)
   }
 
   // ── Toggle tag ──
   const toggleTag = (name: string) => {
-    setTags(prev =>
-      prev.includes(name) ? prev.filter(t => t !== name) : [...prev, name]
-    )
+    setTags(prev => (prev.includes(name) ? prev.filter(t => t !== name) : [...prev, name]))
   }
 
-  // ── Submit ──
+  // ── Submit — Task 10: validate department required ──
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) return
+    if (!department.trim()) {
+      setDeptError(true)
+      return
+    }
     setSaving(true)
     try {
       const res = await fetch(`${API_BASE}/api/kanban/tasks`, {
@@ -622,7 +796,9 @@ function CreateTaskModal({ onClose, onCreated, defaultStatus }: {
       <div className="kanban-modal kanban-create-modal" onClick={e => e.stopPropagation()}>
         <div className="kanban-modal-header">
           <h3>Новая задача</h3>
-          <button className="kanban-modal-close" onClick={onClose}>✕</button>
+          <button className="kanban-modal-close" onClick={onClose}>
+            ✕
+          </button>
         </div>
         <form onSubmit={handleSubmit}>
           {/* Title */}
@@ -673,14 +849,22 @@ function CreateTaskModal({ onClose, onCreated, defaultStatus }: {
             </div>
           </div>
 
-          {/* Department searchable dropdown */}
+          {/* Department searchable dropdown — Task 10: required field */}
           <div className="kanban-form-row">
-            <div className="kanban-form-group" style={{ position: 'relative' }} ref={deptDropdownRef}>
-              <label>Отдел</label>
+            <div
+              className="kanban-form-group"
+              style={{ position: 'relative' }}
+              ref={deptDropdownRef}
+            >
+              <label>
+                Отдел *{' '}
+                {deptError && <span className="kanban-field-error">Выберите отдел</span>}
+              </label>
               <div
-                className="kanban-dept-trigger"
+                className={`kanban-dept-trigger ${deptError ? 'kanban-dept-error' : ''}`}
                 onClick={() => {
                   setDeptOpen(prev => !prev)
+                  setDeptError(false)
                   setTimeout(() => deptSearchInputRef.current?.focus(), 0)
                 }}
               >
@@ -705,7 +889,11 @@ function CreateTaskModal({ onClose, onCreated, defaultStatus }: {
                     {filteredDepts.map(d => (
                       <div
                         key={d.otdelid || d.id || d.name}
-                        className={`kanban-dept-item ${department === (d.otdelid || d.id || d.departmentsid || d.name) ? 'active' : ''}`}
+                        className={`kanban-dept-item ${
+                          department === (d.otdelid || d.id || d.departmentsid || d.name)
+                            ? 'active'
+                            : ''
+                        }`}
                         onClick={() => selectDept(d)}
                       >
                         <span>{d.name}</span>
@@ -719,11 +907,7 @@ function CreateTaskModal({ onClose, onCreated, defaultStatus }: {
             {/* Deadline */}
             <div className="kanban-form-group">
               <label>Дедлайн</label>
-              <input
-                type="date"
-                value={deadline}
-                onChange={e => setDeadline(e.target.value)}
-              />
+              <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)} />
             </div>
           </div>
 
@@ -740,7 +924,11 @@ function CreateTaskModal({ onClose, onCreated, defaultStatus }: {
                     className="kanban-tag-chip"
                     style={label ? { background: label.color, color: label.text_color } : undefined}
                     onClick={() => toggleTag(tagName)}
-                    title={label?.description ? `${label.description}\nНажмите чтобы убрать` : 'Нажмите чтобы убрать'}
+                    title={
+                      label?.description
+                        ? `${label.description}\nНажмите чтобы убрать`
+                        : 'Нажмите чтобы убрать'
+                    }
                   >
                     {tagName} ✕
                   </span>
@@ -784,8 +972,14 @@ function CreateTaskModal({ onClose, onCreated, defaultStatus }: {
 
           {/* Actions */}
           <div className="kanban-form-actions">
-            <button type="button" className="kanban-btn-cancel" onClick={onClose}>Отмена</button>
-            <button type="submit" className="kanban-btn-submit" disabled={!title.trim() || saving}>
+            <button type="button" className="kanban-btn-cancel" onClick={onClose}>
+              Отмена
+            </button>
+            <button
+              type="submit"
+              className="kanban-btn-submit"
+              disabled={!title.trim() || !department.trim() || saving}
+            >
               {saving ? 'Создание...' : 'Создать'}
             </button>
           </div>

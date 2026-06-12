@@ -4,21 +4,21 @@
   color: '#dc2626'
   order: 0
   enabled: true
+- id: p0gysg6mos5n3x
+  label: Новая колонка
+  description: ''
+  color: '#6b7280'
+  order: 1
+  enabled: true
 - id: n4dvlbbses8z85
   label: In Progress
   description: ''
   color: '#f97316'
-  order: 1
+  order: 2
   enabled: true
 - id: t2vi3ub8iwt9gk
   label: Review
   description: ''
   color: '#f59e0b'
-  order: 2
-  enabled: true
-- id: p0gysg6mos5n3x
-  label: Новая колонка
-  description: Ntcnjdfz rjkjyrf
-  color: '#6b7280'
   order: 3
   enabled: true

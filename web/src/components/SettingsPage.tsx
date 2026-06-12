@@ -357,17 +357,10 @@ function GeneralSection() {
       .catch(() => {})
   }, [])
 
-  // Apply theme when it changes (skip on initial mount to avoid flash)
-  const prevThemeRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (!settings) return
-
+  // Apply theme ONLY when user changes it (not on mount)
+  // Theme is applied by App.tsx on initial load
+  const applyThemeLocally = useCallback((theme: string, cnThemes?: typeof customThemes) => {
     const root = document.documentElement
-    const theme = settings.ui.theme
-
-    // Skip if theme hasn't actually changed (initial mount)
-    if (prevThemeRef.current === theme) return
-    prevThemeRef.current = theme
 
     // Clear ALL classes first
     root.classList.remove('light-theme', 'dark-theme', 'oled-theme')
@@ -386,15 +379,15 @@ function GeneralSection() {
 
     // Apply theme
     if (theme === 'dark') {
-      // Default dark - no classes needed, CSS :root handles it
+      // Default dark
     } else if (theme === 'dark-oled') {
       root.classList.add('oled-theme')
     } else if (theme === 'light') {
       root.classList.add('light-theme')
     } else if (theme === 'tweakcn') {
       root.classList.add('dark-theme')
-      // Find the 'current' theme (or first available)
-      const current = customThemes.find(t => t.id === 'current') || customThemes[0]
+      const themes = cnThemes || customThemes
+      const current = themes.find(t => t.id === 'current') || themes[0]
       if (current) {
         const vars = current.dark || current.light
         if (vars) {
@@ -406,9 +399,9 @@ function GeneralSection() {
       }
     }
 
-    // Cache theme for instant load on next refresh
+    // Cache for instant load on next refresh
     localStorage.setItem('synpin_theme', JSON.stringify(themeCache))
-  }, [settings?.ui.theme, customThemes])
+  }, [customThemes])
 
   // Debounced save
   const saveSettings = useCallback((patch: Partial<SettingsData>) => {
@@ -441,6 +434,10 @@ function GeneralSection() {
         ui.sidebar = { ...ui.sidebar, [key]: value }
       } else {
         ;(ui as any)[path] = value
+      }
+      // Apply theme immediately when changed
+      if (path === 'theme') {
+        applyThemeLocally(value as string)
       }
       return { ...prev, ui }
     })
@@ -516,23 +513,8 @@ function GeneralSection() {
 
       if (!saveRes.ok) throw new Error('Failed to save theme')
 
-      // Apply the theme immediately
-      const root = document.documentElement
-      const vars = data.dark  // TweakCN themes are always dark
-
-      // Clear all custom properties first
-      const existingVars = root.style;
-      for (let i = existingVars.length - 1; i >= 0; i--) {
-        const prop = existingVars[i];
-        if (prop && prop.startsWith('--')) {
-          root.style.removeProperty(prop);
-        }
-      }
-
-      // Apply new theme variables
-      Object.entries(vars).forEach(([key, value]) => {
-        root.style.setProperty(key, value as string)
-      })
+      // Apply the theme immediately via unified function
+      applyThemeLocally('tweakcn', [{ id: 'current', name: data.name, dark: data.dark, light: data.light } as any])
 
       // Refresh custom themes list
       const listRes = await fetch(`${API_BASE}/api/themes/tweakcn/list`)

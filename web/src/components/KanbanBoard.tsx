@@ -530,7 +530,10 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
     d.name.toLowerCase().includes(deptSearch.toLowerCase())
   )
 
-  const selectedDept = departments.find(d => d.id === department || d.name === department)
+  const selectedDept = departments.find(d => {
+    const id = d.id || (d as any).departmentsid
+    return id === department || d.name === department
+  })
 
   // ── Auto-resize textarea ──
   const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -542,7 +545,8 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
   // ── Toggle department ──
   const selectDept = (d: DepartmentItem) => {
-    setDepartment(d.id || d.name)
+    const id = d.id || (d as any).departmentsid
+    setDepartment(id || d.name)
     // Task 6: auto-assign responsible from department head (structured for future)
     // if (d.head) setResponsible(d.head)
     setDeptOpen(false)
@@ -614,24 +618,26 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
             />
           </div>
 
-          {/* Priority buttons */}
+          {/* Priority inline selector */}
           <div className="kanban-form-group">
             <label>Приоритет</label>
-            <div className="priority-buttons">
+            <div className="priority-inline">
               {[
-                { value: 'low', label: 'Низкий', color: 'var(--text-dim)' },
+                { value: 'low', label: 'Низкий', color: '#22c55e' },
                 { value: 'medium', label: 'Средний', color: '#f59e0b' },
                 { value: 'high', label: 'Высокий', color: '#ef4444' },
-              ].map(p => (
-                <button
-                  key={p.value}
-                  type="button"
-                  className={`priority-btn ${priority === p.value ? 'active' : ''}`}
-                  style={{ '--priority-color': p.color } as React.CSSProperties}
-                  onClick={() => setPriority(p.value)}
-                >
-                  {p.label}
-                </button>
+              ].map((p, idx) => (
+                <React.Fragment key={p.value}>
+                  {idx > 0 && <span className="priority-separator">|</span>}
+                  <button
+                    type="button"
+                    className={`priority-inline-btn ${priority === p.value ? 'active' : ''}`}
+                    onClick={() => setPriority(p.value)}
+                  >
+                    <span className="priority-dot" style={{ background: p.color }} />
+                    {p.label}
+                  </button>
+                </React.Fragment>
               ))}
             </div>
           </div>
@@ -668,7 +674,7 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
                     {filteredDepts.map(d => (
                       <div
                         key={d.id || d.name}
-                        className={`kanban-dept-item ${department === (d.id || d.name) ? 'active' : ''}`}
+                        className={`kanban-dept-item ${department === (d.id || (d as any).departmentsid || d.name) ? 'active' : ''}`}
                         onClick={() => selectDept(d)}
                       >
                         <span>{d.name}</span>

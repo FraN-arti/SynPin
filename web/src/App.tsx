@@ -898,7 +898,7 @@ function App() {
             </button>
             <div className="version-bar">
               <span className="version-label">VERSION</span>
-              <span className="version-number">v0.2.2</span>
+              <span className="version-number">v0.2.5.2</span>
               <span className="version-status up-to-date" />
             </div>
           </div>

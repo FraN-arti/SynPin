@@ -192,9 +192,10 @@ interface CustomDropdownProps {
   options: DropdownOption[]
   onChange: (value: string) => void
   width?: string
+  disabled?: boolean
 }
 
-function CustomDropdown({ value, options, onChange, width }: CustomDropdownProps) {
+function CustomDropdown({ value, options, onChange, width, disabled }: CustomDropdownProps) {
   const [open, setOpen] = useState(false)
   const [highlighted, setHighlighted] = useState(-1)
   const ref = useRef<HTMLDivElement>(null)
@@ -216,11 +217,12 @@ function CustomDropdown({ value, options, onChange, width }: CustomDropdownProps
   }
 
   return (
-    <div className="custom-dropdown" ref={ref} style={{ width }}>
+    <div className={`custom-dropdown ${disabled ? 'disabled' : ''}`} ref={ref} style={{ width }}>
       <button
         className={`custom-dropdown-trigger ${open ? 'open' : ''}`}
-        onClick={() => setOpen(!open)}
+        onClick={() => !disabled && setOpen(!open)}
         type="button"
+        disabled={disabled}
       >
         <span className="dropdown-selected">{selected?.label || value}</span>
         <svg className="dropdown-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -653,15 +655,16 @@ function GeneralSection() {
               ]}
             />
           </div>
-          <div className="settings-field">
-            <label>Язык</label>
+          <div className="settings-field" style={{ opacity: 0.5 }}>
+            <label>Язык <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>🚧 скоро</span></label>
             <CustomDropdown
               value={settings.ui.language}
-              onChange={v => updateUI('language', v)}
+              onChange={() => {}}
               options={[
                 { value: 'ru', label: 'Русский' },
                 { value: 'en', label: 'English' },
               ]}
+              disabled
             />
           </div>
         </div>

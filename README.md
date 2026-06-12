@@ -4,11 +4,11 @@
 
 **ИИ-команда, которая работает вместе с вами.**
 
-[Как это работает](#как-это-работает) · [Быстрый старт](#быстрый-старт) · [Архитектура](#архитектура) · [Лицензия](#лицензия)
+[Как это работает](#как-это-работает) · [Быстрый старт](#быстрый-старт) · [Архитектура](#архитектура)
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg)](https://react.dev)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
 </div>
 
@@ -128,8 +128,3 @@ SynPin/
 └── scripts/                 # Утилиты установки
 ```
 
----
-
-## Лицензия
-
-MIT License. Автор: [FraN-arti](https://github.com/FraN-arti).

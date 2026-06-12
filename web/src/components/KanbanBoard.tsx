@@ -314,6 +314,8 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
     ? (columns.find(c => c.id === defaultColId)?.status || 'backlog')
     : 'backlog'
 
+  const effectiveColumns = columns.length > 0 ? columns : []
+
   return (
     <div className="kanban-page">
       {/* Header */}

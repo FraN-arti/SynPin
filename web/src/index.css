@@ -5951,7 +5951,7 @@ body {
   padding: 10px 12px;
   cursor: pointer;
   position: relative;
-  transition: border-color 0.15s, box-shadow 0.15s, opacity 0.2s, transform 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, opacity 0.2s;
   touch-action: none;
   user-select: none;
 }

@@ -119,11 +119,10 @@ function DraggableTaskCard({
 
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
-    transition: 'opacity 0.2s ease',
-    opacity: isDragging ? 0.4 : 1,
+    transition: isDragging ? 'none' : 'opacity 0.2s ease',
+    opacity: isDragging ? 0.85 : 1,
     zIndex: isDragging ? 9999 : 'auto',
     borderLeft: `3px solid ${PRIORITY_COLORS[task.priority] || '#22c55e'}`,
-    position: isDragging ? 'fixed' as const : undefined,
   }
 
   const deptName = deptMap[task.department] || task.department || ''

@@ -155,7 +155,11 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
     <div className="kanban-page">
       {/* Header */}
       <div className="kanban-header">
-        <button className="kanban-back-btn" onClick={onBack}>← Назад</button>
+        <button className="nav-back-btn" onClick={onBack} title="Назад">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>
+        </button>
         <h2 className="kanban-title">Глобальный Канбан</h2>
         <div className="kanban-header-right">
           <span className="kanban-count">{totalTasks} задач</span>

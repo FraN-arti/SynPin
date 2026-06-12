@@ -99,58 +99,39 @@ export function KanbanWidget({ onNavigateToBoard }: KanbanWidgetProps) {
 
   if (loading) {
     return (
-      <div className="widget-card">
-        <div className="widget-card-header">
-          <span className="widget-icon">📋</span>
-          <span className="widget-title">Канбан</span>
-        </div>
-        <div className="widget-card-body">
-          <div className="widget-empty">Загрузка...</div>
-        </div>
+      <div className="kanban-widget">
+        <div className="widget-empty">Загрузка...</div>
       </div>
     )
   }
 
   return (
-    <div className="widget-card">
-      <div className="widget-card-header">
-        <span className="widget-icon">📋</span>
-        <span className="widget-title">Канбан</span>
-        {onNavigateToBoard && (
-          <button className="widget-remove-btn" onClick={onNavigateToBoard} title="Открыть доску">
-            →
-          </button>
-        )}
-      </div>
-      <div className="widget-card-body">
-        <div className="kanban-widget">
-          {tasks.length === 0 && (
-            <div className="widget-empty">Нет задач</div>
+    <div className="kanban-widget">
+      {tasks.length === 0 && (
+        <div className="widget-empty">Нет задач</div>
+      )}
+      {tasks.map(task => (
+        <button
+          key={task.id}
+          className="kanban-widget-task"
+          onClick={onNavigateToBoard}
+          title={`${task.title} — ${task.status}`}
+        >
+          <span
+            className="kanban-widget-status-dot"
+            style={{ background: STATUS_COLORS[task.status] || '#6b7280' }}
+          />
+          <span className="kanban-widget-task-title">{task.title}</span>
+          {config.show_department && task.department && (
+            <span className="kanban-widget-task-dept">{task.department}</span>
           )}
-          {tasks.map(task => (
-            <button
-              key={task.id}
-              className="kanban-widget-task"
-              onClick={onNavigateToBoard}
-              title={`${task.title} — ${task.status}`}
-            >
-              <span
-                className="kanban-widget-status-dot"
-                style={{ background: STATUS_COLORS[task.status] || '#6b7280' }}
-              />
-              <span className="kanban-widget-task-title">{task.title}</span>
-              {config.show_department && task.department && (
-                <span className="kanban-widget-task-dept">{task.department}</span>
-              )}
-              {config.show_deadline && task.deadline && (
-                <span className="kanban-widget-task-deadline">
-                  {new Date(task.deadline).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
+          {config.show_deadline && task.deadline && (
+            <span className="kanban-widget-task-deadline">
+              {new Date(task.deadline).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}
+            </span>
+          )}
+        </button>
+      ))}
     </div>
   )
 }

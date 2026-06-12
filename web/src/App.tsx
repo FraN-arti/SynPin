@@ -284,6 +284,15 @@ function App() {
 
         const root = document.documentElement
 
+        // Check if theme is already applied (by index.html inline script)
+        const currentClass = root.classList.contains('light-theme') ? 'light'
+          : root.classList.contains('oled-theme') ? 'dark-oled'
+          : 'dark'
+        const hasInlineVars = root.style.length > 0
+
+        // Skip if same theme already applied with vars
+        if (currentClass === theme && (theme !== 'tweakcn' || hasInlineVars)) return
+
         // Clear all classes
         root.classList.remove('light-theme', 'dark-theme', 'oled-theme')
 

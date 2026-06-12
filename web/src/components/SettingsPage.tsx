@@ -3164,20 +3164,20 @@ function KanbanColumnsConfig() {
           {saving && savedId === col.id && <span style={{ color: '#22c55e', fontSize: '12px' }}>✓</span>}
         </div>
       ))}
-      <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+      <div style={{ display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center', overflow: 'visible' }}>
         <button className="kanban-create-btn" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={addColumn}>
           + Добавить колонку
         </button>
-      </div>
-      <div className="kanban-config-row" style={{ paddingTop: '12px', borderTop: '1px solid var(--border, rgba(255,255,255,0.06))' }}>
-        <label style={{ color: 'var(--text-secondary)', fontSize: '13px', width: '150px' }}>Дэфолтная колонка</label>
-        <CustomDropdown
-          value={defaultColumnValue}
-          options={defaultColumnOptions}
-          onChange={handleDefaultColumnChange}
-          disabled={enabledColumns.length === 0}
-          width="min(320px, 100%)"
-        />
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <label style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Дэфолтная колонка</label>
+          <CustomDropdown
+            value={defaultColumnValue}
+            options={defaultColumnOptions}
+            onChange={handleDefaultColumnChange}
+            disabled={enabledColumns.length === 0}
+            width="min(320px, 100%)"
+          />
+        </div>
         {widgetSaving && <span style={{ color: '#22c55e', fontSize: '12px' }}>✓</span>}
       </div>
       {/* Undo Toast */}
@@ -3364,7 +3364,13 @@ function KanbanLabelsConfig() {
 
     // Restore the label
     const restoreIndex = pendingDelete.index
-    const restored: any = { id: pendingDelete.id, name: pendingDelete.name }
+    const restored: any = {
+      id: pendingDelete.id,
+      name: pendingDelete.name,
+      color: pendingDelete.color,
+      text_color: pendingDelete.text_color,
+      description: pendingDelete.description || '',
+    }
     setLabels(prev => {
       const newLabels = [...prev]
       newLabels.splice(restoreIndex, 0, restored)

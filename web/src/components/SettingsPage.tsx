@@ -2863,6 +2863,10 @@ function KanbanColumnsConfig() {
   const [saving, setSaving] = useState(false)
   const [savedId, setSavedId] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; label: string; index: number } | null>(null)
+  const [undoProgress, setUndoProgress] = useState(100)
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     fetch(`${API_BASE}/api/kanban/config/columns`)
@@ -2874,6 +2878,14 @@ function KanbanColumnsConfig() {
   // Cleanup debounce timer on unmount
   useEffect(() => {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [])
+
+  // Cleanup undo timers on unmount
+  useEffect(() => {
+    return () => {
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current)
+    }
   }, [])
 
   const genId = () => {
@@ -2964,15 +2976,82 @@ function KanbanColumnsConfig() {
     }
   }
 
-  const deleteColumn = async (colId: string) => {
-    setColumns(prev => prev.filter(c => c.id !== colId))
+  const moveColumn = async (index: number, direction: -1 | 1) => {
+    const newIndex = index + direction
+    if (newIndex < 0 || newIndex >= columns.length) return
+
+    // Swap locally
+    const newCols = [...columns]
+    const temp = newCols[index]!
+    newCols[index] = newCols[newIndex]!
+    newCols[newIndex] = temp
+
+    // Update order numbers
+    newCols.forEach((c, i) => c.order = i)
+    setColumns(newCols)
+
+    // Save to backend
     try {
-      await fetch(`${API_BASE}/api/kanban/config/columns/${colId}`, {
-        method: 'DELETE',
+      await fetch(`${API_BASE}/api/kanban/config/columns`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newCols),
       })
     } catch (e) {
-      console.error('[kanban] delete column error:', e)
+      console.error('[kanban] move column error:', e)
     }
+  }
+
+  const deleteColumn = (colId: string) => {
+    const col = columns.find(c => c.id === colId)
+    if (!col) return
+
+    // Remove from UI immediately
+    setColumns(prev => prev.filter(c => c.id !== colId))
+
+    // Set pending delete
+    const idx = columns.findIndex(c => c.id === colId)
+    setPendingDelete({ id: colId, label: col.label, index: idx })
+    setUndoProgress(100)
+
+    // Start countdown (5 seconds)
+    const startTime = Date.now()
+    const duration = 5000
+
+    progressTimerRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime
+      const remaining = Math.max(0, 100 - (elapsed / duration) * 100)
+      setUndoProgress(remaining)
+      if (remaining <= 0) {
+        clearInterval(progressTimerRef.current!)
+      }
+    }, 30)
+
+    undoTimerRef.current = setTimeout(() => {
+      // Actually delete
+      fetch(`${API_BASE}/api/kanban/config/columns/${colId}`, { method: 'DELETE' })
+        .catch(e => console.error('[kanban] delete column error:', e))
+      setPendingDelete(null)
+      clearInterval(progressTimerRef.current!)
+    }, duration)
+  }
+
+  const undoDelete = () => {
+    if (!pendingDelete) return
+
+    // Cancel the pending delete
+    clearTimeout(undoTimerRef.current!)
+    clearInterval(progressTimerRef.current!)
+
+    // Restore the column
+    const restoreIndex = pendingDelete.index
+    const restored: any = { id: pendingDelete.id, label: pendingDelete.label }
+    setColumns(prev => {
+      const newCols = [...prev]
+      newCols.splice(restoreIndex, 0, restored)
+      return newCols
+    })
+    setPendingDelete(null)
   }
 
   return (
@@ -3016,6 +3095,18 @@ function KanbanColumnsConfig() {
             onClick={() => deleteColumn(col.id)}
             title="Удалить колонку"
           >×</button>
+          <button
+            className="kanban-move-btn"
+            onClick={() => moveColumn(i, -1)}
+            disabled={i === 0}
+            title="Переместить вверх"
+          >↑</button>
+          <button
+            className="kanban-move-btn"
+            onClick={() => moveColumn(i, 1)}
+            disabled={i === columns.length - 1}
+            title="Переместить вниз"
+          >↓</button>
           {saving && savedId === col.id && <span style={{ color: '#22c55e', fontSize: '12px' }}>✓</span>}
         </div>
       ))}
@@ -3024,6 +3115,21 @@ function KanbanColumnsConfig() {
           + Добавить колонку
         </button>
       </div>
+      {/* Undo Toast */}
+      {pendingDelete && (
+        <div className={`undo-toast ${pendingDelete ? 'visible' : ''}`}>
+          <span className="undo-toast-text">
+            «{pendingDelete.label}» удалена
+          </span>
+          <button className="undo-toast-btn" onClick={undoDelete}>
+            Отменить
+          </button>
+          <div
+            className="undo-toast-progress"
+            style={{ width: `${undoProgress}%`, transition: 'width 30ms linear' }}
+          />
+        </div>
+      )}
     </section>
   )
 }

@@ -376,6 +376,9 @@ function GeneralSection() {
       }
     }
 
+    // Theme data for localStorage cache
+    const themeCache: { name: string; vars?: Record<string, string> } = { name: theme }
+
     // Apply theme
     if (theme === 'dark') {
       // Default dark - no classes needed, CSS :root handles it
@@ -393,9 +396,13 @@ function GeneralSection() {
           Object.entries(vars).forEach(([key, value]) => {
             root.style.setProperty(key, value as string)
           })
+          themeCache.vars = vars as Record<string, string>
         }
       }
     }
+
+    // Cache theme for instant load on next refresh
+    localStorage.setItem('synpin_theme', JSON.stringify(themeCache))
   }, [settings?.ui.theme, customThemes])
 
   // Debounced save

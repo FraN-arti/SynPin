@@ -1,15 +1,9 @@
-- id: l7r8zs6i26wzyl
-  label: TestPatch
-  description: Ожидает назначения
-  color: '#ff0000'
-  order: 0
-  enabled: false
-- id: z6q3t0pkq1psu6
-  label: TODO
+- id: 424s3qetorrta2
+  label: Blocked
   description: ''
-  color: '#3b82f6'
+  color: '#dc2626'
   order: 1
-  enabled: false
+  enabled: true
 - id: n4dvlbbses8z85
   label: In Progress
   description: ''
@@ -21,16 +15,4 @@
   description: ''
   color: '#f59e0b'
   order: 3
-  enabled: true
-- id: qxt2c7v4dbff5p
-  label: Revision
-  description: ''
-  color: '#ef4444'
-  order: 4
-  enabled: false
-- id: 424s3qetorrta2
-  label: Blocked
-  description: ''
-  color: '#dc2626'
-  order: 5
   enabled: true

@@ -4752,7 +4752,8 @@ body {
   transition: opacity 0.15s;
 }
 
-.widget-card:hover .widget-remove-btn {
+.widget-card:hover .widget-remove-btn,
+.kanban-config-row:hover .widget-remove-btn {
   opacity: 1;
 }
 

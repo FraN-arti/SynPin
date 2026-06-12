@@ -359,7 +359,10 @@ function GeneralSection() {
 
   // Apply theme ONLY when user changes it (not on mount)
   // Theme is applied by App.tsx on initial load
-  const applyThemeLocally = useCallback((theme: string, cnThemes?: typeof customThemes) => {
+  // Cache TweakCN vars in a ref so they survive theme switches
+  const tweakcnVarsRef = useRef<Record<string, string> | null>(null)
+
+  const applyThemeLocally = useCallback((theme: string, cnThemes?: typeof customThemes, directVars?: Record<string, string>) => {
     const root = document.documentElement
 
     // Clear ALL classes first
@@ -386,16 +389,24 @@ function GeneralSection() {
       root.classList.add('light-theme')
     } else if (theme === 'tweakcn') {
       root.classList.add('dark-theme')
-      const themes = cnThemes || customThemes
-      const current = themes.find(t => t.id === 'current') || themes[0]
-      if (current) {
-        const vars = current.dark || current.light
-        if (vars) {
-          Object.entries(vars).forEach(([key, value]) => {
-            root.style.setProperty(key, value as string)
-          })
-          themeCache.vars = vars as Record<string, string>
+      // Try direct vars first, then customThemes, then cached ref
+      let vars = directVars
+      if (!vars) {
+        const themes = cnThemes || customThemes
+        const current = themes.find(t => t.id === 'current') || themes[0]
+        if (current) {
+          vars = current.dark || current.light
         }
+      }
+      if (!vars && tweakcnVarsRef.current) {
+        vars = tweakcnVarsRef.current
+      }
+      if (vars) {
+        Object.entries(vars).forEach(([key, value]) => {
+          root.style.setProperty(key, value as string)
+        })
+        themeCache.vars = vars as Record<string, string>
+        tweakcnVarsRef.current = vars as Record<string, string>
       }
     }
 

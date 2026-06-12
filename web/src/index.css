@@ -4618,11 +4618,13 @@ body {
 }
 
 .widget-drop-zone.drop-hover {
-  background: rgba(249, 115, 22, 0.05);
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  box-shadow: inset 0 0 20px var(--accent-muted);
 }
 
 .widget-drop-zone.empty-drag-target {
-  background: rgba(249, 115, 22, 0.03);
+  background: var(--accent-bg);
   border: 2px dashed var(--accent);
   border-radius: 8px;
   pointer-events: auto;
@@ -4639,9 +4641,11 @@ body {
   left: 50%;
   transform: translate(-50%, -50%);
   width: 100%;
+  pointer-events: none;
 }
 
-.widget-drop-zone.drop-hover .drop-zone-placeholder {
+.widget-drop-zone.drop-hover .drop-zone-placeholder,
+.widget-drop-zone.empty-drag-target .drop-zone-placeholder {
   color: var(--accent);
   opacity: 1;
 }

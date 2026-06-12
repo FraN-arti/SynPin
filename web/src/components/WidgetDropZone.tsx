@@ -152,12 +152,20 @@ export function WidgetDropZone({ side, widgets, departments, onRemove, isDraggin
   // Show zone when dragging OR when has widgets
   if (widgets.length === 0 && !isDragging) return null
 
+  // Unified visual: dashed border when dragging, glow when hovering
+  const isDropTarget = isDragging && !isOver
+  const isDropHover = isDragging && isOver
+
   return (
     <div
       ref={setNodeRef}
-      className={`widget-drop-zone ${side} ${isOver ? 'drop-hover' : ''} ${widgets.length === 0 && isDragging ? 'empty-drag-target' : ''}`}
+      className={[
+        'widget-drop-zone', side,
+        isDropHover ? 'drop-hover' : '',
+        isDropTarget ? 'empty-drag-target' : '',
+      ].filter(Boolean).join(' ')}
     >
-      {widgets.length === 0 && isDragging && (
+      {isDropTarget && (
         <div className="drop-zone-placeholder">
           {side === 'left' ? '←' : '→'} Перетащите сюда
         </div>

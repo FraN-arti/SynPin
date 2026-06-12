@@ -3,6 +3,7 @@
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from synpin import __version__
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import logging
@@ -38,7 +39,7 @@ for _sp in _settings_candidates:
 app = FastAPI(
     title="SynPin",
     description="Agent-Driven Organization Platform",
-    version="0.2.5.2",
+    version=__version__,
 )
 
 # Allow Vite dev server to reach the API
@@ -149,7 +150,7 @@ except RuntimeError:
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "version": "0.2.3"}
+    return {"status": "ok", "version": __version__}
 
 
 @app.post("/api/admin/reload")

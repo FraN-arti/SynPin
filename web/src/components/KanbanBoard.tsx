@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { API_BASE } from '../config'
-import { DndContext, closestCenter, useDraggable, useDroppable, DragEndEvent, DragOverlay } from '@dnd-kit/core'
+import { DndContext, closestCenter, useDraggable, useDroppable, DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, arrayMove, horizontalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
@@ -119,8 +119,7 @@ function DraggableTaskCard({
 
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
-    transition: isDragging ? 'none' : 'opacity 0.2s ease',
-    opacity: isDragging ? 0.85 : 1,
+    opacity: isDragging ? 1 : 1,
     zIndex: isDragging ? 9999 : 'auto',
     borderLeft: `3px solid ${PRIORITY_COLORS[task.priority] || '#22c55e'}`,
   }
@@ -273,7 +272,6 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
   const [labels, setLabels] = useState<LabelConfig[]>([])
   const [defaultColumn, setDefaultColumn] = useState<string | null>(null)
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
-  const [draggedTask, setDraggedTask] = useState<Task | null>(null)
 
   // Build label lookup map
   const labelMap: Record<string, LabelConfig> = {}
@@ -422,13 +420,6 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
 
   const effectiveColumns = columns.length > 0 ? columns : []
 
-  const handleDragStart = (event: DragEndEvent) => {
-    const activeData = (event.active.data as any).current
-    if (activeData?.type === 'task') {
-      setDraggedTask(activeData.task as Task)
-    }
-  }
-
   // Task 4: Handle drag end — supports both column reorder and task move between columns
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
@@ -511,7 +502,7 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
       {loading ? (
         <div className="kanban-loading">Загрузка доски...</div>
       ) : (
-        <DndContext collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setDraggedTask(null)}>
+        <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext
             items={effectiveColumns.map(c => c.id)}
             strategy={horizontalListSortingStrategy}
@@ -528,17 +519,6 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
               ))}
             </div>
           </SortableContext>
-          {draggedTask && (
-            <DragOverlay>
-              <div className="kanban-card kanban-card-overlay" style={{ borderLeft: `3px solid ${PRIORITY_COLORS[draggedTask.priority] || '#22c55e'}` }}>
-                <div className="kanban-card-top">
-                  <span className="kanban-card-priority" style={{ background: PRIORITY_COLORS[draggedTask.priority] || '#22c55e' }} />
-                  <span className="kanban-card-title">{draggedTask.title}</span>
-                </div>
-                {deptMap[draggedTask.department] && <div className="kanban-card-dept">{deptMap[draggedTask.department]}</div>}
-              </div>
-            </DragOverlay>
-          )}
         </DndContext>
       )}
 

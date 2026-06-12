@@ -6,7 +6,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { API_BASE } from '../config'
 
 // Tabs that can be dragged to widget zones
-const DRAGGABLE_TABS = new Set(['departments'])
+const DRAGGABLE_TABS = new Set(['departments', 'kanban'])
 
 function DraggableTab({ tab, isActive, onClick }: { tab: { id: string; label: string }; isActive: boolean; onClick: () => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({

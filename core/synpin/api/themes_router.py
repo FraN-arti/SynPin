@@ -281,46 +281,78 @@ def _map_to_synpin_vars(tweakcn: dict) -> dict:
     # --- Text ---
     fg = tweakcn.get("foreground", "#f0f0f0")
     mapped["--white"] = fg
+    mapped["--text"] = fg
 
     # --- Card / sidebar background ---
     card = tweakcn.get("card", tweakcn.get("sidebar", bg))
     mapped["--gray-900"] = card
+    mapped["--bg-card"] = card
+    mapped["--glass-bg"] = _with_alpha(_parse_css_color(card), 0.55)
+    mapped["--glass-bg-heavy"] = _with_alpha(_parse_css_color(card), 0.8)
+
+    # --- Popover (elevated panels, modals) ---
+    popover = tweakcn.get("popover", card)
+    mapped["--bg-elevated"] = popover
 
     # --- Borders / input ---
     border = tweakcn.get("border", "#262626")
     inp = tweakcn.get("input", border)
     mapped["--gray-800"] = inp
+    mapped["--border"] = inp
+    mapped["--glass-border"] = inp
 
-    # --- Secondary bg ---
+    # --- Secondary bg (hover states, subtle backgrounds) ---
     secondary = tweakcn.get("secondary", tweakcn.get("muted", border))
     mapped["--gray-700"] = secondary
+    mapped["--bg-hover"] = _with_alpha(_parse_css_color(secondary), 0.6)
+
+    # --- Accent (active states, highlighted items) ---
+    accent = tweakcn.get("accent", secondary)
+    mapped["--accent-bg"] = _with_alpha(_parse_css_color(accent), 0.1)
+
+    # --- Muted / tertiary (subtle backgrounds, badges) ---
+    muted = tweakcn.get("muted", bg)
+    mapped["--bg-tertiary"] = muted
 
     # --- Muted foreground (subtle text) ---
     muted_fg = tweakcn.get("muted-foreground", "#969696")
     mapped["--gray-600"] = muted_fg
+    mapped["--text-dim"] = _with_alpha(_parse_css_color(muted_fg), 0.5)
+    mapped["--text-secondary"] = _with_alpha(_parse_css_color(muted_fg), 0.75)
 
     # --- Interpolate grays between gray-600 (subtle text) and gray-950 (bg) ---
-    # gray-500 = slightly lighter than gray-600
     mapped["--gray-500"] = _interpolate_color(muted_fg, fg, 0.2)
-    # gray-400 = more towards fg
     mapped["--gray-400"] = _interpolate_color(muted_fg, fg, 0.45)
-    # gray-300 = close to fg but not quite
     mapped["--gray-300"] = _interpolate_color(muted_fg, fg, 0.7)
+
+    # --- Destructive (error, delete) ---
+    destructive = tweakcn.get("destructive", "#ef4444")
+    mapped["--destructive"] = destructive
+
+    # --- Ring (focus rings, glow) ---
+    ring = tweakcn.get("ring", primary)
+    mapped["--glow-border"] = _with_alpha(_parse_css_color(ring), 0.3)
+    mapped["--glow-orange"] = f"0 0 20px {_with_alpha(_parse_css_color(ring), 0.15)}, 0 0 40px {_with_alpha(_parse_css_color(ring), 0.05)}"
+    mapped["--glow-orange-strong"] = f"0 0 15px {_with_alpha(_parse_css_color(ring), 0.25)}, 0 0 45px {_with_alpha(_parse_css_color(ring), 0.1)}"
+
+    # --- Sidebar specific ---
+    sidebar_bg = tweakcn.get("sidebar", bg)
+    sidebar_fg = tweakcn.get("sidebar-foreground", fg)
+    sidebar_accent = tweakcn.get("sidebar-accent", secondary)
+    sidebar_border = tweakcn.get("sidebar-border", border)
+    mapped["--sidebar-bg"] = sidebar_bg
+    mapped["--sidebar-fg"] = sidebar_fg
+    mapped["--sidebar-accent"] = sidebar_accent
+    mapped["--sidebar-border"] = sidebar_border
+
+    # --- Font ---
+    font_sans = tweakcn.get("font-sans", "")
+    if font_sans:
+        mapped["--font-sans"] = font_sans
 
     # --- Radius ---
     radius_raw = tweakcn.get("radius", "0.625rem")
     mapped["--radius"] = _rem_to_px(radius_raw)
-
-    # --- Shadow (SynPin doesn't use CSS vars for shadows yet, but store for future) ---
-    shadow_color = tweakcn.get("shadow-color", "oklch(0 0 0)")
-    shadow_opacity = tweakcn.get("shadow-opacity", "0.1")
-    shadow_blur = tweakcn.get("shadow-blur", "3px")
-    shadow_spread = tweakcn.get("shadow-spread", "0px")
-    shadow_oy = tweakcn.get("shadow-offset-y", "1px")
-    shadow_ox = tweakcn.get("shadow-offset-x", "0")
-
-    # Build a CSS shadow string from TweakCN params
-    mapped["--shadow"] = f"{shadow_ox} {shadow_oy} {shadow_blur} {shadow_spread} rgba(0, 0, 0, {shadow_opacity})"
 
     return mapped
 

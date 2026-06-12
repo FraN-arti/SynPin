@@ -540,7 +540,7 @@ function App() {
         ]
         if (activeAgent.name) ctx.push(`Твоё имя в SynPin: ${activeAgent.name}`)
         if (activeAgent.role_name) ctx.push(`Твоя роль: ${activeAgent.role_name}`)
-        if (activeAgent.department_name) ctx.push(`Твой департамент: ${activeAgent.department_name}`)
+        if (activeAgent.department_name) ctx.push(`Твой отдел: ${activeAgent.department_name}`)
         if (activeAgent.system_prompt) ctx.push(activeAgent.system_prompt)
         ctx.push(`Если тебя спрашивают где ты или что ты — ты внутри SynPin и можешь помогать с задачами организации.`)
         systemPrompt = ctx.join('\n')
@@ -549,7 +549,7 @@ function App() {
         if (activeAgent.name) parts.push(`Имя: ${activeAgent.name}`)
         if (activeAgent.description) parts.push(activeAgent.description)
         if (activeAgent.role_name) parts.push(`Роль: ${activeAgent.role_name}`)
-        if (activeAgent.department_name) parts.push(`Департамент: ${activeAgent.department_name}`)
+        if (activeAgent.department_name) parts.push(`Отдел: ${activeAgent.department_name}`)
         if (activeAgent.system_prompt) parts.push(activeAgent.system_prompt)
         if (activeAgent.tone) parts.push(`Тон общения: ${activeAgent.tone}`)
         if (activeAgent.style) parts.push(`Стиль ответов: ${activeAgent.style}`)

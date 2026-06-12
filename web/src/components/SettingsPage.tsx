@@ -860,7 +860,7 @@ function GeneralSection() {
               onChange={v => updateFeed('group_by', v)}
               options={[
                 { value: 'none', label: 'Без группировки' },
-                { value: 'department', label: 'По департаменту' },
+                { value: 'department', label: 'По отделу' },
                 { value: 'type', label: 'По типу' },
               ]}
             />
@@ -1356,7 +1356,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
                   </select>
                 </div>
                 <div className="settings-field">
-                  <label>Департамент</label>
+                  <label>Отдел</label>
                   <select className="settings-input" style={{ cursor: 'pointer' }}
                     value={createForm.department} onChange={e => setCreateForm({ ...createForm, department: e.target.value })}>
                     <option value="">— не указан —</option>
@@ -1429,7 +1429,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
           {/* Departments column */}
           <div className="roles-depts-column">
-            <h3 className="roles-depts-title">Департаменты</h3>
+            <h3 className="roles-depts-title">Отделы</h3>
             <p className="roles-depts-hint">Определяют область специализации агента. Влияют на контекст системного промта и распределение задач.</p>
             <div className="roles-depts-list">
               {departments.map(dept => (
@@ -1446,13 +1446,13 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
               ))}
             </div>
             <div className="roles-depts-add">
-              <input className="settings-input roles-depts-input" placeholder="Название департамента..."
+              <input className="settings-input roles-depts-input" placeholder="Название отдела..."
                 value={newDept.name} onChange={e => setNewDept({ ...newDept, name: e.target.value })} />
               <input className="settings-input roles-depts-input roles-depts-input-sm" placeholder="Описание..."
                 value={newDept.description} onChange={e => setNewDept({ ...newDept, description: e.target.value })} />
               <input type="color" className="roles-depts-color-picker" value={newDept.color}
                 onChange={e => setNewDept({ ...newDept, color: e.target.value })} />
-              <button className="roles-depts-add-btn" onClick={handleAddDept} title="Добавить департамент">+</button>
+              <button className="roles-depts-add-btn" onClick={handleAddDept} title="Добавить отдел">+</button>
             </div>
           </div>
         </div>
@@ -1533,7 +1533,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
                           </select>
                         </div>
                         <div className="expanded-field">
-                          <label>Департамент</label>
+                          <label>Отдел</label>
                           <select className="settings-input" value={agent.department} onChange={e => handleExternalDeptChange(agent, e.target.value)} style={{ cursor: 'pointer' }}>
                             {departments.map(d => (<option key={d.departmentsid} value={d.departmentsid}>{d.name}</option>))}
                           </select>
@@ -1648,7 +1648,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
                             </select>
                           </div>
                           <div className="expanded-field">
-                            <label>Департамент</label>
+                            <label>Отдел</label>
                             <select className="settings-input" value={agent.department} onChange={e => handleAgentDeptChange(agent, e.target.value)} style={{ cursor: 'pointer' }}>
                               {departments.map(d => (<option key={d.departmentsid} value={d.departmentsid}>{d.name}</option>))}
                             </select>
@@ -2308,8 +2308,8 @@ function ChannelsSection({ onAddChannel }: { onAddChannel: () => void }) {
                   onChange={() => {}}
                   options={[
                     { value: 'main', label: 'Основной агент' },
-                    { value: 'department:dev', label: 'Департамент: Разработка' },
-                    { value: 'department:qa', label: 'Департамент: QA' },
+                    { value: 'department:dev', label: 'Отдел: Разработка' },
+                    { value: 'department:qa', label: 'Отдел: QA' },
                     { value: 'agent:architect', label: 'Агент: Архитектор' },
                   ]}
                 />
@@ -2730,7 +2730,7 @@ function AddChannelModal({ onClose }: { onClose: () => void }) {
             onChange={() => {}}
             options={[
               { value: 'main', label: 'Основной агент' },
-              { value: 'department', label: 'Департамент' },
+              { value: 'department', label: 'Отдел' },
               { value: 'agent', label: 'Конкретный агент' },
             ]}
           />

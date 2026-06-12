@@ -29,6 +29,7 @@ class ColumnConfig(BaseModel):
     """A single column on the Kanban board."""
     id: str                       # 14-char alphanumeric
     label: str                    # Display name
+    description: str = ""         # Purpose description (for agent prompts)
     color: str = "#6b7280"       # Color for the indicator square
     order: int = 0               # Sort order on the board
     enabled: bool = True         # Show/hide this column

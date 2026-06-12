@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { API_BASE } from '../config'
+import { DndContext, closestCenter } from '@dnd-kit/core'
+import { SortableContext, useSortable, arrayMove, horizontalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 interface Task {
   id: string
@@ -23,6 +26,7 @@ interface Task {
 interface ColumnConfig {
   id: string
   label: string
+  description: string
   color: string
   order: number
   enabled: boolean
@@ -38,6 +42,111 @@ interface LabelConfig {
 interface KanbanBoardProps {
   onBack: () => void
   wsOn?: (type: string, handler: (data: any) => void) => () => void
+}
+
+// ── Sortable Column ──────────────────────────────────────────────────────────
+
+function SortableColumn({
+  col,
+  tasks,
+  labelMap,
+  onSelectTask,
+}: {
+  col: ColumnConfig
+  tasks: Task[]
+  labelMap: Record<string, LabelConfig>
+  onSelectTask: (task: Task) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: col.id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : 0,
+  }
+
+  const PRIORITY_COLORS: Record<string, string> = {
+    low: '#6b7280',
+    medium: '#f59e0b',
+    high: '#f97316',
+    critical: '#ef4444',
+  }
+
+  const formatDate = (s: string) => {
+    if (!s) return ''
+    const d = new Date(s)
+    return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className={`kanban-column ${isDragging ? 'dragging' : ''}`}>
+      <div className="kanban-column-header" {...attributes} {...listeners}>
+        <span className="kanban-col-drag-handle">⠿</span>
+        <span className="kanban-col-indicator" style={{ background: col.color }} />
+        <span>{col.label}</span>
+        <span className="kanban-column-count">{tasks.length}</span>
+      </div>
+      <div
+        ref={el => {
+          if (!el) return
+          const check = () => {
+            if (el.scrollHeight > el.clientHeight + 5) {
+              el.classList.add('has-overflow')
+            } else {
+              el.classList.remove('has-overflow')
+            }
+          }
+          check()
+          const obs = new MutationObserver(check)
+          obs.observe(el, { childList: true, subtree: true })
+        }}
+        className="kanban-column-body"
+      >
+        {tasks.map(task => (
+          <div
+            key={task.id}
+            className="kanban-card"
+            onClick={() => onSelectTask(task)}
+          >
+            <div className="kanban-card-header">
+              <span className="kanban-card-id">{task.id}</span>
+              <span
+                className="kanban-card-priority"
+                style={{ background: PRIORITY_COLORS[task.priority] || '#6b7280' }}
+                title={task.priority}
+              />
+            </div>
+            <div className="kanban-card-title">{task.title}</div>
+            {task.department && (
+              <div className="kanban-card-dept">{task.department}</div>
+            )}
+            {task.tags.length > 0 && (
+              <div className="kanban-card-tags">
+                {task.tags.map(t => {
+                  const label = labelMap[t.toLowerCase()]
+                  return (
+                    <span
+                      key={t}
+                      className="kanban-tag"
+                      style={label ? { background: label.color, color: label.text_color } : undefined}
+                    >
+                      {t}
+                    </span>
+                  )
+                })}
+              </div>
+            )}
+            {task.deadline && (
+              <div className="kanban-card-deadline">⏰ {formatDate(task.deadline)}</div>
+            )}
+          </div>
+        ))}
+        {tasks.length === 0 && (
+          <div className="kanban-column-empty">Пусто</div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -59,6 +168,23 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
   const labelMap: Record<string, LabelConfig> = {}
   for (const l of labels) {
     labelMap[l.name.toLowerCase()] = l
+  }
+
+  const handleDragEnd = (event: { active: { id: string | number }; over: { id: string | number } | null }) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = columns.findIndex(c => c.id === active.id)
+    const newIndex = columns.findIndex(c => c.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+    const newCols = arrayMove(columns, oldIndex, newIndex)
+    newCols.forEach((c, i) => c.order = i)
+    setColumns(newCols)
+    // Save to backend
+    fetch(`${API_BASE}/api/kanban/config/columns`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newCols),
+    }).catch(e => console.error('[kanban] save column order error:', e))
   }
 
   const loadBoard = useCallback(async () => {
@@ -189,80 +315,21 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
       {loading ? (
         <div className="kanban-loading">Загрузка доски...</div>
       ) : (
-        <div className="kanban-columns">
-          {effectiveColumns.map(col => {
-            const tasks = board[col.id] || []
-            return (
-              <div key={col.id} className="kanban-column">
-                <div className="kanban-column-header">
-                  <span className="kanban-col-indicator" style={{ background: col.color }} />
-                  <span>{col.label}</span>
-                  <span className="kanban-column-count">{tasks.length}</span>
-                </div>
-                <div
-                  ref={el => {
-                    if (!el) return
-                    const check = () => {
-                      if (el.scrollHeight > el.clientHeight + 5) {
-                        el.classList.add('has-overflow')
-                      } else {
-                        el.classList.remove('has-overflow')
-                      }
-                    }
-                    check()
-                    // Recheck on content changes
-                    const obs = new MutationObserver(check)
-                    obs.observe(el, { childList: true, subtree: true })
-                  }}
-                  className="kanban-column-body"
-                >
-                  {tasks.map(task => (
-                    <div
-                      key={task.id}
-                      className="kanban-card"
-                      onClick={() => setSelectedTask(task)}
-                    >
-                      <div className="kanban-card-header">
-                        <span className="kanban-card-id">{task.id}</span>
-                        <span
-                          className="kanban-card-priority"
-                          style={{ background: PRIORITY_COLORS[task.priority] || '#6b7280' }}
-                          title={task.priority}
-                        />
-                      </div>
-                      <div className="kanban-card-title">{task.title}</div>
-                      {task.department && (
-                        <div className="kanban-card-dept">{task.department}</div>
-                      )}
-                      {task.tags.length > 0 && (
-                        <div className="kanban-card-tags">
-                          {task.tags.map(t => {
-                            const label = labelMap[t.toLowerCase()]
-                            return (
-                              <span
-                                key={t}
-                                className="kanban-tag"
-                                style={label ? { background: label.color, color: label.text_color } : undefined}
-                              >
-                                {t}
-                              </span>
-                            )
-                          })}
-                        </div>
-                      )}
-                      {task.deadline && (
-                        <div className="kanban-card-deadline">⏰ {formatDate(task.deadline)}</div>
-                      )}
-                    </div>
-                  ))}
-                  {tasks.length === 0 && (
-                    <div className="kanban-column-empty">Пусто</div>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
+        <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={effectiveColumns.map(c => c.id)} strategy={horizontalListSortingStrategy}>
+            <div className="kanban-columns">
+              {effectiveColumns.map(col => (
+                <SortableColumn
+                  key={col.id}
+                  col={col}
+                  tasks={board[col.id] || []}
+                  labelMap={labelMap}
+                  onSelectTask={setSelectedTask}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {/* Bottom area — stats and more will go here */}

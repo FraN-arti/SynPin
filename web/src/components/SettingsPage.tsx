@@ -2852,6 +2852,7 @@ function KanbanSection() {
 interface KanbanColumnItem {
   id: string
   label: string
+  description: string
   color: string
   order: number
   enabled: boolean
@@ -2899,13 +2900,6 @@ function KanbanColumnsConfig() {
     }
   }
 
-  const updateColumn = (index: number, field: string, value: unknown) => {
-    const col = columns[index]
-    if (!col) return
-    setColumns(prev => prev.map((c, i) => i === index ? { ...c, [field]: value } : c))
-    patchColumn(col.id, { [field]: value } as Partial<KanbanColumnItem>)
-  }
-
   const toggleColumn = (index: number) => {
     const col = columns[index]
     if (!col) return
@@ -2932,19 +2926,33 @@ function KanbanColumnsConfig() {
     }, 500)
   }
 
+  const updateDescription = (index: number, description: string) => {
+    const col = columns[index]
+    if (!col) return
+    setColumns(prev => prev.map((c, i) => i === index ? { ...c, description } : c))
+    // Debounce text input saves
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      patchColumn(col.id, { description })
+    }, 500)
+  }
+
   const addColumn = async () => {
     const newId = genId()
-    const newCol = { id: newId, label: 'Новая колонка', color: '#3b82f6', order: columns.length, enabled: true }
+    const newCol = { id: newId, label: 'Новая колонка', description: '', color: '#3b82f6', order: columns.length, enabled: true }
     setColumns(prev => [...prev, newCol])
     patchColumn(newId, newCol)
   }
 
-  const removeColumn = (index: number) => {
-    const col = columns[index]
-    if (!col) return
-    setColumns(prev => prev.filter((_, i) => i !== index))
-    // Delete by PATCHing enabled=false (soft delete) or could add DELETE endpoint
-    patchColumn(col.id, { enabled: false, order: 999 })
+  const deleteColumn = async (colId: string) => {
+    setColumns(prev => prev.filter(c => c.id !== colId))
+    try {
+      await fetch(`${API_BASE}/api/kanban/config/columns/${colId}`, {
+        method: 'DELETE',
+      })
+    } catch (e) {
+      console.error('[kanban] delete column error:', e)
+    }
   }
 
   return (
@@ -2954,7 +2962,14 @@ function KanbanColumnsConfig() {
       <div className="settings-divider-thin" />
       {columns.map((col, i) => (
         <div key={col.id} className={`kanban-config-row${saving && savedId === col.id ? ' saving' : ''}`}>
-          <div className="kanban-col-indicator" style={{ background: col.color }} />
+          <label className="kanban-color-trigger" style={{ background: col.color }} title="Изменить цвет">
+            <input
+              type="color"
+              value={col.color}
+              onChange={e => { updateColor(i, e.target.value) }}
+              className="kanban-color-hidden"
+            />
+          </label>
           <input
             className="settings-input"
             value={col.label}
@@ -2963,19 +2978,11 @@ function KanbanColumnsConfig() {
             style={{ flex: 1, minWidth: 120 }}
           />
           <input
-            type="color"
-            className="kanban-color-picker"
-            value={col.color}
-            onChange={e => updateColor(i, e.target.value)}
-            title="Цвет колонки"
-          />
-          <input
-            type="number"
             className="settings-input"
-            value={col.order}
-            onChange={e => updateColumn(i, 'order', parseInt(e.target.value) || 0)}
-            title="Порядок"
-            style={{ width: 50, textAlign: 'center' }}
+            value={col.description || ''}
+            onChange={e => updateDescription(i, e.target.value)}
+            placeholder="Описание (для промпта агентов)"
+            style={{ flex: 1, minWidth: 120, fontSize: '12px', opacity: 0.7 }}
           />
           <label className="settings-toggle" style={{ margin: 0, fontSize: '12px' }}>
             <input
@@ -2986,7 +2993,7 @@ function KanbanColumnsConfig() {
           </label>
           <button
             className="widget-remove-btn"
-            onClick={() => removeColumn(i)}
+            onClick={() => deleteColumn(col.id)}
             title="Удалить колонку"
           >×</button>
           {saving && savedId === col.id && <span style={{ color: '#22c55e', fontSize: '12px' }}>✓</span>}

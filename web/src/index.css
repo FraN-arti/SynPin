@@ -6380,3 +6380,42 @@ body {
   flex-shrink: 0;
   font-family: monospace;
 }
+
+/* ── Column Drag Handle ──────────────────────────────────────────────────── */
+
+.kanban-col-drag-handle {
+  cursor: grab;
+  color: var(--text-dim);
+  font-size: 14px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.kanban-column-header:hover .kanban-col-drag-handle {
+  opacity: 0.6;
+}
+
+.kanban-column.dragging {
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  border-color: var(--accent);
+}
+
+/* ── Color Picker Trigger (Settings) ──────────────────────────────────────── */
+
+.kanban-color-trigger {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+}
+.kanban-color-hidden {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}

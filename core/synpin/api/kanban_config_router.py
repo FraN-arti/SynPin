@@ -31,6 +31,7 @@ router = APIRouter(prefix="/api/kanban/config", tags=["kanban-config"])
 class ColumnRequest(BaseModel):
     id: str | None = None         # Auto-generated if not provided
     label: str = ""
+    description: str = ""
     color: str = "#6b7280"
     order: int = 0
     enabled: bool = True
@@ -39,6 +40,7 @@ class ColumnRequest(BaseModel):
 class ColumnPatchRequest(BaseModel):
     """Partial update — all fields optional."""
     label: str | None = None
+    description: str | None = None
     color: str | None = None
     order: int | None = None
     enabled: bool | None = None
@@ -110,6 +112,7 @@ def add_column(col: ColumnRequest) -> dict:
     new_col = ColumnConfig(
         id=col_id,
         label=col.label,
+        description=col.description,
         color=col.color,
         order=col.order if col.order != 0 else len(cols),
         enabled=col.enabled,
@@ -139,6 +142,8 @@ def update_column(column_id: str, col: ColumnPatchRequest) -> dict:
         if c.id == column_id:
             if col.label is not None:
                 c.label = col.label
+            if col.description is not None:
+                c.description = col.description
             if col.color is not None:
                 c.color = col.color
             if col.order is not None:

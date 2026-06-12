@@ -4,7 +4,7 @@ show_columns:
 - in_progress
 - review
 - blocked
-default_column: null
+default_column: 424s3qetorrta2
 show_deadline: true
 show_department: true
 compact: true

@@ -3330,7 +3330,14 @@ function KanbanLabelsConfig() {
     setLabels(prev => prev.filter((_, i) => i !== index))
 
     // Set pending delete
-    setPendingDelete({ id: label.id, name: label.name, index })
+    setPendingDelete({
+      id: label.id,
+      name: label.name,
+      color: label.color,
+      text_color: label.text_color,
+      description: label.description || '',
+      index,
+    })
     setUndoProgress(100)
 
     // Start countdown (5 seconds)

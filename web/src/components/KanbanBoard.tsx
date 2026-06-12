@@ -598,7 +598,6 @@ function CreateTaskModal({ onClose, onCreated, defaultStatus }: {
           title: title.trim(),
           description: description.trim(),
           department: department.trim(),
-          status: defaultStatus || undefined,
           priority,
           deadline: deadline || null,
           tags,

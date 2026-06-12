@@ -6285,10 +6285,15 @@ body {
 
 .kanban-config-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 8px 0;
   border-bottom: 1px solid var(--border, rgba(255,255,255,0.06));
+}
+
+.kanban-config-row > input {
+  flex: 1 1 100%;
 }
 .kanban-config-row:last-child {
   border-bottom: none;

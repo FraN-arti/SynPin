@@ -15,8 +15,21 @@ from .models import (
     load_task,
     load_all_tasks,
 )
+from .config import (
+    KanbanConfig,
+    ColumnConfig,
+    LabelConfig,
+    WidgetConfig,
+    load_config,
+    save_config,
+    get_columns,
+    get_all_columns,
+    get_labels,
+    get_widget_config,
+)
 
 __all__ = [
+    "KanbanService",
     "Task",
     "TaskStatus",
     "Priority",
@@ -30,4 +43,14 @@ __all__ = [
     "save_task",
     "load_task",
     "load_all_tasks",
+    "KanbanConfig",
+    "ColumnConfig",
+    "LabelConfig",
+    "WidgetConfig",
+    "load_config",
+    "save_config",
+    "get_columns",
+    "get_all_columns",
+    "get_labels",
+    "get_widget_config",
 ]

@@ -1,9 +1,11 @@
 """Kanban service — manages task lifecycle, assignment, Summon, and escalation.
 
 This is the business logic layer between the API and the task data.
+Broadcasts WebSocket events on every task change for live board updates.
 """
 from __future__ import annotations
 
+import asyncio
 import os
 import threading
 from datetime import datetime
@@ -20,6 +22,35 @@ from .models import (
     load_task,
     save_task,
 )
+
+# ── WebSocket broadcast helper ───────────────────────────────────────────────
+
+_ws_loop: asyncio.AbstractEventLoop | None = None
+
+
+def set_ws_loop(loop: asyncio.AbstractEventLoop) -> None:
+    """Set the event loop for broadcasting WS events from sync context."""
+    global _ws_loop
+    _ws_loop = loop
+
+
+def _broadcast(event: dict) -> None:
+    """Schedule a broadcast on the WS event loop (thread-safe)."""
+    if _ws_loop is None:
+        return
+    try:
+        asyncio.run_coroutine_threadsafe(_ws_broadcast(event), _ws_loop)
+    except Exception:
+        pass
+
+
+async def _ws_broadcast(event: dict) -> None:
+    """Actually broadcast via ws_manager."""
+    try:
+        from ..chat.ws_manager import ws_manager
+        await ws_manager.broadcast(event)
+    except Exception:
+        pass
 
 # ── Directory resolution ─────────────────────────────────────────────────────
 
@@ -103,6 +134,11 @@ class KanbanService:
                 task_id=task_id,
             )
             save_task(task, self._data_dir)
+            # Broadcast new task to all connected clients
+            _broadcast({
+                "type": "kanban:task_created",
+                "task": task.model_dump(mode="json"),
+            })
             return task
 
     # ── Read ──────────────────────────────────────────────────────────
@@ -143,10 +179,16 @@ class KanbanService:
     # ── Update ────────────────────────────────────────────────────────
 
     def save_task(self, task: Task) -> Path:
-        """Save task changes to disk."""
+        """Save task changes to disk and broadcast update."""
         with self._lock:
             task.updated_at = datetime.now()
-            return save_task(task, self._data_dir)
+            path = save_task(task, self._data_dir)
+            # Broadcast live update to all connected clients
+            _broadcast({
+                "type": "kanban:task_updated",
+                "task": task.model_dump(mode="json"),
+            })
+            return path
 
     def assign_head(self, task_id: str, head_agent_id: str) -> Task | None:
         """Assign a head agent to manage the task."""

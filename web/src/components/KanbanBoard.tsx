@@ -20,19 +20,25 @@ interface Task {
   tags: string[]
 }
 
-interface KanbanBoardProps {
-  onBack: () => void
+interface ColumnConfig {
+  id: string
+  label: string
+  color: string
+  order: number
+  enabled: boolean
 }
 
-const COLUMNS = [
-  { key: 'backlog', label: 'Backlog', icon: '📥' },
-  { key: 'todo', label: 'TODO', icon: '📋' },
-  { key: 'in_progress', label: 'In Progress', icon: '⚙️' },
-  { key: 'review', label: 'Review', icon: '🔍' },
-  { key: 'revision', label: 'Revision', icon: '🔄' },
-  { key: 'blocked', label: 'Blocked', icon: '🚨' },
-  { key: 'done', label: 'Done', icon: '✅' },
-]
+interface LabelConfig {
+  id: string
+  name: string
+  color: string
+  text_color: string
+}
+
+interface KanbanBoardProps {
+  onBack: () => void
+  wsOn?: (type: string, handler: (data: any) => void) => () => void
+}
 
 const PRIORITY_COLORS: Record<string, string> = {
   low: '#6b7280',
@@ -41,11 +47,19 @@ const PRIORITY_COLORS: Record<string, string> = {
   critical: '#ef4444',
 }
 
-export function KanbanBoard({ onBack }: KanbanBoardProps) {
+export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
   const [board, setBoard] = useState<Record<string, Task[]>>({})
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [columns, setColumns] = useState<ColumnConfig[]>([])
+  const [labels, setLabels] = useState<LabelConfig[]>([])
+
+  // Build label lookup map
+  const labelMap: Record<string, LabelConfig> = {}
+  for (const l of labels) {
+    labelMap[l.name.toLowerCase()] = l
+  }
 
   const loadBoard = useCallback(async () => {
     try {
@@ -59,9 +73,52 @@ export function KanbanBoard({ onBack }: KanbanBoardProps) {
     }
   }, [])
 
-  useEffect(() => { loadBoard() }, [loadBoard])
+  const loadColumns = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/kanban/config/columns`)
+      if (res.ok) {
+        const data = await res.json()
+        setColumns((data.columns || []).filter((c: ColumnConfig) => c.enabled).sort((a: ColumnConfig, b: ColumnConfig) => a.order - b.order))
+      }
+    } catch (e) {
+      console.error('[kanban] load columns error:', e)
+    }
+  }, [])
 
-  // Refresh when a task is selected (to get live updates)
+  const loadLabels = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/kanban/config/labels`)
+      if (res.ok) {
+        const data = await res.json()
+        setLabels(data.labels || [])
+      }
+    } catch (e) {
+      console.error('[kanban] load labels error:', e)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadBoard()
+    loadColumns()
+    loadLabels()
+  }, [loadBoard, loadColumns, loadLabels])
+
+  // WebSocket live updates
+  useEffect(() => {
+    if (!wsOn) return
+    const unsub1 = wsOn('kanban:task_updated', () => {
+      loadBoard()
+    })
+    const unsub2 = wsOn('kanban:task_created', () => {
+      loadBoard()
+    })
+    return () => {
+      unsub1()
+      unsub2()
+    }
+  }, [wsOn, loadBoard])
+
+  // Refresh when a task is selected (fallback polling if WS not available)
   useEffect(() => {
     if (!selectedTask) return
     const interval = setInterval(async () => {
@@ -91,12 +148,15 @@ export function KanbanBoard({ onBack }: KanbanBoardProps) {
 
   const totalTasks = Object.values(board).reduce((sum, col) => sum + col.length, 0)
 
+  // If no columns loaded from config, show loading
+  const effectiveColumns = columns.length > 0 ? columns : []
+
   return (
     <div className="kanban-page">
       {/* Header */}
       <div className="kanban-header">
         <button className="kanban-back-btn" onClick={onBack}>← Назад</button>
-        <h2 className="kanban-title">📋 Глобальный Канбан</h2>
+        <h2 className="kanban-title">Глобальный Канбан</h2>
         <div className="kanban-header-right">
           <span className="kanban-count">{totalTasks} задач</span>
           <button className="kanban-create-btn" onClick={() => setShowCreateModal(true)}>
@@ -110,12 +170,13 @@ export function KanbanBoard({ onBack }: KanbanBoardProps) {
         <div className="kanban-loading">Загрузка доски...</div>
       ) : (
         <div className="kanban-columns">
-          {COLUMNS.map(col => {
-            const tasks = board[col.key] || []
+          {effectiveColumns.map(col => {
+            const tasks = board[col.id] || []
             return (
-              <div key={col.key} className="kanban-column">
+              <div key={col.id} className="kanban-column">
                 <div className="kanban-column-header">
-                  <span>{col.icon} {col.label}</span>
+                  <span className="kanban-col-indicator" style={{ background: col.color }} />
+                  <span>{col.label}</span>
                   <span className="kanban-column-count">{tasks.length}</span>
                 </div>
                 <div className="kanban-column-body">
@@ -139,7 +200,18 @@ export function KanbanBoard({ onBack }: KanbanBoardProps) {
                       )}
                       {task.tags.length > 0 && (
                         <div className="kanban-card-tags">
-                          {task.tags.map(t => <span key={t} className="kanban-tag">{t}</span>)}
+                          {task.tags.map(t => {
+                            const label = labelMap[t.toLowerCase()]
+                            return (
+                              <span
+                                key={t}
+                                className="kanban-tag"
+                                style={label ? { background: label.color, color: label.text_color } : undefined}
+                              >
+                                {t}
+                              </span>
+                            )
+                          })}
                         </div>
                       )}
                       {task.deadline && (
@@ -240,7 +312,18 @@ export function KanbanBoard({ onBack }: KanbanBoardProps) {
               <div className="kanban-modal-section">
                 <h4>Теги</h4>
                 <div className="kanban-card-tags">
-                  {selectedTask.tags.map(t => <span key={t} className="kanban-tag">{t}</span>)}
+                  {selectedTask.tags.map(t => {
+                    const label = labelMap[t.toLowerCase()]
+                    return (
+                      <span
+                        key={t}
+                        className="kanban-tag"
+                        style={label ? { background: label.color, color: label.text_color } : undefined}
+                      >
+                        {t}
+                      </span>
+                    )
+                  })}
                 </div>
               </div>
             )}

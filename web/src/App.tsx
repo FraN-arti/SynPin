@@ -924,7 +924,7 @@ function App() {
           />
           <main className="main-area">
         {page === 'kanban' ? (
-          <KanbanBoard onBack={() => setPage('chat')} />
+          <KanbanBoard onBack={() => setPage('chat')} wsOn={wsOn} />
         ) : page === 'settings' ? (
           <SettingsPage onBack={() => setPage('chat')} onAgentsChange={refreshAgents} onDepartmentsChange={refreshDepartments} />
         ) : activeOtdelId ? (() => {

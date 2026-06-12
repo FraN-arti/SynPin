@@ -124,6 +124,21 @@ app.include_router(themes_router)
 from .kanban_router import router as kanban_router
 app.include_router(kanban_router)
 
+# Kanban config API (columns, labels, widget)
+from .kanban_config_router import router as kanban_config_router
+app.include_router(kanban_config_router)
+
+# Set up Kanban WS broadcast loop
+import asyncio
+from ..kanban.service import set_ws_loop
+try:
+    loop = asyncio.get_running_loop()
+    set_ws_loop(loop)
+except RuntimeError:
+    @app.on_event("startup")
+    def _setup_kanban_ws():
+        set_ws_loop(asyncio.get_event_loop())
+
 
 @app.get("/api/health")
 def health():

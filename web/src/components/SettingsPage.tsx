@@ -2864,7 +2864,7 @@ function KanbanColumnsConfig() {
   useEffect(() => {
     fetch(`${API_BASE}/api/kanban/config/columns`)
       .then(r => r.json())
-      .then(data => setColumns(data.columns || []))
+      .then(data => setColumns(Array.isArray(data) ? data : data.columns || []))
       .catch(() => {})
   }, [])
 
@@ -2891,7 +2891,7 @@ function KanbanColumnsConfig() {
       })
       if (res.ok) {
         const data = await res.json()
-        setColumns(data.columns || columns)
+        setColumns(Array.isArray(data) ? data : data.columns || columns)
       }
     } catch (e) {
       console.error('[kanban] save columns error:', e)
@@ -2977,7 +2977,7 @@ function KanbanLabelsConfig() {
   useEffect(() => {
     fetch(`${API_BASE}/api/kanban/config/labels`)
       .then(r => r.json())
-      .then(data => setLabels(data.labels || []))
+      .then(data => setLabels(Array.isArray(data) ? data : data.labels || []))
       .catch(() => {})
   }, [])
 
@@ -3004,7 +3004,7 @@ function KanbanLabelsConfig() {
       })
       if (res.ok) {
         const data = await res.json()
-        setLabels(data.labels || labels)
+        setLabels(Array.isArray(data) ? data : data.labels || labels)
       }
     } catch (e) {
       console.error('[kanban] save labels error:', e)

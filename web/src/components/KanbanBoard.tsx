@@ -78,7 +78,8 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
       const res = await fetch(`${API_BASE}/api/kanban/config/columns`)
       if (res.ok) {
         const data = await res.json()
-        setColumns((data.columns || []).filter((c: ColumnConfig) => c.enabled).sort((a: ColumnConfig, b: ColumnConfig) => a.order - b.order))
+        const cols = Array.isArray(data) ? data : data.columns || []
+        setColumns(cols.filter((c: ColumnConfig) => c.enabled).sort((a: ColumnConfig, b: ColumnConfig) => a.order - b.order))
       }
     } catch (e) {
       console.error('[kanban] load columns error:', e)
@@ -90,7 +91,7 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
       const res = await fetch(`${API_BASE}/api/kanban/config/labels`)
       if (res.ok) {
         const data = await res.json()
-        setLabels(data.labels || [])
+        setLabels(Array.isArray(data) ? data : data.labels || [])
       }
     } catch (e) {
       console.error('[kanban] load labels error:', e)

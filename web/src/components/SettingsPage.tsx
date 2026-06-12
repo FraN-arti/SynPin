@@ -3169,7 +3169,7 @@ function KanbanColumnsConfig() {
           + Добавить колонку
         </button>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <label style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Дэфолтная колонка</label>
+          <label style={{ color: 'var(--text-secondary)', fontSize: '13px', whiteSpace: 'nowrap' }}>Стандартно в</label>
           <CustomDropdown
             value={defaultColumnValue}
             options={defaultColumnOptions}

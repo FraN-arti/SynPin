@@ -1609,6 +1609,8 @@ body {
   border-radius: var(--radius);
   padding: 16px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  overflow: visible;
+  position: relative;
 }
 
 .settings-card:hover {

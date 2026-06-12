@@ -124,13 +124,45 @@ def add_column(col: ColumnRequest) -> dict:
 
 @router.delete("/columns/{column_id}")
 def delete_column(column_id: str) -> dict:
-    """Remove a column."""
+    """Remove a column AND clean up all references.
+
+    Clean delete concept:
+    1. Remove from columns.yaml
+    2. Remove from widget.yaml → show_columns
+    3. Move tasks with that status → backlog (first enabled column)
+    """
     cols = load_columns()
     before = len(cols)
     cols = [c for c in cols if c.id != column_id]
     if len(cols) == before:
         raise HTTPException(404, f"Column '{column_id}' not found")
     save_columns(cols)
+
+    # Clean widget references
+    widget = load_widget()
+    if column_id in widget.show_columns:
+        widget.show_columns.remove(column_id)
+        save_widget(widget)
+
+    # Clean task references — move orphans to first enabled column
+    try:
+        from .models import load_all_tasks, save_task, TaskStatus
+        from .service import KanbanService
+        tasks = load_all_tasks()
+        first_col = cols[0] if cols else None
+        if first_col and tasks:
+            for task in tasks:
+                if task.status.value == column_id:
+                    # Find a valid status to move to
+                    try:
+                        new_status = TaskStatus(first_col.id)
+                    except ValueError:
+                        new_status = TaskStatus.BACKLOG
+                    task.status = new_status
+                    save_task(task)
+    except Exception:
+        pass  # Tasks may not exist yet
+
     return {"status": "ok", "deleted": column_id}
 
 
@@ -197,13 +229,38 @@ def add_label(label: LabelRequest) -> dict:
 
 @router.delete("/labels/{label_id}")
 def delete_label(label_id: str) -> dict:
-    """Remove a label."""
+    """Remove a label AND clean up all references.
+
+    Clean delete concept:
+    1. Remove from labels.yaml
+    2. Remove tag from all tasks that reference it
+    """
     lbls = load_labels()
     before = len(lbls)
-    lbls = [l for l in lbls if l.id != label_id]
-    if len(lbls) == before:
+    deleted_label = None
+    new_lbls = []
+    for l in lbls:
+        if l.id == label_id:
+            deleted_label = l
+        else:
+            new_lbls.append(l)
+    if deleted_label is None:
         raise HTTPException(404, f"Label '{label_id}' not found")
-    save_labels(lbls)
+    save_labels(new_lbls)
+
+    # Clean task references — remove tag from tasks
+    try:
+        from .models import load_all_tasks, save_task
+        tasks = load_all_tasks()
+        if tasks and deleted_label:
+            tag_name = deleted_label.name.lstrip('#')
+            for task in tasks:
+                if tag_name in task.tags:
+                    task.tags.remove(tag_name)
+                    save_task(task)
+    except Exception:
+        pass  # Tasks may not exist yet
+
     return {"status": "ok", "deleted": label_id}
 
 

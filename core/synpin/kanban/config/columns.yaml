@@ -34,9 +34,3 @@
   color: '#dc2626'
   order: 5
   enabled: true
-- id: d5ihw5xspmqtqm
-  label: Done
-  description: ''
-  color: '#22c55e'
-  order: 6
-  enabled: true

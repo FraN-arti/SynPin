@@ -2938,10 +2938,30 @@ function KanbanColumnsConfig() {
   }
 
   const addColumn = async () => {
-    const newId = genId()
-    const newCol = { id: newId, label: 'Новая колонка', description: '', color: '#3b82f6', order: columns.length, enabled: true }
-    setColumns(prev => [...prev, newCol])
-    patchColumn(newId, newCol)
+    setSaving(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/kanban/config/columns`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          label: 'Новая колонка',
+          description: '',
+          color: '#3b82f6',
+          order: columns.length,
+          enabled: true,
+        }),
+      })
+      if (res.ok) {
+        const newCol = await res.json()
+        setColumns(prev => [...prev, newCol])
+        setSavedId(newCol.id)
+        setTimeout(() => setSavedId(null), 1500)
+      }
+    } catch (e) {
+      console.error('[kanban] add column error:', e)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const deleteColumn = async (colId: string) => {
@@ -3077,11 +3097,29 @@ function KanbanLabelsConfig() {
     }, 500)
   }
 
-  const addLabel = () => {
-    const newId = genId()
-    const newLabel = { id: newId, name: 'Новая метка', color: '#3b82f6', text_color: '#ffffff' }
-    setLabels(prev => [...prev, newLabel])
-    patchLabel(newId, newLabel)
+  const addLabel = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/kanban/config/labels`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Новая метка',
+          color: '#3b82f6',
+          text_color: '#ffffff',
+        }),
+      })
+      if (res.ok) {
+        const newLabel = await res.json()
+        setLabels(prev => [...prev, newLabel])
+        setSavedId(newLabel.id)
+        setTimeout(() => setSavedId(null), 1500)
+      }
+    } catch (e) {
+      console.error('[kanban] add label error:', e)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const removeLabel = (index: number) => {

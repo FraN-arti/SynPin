@@ -210,7 +210,7 @@ export function useWidgetLayout() {
 
     // New tab from settings — strip "tab-" prefix
     const widgetType = widgetId.startsWith('tab-') ? widgetId.replace('tab-', '') : widgetId
-    if (!['departments'].includes(widgetType)) return
+    if (!['departments', 'kanban'].includes(widgetType)) return
 
     const overId = String(over.id)
 

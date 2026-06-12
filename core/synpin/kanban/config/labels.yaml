@@ -1,20 +1,30 @@
 - id: 00taq8fvaaxtpm
-  name: '#System'
-  color: '#1e3a5f'
-  text_color: '#93c5fd'
+  name: ''
+  color: '#000000'
+  text_color: '#000000'
+  description: ''
 - id: qhf7gv5w2jblvz
   name: '#Service'
   color: '#166534'
   text_color: '#bbf7d0'
+  description: ''
 - id: fw2ateznveb2yg
   name: '#Bug'
   color: '#7f1d1d'
   text_color: '#fca5a5'
+  description: ''
 - id: oa17vfo27pq8h8
   name: '#Feature'
   color: '#4c1d95'
   text_color: '#c4b5fd'
+  description: ''
 - id: 3qpwzcxtxucunk
   name: '#Urgent'
   color: '#78350f'
   text_color: '#fcd34d'
+  description: ''
+- id: 0zov0f9jxbgzdm
+  name: Новая метка
+  color: '#3b82f6'
+  text_color: '#ffffff'
+  description: ''

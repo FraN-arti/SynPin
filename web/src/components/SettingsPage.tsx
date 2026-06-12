@@ -3155,6 +3155,7 @@ interface KanbanLabelItem {
   name: string
   color: string
   text_color: string
+  description?: string
 }
 
 function KanbanLabelsConfig() {
@@ -3162,6 +3163,11 @@ function KanbanLabelsConfig() {
   const [saving, setSaving] = useState(false)
   const [savedId, setSavedId] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const descDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string; index: number } | null>(null)
+  const [undoProgress, setUndoProgress] = useState(100)
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     fetch(`${API_BASE}/api/kanban/config/labels`)
@@ -3172,7 +3178,18 @@ function KanbanLabelsConfig() {
 
   // Cleanup debounce timer on unmount
   useEffect(() => {
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      if (descDebounceRef.current) clearTimeout(descDebounceRef.current)
+    }
+  }, [])
+
+  // Cleanup undo timers on unmount
+  useEffect(() => {
+    return () => {
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current)
+    }
   }, [])
 
   const genId = () => {
@@ -3217,6 +3234,17 @@ function KanbanLabelsConfig() {
     }, 500)
   }
 
+  const updateDescription = (index: number, description: string) => {
+    const label = labels[index]
+    if (!label) return
+    setLabels(prev => prev.map((l, i) => i === index ? { ...l, description } : l))
+    // Debounce text input saves
+    if (descDebounceRef.current) clearTimeout(descDebounceRef.current)
+    descDebounceRef.current = setTimeout(() => {
+      patchLabel(label.id, { description } as Partial<KanbanLabelItem>)
+    }, 500)
+  }
+
   const addLabel = async () => {
     setSaving(true)
     try {
@@ -3227,6 +3255,7 @@ function KanbanLabelsConfig() {
           name: 'Новая метка',
           color: '#3b82f6',
           text_color: '#ffffff',
+          description: '',
         }),
       })
       if (res.ok) {
@@ -3245,8 +3274,52 @@ function KanbanLabelsConfig() {
   const removeLabel = (index: number) => {
     const label = labels[index]
     if (!label) return
+
+    // Remove from UI immediately
     setLabels(prev => prev.filter((_, i) => i !== index))
-    patchLabel(label.id, { name: '', color: '#000000', text_color: '#000000' })
+
+    // Set pending delete
+    setPendingDelete({ id: label.id, name: label.name, index })
+    setUndoProgress(100)
+
+    // Start countdown (5 seconds)
+    const startTime = Date.now()
+    const duration = 5000
+
+    progressTimerRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime
+      const remaining = Math.max(0, 100 - (elapsed / duration) * 100)
+      setUndoProgress(remaining)
+      if (remaining <= 0) {
+        clearInterval(progressTimerRef.current!)
+      }
+    }, 30)
+
+    undoTimerRef.current = setTimeout(() => {
+      // Actually delete
+      fetch(`${API_BASE}/api/kanban/config/labels/${label.id}`, { method: 'DELETE' })
+        .catch(e => console.error('[kanban] delete label error:', e))
+      setPendingDelete(null)
+      clearInterval(progressTimerRef.current!)
+    }, duration)
+  }
+
+  const undoDelete = () => {
+    if (!pendingDelete) return
+
+    // Cancel the pending delete
+    clearTimeout(undoTimerRef.current!)
+    clearInterval(progressTimerRef.current!)
+
+    // Restore the label
+    const restoreIndex = pendingDelete.index
+    const restored: any = { id: pendingDelete.id, name: pendingDelete.name }
+    setLabels(prev => {
+      const newLabels = [...prev]
+      newLabels.splice(restoreIndex, 0, restored)
+      return newLabels
+    })
+    setPendingDelete(null)
   }
 
   return (
@@ -3289,6 +3362,13 @@ function KanbanLabelsConfig() {
               title="Цвет текста"
             />
           </div>
+          <input
+            className="settings-input"
+            value={label.description || ''}
+            onChange={e => updateDescription(i, e.target.value)}
+            placeholder="Описание..."
+            style={{ flex: 1, minWidth: 120 }}
+          />
           <button
             className="widget-remove-btn"
             onClick={() => removeLabel(i)}
@@ -3302,6 +3382,21 @@ function KanbanLabelsConfig() {
           + Добавить метку
         </button>
       </div>
+      {/* Undo Toast */}
+      {pendingDelete && (
+        <div className={`undo-toast ${pendingDelete ? 'visible' : ''}`}>
+          <span className="undo-toast-text">
+            «{pendingDelete.name}» удалена
+          </span>
+          <button className="undo-toast-btn" onClick={undoDelete}>
+            Отменить
+          </button>
+          <div
+            className="undo-toast-progress"
+            style={{ width: `${undoProgress}%`, transition: 'width 30ms linear' }}
+          />
+        </div>
+      )}
     </section>
   )
 }

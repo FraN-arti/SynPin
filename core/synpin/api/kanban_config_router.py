@@ -51,6 +51,7 @@ class LabelRequest(BaseModel):
     name: str = ""
     color: str = "#6b7280"
     text_color: str = "#ffffff"
+    description: str = ""
 
 
 class LabelPatchRequest(BaseModel):
@@ -58,6 +59,7 @@ class LabelPatchRequest(BaseModel):
     name: str | None = None
     color: str | None = None
     text_color: str | None = None
+    description: str | None = None
 
 
 class WidgetRequest(BaseModel):
@@ -206,6 +208,7 @@ def set_labels(labels: list[LabelRequest]) -> list[dict]:
             name=l.name,
             color=l.color,
             text_color=l.text_color,
+            description=l.description,
         ))
     save_labels(lbls)
     return [l.model_dump() for l in lbls]
@@ -221,6 +224,7 @@ def add_label(label: LabelRequest) -> dict:
         name=label.name,
         color=label.color,
         text_color=label.text_color,
+        description=label.description,
     )
     lbls.append(new_label)
     save_labels(lbls)
@@ -276,6 +280,8 @@ def update_label(label_id: str, label: LabelPatchRequest) -> dict:
                 l.color = label.color
             if label.text_color is not None:
                 l.text_color = label.text_color
+            if label.description is not None:
+                l.description = label.description
             save_labels(lbls)
             return l.model_dump()
     raise HTTPException(404, f"Label '{label_id}' not found")

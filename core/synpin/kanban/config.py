@@ -41,6 +41,7 @@ class LabelConfig(BaseModel):
     name: str                     # Display name: #System, #Service
     color: str = "#6b7280"       # Background color
     text_color: str = "#ffffff"  # Text color
+    description: str = ""         # Purpose description (for agent prompts)
 
 
 class WidgetConfig(BaseModel):

@@ -457,6 +457,8 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
 
 interface DepartmentItem {
   id: string
+  otdelid?: string
+  departmentsid?: string
   name: string
   head?: string
 }
@@ -488,9 +490,9 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
   // ── Fetch departments & labels ──
   useEffect(() => {
-    fetch(`${API_BASE}/api/departments`)
+    fetch(`${API_BASE}/api/otdels`)
       .then(r => r.json())
-      .then(data => setDepartments(Array.isArray(data) ? data : data.departments || []))
+      .then(data => setDepartments(Array.isArray(data) ? data : data.otdels || data.departments || []))
       .catch(() => {})
   }, [])
 
@@ -531,7 +533,7 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
   )
 
   const selectedDept = departments.find(d => {
-    const id = d.id || (d as any).departmentsid
+    const id = d.id || d.otdelid || d.departmentsid
     return id === department || d.name === department
   })
 
@@ -545,7 +547,7 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
   // ── Toggle department ──
   const selectDept = (d: DepartmentItem) => {
-    const id = d.id || (d as any).departmentsid
+    const id = d.id || d.otdelid || d.departmentsid
     setDepartment(id || d.name)
     // Task 6: auto-assign responsible from department head (structured for future)
     // if (d.head) setResponsible(d.head)
@@ -673,8 +675,8 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
                     )}
                     {filteredDepts.map(d => (
                       <div
-                        key={d.id || d.name}
-                        className={`kanban-dept-item ${department === (d.id || (d as any).departmentsid || d.name) ? 'active' : ''}`}
+                        key={d.otdelid || d.id || d.name}
+                        className={`kanban-dept-item ${department === (d.otdelid || d.id || d.departmentsid || d.name) ? 'active' : ''}`}
                         onClick={() => selectDept(d)}
                       >
                         <span>{d.name}</span>

@@ -51,6 +51,7 @@ interface DepartmentItem {
   departmentsid?: string
   name: string
   head?: string
+  color?: string
 }
 
 interface KanbanBoardProps {
@@ -118,11 +119,11 @@ function DraggableTaskCard({
 
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
-    transition: 'opacity 0.2s ease, transform 0.15s ease',
+    transition: 'opacity 0.2s ease',
     opacity: isDragging ? 0.4 : 1,
-    zIndex: isDragging ? 50 : 0,
+    zIndex: isDragging ? 9999 : 'auto',
     borderLeft: `3px solid ${PRIORITY_COLORS[task.priority] || '#22c55e'}`,
-    position: isDragging ? 'relative' as const : undefined,
+    position: isDragging ? 'fixed' as const : undefined,
   }
 
   const deptName = deptMap[task.department] || task.department || ''
@@ -282,11 +283,15 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
 
   // Build department name lookup map (id → name)
   const deptMap: Record<string, string> = {}
+  const deptColorMap: Record<string, string> = {}
   for (const d of departments) {
     const id = d.id || d.otdelid || d.departmentsid
-    if (id) deptMap[id] = d.name
-    // Also map by name in case tasks store the name directly
+    if (id) {
+      deptMap[id] = d.name
+      if (d.color) deptColorMap[id] = d.color
+    }
     deptMap[d.name] = d.name
+    if (d.color) deptColorMap[d.name] = d.color
   }
 
   const loadBoard = useCallback(async () => {
@@ -547,14 +552,21 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
             </div>
 
             {selectedTask.description && (
-              <p className="kanban-modal-desc">{selectedTask.description}</p>
+              <p className="kanban-modal-desc" style={{ fontStyle: 'italic' }}>{selectedTask.description}</p>
             )}
 
-            {/* Task 2: Show department NAME, not ID. Removed status line. */}
-            <div className="kanban-modal-divider" />
+            {/* Department badge with color */}
             <div className="kanban-modal-meta">
-              {selectedDeptName && <span>{selectedDeptName}</span>}
-              {selectedTask.assigned_head && <span>👤 {selectedTask.assigned_head}</span>}
+              {selectedDeptName && (
+                <span
+                  className="kanban-dept-badge"
+                  style={{
+                    background: `${deptColorMap[selectedTask.department] || '#6b7280'}22`,
+                    color: deptColorMap[selectedTask.department] || '#6b7280',
+                    border: `1px solid ${deptColorMap[selectedTask.department] || '#6b7280'}44`,
+                  }}
+                >{selectedDeptName}</span>
+              )}
               {selectedTask.deadline && <span>⏰ {formatDate(selectedTask.deadline)}</span>}
             </div>
 

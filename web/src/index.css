@@ -5970,6 +5970,29 @@ body {
   margin: 12px 0;
 }
 
+.kanban-dept-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.kanban-history-entry {
+  padding: 8px 12px;
+  border-left: 3px solid var(--accent, #22c55e);
+  border-radius: 0 6px 6px 0;
+  background: var(--bg-card, rgba(255,255,255,0.03));
+  margin-bottom: 6px;
+  font-size: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
 .kanban-card-drag-handle {
   position: absolute;
   top: 4px;

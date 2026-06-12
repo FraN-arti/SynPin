@@ -357,12 +357,17 @@ function GeneralSection() {
       .catch(() => {})
   }, [])
 
-  // Apply theme when it changes
+  // Apply theme when it changes (skip on initial mount to avoid flash)
+  const prevThemeRef = useRef<string | null>(null)
   useEffect(() => {
     if (!settings) return
 
     const root = document.documentElement
     const theme = settings.ui.theme
+
+    // Skip if theme hasn't actually changed (initial mount)
+    if (prevThemeRef.current === theme) return
+    prevThemeRef.current = theme
 
     // Clear ALL classes first
     root.classList.remove('light-theme', 'dark-theme', 'oled-theme')

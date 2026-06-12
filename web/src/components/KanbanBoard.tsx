@@ -308,9 +308,11 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
 
   const totalTasks = Object.values(board).reduce((sum, col) => sum + col.length, 0)
 
-  // If no columns loaded from config, show loading
-  const effectiveColumns = columns.length > 0 ? columns : []
-  const defaultTaskStatus = defaultColumn || columns.find(c => c.enabled)?.id || null
+  // Resolve default column ID → status for task creation
+  const defaultColId = defaultColumn || columns.find(c => c.enabled)?.id || null
+  const defaultTaskStatus = defaultColId
+    ? (columns.find(c => c.id === defaultColId)?.status || 'backlog')
+    : 'backlog'
 
   return (
     <div className="kanban-page">
@@ -599,6 +601,7 @@ function CreateTaskModal({ onClose, onCreated, defaultStatus }: {
           title: title.trim(),
           description: description.trim(),
           department: department.trim(),
+          status: defaultStatus || 'backlog',
           priority,
           deadline: deadline || null,
           tags,

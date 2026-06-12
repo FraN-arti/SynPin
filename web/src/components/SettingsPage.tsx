@@ -35,7 +35,7 @@ interface SettingsPageProps {
   onDepartmentsChange?: () => void
 }
 
-type Tab = 'general' | 'agents' | 'providers' | 'memory' | 'channels' | 'departments' | 'skills'
+type Tab = 'general' | 'agents' | 'providers' | 'memory' | 'channels' | 'departments' | 'skills' | 'kanban'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'general', label: 'Основное' },
@@ -45,6 +45,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'channels', label: 'Каналы' },
   { id: 'departments', label: 'Отделы' },
   { id: 'skills', label: 'Скиллы' },
+  { id: 'kanban', label: 'Канбан' },
 ]
 
 const SECTION_INFO: Record<Tab, { title: string; description: string }> = {
@@ -55,6 +56,7 @@ const SECTION_INFO: Record<Tab, { title: string; description: string }> = {
   channels: { title: 'Каналы связи', description: 'Feishu, WhatsApp, Telegram — мультимодальная связь с системой' },
   departments: { title: 'Отделы', description: 'Организационные единицы для командной работы агентов' },
   skills: { title: 'Скиллы', description: 'База скиллов системы — подходы, шаблоны, процедуры' },
+  kanban: { title: 'Канбан', description: 'Глобальная доска задач — настройки, автоматизация, архивация' },
 }
 
 export function SettingsPage({ onBack, onAgentsChange, onDepartmentsChange }: SettingsPageProps) {
@@ -170,6 +172,7 @@ export function SettingsPage({ onBack, onAgentsChange, onDepartmentsChange }: Se
           {activeTab === 'channels' && <ChannelsSection onAddChannel={() => setActiveModal('add-channel')} />}
           {activeTab === 'departments' && <DepartmentsSection onDepartmentsChange={onDepartmentsChange} />}
           {activeTab === 'skills' && <SkillsSection />}
+          {activeTab === 'kanban' && <KanbanSection />}
         </div>
       </div>
     </>
@@ -2748,6 +2751,93 @@ function SkillsSection() {
         <div style={{ marginTop: '16px', padding: '12px', background: 'var(--gray-900)', borderRadius: '8px', border: '1px solid var(--gray-800)' }}>
           <span style={{ color: 'var(--gray-400)', fontSize: '13px' }}>🚧 В разработке — здесь будет список скиллов с возможностью добавления, редактирования и привязки к агентам</span>
         </div>
+      </section>
+    </div>
+  )
+}
+
+// ─── Kanban Section ───────────────────────────────────────────
+
+function KanbanSection() {
+  const [stats, setStats] = useState<any>(null)
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/kanban/stats`)
+      .then(r => r.json())
+      .then(setStats)
+      .catch(() => {})
+  }, [])
+
+  return (
+    <div className="settings-sections">
+      {/* Stats Overview */}
+      <section className="settings-card">
+        <h2 className="settings-card-title">📋 Глобальный Канбан</h2>
+        <p style={{ color: 'var(--gray-500)', fontSize: '14px', lineHeight: '1.6', marginBottom: '16px' }}>
+          Глобальная доска задач для управления работой всех отделов и агентов.
+        </p>
+        {stats && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
+            <div style={{ padding: '12px', background: 'var(--gray-900)', borderRadius: '8px', textAlign: 'center' }}>
+              <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text)' }}>{stats.total}</div>
+              <div style={{ fontSize: '11px', color: 'var(--gray-500)' }}>Всего задач</div>
+            </div>
+            <div style={{ padding: '12px', background: 'var(--gray-900)', borderRadius: '8px', textAlign: 'center' }}>
+              <div style={{ fontSize: '24px', fontWeight: '700', color: '#f97316' }}>{stats.by_status?.in_progress || 0}</div>
+              <div style={{ fontSize: '11px', color: 'var(--gray-500)' }}>В работе</div>
+            </div>
+            <div style={{ padding: '12px', background: 'var(--gray-900)', borderRadius: '8px', textAlign: 'center' }}>
+              <div style={{ fontSize: '24px', fontWeight: '700', color: '#f59e0b' }}>{stats.by_status?.review || 0}</div>
+              <div style={{ fontSize: '11px', color: 'var(--gray-500)' }}>На ревью</div>
+            </div>
+            <div style={{ padding: '12px', background: 'var(--gray-900)', borderRadius: '8px', textAlign: 'center' }}>
+              <div style={{ fontSize: '24px', fontWeight: '700', color: '#22c55e' }}>{stats.by_status?.done || 0}</div>
+              <div style={{ fontSize: '11px', color: 'var(--gray-500)' }}>Выполнено</div>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Board Settings */}
+      <section className="settings-card">
+        <h2 className="settings-card-title">⚙️ Настройки доски</h2>
+        <div className="settings-row-2">
+          <div className="settings-field">
+            <label>Максимум активных задач</label>
+            <input type="number" className="settings-input" defaultValue={50} />
+            <span className="settings-hint">Лимит одновременно открытых задач на доске</span>
+          </div>
+          <div className="settings-field">
+            <label>Автоархивация закрытых</label>
+            <select className="settings-input" defaultValue="30d">
+              <option value="7d">7 дней</option>
+              <option value="14d">14 дней</option>
+              <option value="30d">30 дней</option>
+              <option value="90d">90 дней</option>
+              <option value="never">Никогда</option>
+            </select>
+            <span className="settings-hint">Перемещать завершённые задачи в архив через</span>
+          </div>
+        </div>
+        <Toggle label="Уведомления о задачах" defaultChecked={true} onChange={() => {}} />
+      </section>
+
+      {/* Automation */}
+      <section className="settings-card">
+        <h2 className="settings-card-title">🤖 Автоматизация</h2>
+        <Toggle label="Авто назначение главы" defaultChecked={true} onChange={() => {}} />
+        <Toggle label="Summon при завершении — автоматически передавать задачу следующему отделу" defaultChecked={false} onChange={() => {}} />
+        <Toggle label="Эскалация при простое — эскалировать при превышении дедлайна" defaultChecked={false} onChange={() => {}} />
+        <Toggle label="Запрос человека при блоке — уведомление при эскалации" defaultChecked={false} onChange={() => {}} />
+      </section>
+
+      {/* Coming Soon */}
+      <section className="settings-card" style={{ opacity: 0.5, pointerEvents: 'none' }}>
+        <h2 className="settings-card-title">🔒 Скоро</h2>
+        <Toggle label="Drag & Drop — перетаскивание тасков между колонками" defaultChecked={false} onChange={() => {}} />
+        <Toggle label="Интеграция с Forum — обсуждения задач в форуме агентов" defaultChecked={false} onChange={() => {}} />
+        <Toggle label="Canvas связей — визуализация потока задач между отделами" defaultChecked={false} onChange={() => {}} />
+        <Toggle label="Skills привязка — автоматический подбор агентов по навыкам" defaultChecked={false} onChange={() => {}} />
       </section>
     </div>
   )

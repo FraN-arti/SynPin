@@ -120,6 +120,10 @@ app.include_router(stats_router)
 from .themes_router import router as themes_router
 app.include_router(themes_router)
 
+# Kanban task board API
+from .kanban_router import router as kanban_router
+app.include_router(kanban_router)
+
 
 @app.get("/api/health")
 def health():

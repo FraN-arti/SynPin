@@ -6,6 +6,7 @@ import { EmojiPicker } from './components/EmojiPicker'
 import { SettingsPage } from './components/SettingsPage'
 import { OtdelChatView } from './components/OtdelChatView'
 import { OtdelSettingsPanel } from './components/OtdelSettingsPanel'
+import { KanbanBoard } from './components/KanbanBoard'
 import {
   WidgetDropZone,
   useWidgetLayout,
@@ -154,7 +155,7 @@ function ToolTimeline({ tools, isLive, toolNames }: ToolTimelineProps) {
 }
 
 function App() {
-  const [page, setPage] = useState<'chat' | 'settings'>('chat')
+  const [page, setPage] = useState<'chat' | 'settings' | 'kanban'>('chat')
   const [activeOtdelId, setActiveOtdelId] = useState<string | null>(null)
   const [otdelSettingsOpen, setOtdelSettingsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
@@ -889,6 +890,9 @@ function App() {
           })()}
 
           <div className="sidebar-footer">
+            <button className={`settings-btn ${page === 'kanban' ? 'active' : ''}`} onClick={() => { setPage('kanban'); setActiveOtdelId(null) }}>
+              <span>📋</span> Задачи
+            </button>
             <button className="settings-btn" onClick={() => setPage('settings')}>
               <span>⚙️</span> Настройки
             </button>
@@ -919,7 +923,9 @@ function App() {
             activeOtdelId={activeOtdelId}
           />
           <main className="main-area">
-        {page === 'settings' ? (
+        {page === 'kanban' ? (
+          <KanbanBoard onBack={() => setPage('chat')} />
+        ) : page === 'settings' ? (
           <SettingsPage onBack={() => setPage('chat')} onAgentsChange={refreshAgents} onDepartmentsChange={refreshDepartments} />
         ) : activeOtdelId ? (() => {
           const otdel = sidebarDepartments.find(d => d.id === activeOtdelId)

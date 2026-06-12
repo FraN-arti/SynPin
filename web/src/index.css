@@ -6359,6 +6359,7 @@ body {
 .priority-inline-btn.active {
   color: var(--text);
   font-weight: 600;
+  background: var(--bg-hover);
 }
 
 .priority-dot {
@@ -6379,7 +6380,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: var(--bg-secondary);
+  background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text);
@@ -6414,7 +6415,7 @@ body {
   left: 0;
   right: 0;
   margin-top: 4px;
-  background: var(--bg-secondary, rgba(20, 20, 36, 0.95));
+  background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius, 8px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
@@ -6893,4 +6894,36 @@ body {
   cursor: pointer;
   border: 2px solid var(--glass-bg-heavy);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Date Input (Deadline) ──────────────────────────────────────── */
+
+input[type="date"] {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 6px);
+  color: var(--text);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+input[type="date"]:hover {
+  border-color: var(--text-dim);
+}
+
+input[type="date"]:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: var(--calendar-icon-filter, invert(0.7));
+  cursor: pointer;
+}
+
+input[type="date"]::-webkit-datetime-edit {
+  color: var(--text);
 }

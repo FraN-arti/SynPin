@@ -5867,8 +5867,9 @@ body {
   border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
 }
 .kanban-column.drop-target {
   border-color: var(--accent, #f97316);

@@ -9,10 +9,11 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { KanbanWidget } from './KanbanWidget'
 
 // ─── Types ───────────────────────────────────────────────────────
 
-export type WidgetType = 'departments'
+export type WidgetType = 'departments' | 'kanban'
 
 export interface WidgetLayout {
   left: WidgetType[]
@@ -35,6 +36,7 @@ export interface Department {
 
 export const WIDGET_META: Record<WidgetType, { label: string; icon: string }> = {
   departments: { label: 'Отделы', icon: '🏢' },
+  kanban: { label: 'Канбан', icon: '📋' },
 }
 
 // ─── Layout persistence ──────────────────────────────────────────
@@ -49,12 +51,12 @@ export function loadWidgetLayout(): WidgetLayout {
       const parsed = JSON.parse(raw)
       // Migrate old format
       if (parsed.widgets && Array.isArray(parsed.widgets)) {
-        return { left: parsed.widgets.filter((w: string) => ['departments'].includes(w)), right: [] }
+        return { left: parsed.widgets.filter((w: string) => ['departments', 'kanban'].includes(w)), right: [] }
       }
       // Filter out removed widget types
       return {
-        left: (parsed.left || []).filter((w: string) => ['departments'].includes(w)),
-        right: (parsed.right || []).filter((w: string) => ['departments'].includes(w)),
+        left: (parsed.left || []).filter((w: string) => ['departments', 'kanban'].includes(w)),
+        right: (parsed.right || []).filter((w: string) => ['departments', 'kanban'].includes(w)),
       }
     }
   } catch {}
@@ -126,6 +128,7 @@ function SortableWidget({ id, departments, onRemove, onDepartmentClick, activeOt
       </div>
       <div className="widget-card-body">
         {id === 'departments' && <DepartmentsWidgetContent departments={departments} onDepartmentClick={onDepartmentClick} activeOtdelId={activeOtdelId} />}
+        {id === 'kanban' && <KanbanWidget />}
       </div>
     </div>
   )

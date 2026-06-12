@@ -5965,6 +5965,14 @@ body {
   border-color: var(--accent, #f97316);
 }
 
+.kanban-card-overlay {
+  position: fixed;
+  z-index: 999999;
+  pointer-events: none;
+  transform: scale(1.02) rotate(2deg);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+}
+
 .kanban-modal-divider {
   height: 1px;
   background: var(--border, rgba(255,255,255,0.1));

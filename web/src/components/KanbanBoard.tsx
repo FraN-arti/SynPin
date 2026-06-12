@@ -30,6 +30,7 @@ interface ColumnConfig {
   color: string
   order: number
   enabled: boolean
+  status?: string
 }
 
 interface LabelConfig {
@@ -340,7 +341,7 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
                 <SortableColumn
                   key={col.id}
                   col={col}
-                  tasks={board[col.id] || []}
+                  tasks={board[col.status || col.id] || []}
                   labelMap={labelMap}
                   onSelectTask={setSelectedTask}
                 />

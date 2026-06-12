@@ -2870,6 +2870,7 @@ interface KanbanColumnItem {
   color: string
   order: number
   enabled: boolean
+  status?: string
 }
 
 function KanbanColumnsConfig() {

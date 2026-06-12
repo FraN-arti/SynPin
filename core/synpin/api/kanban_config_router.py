@@ -35,6 +35,7 @@ class ColumnRequest(BaseModel):
     color: str = "#6b7280"
     order: int = 0
     enabled: bool = True
+    status: str | None = None
 
 
 class ColumnPatchRequest(BaseModel):
@@ -44,6 +45,7 @@ class ColumnPatchRequest(BaseModel):
     color: str | None = None
     order: int | None = None
     enabled: bool | None = None
+    status: str | None = None
 
 
 class LabelRequest(BaseModel):
@@ -99,9 +101,11 @@ def set_columns(columns: list[ColumnRequest]) -> list[dict]:
         cols.append(ColumnConfig(
             id=col_id,
             label=c.label,
+            description=c.description or '',
             color=c.color,
             order=c.order if c.order != 0 else i,
             enabled=c.enabled,
+            status=c.status,
         ))
     save_columns(cols)
     return [c.model_dump() for c in cols]
@@ -119,6 +123,7 @@ def add_column(col: ColumnRequest) -> dict:
         color=col.color,
         order=col.order if col.order != 0 else len(cols),
         enabled=col.enabled,
+        status=col.status,
     )
     cols.append(new_col)
     save_columns(cols)

@@ -33,6 +33,7 @@ class ColumnConfig(BaseModel):
     color: str = "#6b7280"       # Color for the indicator square
     order: int = 0               # Sort order on the board
     enabled: bool = True         # Show/hide this column
+    status: str | None = None     # Maps to TaskStatus enum (backlog, todo, in_progress, etc.)
 
 
 class LabelConfig(BaseModel):

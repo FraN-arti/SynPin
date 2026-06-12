@@ -4603,7 +4603,7 @@ body {
   top: 0;
   bottom: 0;
   width: 280px;
-  padding: 70px 8px 12px;
+  padding: 12px 8px;
   overflow-y: auto;
   overflow-x: hidden;
   z-index: 10;
@@ -4614,6 +4614,7 @@ body {
 
 .widget-drop-zone.left {
   left: 0;
+  padding-top: 70px;  /* Space for logo */
 }
 
 .widget-drop-zone.right {

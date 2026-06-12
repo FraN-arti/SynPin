@@ -701,26 +701,6 @@ function GeneralSection() {
         )}
 
         <div className="settings-divider-thin" />
-        <h3 className="settings-subsection-title">Чат</h3>
-        <Toggle
-          label="Показывать метаданные сообщений"
-          checked={settings.ui.chat.show_metadata}
-          onChange={v => updateUI('chat.show_metadata', v)} />
-        <Toggle
-          label="Анимированная обводка при стриминге"
-          checked={settings.ui.chat.streaming_border}
-          onChange={v => updateUI('chat.streaming_border', v)} />
-        <Toggle
-          label="Автоскролл к новым сообщениям"
-          checked={settings.ui.chat.auto_scroll}
-          onChange={v => updateUI('chat.auto_scroll', v)} />
-        <div className="settings-field">
-          <label>Макс. длина сообщения</label>
-          <input type="number" className="settings-input"
-            value={settings.ui.chat.max_message_length}
-            onChange={e => updateUI('chat.max_message_length', parseInt(e.target.value) || 4000)} />
-        </div>
-        <div className="settings-divider-thin" />
         <h3 className="settings-subsection-title">Сайдбар</h3>
         <Toggle
           label="Открыт по умолчанию"

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { API_BASE } from '../config'
 
 interface Task {
@@ -183,7 +183,23 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
                   <span>{col.label}</span>
                   <span className="kanban-column-count">{tasks.length}</span>
                 </div>
-                <div className="kanban-column-body">
+                <div
+                  ref={el => {
+                    if (!el) return
+                    const check = () => {
+                      if (el.scrollHeight > el.clientHeight + 5) {
+                        el.classList.add('has-overflow')
+                      } else {
+                        el.classList.remove('has-overflow')
+                      }
+                    }
+                    check()
+                    // Recheck on content changes
+                    const obs = new MutationObserver(check)
+                    obs.observe(el, { childList: true, subtree: true })
+                  }}
+                  className="kanban-column-body"
+                >
                   {tasks.map(task => (
                     <div
                       key={task.id}
@@ -232,6 +248,14 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
           })}
         </div>
       )}
+
+      {/* Bottom area — stats and more will go here */}
+      <div className="kanban-bottom">
+        <div className="kanban-bottom-placeholder">
+          <span className="kanban-bottom-icon">📊</span>
+          <span>Статистика и аналитика — скоро</span>
+        </div>
+      </div>
 
       {/* Task Detail Modal */}
       {selectedTask && (

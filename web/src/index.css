@@ -5838,20 +5838,22 @@ body {
   gap: 12px;
   padding: 16px;
   overflow-x: auto;
-  flex: 1;
-  align-items: flex-start;
+  height: 40vh;
+  min-height: 300px;
+  flex-shrink: 0;
+  align-items: stretch;
 }
 
 .kanban-column {
   min-width: 220px;
-  max-width: 260px;
+  max-width: 280px;
   flex: 1;
   background: var(--bg-secondary);
   border-radius: 10px;
   border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 120px);
+  overflow: hidden;
 }
 
 .kanban-column-header {
@@ -5863,6 +5865,7 @@ body {
   font-weight: 600;
   color: var(--text);
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .kanban-column-count {
@@ -5881,6 +5884,35 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  position: relative;
+}
+
+.kanban-bottom {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.kanban-bottom-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 14px;
+  opacity: 0.5;
+}
+
+.kanban-bottom-icon {
+  font-size: 32px;
+}
+
+/* Gradient fade at bottom when content overflows */
+.kanban-column-body.has-overflow {
+  mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
 }
 
 .kanban-column-empty {

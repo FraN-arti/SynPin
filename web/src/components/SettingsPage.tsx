@@ -275,6 +275,7 @@ interface SettingsData {
   ui: {
     theme: string
     language: string
+    border_radius: number
     sidebar: { default_open: boolean; show_icons: boolean }
     chat: {
       show_metadata: boolean
@@ -668,6 +669,32 @@ function GeneralSection() {
             />
           </div>
         </div>
+
+        {/* Border Radius Slider */}
+        {settings.ui.theme !== 'tweakcn' && (
+          <>
+            <div className="settings-divider-thin" />
+            <div className="settings-field">
+              <label>Скругление углов: <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{settings.ui.border_radius ?? 8}px</span></label>
+              <div className="radius-slider-row">
+                <span className="radius-label">1px</span>
+                <input
+                  type="range"
+                  min={1}
+                  max={20}
+                  value={settings.ui.border_radius ?? 8}
+                  onChange={e => {
+                    const val = parseInt(e.target.value)
+                    updateUI('border_radius', val)
+                    document.documentElement.style.setProperty('--radius', `${val}px`)
+                  }}
+                  className="radius-slider"
+                />
+                <span className="radius-label">20px</span>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* TweakCN Import Section */}
         {settings.ui.theme === 'tweakcn' && (

@@ -214,6 +214,7 @@ _SETTINGS_DEFAULTS: dict[str, Any] = {
     "ui": {
         "theme": "dark",
         "language": "ru",
+        "border_radius": 8,
         "sidebar": {"default_open": True, "show_icons": True},
         "chat": {
             "show_metadata": True,

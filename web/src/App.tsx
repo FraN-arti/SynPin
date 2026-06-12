@@ -284,6 +284,11 @@ function App() {
         const theme = settings?.ui?.theme
         if (!theme) return
 
+        // Apply border_radius (skip if TweakCN handles it)
+        if (theme !== 'tweakcn' && settings.ui.border_radius) {
+          document.documentElement.style.setProperty('--radius', `${settings.ui.border_radius}px`)
+        }
+
         // Check what's currently applied (set by inline script or previous apply)
         const root = document.documentElement
         const cached = (() => {

@@ -6418,10 +6418,11 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius, 8px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   z-index: 50;
   overflow: hidden;
   animation: kanbanScaleIn 0.15s ease-out;
+  opacity: 1;
 }
 
 .kanban-dept-search {

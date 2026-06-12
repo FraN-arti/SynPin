@@ -680,7 +680,6 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
                         onClick={() => selectDept(d)}
                       >
                         <span>{d.name}</span>
-                        {d.head && <span className="kanban-dept-head">👤 {d.head}</span>}
                       </div>
                     ))}
                   </div>

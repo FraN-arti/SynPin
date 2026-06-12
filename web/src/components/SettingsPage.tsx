@@ -3329,52 +3329,54 @@ function KanbanLabelsConfig() {
       <div className="settings-divider-thin" />
       {labels.map((label, i) => (
         <div key={label.id} className={`kanban-config-row${saving && savedId === label.id ? ' saving' : ''}`}>
-          <span
-            className="kanban-label-chip"
-            style={{ background: label.color, color: label.text_color }}
-          >
-            {label.name}
-          </span>
-          <input
-            className="settings-input"
-            value={label.name}
-            onChange={e => updateLabelName(i, e.target.value)}
-            placeholder="Название метки"
-            style={{ flex: 1, minWidth: 120 }}
-          />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span style={{ fontSize: '10px', color: 'var(--gray-500)' }}>Фон</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+            <span
+              className="kanban-label-chip"
+              style={{ background: label.color, color: label.text_color }}
+            >
+              {label.name}
+            </span>
             <input
-              type="color"
-              className="kanban-color-picker"
-              value={label.color}
-              onChange={e => updateLabelField(i, 'color', e.target.value)}
-              title="Цвет фона"
+              className="settings-input"
+              value={label.name}
+              onChange={e => updateLabelName(i, e.target.value)}
+              placeholder="Название метки"
+              style={{ flex: 1, minWidth: 120 }}
             />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <span style={{ fontSize: '10px', color: 'var(--gray-500)' }}>Текст</span>
-            <input
-              type="color"
-              className="kanban-color-picker"
-              value={label.text_color}
-              onChange={e => updateLabelField(i, 'text_color', e.target.value)}
-              title="Цвет текста"
-            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontSize: '10px', color: 'var(--gray-500)' }}>Фон</span>
+              <input
+                type="color"
+                className="kanban-color-picker"
+                value={label.color}
+                onChange={e => updateLabelField(i, 'color', e.target.value)}
+                title="Цвет фона"
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontSize: '10px', color: 'var(--gray-500)' }}>Текст</span>
+              <input
+                type="color"
+                className="kanban-color-picker"
+                value={label.text_color}
+                onChange={e => updateLabelField(i, 'text_color', e.target.value)}
+                title="Цвет текста"
+              />
+            </div>
+            <button
+              className="widget-remove-btn"
+              onClick={() => removeLabel(i)}
+              title="Удалить метку"
+            >×</button>
+            {saving && savedId === label.id && <span style={{ color: '#22c55e', fontSize: '12px' }}>✓</span>}
           </div>
           <input
             className="settings-input"
             value={label.description || ''}
             onChange={e => updateDescription(i, e.target.value)}
-            placeholder="Описание..."
-            style={{ flex: 1, minWidth: 120 }}
+            placeholder="Описание метки..."
+            style={{ width: '100%', marginTop: '4px', fontSize: '12px' }}
           />
-          <button
-            className="widget-remove-btn"
-            onClick={() => removeLabel(i)}
-            title="Удалить метку"
-          >×</button>
-          {saving && savedId === label.id && <span style={{ color: '#22c55e', fontSize: '12px' }}>✓</span>}
         </div>
       ))}
       <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>

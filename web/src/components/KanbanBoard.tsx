@@ -710,7 +710,7 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
                     className="kanban-tag-chip"
                     style={label ? { background: label.color, color: label.text_color } : undefined}
                     onClick={() => toggleTag(tagName)}
-                    title="Нажмите чтобы убрать"
+                    title={label?.description ? `${label.description}\nНажмите чтобы убрать` : 'Нажмите чтобы убрать'}
                   >
                     {tagName} ✕
                   </span>
@@ -742,6 +742,7 @@ function CreateTaskModal({ onClose, onCreated }: { onClose: () => void; onCreate
                     className={`tag-block ${tags.includes(label.name) ? 'selected' : ''}`}
                     style={{ background: label.color, color: label.text_color }}
                     onClick={() => toggleTag(label.name)}
+                    title={label.description || label.name}
                   >
                     {tags.includes(label.name) && <span className="tag-check">✓</span>}
                     {label.name}

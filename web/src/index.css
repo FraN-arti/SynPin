@@ -6442,7 +6442,7 @@ body {
 }
 
 .kanban-dept-list {
-  max-height: 200px;
+  max-height: 114px; /* ~3 rows (38px each) */
   overflow-y: auto;
 }
 

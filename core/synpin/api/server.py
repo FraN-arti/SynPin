@@ -131,13 +131,20 @@ app.include_router(kanban_config_router)
 # Set up Kanban WS broadcast loop
 import asyncio
 from ..kanban.service import set_ws_loop
+from ..kanban.config import set_config_broadcast
 try:
     loop = asyncio.get_running_loop()
     set_ws_loop(loop)
 except RuntimeError:
     @app.on_event("startup")
     def _setup_kanban_ws():
-        set_ws_loop(asyncio.get_event_loop())
+        loop = asyncio.get_event_loop()
+        set_ws_loop(loop)
+        # Wire up config broadcast
+        async def _broadcast(event: dict):
+            from ..chat.ws_manager import ws_manager
+            await ws_manager.broadcast(event)
+        set_config_broadcast(lambda e: asyncio.ensure_future(_broadcast(e)))
 
 
 @app.get("/api/health")

@@ -21,6 +21,7 @@ interface Task {
 
 interface KanbanWidgetProps {
   onNavigateToBoard?: () => void
+  wsOn?: (type: string, handler: (data: any) => void) => () => void
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -33,7 +34,7 @@ const STATUS_COLORS: Record<string, string> = {
   done: '#22c55e',
 }
 
-export function KanbanWidget({ onNavigateToBoard }: KanbanWidgetProps) {
+export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
   const [config, setConfig] = useState<WidgetConfig>({
     mode: 'active',
     max_items: 10,
@@ -96,6 +97,21 @@ export function KanbanWidget({ onNavigateToBoard }: KanbanWidgetProps) {
 
   useEffect(() => { loadConfig() }, [loadConfig])
   useEffect(() => { loadTasks() }, [loadTasks])
+
+  // WebSocket live updates for config changes
+  useEffect(() => {
+    if (!wsOn) return
+    const unsub1 = wsOn('kanban:widget_updated', () => {
+      loadConfig()
+    })
+    const unsub2 = wsOn('kanban:columns_updated', () => {
+      loadTasks()
+    })
+    const unsub3 = wsOn('kanban:labels_updated', () => {
+      loadTasks()
+    })
+    return () => { unsub1(); unsub2(); unsub3() }
+  }, [wsOn, loadConfig, loadTasks])
 
   if (loading) {
     return (

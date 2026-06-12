@@ -2860,6 +2860,8 @@ interface KanbanColumnItem {
 function KanbanColumnsConfig() {
   const [columns, setColumns] = useState<KanbanColumnItem[]>([])
   const [saving, setSaving] = useState(false)
+  const [savedId, setSavedId] = useState<string | null>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     fetch(`${API_BASE}/api/kanban/config/columns`)
@@ -2868,36 +2870,81 @@ function KanbanColumnsConfig() {
       .catch(() => {})
   }, [])
 
-  const updateColumn = (index: number, field: string, value: unknown) => {
-    setColumns(prev => prev.map((c, i) => i === index ? { ...c, [field]: value } : c))
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [])
+
+  const genId = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+    let id = ''
+    for (let i = 0; i < 14; i++) id += chars[Math.floor(Math.random() * chars.length)]
+    return id
   }
 
-  const addColumn = () => {
-    const newId = `col_${Date.now()}`
-    setColumns(prev => [...prev, { id: newId, label: 'Новая колонка', color: '#3b82f6', order: prev.length, enabled: true }])
+  const patchColumn = async (id: string, updates: Partial<KanbanColumnItem>) => {
+    setSaving(true)
+    setSavedId(id)
+    try {
+      await fetch(`${API_BASE}/api/kanban/config/columns/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      })
+    } catch (e) {
+      console.error('[kanban] patch column error:', e)
+    } finally {
+      setSaving(false)
+      setTimeout(() => setSavedId(null), 600)
+    }
+  }
+
+  const updateColumn = (index: number, field: string, value: unknown) => {
+    const col = columns[index]
+    if (!col) return
+    setColumns(prev => prev.map((c, i) => i === index ? { ...c, [field]: value } : c))
+    patchColumn(col.id, { [field]: value } as Partial<KanbanColumnItem>)
+  }
+
+  const toggleColumn = (index: number) => {
+    const col = columns[index]
+    if (!col) return
+    const newEnabled = !col.enabled
+    setColumns(prev => prev.map((c, i) => i === index ? { ...c, enabled: newEnabled } : c))
+    patchColumn(col.id, { enabled: newEnabled })
+  }
+
+  const updateColor = (index: number, color: string) => {
+    const col = columns[index]
+    if (!col) return
+    setColumns(prev => prev.map((c, i) => i === index ? { ...c, color } : c))
+    patchColumn(col.id, { color })
+  }
+
+  const updateLabel = (index: number, label: string) => {
+    const col = columns[index]
+    if (!col) return
+    setColumns(prev => prev.map((c, i) => i === index ? { ...c, label } : c))
+    // Debounce text input saves
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      patchColumn(col.id, { label })
+    }, 500)
+  }
+
+  const addColumn = async () => {
+    const newId = genId()
+    const newCol = { id: newId, label: 'Новая колонка', color: '#3b82f6', order: columns.length, enabled: true }
+    setColumns(prev => [...prev, newCol])
+    patchColumn(newId, newCol)
   }
 
   const removeColumn = (index: number) => {
+    const col = columns[index]
+    if (!col) return
     setColumns(prev => prev.filter((_, i) => i !== index))
-  }
-
-  const saveColumns = async () => {
-    setSaving(true)
-    try {
-      const res = await fetch(`${API_BASE}/api/kanban/config/columns`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ columns }),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setColumns(Array.isArray(data) ? data : data.columns || columns)
-      }
-    } catch (e) {
-      console.error('[kanban] save columns error:', e)
-    } finally {
-      setSaving(false)
-    }
+    // Delete by PATCHing enabled=false (soft delete) or could add DELETE endpoint
+    patchColumn(col.id, { enabled: false, order: 999 })
   }
 
   return (
@@ -2906,12 +2953,12 @@ function KanbanColumnsConfig() {
       <p className="settings-hint">Настройте колонки доски: цвета, порядок, видимость</p>
       <div className="settings-divider-thin" />
       {columns.map((col, i) => (
-        <div key={col.id} className="kanban-config-row">
+        <div key={col.id} className={`kanban-config-row${saving && savedId === col.id ? ' saving' : ''}`}>
           <div className="kanban-col-indicator" style={{ background: col.color }} />
           <input
             className="settings-input"
             value={col.label}
-            onChange={e => updateColumn(i, 'label', e.target.value)}
+            onChange={e => updateLabel(i, e.target.value)}
             placeholder="Название"
             style={{ flex: 1, minWidth: 120 }}
           />
@@ -2919,7 +2966,7 @@ function KanbanColumnsConfig() {
             type="color"
             className="kanban-color-picker"
             value={col.color}
-            onChange={e => updateColumn(i, 'color', e.target.value)}
+            onChange={e => updateColor(i, e.target.value)}
             title="Цвет колонки"
           />
           <input
@@ -2934,7 +2981,7 @@ function KanbanColumnsConfig() {
             <input
               type="checkbox"
               checked={col.enabled}
-              onChange={e => updateColumn(i, 'enabled', e.target.checked)}
+              onChange={() => toggleColumn(i)}
             />
           </label>
           <button
@@ -2942,19 +2989,12 @@ function KanbanColumnsConfig() {
             onClick={() => removeColumn(i)}
             title="Удалить колонку"
           >×</button>
+          {saving && savedId === col.id && <span style={{ color: '#22c55e', fontSize: '12px' }}>✓</span>}
         </div>
       ))}
       <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
         <button className="kanban-create-btn" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={addColumn}>
           + Добавить колонку
-        </button>
-        <button
-          className="kanban-btn-submit"
-          style={{ padding: '6px 16px', fontSize: '12px' }}
-          onClick={saveColumns}
-          disabled={saving}
-        >
-          {saving ? 'Сохранение...' : 'Сохранить'}
         </button>
       </div>
     </section>
@@ -2973,6 +3013,8 @@ interface KanbanLabelItem {
 function KanbanLabelsConfig() {
   const [labels, setLabels] = useState<KanbanLabelItem[]>([])
   const [saving, setSaving] = useState(false)
+  const [savedId, setSavedId] = useState<string | null>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     fetch(`${API_BASE}/api/kanban/config/labels`)
@@ -2981,36 +3023,65 @@ function KanbanLabelsConfig() {
       .catch(() => {})
   }, [])
 
-  const updateLabel = (index: number, field: string, value: unknown) => {
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [])
+
+  const genId = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+    let id = ''
+    for (let i = 0; i < 14; i++) id += chars[Math.floor(Math.random() * chars.length)]
+    return id
+  }
+
+  const patchLabel = async (id: string, updates: Partial<KanbanLabelItem>) => {
+    setSaving(true)
+    setSavedId(id)
+    try {
+      await fetch(`${API_BASE}/api/kanban/config/labels/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      })
+    } catch (e) {
+      console.error('[kanban] patch label error:', e)
+    } finally {
+      setSaving(false)
+      setTimeout(() => setSavedId(null), 600)
+    }
+  }
+
+  const updateLabelField = (index: number, field: string, value: unknown) => {
+    const label = labels[index]
+    if (!label) return
     setLabels(prev => prev.map((l, i) => i === index ? { ...l, [field]: value } : l))
+    patchLabel(label.id, { [field]: value } as Partial<KanbanLabelItem>)
+  }
+
+  const updateLabelName = (index: number, name: string) => {
+    const label = labels[index]
+    if (!label) return
+    setLabels(prev => prev.map((l, i) => i === index ? { ...l, name } : l))
+    // Debounce text input saves
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      patchLabel(label.id, { name })
+    }, 500)
   }
 
   const addLabel = () => {
-    const newId = `label_${Date.now()}`
-    setLabels(prev => [...prev, { id: newId, name: 'Новая метка', color: '#3b82f6', text_color: '#ffffff' }])
+    const newId = genId()
+    const newLabel = { id: newId, name: 'Новая метка', color: '#3b82f6', text_color: '#ffffff' }
+    setLabels(prev => [...prev, newLabel])
+    patchLabel(newId, newLabel)
   }
 
   const removeLabel = (index: number) => {
+    const label = labels[index]
+    if (!label) return
     setLabels(prev => prev.filter((_, i) => i !== index))
-  }
-
-  const saveLabels = async () => {
-    setSaving(true)
-    try {
-      const res = await fetch(`${API_BASE}/api/kanban/config/labels`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ labels }),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setLabels(Array.isArray(data) ? data : data.labels || labels)
-      }
-    } catch (e) {
-      console.error('[kanban] save labels error:', e)
-    } finally {
-      setSaving(false)
-    }
+    patchLabel(label.id, { name: '', color: '#000000', text_color: '#000000' })
   }
 
   return (
@@ -3019,7 +3090,7 @@ function KanbanLabelsConfig() {
       <p className="settings-hint">Настройте метки (теги) для задач: цвет фона и текста</p>
       <div className="settings-divider-thin" />
       {labels.map((label, i) => (
-        <div key={label.id} className="kanban-config-row">
+        <div key={label.id} className={`kanban-config-row${saving && savedId === label.id ? ' saving' : ''}`}>
           <span
             className="kanban-label-chip"
             style={{ background: label.color, color: label.text_color }}
@@ -3029,7 +3100,7 @@ function KanbanLabelsConfig() {
           <input
             className="settings-input"
             value={label.name}
-            onChange={e => updateLabel(i, 'name', e.target.value)}
+            onChange={e => updateLabelName(i, e.target.value)}
             placeholder="Название метки"
             style={{ flex: 1, minWidth: 120 }}
           />
@@ -3039,7 +3110,7 @@ function KanbanLabelsConfig() {
               type="color"
               className="kanban-color-picker"
               value={label.color}
-              onChange={e => updateLabel(i, 'color', e.target.value)}
+              onChange={e => updateLabelField(i, 'color', e.target.value)}
               title="Цвет фона"
             />
           </div>
@@ -3049,7 +3120,7 @@ function KanbanLabelsConfig() {
               type="color"
               className="kanban-color-picker"
               value={label.text_color}
-              onChange={e => updateLabel(i, 'text_color', e.target.value)}
+              onChange={e => updateLabelField(i, 'text_color', e.target.value)}
               title="Цвет текста"
             />
           </div>
@@ -3058,19 +3129,12 @@ function KanbanLabelsConfig() {
             onClick={() => removeLabel(i)}
             title="Удалить метку"
           >×</button>
+          {saving && savedId === label.id && <span style={{ color: '#22c55e', fontSize: '12px' }}>✓</span>}
         </div>
       ))}
       <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
         <button className="kanban-create-btn" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={addLabel}>
           + Добавить метку
-        </button>
-        <button
-          className="kanban-btn-submit"
-          style={{ padding: '6px 16px', fontSize: '12px' }}
-          onClick={saveLabels}
-          disabled={saving}
-        >
-          {saving ? 'Сохранение...' : 'Сохранить'}
         </button>
       </div>
     </section>
@@ -3100,6 +3164,7 @@ function KanbanWidgetConfig() {
     compact: true,
   })
   const [saving, setSaving] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     fetch(`${API_BASE}/api/kanban/config/widget`)
@@ -3108,36 +3173,54 @@ function KanbanWidgetConfig() {
       .catch(() => {})
   }, [])
 
-  const toggleShowColumn = (col: string) => {
-    setConfig(prev => ({
-      ...prev,
-      show_columns: prev.show_columns.includes(col)
-        ? prev.show_columns.filter(c => c !== col)
-        : [...prev.show_columns, col],
-    }))
-  }
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [])
 
-  const saveConfig = async () => {
-    setSaving(true)
-    try {
-      const res = await fetch(`${API_BASE}/api/kanban/config/widget`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setConfig(data)
+  const saveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const saveWidgetConfig = useCallback((newConfig: KanbanWidgetConfigData) => {
+    // Debounce the actual save
+    if (saveRef.current) clearTimeout(saveRef.current)
+    saveRef.current = setTimeout(async () => {
+      setSaving(true)
+      try {
+        await fetch(`${API_BASE}/api/kanban/config/widget`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newConfig),
+        })
+      } catch (e) {
+        console.error('[kanban] save widget config error:', e)
+      } finally {
+        setSaving(false)
       }
-    } catch (e) {
-      console.error('[kanban] save widget config error:', e)
-    } finally {
-      setSaving(false)
-    }
+    }, 500)
+  }, [])
+
+  const updateConfig = useCallback((patch: Partial<KanbanWidgetConfigData>) => {
+    setConfig(prev => {
+      const next = { ...prev, ...patch }
+      saveWidgetConfig(next)
+      return next
+    })
+  }, [saveWidgetConfig])
+
+  const toggleShowColumn = (col: string) => {
+    setConfig(prev => {
+      const next = {
+        ...prev,
+        show_columns: prev.show_columns.includes(col)
+          ? prev.show_columns.filter(c => c !== col)
+          : [...prev.show_columns, col],
+      }
+      saveWidgetConfig(next)
+      return next
+    })
   }
 
   return (
-    <section className="settings-card">
+    <section className={`settings-card${saving ? ' saving' : ''}`}>
       <h2 className="settings-card-title">📦 Конфигурация виджета</h2>
       <p className="settings-hint">Настройте виджет канбан-доски на главной странице</p>
       <div className="settings-divider-thin" />
@@ -3147,7 +3230,7 @@ function KanbanWidgetConfig() {
           <select
             className="settings-input"
             value={config.mode}
-            onChange={e => setConfig(prev => ({ ...prev, mode: e.target.value }))}
+            onChange={e => updateConfig({ mode: e.target.value })}
           >
             <option value="active">Активные</option>
             <option value="all">Все задачи</option>
@@ -3162,7 +3245,7 @@ function KanbanWidgetConfig() {
             min={1}
             max={50}
             value={config.max_items}
-            onChange={e => setConfig(prev => ({ ...prev, max_items: parseInt(e.target.value) }))}
+            onChange={e => updateConfig({ max_items: parseInt(e.target.value) })}
             style={{ width: '100%' }}
           />
         </div>
@@ -3187,28 +3270,18 @@ function KanbanWidgetConfig() {
       <Toggle
         label="Показывать дедлайн"
         checked={config.show_deadline}
-        onChange={v => setConfig(prev => ({ ...prev, show_deadline: v }))}
+        onChange={v => updateConfig({ show_deadline: v })}
       />
       <Toggle
         label="Показывать отдел"
         checked={config.show_department}
-        onChange={v => setConfig(prev => ({ ...prev, show_department: v }))}
+        onChange={v => updateConfig({ show_department: v })}
       />
       <Toggle
         label="Компактный режим"
         checked={config.compact}
-        onChange={v => setConfig(prev => ({ ...prev, compact: v }))}
+        onChange={v => updateConfig({ compact: v })}
       />
-      <div style={{ marginTop: '12px' }}>
-        <button
-          className="kanban-btn-submit"
-          style={{ padding: '6px 16px', fontSize: '12px' }}
-          onClick={saveConfig}
-          disabled={saving}
-        >
-          {saving ? 'Сохранение...' : 'Сохранить'}
-        </button>
-      </div>
     </section>
   )
 }

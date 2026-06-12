@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { API_BASE } from '../config'
 
 interface Task {
@@ -113,11 +113,26 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
     const unsub2 = wsOn('kanban:task_created', () => {
       loadBoard()
     })
+    const unsub3 = wsOn('kanban:columns_updated', () => {
+      loadColumns()
+      loadBoard()
+    })
+    const unsub4 = wsOn('kanban:labels_updated', () => {
+      loadLabels()
+      loadBoard()
+    })
+    const unsub5 = wsOn('kanban:widget_updated', () => {
+      // Widget config changed — reload board if needed
+      loadBoard()
+    })
     return () => {
       unsub1()
       unsub2()
+      unsub3()
+      unsub4()
+      unsub5()
     }
-  }, [wsOn, loadBoard])
+  }, [wsOn, loadBoard, loadColumns, loadLabels])
 
   // Refresh when a task is selected (fallback polling if WS not available)
   useEffect(() => {

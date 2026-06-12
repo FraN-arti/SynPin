@@ -1,0 +1,7 @@
+max_active_tasks: 50
+auto_archive_days: 30
+notifications_enabled: true
+auto_assign_head: true
+auto_summon: false
+auto_escalate_overdue: false
+notify_human_on_block: false

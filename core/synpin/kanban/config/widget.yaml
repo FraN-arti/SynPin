@@ -1,0 +1,9 @@
+mode: active
+max_items: 5
+show_columns:
+- in_progress
+- review
+- blocked
+show_deadline: true
+show_department: true
+compact: true

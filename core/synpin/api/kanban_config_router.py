@@ -1,20 +1,26 @@
-"""Kanban Config API — manage columns, labels, and widget settings."""
+"""Kanban Config API — manage columns, labels, widget, and board settings.
+
+All changes auto-save and broadcast via WebSocket for live sync.
+"""
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from ..kanban.config import (
-    KanbanConfig,
     ColumnConfig,
     LabelConfig,
     WidgetConfig,
-    load_config,
-    save_config,
-    get_columns,
-    get_all_columns,
-    get_labels,
-    get_widget_config,
+    BoardSettings,
+    generate_id,
+    load_columns,
+    save_columns,
+    load_labels,
+    save_labels,
+    load_widget,
+    save_widget,
+    load_settings,
+    save_settings,
 )
 
 router = APIRouter(prefix="/api/kanban/config", tags=["kanban-config"])
@@ -23,7 +29,7 @@ router = APIRouter(prefix="/api/kanban/config", tags=["kanban-config"])
 # ── Request models ───────────────────────────────────────────────────────────
 
 class ColumnRequest(BaseModel):
-    id: str
+    id: str | None = None         # Auto-generated if not provided
     label: str
     color: str = "#6b7280"
     order: int = 0
@@ -31,7 +37,7 @@ class ColumnRequest(BaseModel):
 
 
 class LabelRequest(BaseModel):
-    id: str
+    id: str | None = None         # Auto-generated if not provided
     name: str
     color: str = "#6b7280"
     text_color: str = "#ffffff"
@@ -56,56 +62,75 @@ class BoardSettingsRequest(BaseModel):
     notify_human_on_block: bool | None = None
 
 
-# ── Endpoints ────────────────────────────────────────────────────────────────
+# ── Columns ──────────────────────────────────────────────────────────────────
 
 @router.get("/columns")
 def list_columns() -> list[dict]:
-    """Get all columns (enabled + disabled)."""
-    return [c.model_dump() for c in get_all_columns()]
+    """Get all columns."""
+    return [c.model_dump() for c in load_columns()]
 
 
 @router.put("/columns")
 def set_columns(columns: list[ColumnRequest]) -> list[dict]:
     """Replace all columns."""
-    config = load_config()
-    config.columns = [ColumnConfig(**c.model_dump()) for c in columns]
-    save_config(config)
-    return [c.model_dump() for c in config.columns]
+    cols = []
+    for i, c in enumerate(columns):
+        col_id = c.id or generate_id()
+        cols.append(ColumnConfig(
+            id=col_id,
+            label=c.label,
+            color=c.color,
+            order=c.order if c.order != 0 else i,
+            enabled=c.enabled,
+        ))
+    save_columns(cols)
+    return [c.model_dump() for c in cols]
 
 
 @router.post("/columns")
 def add_column(col: ColumnRequest) -> dict:
-    """Add a new column."""
-    config = load_config()
-    # Check for duplicate id
-    if any(c.id == col.id for c in config.columns):
-        raise HTTPException(400, f"Column '{col.id}' already exists")
-    config.columns.append(ColumnConfig(**col.model_dump()))
-    save_config(config)
-    return col.model_dump()
+    """Add a new column (auto-generates ID)."""
+    cols = load_columns()
+    col_id = col.id or generate_id()
+    new_col = ColumnConfig(
+        id=col_id,
+        label=col.label,
+        color=col.color,
+        order=col.order if col.order != 0 else len(cols),
+        enabled=col.enabled,
+    )
+    cols.append(new_col)
+    save_columns(cols)
+    return new_col.model_dump()
 
 
 @router.delete("/columns/{column_id}")
 def delete_column(column_id: str) -> dict:
     """Remove a column."""
-    config = load_config()
-    before = len(config.columns)
-    config.columns = [c for c in config.columns if c.id != column_id]
-    if len(config.columns) == before:
+    cols = load_columns()
+    before = len(cols)
+    cols = [c for c in cols if c.id != column_id]
+    if len(cols) == before:
         raise HTTPException(404, f"Column '{column_id}' not found")
-    save_config(config)
+    save_columns(cols)
     return {"status": "ok", "deleted": column_id}
 
 
 @router.patch("/columns/{column_id}")
 def update_column(column_id: str, col: ColumnRequest) -> dict:
-    """Update a single column."""
-    config = load_config()
-    for i, c in enumerate(config.columns):
+    """Update a single column (live sync)."""
+    cols = load_columns()
+    for i, c in enumerate(cols):
         if c.id == column_id:
-            config.columns[i] = ColumnConfig(**col.model_dump())
-            save_config(config)
-            return config.columns[i].model_dump()
+            cols[i] = ColumnConfig(
+                id=column_id,
+                label=col.label if col.label else c.label,
+                color=col.color if col.color != "#6b7280" else c.color,
+                order=col.order if col.order != 0 else c.order,
+                enabled=col.enabled,
+            )
+            save_columns(cols)
+            return cols[i].model_dump()
     raise HTTPException(404, f"Column '{column_id}' not found")
 
 
@@ -114,50 +139,67 @@ def update_column(column_id: str, col: ColumnRequest) -> dict:
 @router.get("/labels")
 def list_labels() -> list[dict]:
     """Get all labels."""
-    return [l.model_dump() for l in get_labels()]
+    return [l.model_dump() for l in load_labels()]
 
 
 @router.put("/labels")
 def set_labels(labels: list[LabelRequest]) -> list[dict]:
     """Replace all labels."""
-    config = load_config()
-    config.labels = [LabelConfig(**l.model_dump()) for l in labels]
-    save_config(config)
-    return [l.model_dump() for l in config.labels]
+    lbls = []
+    for l in labels:
+        lbl_id = l.id or generate_id()
+        lbls.append(LabelConfig(
+            id=lbl_id,
+            name=l.name,
+            color=l.color,
+            text_color=l.text_color,
+        ))
+    save_labels(lbls)
+    return [l.model_dump() for l in lbls]
 
 
 @router.post("/labels")
 def add_label(label: LabelRequest) -> dict:
-    """Add a new label."""
-    config = load_config()
-    if any(l.id == label.id for l in config.labels):
-        raise HTTPException(400, f"Label '{label.id}' already exists")
-    config.labels.append(LabelConfig(**label.model_dump()))
-    save_config(config)
-    return label.model_dump()
+    """Add a new label (auto-generates ID)."""
+    lbls = load_labels()
+    lbl_id = label.id or generate_id()
+    new_label = LabelConfig(
+        id=lbl_id,
+        name=label.name,
+        color=label.color,
+        text_color=label.text_color,
+    )
+    lbls.append(new_label)
+    save_labels(lbls)
+    return new_label.model_dump()
 
 
 @router.delete("/labels/{label_id}")
 def delete_label(label_id: str) -> dict:
     """Remove a label."""
-    config = load_config()
-    before = len(config.labels)
-    config.labels = [l for l in config.labels if l.id != label_id]
-    if len(config.labels) == before:
+    lbls = load_labels()
+    before = len(lbls)
+    lbls = [l for l in lbls if l.id != label_id]
+    if len(lbls) == before:
         raise HTTPException(404, f"Label '{label_id}' not found")
-    save_config(config)
+    save_labels(lbls)
     return {"status": "ok", "deleted": label_id}
 
 
 @router.patch("/labels/{label_id}")
 def update_label(label_id: str, label: LabelRequest) -> dict:
-    """Update a single label."""
-    config = load_config()
-    for i, l in enumerate(config.labels):
+    """Update a single label (live sync)."""
+    lbls = load_labels()
+    for i, l in enumerate(lbls):
         if l.id == label_id:
-            config.labels[i] = LabelConfig(**label.model_dump())
-            save_config(config)
-            return config.labels[i].model_dump()
+            lbls[i] = LabelConfig(
+                id=label_id,
+                name=label.name if label.name else l.name,
+                color=label.color if label.color != "#6b7280" else l.color,
+                text_color=label.text_color if label.text_color != "#ffffff" else l.text_color,
+            )
+            save_labels(lbls)
+            return lbls[i].model_dump()
     raise HTTPException(404, f"Label '{label_id}' not found")
 
 
@@ -166,14 +208,13 @@ def update_label(label_id: str, label: LabelRequest) -> dict:
 @router.get("/widget")
 def get_widget() -> dict:
     """Get widget configuration."""
-    return get_widget_config().model_dump()
+    return load_widget().model_dump()
 
 
 @router.put("/widget")
 def set_widget(req: WidgetRequest) -> dict:
     """Update widget configuration."""
-    config = load_config()
-    widget = config.widget
+    widget = load_widget()
     if req.mode is not None:
         widget.mode = req.mode
     if req.max_items is not None:
@@ -186,7 +227,7 @@ def set_widget(req: WidgetRequest) -> dict:
         widget.show_department = req.show_department
     if req.compact is not None:
         widget.compact = req.compact
-    save_config(config)
+    save_widget(widget)
     return widget.model_dump()
 
 
@@ -195,35 +236,26 @@ def set_widget(req: WidgetRequest) -> dict:
 @router.get("/settings")
 def get_settings() -> dict:
     """Get board settings."""
-    config = load_config()
-    return {
-        "max_active_tasks": config.max_active_tasks,
-        "auto_archive_days": config.auto_archive_days,
-        "notifications_enabled": config.notifications_enabled,
-        "auto_assign_head": config.auto_assign_head,
-        "auto_summon": config.auto_summon,
-        "auto_escalate_overdue": config.auto_escalate_overdue,
-        "notify_human_on_block": config.notify_human_on_block,
-    }
+    return load_settings().model_dump()
 
 
 @router.put("/settings")
 def set_settings(req: BoardSettingsRequest) -> dict:
     """Update board settings."""
-    config = load_config()
+    settings = load_settings()
     if req.max_active_tasks is not None:
-        config.max_active_tasks = req.max_active_tasks
+        settings.max_active_tasks = req.max_active_tasks
     if req.auto_archive_days is not None:
-        config.auto_archive_days = req.auto_archive_days
+        settings.auto_archive_days = req.auto_archive_days
     if req.notifications_enabled is not None:
-        config.notifications_enabled = req.notifications_enabled
+        settings.notifications_enabled = req.notifications_enabled
     if req.auto_assign_head is not None:
-        config.auto_assign_head = req.auto_assign_head
+        settings.auto_assign_head = req.auto_assign_head
     if req.auto_summon is not None:
-        config.auto_summon = req.auto_summon
+        settings.auto_summon = req.auto_summon
     if req.auto_escalate_overdue is not None:
-        config.auto_escalate_overdue = req.auto_escalate_overdue
+        settings.auto_escalate_overdue = req.auto_escalate_overdue
     if req.notify_human_on_block is not None:
-        config.notify_human_on_block = req.notify_human_on_block
-    save_config(config)
+        settings.notify_human_on_block = req.notify_human_on_block
+    save_settings(settings)
     return {"status": "ok"}

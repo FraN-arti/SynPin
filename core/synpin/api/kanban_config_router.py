@@ -30,17 +30,32 @@ router = APIRouter(prefix="/api/kanban/config", tags=["kanban-config"])
 
 class ColumnRequest(BaseModel):
     id: str | None = None         # Auto-generated if not provided
-    label: str
+    label: str = ""
     color: str = "#6b7280"
     order: int = 0
     enabled: bool = True
 
 
+class ColumnPatchRequest(BaseModel):
+    """Partial update — all fields optional."""
+    label: str | None = None
+    color: str | None = None
+    order: int | None = None
+    enabled: bool | None = None
+
+
 class LabelRequest(BaseModel):
     id: str | None = None         # Auto-generated if not provided
-    name: str
+    name: str = ""
     color: str = "#6b7280"
     text_color: str = "#ffffff"
+
+
+class LabelPatchRequest(BaseModel):
+    """Partial update — all fields optional."""
+    name: str | None = None
+    color: str | None = None
+    text_color: str | None = None
 
 
 class WidgetRequest(BaseModel):
@@ -117,20 +132,21 @@ def delete_column(column_id: str) -> dict:
 
 
 @router.patch("/columns/{column_id}")
-def update_column(column_id: str, col: ColumnRequest) -> dict:
+def update_column(column_id: str, col: ColumnPatchRequest) -> dict:
     """Update a single column (live sync)."""
     cols = load_columns()
     for i, c in enumerate(cols):
         if c.id == column_id:
-            cols[i] = ColumnConfig(
-                id=column_id,
-                label=col.label if col.label else c.label,
-                color=col.color if col.color != "#6b7280" else c.color,
-                order=col.order if col.order != 0 else c.order,
-                enabled=col.enabled,
-            )
+            if col.label is not None:
+                c.label = col.label
+            if col.color is not None:
+                c.color = col.color
+            if col.order is not None:
+                c.order = col.order
+            if col.enabled is not None:
+                c.enabled = col.enabled
             save_columns(cols)
-            return cols[i].model_dump()
+            return c.model_dump()
     raise HTTPException(404, f"Column '{column_id}' not found")
 
 
@@ -187,19 +203,19 @@ def delete_label(label_id: str) -> dict:
 
 
 @router.patch("/labels/{label_id}")
-def update_label(label_id: str, label: LabelRequest) -> dict:
+def update_label(label_id: str, label: LabelPatchRequest) -> dict:
     """Update a single label (live sync)."""
     lbls = load_labels()
-    for i, l in enumerate(lbls):
+    for l in lbls:
         if l.id == label_id:
-            lbls[i] = LabelConfig(
-                id=label_id,
-                name=label.name if label.name else l.name,
-                color=label.color if label.color != "#6b7280" else l.color,
-                text_color=label.text_color if label.text_color != "#ffffff" else l.text_color,
-            )
+            if label.name is not None:
+                l.name = label.name
+            if label.color is not None:
+                l.color = label.color
+            if label.text_color is not None:
+                l.text_color = label.text_color
             save_labels(lbls)
-            return lbls[i].model_dump()
+            return l.model_dump()
     raise HTTPException(404, f"Label '{label_id}' not found")
 
 

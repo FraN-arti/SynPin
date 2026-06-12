@@ -1,8 +1,8 @@
 - id: l7r8zs6i26wzyl
   label: TestPatch
-  color: '#6b7280'
+  color: '#ff0000'
   order: 0
-  enabled: true
+  enabled: false
 - id: z6q3t0pkq1psu6
   label: TODO
   color: '#3b82f6'

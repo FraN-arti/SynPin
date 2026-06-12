@@ -700,16 +700,6 @@ function GeneralSection() {
           </div>
         )}
 
-        <div className="settings-divider-thin" />
-        <h3 className="settings-subsection-title">Сайдбар</h3>
-        <Toggle
-          label="Открыт по умолчанию"
-          checked={settings.ui.sidebar.default_open}
-          onChange={v => updateUI('sidebar.default_open', v)} />
-        <Toggle
-          label="Показывать иконки"
-          checked={settings.ui.sidebar.show_icons}
-          onChange={v => updateUI('sidebar.show_icons', v)} />
         </section>
 
         {/* ─── 🤖 Настройка моделей ─── */}

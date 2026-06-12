@@ -362,7 +362,7 @@ function GeneralSection() {
   // Cache TweakCN vars in a ref so they survive theme switches
   const tweakcnVarsRef = useRef<Record<string, string> | null>(null)
 
-  const applyThemeLocally = useCallback((theme: string, cnThemes?: typeof customThemes, directVars?: Record<string, string>) => {
+  const applyThemeLocally = useCallback(async (theme: string, cnThemes?: typeof customThemes, directVars?: Record<string, string>) => {
     const root = document.documentElement
 
     // Clear ALL classes first
@@ -389,17 +389,26 @@ function GeneralSection() {
       root.classList.add('light-theme')
     } else if (theme === 'tweakcn') {
       root.classList.add('dark-theme')
-      // Try direct vars first, then customThemes, then cached ref
+      // Try to find vars: direct → customThemes → ref → API fetch
       let vars = directVars
       if (!vars) {
         const themes = cnThemes || customThemes
         const current = themes.find(t => t.id === 'current') || themes[0]
-        if (current) {
-          vars = current.dark || current.light
-        }
+        if (current) vars = current.dark || current.light
       }
       if (!vars && tweakcnVarsRef.current) {
         vars = tweakcnVarsRef.current
+      }
+      // Last resort: fetch from API
+      if (!vars) {
+        try {
+          const res = await fetch(`${API_BASE}/api/themes/tweakcn/list`)
+          if (res.ok) {
+            const data = await res.json()
+            const saved = data?.themes?.[0]
+            if (saved) vars = saved.dark || saved.light
+          }
+        } catch {}
       }
       if (vars) {
         Object.entries(vars).forEach(([key, value]) => {

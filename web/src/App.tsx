@@ -273,8 +273,10 @@ function App() {
     }, [])
 
   // Apply saved theme on initial load
+  // The inline script in index.html already applied from localStorage cache.
+  // We only need to sync if API has a DIFFERENT theme than what's cached.
   useEffect(() => {
-    const applyTheme = async () => {
+    const syncTheme = async () => {
       try {
         const res = await fetch(`${API_BASE}/api/config/settings`)
         if (!res.ok) return
@@ -282,29 +284,22 @@ function App() {
         const theme = settings?.ui?.theme
         if (!theme) return
 
+        // Check what's currently applied (set by inline script or previous apply)
         const root = document.documentElement
+        const cached = (() => {
+          try { return JSON.parse(localStorage.getItem('synpin_theme') || '{}') } catch { return {} }
+        })()
 
-        // Check if theme is already applied (by index.html inline script)
-        const currentClass = root.classList.contains('light-theme') ? 'light'
-          : root.classList.contains('oled-theme') ? 'dark-oled'
-          : 'dark'
-        const hasInlineVars = root.style.length > 0
+        // If API theme matches cached theme — already applied by inline script, skip
+        if (cached.name === theme) return
 
-        // Skip if same theme already applied with vars
-        if (currentClass === theme && (theme !== 'tweakcn' || hasInlineVars)) return
-
-        // Clear all classes
+        // Theme changed externally (another tab?) — apply it
         root.classList.remove('light-theme', 'dark-theme', 'oled-theme')
-
-        // Clear inline styles
         for (let i = root.style.length - 1; i >= 0; i--) {
           const prop = root.style[i]
-          if (prop && prop.startsWith('--')) {
-            root.style.removeProperty(prop)
-          }
+          if (prop && prop.startsWith('--')) root.style.removeProperty(prop)
         }
 
-        // Theme data for localStorage cache
         const themeCache: { name: string; vars?: Record<string, string> } = { name: theme }
 
         if (theme === 'dark') {
@@ -315,11 +310,9 @@ function App() {
           root.classList.add('light-theme')
         } else if (theme === 'tweakcn') {
           root.classList.add('dark-theme')
-          // Load saved TweakCN theme
           const themesRes = await fetch(`${API_BASE}/api/themes/tweakcn/list`)
           if (themesRes.ok) {
             const themesData = await themesRes.json()
-            // 'current' is always first in the list
             const savedTheme = themesData?.themes?.[0]
             if (savedTheme) {
               const vars = savedTheme.dark || savedTheme.light
@@ -333,11 +326,10 @@ function App() {
           }
         }
 
-        // Cache theme for instant load on next refresh
         localStorage.setItem('synpin_theme', JSON.stringify(themeCache))
       } catch {}
     }
-    applyTheme()
+    syncTheme()
   }, [])
 
   // Load available agents (both SynPin and external)

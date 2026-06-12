@@ -29,10 +29,121 @@ def _save_custom_themes(themes: dict):
 
 # --- Color helpers ---
 
+import re as _re
+
+def _parse_css_color(color: str) -> str:
+    """Parse any CSS color format and return hex (#rrggbb).
+
+    Supports: #hex, rgb(), rgba(), hsl(), hsla(), oklch(), oklab(), named colors.
+    """
+    if not color or not isinstance(color, str):
+        return "#888888"
+
+    color = color.strip()
+
+    # Already hex
+    if color.startswith("#"):
+        h = color.lstrip("#")
+        if len(h) == 3:
+            h = h[0]*2 + h[1]*2 + h[2]*2
+        if len(h) == 6 and all(c in "0123456789abcdefABCDEF" for c in h):
+            return f"#{h.lower()}"
+        return "#888888"
+
+    # oklch(L C H) or oklch(L C H / A)
+    m = _re.match(r"oklch\s*\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)", color, _re.IGNORECASE)
+    if m:
+        L, C, H = float(m.group(1)), float(m.group(2)), float(m.group(3))
+        return _oklch_to_hex(L, C, H)
+
+    # oklab(L a b)
+    m = _re.match(r"oklab\s*\(\s*([\d.]+)\s+([\d.-]+)\s+([\d.-]+)", color, _re.IGNORECASE)
+    if m:
+        L, a, b = float(m.group(1)), float(m.group(2)), float(m.group(3))
+        return _oklab_to_hex(L, a, b)
+
+    # rgb(r g b) or rgb(r, g, b) or rgba(r, g, b, a)
+    m = _re.match(r"rgba?\s*\(\s*([\d.]+)\s*[,/]\s*([\d.]+)\s*[,/]\s*([\d.]+)", color, _re.IGNORECASE)
+    if m:
+        r, g, b = int(float(m.group(1))), int(float(m.group(2))), int(float(m.group(3)))
+        return f"#{r:02x}{g:02x}{b:02x}"
+
+    # hsl(h s% l%) or hsl(h, s%, l%) or hsla(...)
+    m = _re.match(r"hsla?\s*\(\s*([\d.]+)\s*[,/]\s*([\d.]+)%?\s*[,/]\s*([\d.]+)%?", color, _re.IGNORECASE)
+    if m:
+        h, s, l = float(m.group(1)), float(m.group(2)), float(m.group(3))
+        return _hsl_to_hex(h, s / 100, l / 100)
+
+    # Named colors fallback
+    named = {
+        "white": "#ffffff", "black": "#000000", "red": "#ff0000",
+        "green": "#008000", "blue": "#0000ff", "yellow": "#ffff00",
+        "orange": "#ffa500", "purple": "#800080", "gray": "#808080",
+        "grey": "#808080", "transparent": "#000000",
+    }
+    if color.lower() in named:
+        return named[color.lower()]
+
+    return "#888888"
+
+
+def _oklch_to_hex(L: float, C: float, H: float) -> str:
+    """Convert OKLCH to hex via OKLab -> linear sRGB."""
+    h_rad = H * 3.14159265 / 180
+    a = C * max(0, 1e-6) * max(0, 1e-6)  # ensure non-negative for cos
+    import math
+    a = C * math.cos(h_rad)
+    b = C * math.sin(h_rad)
+    return _oklab_to_hex(L, a, b)
+
+
+def _oklab_to_hex(L: float, a: float, b: float) -> str:
+    """Convert OKLab to hex via linear sRGB."""
+    import math
+    l_ = L + 0.3963377774 * a + 0.2158037573 * b
+    m_ = L - 0.1055613458 * a - 0.0638541728 * b
+    s_ = L - 0.0894841775 * a - 1.2914855480 * b
+
+    l = l_ ** 3
+    m = m_ ** 3
+    s = s_ ** 3
+
+    r = +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s
+    g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s
+    bl = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s
+
+    # Linear to sRGB
+    def to_srgb(x):
+        x = max(0, min(1, x))
+        return int(round(255 * (12.92 * x if x <= 0.0031308 else 1.055 * x ** (1/2.4) - 0.055)))
+
+    return f"#{to_srgb(r):02x}{to_srgb(g):02x}{to_srgb(bl):02x}"
+
+
+def _hsl_to_hex(h: float, s: float, l: float) -> str:
+    """Convert HSL (h 0-360, s 0-1, l 0-1) to hex."""
+    def hue2rgb(p, q, t):
+        if t < 0: t += 1
+        if t > 1: t -= 1
+        if t < 1/6: return p + (q - p) * 6 * t
+        if t < 1/2: return q
+        if t < 2/3: return p + (q - p) * (2/3 - t) * 6
+        return p
+
+    if s == 0:
+        r = g = b = l
+    else:
+        q = l * (1 + s) if l < 0.5 else l + s - l * s
+        p = 2 * l - q
+        r = hue2rgb(p, q, h/360 + 1/3)
+        g = hue2rgb(p, q, h/360)
+        b = hue2rgb(p, q, h/360 - 1/3)
+
+    return f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}"
+
+
 def _hex_to_rgb(h: str) -> tuple[int, int, int]:
-    h = h.lstrip("#")
-    if len(h) == 3:
-        h = h[0]*2 + h[1]*2 + h[2]*2
+    h = _parse_css_color(h if h.startswith("#") else f"#{h}").lstrip("#")
     return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
 
 

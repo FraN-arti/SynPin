@@ -978,6 +978,7 @@ function App() {
             isDragging={!!activeDragId}
             onDepartmentClick={(id) => { setActiveOtdelId(id); setPage('chat') }}
             activeOtdelId={activeOtdelId}
+            wsOn={wsOn}
           />
           <main className="main-area">
         {(() => {
@@ -1096,6 +1097,7 @@ function App() {
             isDragging={!!activeDragId}
             onDepartmentClick={(id) => { setActiveOtdelId(id); setPage('chat') }}
             activeOtdelId={activeOtdelId}
+            wsOn={wsOn}
           />
         </div>
         <DragOverlay>

@@ -94,9 +94,10 @@ interface SortableWidgetProps {
   onRemove: (id: WidgetType) => void
   onDepartmentClick?: (id: string) => void
   activeOtdelId?: string | null
+  wsOn?: (type: string, handler: (data: any) => void) => () => void
 }
 
-function SortableWidget({ id, departments, onRemove, onDepartmentClick, activeOtdelId }: SortableWidgetProps) {
+function SortableWidget({ id, departments, onRemove, onDepartmentClick, activeOtdelId, wsOn }: SortableWidgetProps) {
   const {
     attributes,
     listeners,
@@ -128,7 +129,7 @@ function SortableWidget({ id, departments, onRemove, onDepartmentClick, activeOt
       </div>
       <div className="widget-card-body">
         {id === 'departments' && <DepartmentsWidgetContent departments={departments} onDepartmentClick={onDepartmentClick} activeOtdelId={activeOtdelId} />}
-        {id === 'kanban' && <KanbanWidget />}
+        {id === 'kanban' && <KanbanWidget wsOn={wsOn} />}
       </div>
     </div>
   )
@@ -144,9 +145,10 @@ interface WidgetDropZoneProps {
   isDragging: boolean
   onDepartmentClick?: (id: string) => void
   activeOtdelId?: string | null
+  wsOn?: (type: string, handler: (data: any) => void) => () => void
 }
 
-export function WidgetDropZone({ side, widgets, departments, onRemove, isDragging, onDepartmentClick, activeOtdelId }: WidgetDropZoneProps) {
+export function WidgetDropZone({ side, widgets, departments, onRemove, isDragging, onDepartmentClick, activeOtdelId, wsOn }: WidgetDropZoneProps) {
   const { isOver, setNodeRef } = useDroppable({ id: `drop-zone-${side}` })
 
   // Show zone when dragging OR when has widgets
@@ -180,6 +182,7 @@ export function WidgetDropZone({ side, widgets, departments, onRemove, isDraggin
               onRemove={(id) => onRemove(side, id)}
               onDepartmentClick={onDepartmentClick}
               activeOtdelId={activeOtdelId}
+              wsOn={wsOn}
             />
           ))}
         </div>

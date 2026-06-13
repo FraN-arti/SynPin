@@ -1,15 +1,18 @@
 # SynPin Development launcher (PowerShell).
 #
-# Starts `synpin dev` with unified Rich-colored output. Unlike the old
-# dev.bat, this script:
+# Starts `synpin dev` with unified Rich-colored output. This script:
 #   - sets console to UTF-8 so the Vite/Node ANSI escape codes
-#     (which dev.bat was emitting as raw [32m[1m... garbage) render
-#     as actual color,
+#     render as actual color (they were appearing as raw [32m...
+#     garbage in dev.bat's output),
 #   - enables Windows Terminal VT processing so Rich's ANSI codes
 #     render correctly when running in Windows Terminal / modern
 #     conhost,
 #   - runs synpin dev under python -m so the editable install is
-#     picked up regardless of CWD.
+#     picked up regardless of CWD,
+#   - actively picks the right Python: walks PATH plus a list of
+#     canonical install locations, testing each for an actual
+#     'import synpin' so the first Hermes-venv or Microsoft Store
+#     stub on PATH doesn't get picked.
 #
 # Usage:
 #   .\dev.ps1           # start dev server (foreground)
@@ -25,7 +28,7 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 # enable on legacy conhost. We ignore failures because some hosts
 # (CI, bare cmd) just don't support it.
 try {
-    $null = $Host.UI.RawUI.WindowTitle  # ensure RawUI is available
+    $null = $Host.UI.RawUI.WindowTitle
     $signature = @'
 [DllImport("kernel32.dll", SetLastError = true)]
 public static extern bool SetConsoleMode(IntPtr hConsoleHandle, uint dwMode);
@@ -35,7 +38,7 @@ public static extern bool GetConsoleMode(IntPtr hConsoleHandle, out uint lpMode)
 public static extern IntPtr GetStdHandle(int nStdHandle);
 '@
     $Win32 = Add-Type -MemberDefinition $signature -Name 'Win32' -Namespace 'SynPin' -PassThru
-    $handle = $Win32::GetStdHandle(-11)  # STD_OUTPUT_HANDLE
+    $handle = $Win32::GetStdHandle(-11)
     $mode = 0
     if ($Win32::GetConsoleMode($handle, [ref]$mode)) {
         $ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
@@ -66,74 +69,44 @@ function Show-Help {
     Write-Host ""
 }
 
+# Find a Python that has synpin-core available. Plain 'python' on
+# PATH often points to a tool venv (Hermes-agent) or a Microsoft
+# Store stub that doesn't have our package. We walk PATH plus
+# canonical install locations and test each candidate with a real
+# 'import synpin' before using it.
+function Find-SynPinPython {
+    $candidates = @()
+    foreach ($p in ($env:PATH -split ';')) {
+        if ($p -and (Test-Path (Join-Path $p 'python.exe'))) {
+            $candidates += (Join-Path $p 'python.exe')
+        }
+    }
+    $localApp = $env:LOCALAPPDATA
+    $candidates += @(
+        "$localApp\Programs\Python\Python311\python.exe"
+        "$localApp\Programs\Python\Python312\python.exe"
+        "$localApp\Programs\Python\Python313\python.exe"
+        "$localApp\Python\python.exe"
+        "$localApp\Python\bin\python.exe"
+        'C:\Python311\python.exe'
+        'C:\Python312\python.exe'
+    ) | Where-Object { Test-Path $_ }
+
+    foreach ($py in ($candidates | Select-Object -Unique)) {
+        $out = & $py -c "import synpin; print(synpin.__file__)" 2>$null
+        if ($LASTEXITCODE -eq 0 -and $out) {
+            return $py
+        }
+    }
+    return $null
+}
+
 switch -Regex ($args[0]) {
     '^$|^start$|^dev$' {
-        # Find a Python interpreter that has synpin-core available.
-        # Plain 'python' on PATH often points to a tool venv (e.g.
-        # Hermes-agent's venv) that doesn't have our package. Walking
-        # through PATH in order would still pick the wrong one, so
-        # we test each candidate for the actual import. If none
-        # work, fall back to the system Python and auto-install.
-        $pythonExe = $null
-        $candidates = @()
-        foreach ($p in ($env:PATH -split ';')) {
-            if ($p -and (Test-Path (Join-Path $p 'python.exe'))) {
-                $candidates += (Join-Path $p 'python.exe')
-            }
-        }
-        # Add the canonical Windows install locations that may
-        # not be on PATH (install-for-me without admin) to the
-        # candidate list. We use a here-string for the path
-        # templates and Replace the env var at run time, which
-        # sidesteps the PowerShell-5.1 single-quote parsing
-        # quirks that were tripping up the parser on backslashes.
-        $localApp = $env:LOCALAPPDATA
-        $candidates += @(
-            "$localApp\Programs\Python\Python311\python.exe"
-            "$localApp\Programs\Python\Python312\python.exe"
-            "$localApp\Programs\Python\Python313\python.exe"
-            "$localApp\Python\python.exe"
-            "$localApp\Python\bin\python.exe"
-            'C:\Python311\python.exe'
-            'C:\Python312\python.exe'
-        ) | Where-Object { Test-Path $_ }
-
-        foreach ($py in ($candidates | Select-Object -Unique)) {
-            $ok = $false
-            try {
-                $out = & $py -c "import synpin; print(synpin.__file__)" 2>$null
-                if ($LASTEXITCODE -eq 0 -and $out) {
-                    $pythonExe = $py
-                    Write-Host "[dev] using Python: $py" -ForegroundColor Gray
-                    Write-Host "[dev] synpin located at: $out" -ForegroundColor Gray
-                    # Warn if this Python is 3.14+ — SynPin has not
-                    # been tested on it yet and may fail at startup
-                    # (Python 3.14 changed several pathlib internals
-                    # that the codebase relies on). See
-                    # pyproject.toml for the current bound.
-                    try {
-                        $verOut = & $py -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>$null
-                        if ($LASTEXITCODE -eq 0 -and $verOut) {
-                            $parts = $verOut.Split('.')
-                            if ($parts.Length -ge 2) {
-                                $pyMaj = [int]$parts[0]
-                                $pyMin = [int]$parts[1]
-                                if ($pyMaj -ge 3 -and $pyMin -ge 14) {
-                                    Write-Host "[dev] WARNING: Python $verOut is not yet supported (max 3.13). If SynPin fails to start, install Python 3.11-3.13." -ForegroundColor Yellow
-                                }
-                            }
-                        }
-                    } catch { }
-                    break
-                }
-            } catch { }
-        }
-
+        $pythonExe = Find-SynPinPython
         if (-not $pythonExe) {
-            # No Python on PATH has synpin-core. Try the one that
-            # was used to install the package most recently (look for
-            # an editable install under core/.synpin/ in site-packages
-            # of any reachable Python).
+            # No Python on PATH has synpin-core. Auto-install into
+            # the first Python we can find.
             Write-Host "[!] synpin-core is not pip-installed in any Python on PATH." -ForegroundColor Yellow
             Write-Host "    Attempting to install into the first Python on PATH..." -ForegroundColor Yellow
             $firstPy = (& where.exe python.exe 2>$null | Select-Object -First 1)
@@ -145,10 +118,10 @@ switch -Regex ($args[0]) {
             }
             $pythonExe = $firstPy
             Write-Host "[dev] installed into $pythonExe, continuing." -ForegroundColor Green
+        } else {
+            Write-Host "[dev] using Python: $pythonExe" -ForegroundColor Gray
         }
 
-        # Suppress the old green "Starting SynPin Development..." echo
-        # and let synpin dev's own Rich banner do the talking.
         & $pythonExe -m synpin dev
     }
     '^stop$|^--stop$' {

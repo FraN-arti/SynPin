@@ -30,7 +30,7 @@ _config_candidates = [
 
 _data_candidates = [
     Path.home() / ".synpin" / "data",
-    Path.__new__(Path, os.path.dirname(__file__)).resolve().parent.parent / "data",
+    Path(__file__).resolve().parent.parent / "data",
 ]
 
 CONFIG_DIR: Path | None = None

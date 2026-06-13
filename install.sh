@@ -18,12 +18,6 @@ cd "$SCRIPT_DIR"
 
 REQUIRED_PYTHON_MAJOR=3
 REQUIRED_PYTHON_MINOR=11
-# We pin an upper bound because some Python versions introduce
-# private-API breakages in stdlib that SynPin relies on (notably
-# pathlib internals in 3.14, and chromadb dependencies have
-# lagged behind on 3.13 alphas). Bump this when we've verified
-# on the newer release.
-REQUIRED_PYTHON_MAX_MINOR=13
 REQUIRED_NODE_MAJOR=18
 
 color_red()    { printf "\033[31m%s\033[0m\n" "$*"; }
@@ -147,12 +141,6 @@ check_python() {
     py_major=$(echo "$py_version" | cut -d. -f1)
     py_minor=$(echo "$py_version" | cut -d. -f2)
 
-    if [ "$py_major" -gt "$REQUIRED_PYTHON_MAJOR" ] && [ "$py_minor" -gt "$REQUIRED_PYTHON_MAX_MINOR" ]; then
-        fail "Python $py_version found, but SynPin has not been tested on $py_major.$py_minor+ yet (max supported: $REQUIRED_PYTHON_MAJOR.$REQUIRED_PYTHON_MAX_MINOR)."
-        echo "  Please install Python $REQUIRED_PYTHON_MAJOR.$REQUIRED_PYTHON_MINOR..$REQUIRED_PYTHON_MAJOR.$REQUIRED_PYTHON_MAX_MINOR."
-        echo "  Or set SYNPIN_AUTO_INSTALL=1 to attempt an automatic downgrade."
-        exit 1
-    fi
     if [ "$py_major" -lt "$REQUIRED_PYTHON_MAJOR" ] || \
        { [ "$py_major" -eq "$REQUIRED_PYTHON_MAJOR" ] && [ "$py_minor" -lt "$REQUIRED_PYTHON_MINOR" ]; }; then
         # Try to install a newer Python via the package manager. On

@@ -190,22 +190,46 @@ def cmd_setup(args):
 
 
 def cmd_update(args):
-    """Update SynPin from GitHub and rebuild if needed."""
+    """Update SynPin from GitHub and reinstall changed components.
+
+    The current install layout has SynPin as a git-cloned repo
+    (not a copy under ~/.synpin/repo), so the update flow is:
+    1. 'git pull' inside the repo the user is running from,
+    2. detect which parts changed (core / web / scripts),
+    3. reinstall only the changed parts (pip install -e core,
+       npm install in web, or nothing if neither changed).
+    """
     import shutil
 
-    repo_dir = SYNPIN_HOME / "repo"
+    # The repo the user is running from. We get this from the
+    # location of the synpin-core package install (editable mode
+    # preserves the original path), which is the cleanest way to
+    # detect the active repo even when the user invoked us via
+    # `synpin` (which resolves through pip's installed paths).
+    synpin_pkg = Path(__file__).resolve().parent.parent
+    # synpin/cli/commands.py is at core/synpin/cli/, so .parent.parent
+    # lands at core/synpin/ — go one more step up to the repo root.
+    repo_dir = synpin_pkg.parent.parent
+    # The package lives in core/synpin/ inside the repo.
 
-    if not repo_dir.exists():
-        console.print("[error]ERROR: SynPin not installed. Run install.ps1 first.[/error]")
+    # Make sure we're actually inside a git repo before we run
+    # destructive operations.
+    if not (repo_dir / ".git").exists():
+        console.print(
+            f"[error]ERROR: Not a git repository: {repo_dir}[/error]\n"
+            "[dim]Run 'synpin update' from inside the cloned SynPin repo "
+            "(the one with .git/, dev.bat, install.sh etc).[/dim]"
+        )
         return
 
+    console.print(f"[dim]Repo: {repo_dir}[/dim]")
     console.print("[dim]Checking for updates...[/dim]")
     console.print()
 
     result = subprocess.run(
-        ["git", "pull"], cwd=str(repo_dir), capture_output=True, text=True
+        ["git", "pull", "--rebase", "--autostash"],
+        cwd=str(repo_dir), capture_output=True, text=True,
     )
-
     if result.returncode != 0:
         console.print(f"[error]ERROR: git pull failed:\n{result.stderr}[/error]")
         return
@@ -217,91 +241,76 @@ def cmd_update(args):
     console.print("[success]Updates downloaded![/success]")
     console.print()
 
+    # Detect what changed since the last fetch position.
     core_changed = False
     web_changed = False
+    other_changed = False
 
     result = subprocess.run(
-        ["git", "rev-parse", "--verify", "ORIG_HEAD"],
+        ["git", "diff", "--name-only", "HEAD@{1}", "HEAD"],
         cwd=str(repo_dir), capture_output=True, text=True,
     )
-    old_head = result.stdout.strip() if result.returncode == 0 else "HEAD@{1}"
-
-    result = subprocess.run(
-        ["git", "diff", "--name-only", old_head, "HEAD"],
-        cwd=str(repo_dir), capture_output=True, text=True,
-    )
-
     if result.returncode == 0:
         for f in result.stdout.strip().split("\n"):
             if f.startswith("core/"):
                 core_changed = True
-            if f.startswith("web/"):
+            elif f.startswith("web/"):
                 web_changed = True
-
-    venv_python = synpin_home / "core" / ".venv" / "Scripts" / "python.exe"
-    if not venv_python.exists():
-        venv_python = synpin_home / "core" / ".venv" / "bin" / "python"
+            else:
+                other_changed = True
+    else:
+        # If we can't diff (e.g. no previous HEAD@{1}), just treat
+        # the whole thing as "something changed" and reinstall both.
+        core_changed = web_changed = other_changed = True
 
     if core_changed:
-        console.print("[info]Core changed — updating Python dependencies...[/info]")
-        src_core = repo_dir / "core"
-        dst_core = synpin_home / "core"
-        if src_core.exists():
-            def ignore_venv(dir, contents):
-                return [".venv"] if ".venv" in contents else []
-            shutil.copytree(src_core, dst_core, dirs_exist_ok=True, ignore=ignore_venv)
-
-        console.print("  [dim]Installing package...[/dim]")
-        subprocess.run(
-            ["uv", "pip", "install", "-e", str(synpin_home / "core"),
-             "--python", str(venv_python)],
-            capture_output=True,
+        console.print("[info]Core changed — reinstalling Python package...[/info]")
+        rc = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-e", str(repo_dir / "core"), "--quiet"],
+            capture_output=True, text=True,
         )
-        console.print("  [success]OK: Core updated[/success]")
+        if rc.returncode != 0:
+            console.print(f"[error]ERROR: pip install failed:\n{rc.stderr}[/error]")
+        else:
+            console.print("  [success]OK: Core reinstalled[/success]")
         console.print()
 
     if web_changed:
-        console.print("[info]Web changed — rebuilding UI...[/info]")
-        src_web = repo_dir / "web"
-        dst_web = synpin_home / "web"
-        if src_web.exists():
-            def ignore_web(dir, contents):
-                return [d for d in ["node_modules", "dist"] if d in contents]
-            shutil.copytree(src_web, dst_web, dirs_exist_ok=True, ignore=ignore_web)
-
-        console.print("  [dim]Building...[/dim]")
-        import platform
-        cmd = "npx vite build" if platform.system() == "Windows" else ["npx", "vite", "build"]
-        result = subprocess.run(
-            cmd, cwd=str(dst_web), capture_output=True, text=True,
-            shell=(platform.system() == "Windows"),
-        )
-        if result.returncode != 0:
-            console.print(f"  [error]ERROR: Build failed:\n{result.stderr}[/error]")
+        web_dir = repo_dir / "web"
+        if (web_dir / "package.json").exists():
+            if (web_dir / "node_modules").exists():
+                console.print("[info]Web changed — running npm install...[/info]")
+                rc = subprocess.run(
+                    ["npm", "install", "--no-fund", "--no-audit"],
+                    cwd=str(web_dir), capture_output=True, text=True,
+                    shell=(os.name == "nt"),
+                )
+                if rc.returncode != 0:
+                    console.print(f"[error]ERROR: npm install failed:\n{rc.stderr}[/error]")
+                else:
+                    console.print("  [success]OK: Web dependencies updated[/success]")
+            else:
+                console.print(
+                    "[info]Web changed but web/node_modules is missing. "
+                    "Run 'cd web && npm install' once.[/info]"
+                )
         else:
-            console.print("  [success]OK: Web rebuilt[/success]")
+            console.print("[info]Web changed but no package.json found, skipping.[/info]")
         console.print()
 
-    if not core_changed and not web_changed:
-        console.print("[dim]Copying updated files...[/dim]")
-        for item in repo_dir.iterdir():
-            if item.name in (".git", "node_modules", ".venv"):
-                continue
-            dst = synpin_home / item.name
-            if item.is_dir():
-                if dst.exists():
-                    shutil.rmtree(dst)
-                shutil.copytree(item, dst)
-            else:
-                shutil.copy2(item, dst)
-        console.print("  [success]OK: Files updated[/success]")
+    if other_changed and not core_changed and not web_changed:
+        # Only docs / scripts / etc. changed — no rebuild needed.
+        console.print(
+            "[dim]Only docs/scripts changed — no rebuild required.[/dim]\n"
+            "  [success]OK: Files updated[/success]"
+        )
         console.print()
 
     console.print("[brand]========================================[/brand]")
     console.print("[brand]  Update complete![/brand]")
     console.print("[brand]========================================[/brand]")
     console.print()
-    console.print("  [dim]Restart with: synpin start[/dim]")
+    console.print("  [dim]Restart with: synpin start[/dim]  (or  synpin dev)")
     console.print()
 
 

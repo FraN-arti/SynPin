@@ -195,6 +195,30 @@ function App() {
   // WebSocket — single connection for all real-time messaging
   const { send: wsSend, on: wsOn, connected: wsConnected } = useWebSocket()
 
+  // Server version — single source of truth is the backend.
+  // Strategy: fetch /api/version on mount (works even if WS isn't
+  // connected yet or broadcast was sent before client joined), then
+  // subscribe to the WS 'version:changed' event for future updates
+  // (e.g. server upgrades without page reload).
+  const [serverVersion, setServerVersion] = useState<string>('…')
+  useEffect(() => {
+    let cancelled = false
+    fetch(`${API_BASE}/api/version`)
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { version?: string } | null) => {
+        if (!cancelled && data?.version) setServerVersion(`v${data.version}`)
+      })
+      .catch(() => { /* keep placeholder; WS will fill it in */ })
+    return () => { cancelled = true }
+  }, [])
+  // Push updates from the server (startup broadcast + future changes)
+  useEffect(() => {
+    const off = wsOn('version:changed', (msg: { version: string }) => {
+      setServerVersion(`v${msg.version}`)
+    })
+    return off
+  }, [wsOn])
+
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
 
   const refreshDepartments = useCallback(async () => {
@@ -931,7 +955,7 @@ function App() {
             </button>
             <div className="version-bar">
               <span className="version-label">VERSION</span>
-              <span className="version-number">v0.2.5.2</span>
+              <span className="version-number" title="Live version from server (auto-updates via WebSocket)">{serverVersion}</span>
               <span className="version-status up-to-date" />
             </div>
           </div>

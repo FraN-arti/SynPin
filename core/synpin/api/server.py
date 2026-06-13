@@ -129,6 +129,10 @@ app.include_router(kanban_router)
 from .kanban_config_router import router as kanban_config_router
 app.include_router(kanban_config_router)
 
+# Version metadata endpoint
+from .version_router import router as version_router
+app.include_router(version_router)
+
 # Set up Kanban WS broadcast loop
 import asyncio
 from ..kanban.service import set_ws_loop
@@ -146,6 +150,22 @@ except RuntimeError:
             from ..chat.ws_manager import ws_manager
             await ws_manager.broadcast(event)
         set_config_broadcast(lambda e: asyncio.ensure_future(_broadcast(e)))
+
+    @app.on_event("startup")
+    async def _broadcast_version_on_startup():
+        """Push the current version to all connected clients on boot.
+
+        Clients subscribed via WebSocket receive this immediately and
+        can show the real version without polling /api/version. Clients
+        that connect later also get the version the moment they
+        handshake (the ws_router sends a 'connected' message — we add
+        the version there too).
+        """
+        from ..chat.ws_manager import ws_manager
+        await ws_manager.broadcast({
+            "type": "version:changed",
+            "version": __version__,
+        })
 
 
 @app.get("/api/health")

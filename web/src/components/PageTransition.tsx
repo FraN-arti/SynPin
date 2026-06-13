@@ -28,7 +28,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
  */
 
 const FADE_OUT_MS = 200
-const FADE_IN_MS = 150
 const FADE_DURATION_MS = FADE_OUT_MS // alias for the swap timer (must match the longer phase)
 
 export interface PageTransitionProps {

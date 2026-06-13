@@ -3377,23 +3377,30 @@ function KanbanLabelsConfig() {
 interface KanbanWidgetConfigData {
   mode: string
   max_items: number
-  show_columns: string[]
+  show_columns: string[]  // column.id list (new) or TaskStatus (legacy; backend migrates on load)
   show_deadline: boolean
   show_department: boolean
   compact: boolean
 }
 
-const ALL_COLUMNS = ['backlog', 'todo', 'in_progress', 'review', 'revision', 'blocked', 'done']
+interface KanbanColumnForWidget {
+  id: string
+  label: string
+  status: string | null
+  color: string
+  enabled: boolean
+}
 
 function KanbanWidgetConfig() {
   const [config, setConfig] = useState<KanbanWidgetConfigData>({
     mode: 'active',
     max_items: 10,
-    show_columns: ['in_progress', 'review', 'blocked'],
+    show_columns: [],
     show_deadline: true,
     show_department: true,
     compact: true,
   })
+  const [columns, setColumns] = useState<KanbanColumnForWidget[]>([])
   const [saving, setSaving] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -3401,7 +3408,22 @@ function KanbanWidgetConfig() {
     fetch(`${API_BASE}/api/kanban/config/widget`)
       .then(r => r.json())
       .then(setConfig)
-      .catch(() => {})
+      .catch(() => { })
+  }, [])
+
+  useEffect(() => {
+    // Load columns so the picker shows the user's actual columns
+    // (with their labels and colors) instead of the hard-coded
+    // TaskStatus list. This is also what makes user-added columns
+    // show up in the widget config at all.
+    fetch(`${API_BASE}/api/kanban/config/columns`)
+      .then(r => r.json())
+      .then((cols: KanbanColumnForWidget[]) => {
+        // Enabled only — disabled columns aren't shown in any
+        // view, so they don't belong in the picker.
+        setColumns(cols.filter(c => c.enabled !== false))
+      })
+      .catch(() => { })
   }, [])
 
   // Cleanup debounce timer on unmount
@@ -3437,13 +3459,13 @@ function KanbanWidgetConfig() {
     })
   }, [saveWidgetConfig])
 
-  const toggleShowColumn = (col: string) => {
+  const toggleShowColumn = (colId: string) => {
     setConfig(prev => {
       const next = {
         ...prev,
-        show_columns: prev.show_columns.includes(col)
-          ? prev.show_columns.filter(c => c !== col)
-          : [...prev.show_columns, col],
+        show_columns: prev.show_columns.includes(colId)
+          ? prev.show_columns.filter(c => c !== colId)
+          : [...prev.show_columns, colId],
       }
       saveWidgetConfig(next)
       return next
@@ -3485,14 +3507,36 @@ function KanbanWidgetConfig() {
       <div className="settings-field">
         <label>Показывать колонки</label>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
-          {ALL_COLUMNS.map(col => (
-            <label key={col} className="settings-toggle" style={{ margin: 0, fontSize: '12px', display: 'flex', gap: '4px' }}>
+          {columns.length === 0 && (
+            <span style={{ color: 'var(--text-dim)', fontSize: '12px' }}>
+              Загрузка колонок...
+            </span>
+          )}
+          {columns.map(col => (
+            <label
+              key={col.id}
+              className="settings-toggle"
+              style={{
+                margin: 0, fontSize: '12px', display: 'flex', gap: '6px',
+                alignItems: 'center',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                background: col.color ? col.color + '22' : 'transparent',
+                border: '1px solid ' + (col.color || 'var(--border)'),
+              }}
+            >
               <input
                 type="checkbox"
-                checked={config.show_columns.includes(col)}
-                onChange={() => toggleShowColumn(col)}
+                checked={config.show_columns.includes(col.id)}
+                onChange={() => toggleShowColumn(col.id)}
               />
-              <span>{col}</span>
+              <span
+                style={{
+                  display: 'inline-block', width: '8px', height: '8px',
+                  borderRadius: '50%', background: col.color || '#6b7280',
+                }}
+              />
+              <span>{col.label}</span>
             </label>
           ))}
         </div>

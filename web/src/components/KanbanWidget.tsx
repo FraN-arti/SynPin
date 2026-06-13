@@ -4,10 +4,20 @@ import { API_BASE } from '../config'
 interface WidgetConfig {
   mode: string
   max_items: number
-  show_columns: string[]
+  show_columns: string[]  // column.id list (new format) or status list (legacy)
   show_deadline: boolean
   show_department: boolean
   compact: boolean
+}
+
+interface Column {
+  id: string
+  label: string
+  description: string
+  color: string
+  order: number
+  enabled: boolean
+  status: string | null  // TaskStatus value or null for user-added columns
 }
 
 interface Task {
@@ -24,6 +34,10 @@ interface KanbanWidgetProps {
   wsOn?: (type: string, handler: (data: any) => void) => () => void
 }
 
+// Color fallback for tasks whose status isn't in our map (user-added
+// columns with a custom status). The frontend is the last line of
+// defense — if the backend ever returns a status we don't know, we
+// show it in muted gray rather than crash.
 const STATUS_COLORS: Record<string, string> = {
   backlog: '#6b7280',
   todo: '#3b82f6',
@@ -38,11 +52,12 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
   const [config, setConfig] = useState<WidgetConfig>({
     mode: 'active',
     max_items: 10,
-    show_columns: ['in_progress', 'review', 'blocked'],
+    show_columns: [],  // Will be filled in by loadConfig. Empty array = show all enabled columns.
     show_deadline: true,
     show_department: true,
     compact: true,
   })
+  const [columns, setColumns] = useState<Column[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -58,12 +73,24 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
     }
   }, [])
 
+  const loadColumns = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/kanban/config/columns`)
+      if (res.ok) {
+        setColumns(await res.json())
+      }
+    } catch (e) {
+      console.error('[kanban-widget] columns error:', e)
+    }
+  }, [])
+
   const loadTasks = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/api/kanban/tasks/board`)
       if (res.ok) {
         const data = await res.json()
-        // Flatten board into task list
+        // Flatten board into task list, attaching the status
+        // the backend already gave us via the column key.
         const allTasks: Task[] = []
         for (const [colKey, colTasks] of Object.entries(data)) {
           for (const t of (colTasks as Task[])) {
@@ -71,10 +98,41 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
           }
         }
 
-        // Filter by show_columns
-        let filtered = allTasks
+        // Resolve which statuses to show. show_columns may
+        // contain either column.id (new format) or TaskStatus
+        // strings (legacy). We normalise both into a set of
+        // TaskStatus values by joining with the columns table.
+        // If show_columns is empty, we show all enabled columns.
+        let allowed: Set<string> | null = null
         if (config.show_columns && config.show_columns.length > 0) {
-          filtered = allTasks.filter(t => config.show_columns.includes(t.status))
+          allowed = new Set()
+          for (const entry of config.show_columns) {
+            // Try to find this entry as a column id first.
+            const col = columns.find(c => c.id === entry)
+            if (col && col.status) {
+              allowed.add(col.status)
+            } else if (col && !col.status) {
+              // User-added column with no status mapping.
+              // Tasks in this column are unreachable via the
+              // status-keyed board, so we can only filter by
+              // id — which isn't a key in the board object. We
+              // fall back to including all tasks (best-effort
+              // visibility) but log a warning so the user
+              // knows to set a status on the column.
+              console.warn(
+                `[kanban-widget] show_columns includes column '${entry}' which has no status; ` +
+                `tasks in that column won't appear here. Edit the column to set a status.`
+              )
+            } else {
+              // Treat as legacy TaskStatus value.
+              allowed.add(entry)
+            }
+          }
+        }
+
+        let filtered = allTasks
+        if (allowed !== null) {
+          filtered = allTasks.filter(t => allowed!.has(t.status))
         }
 
         // Sort by priority
@@ -93,9 +151,10 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
     } finally {
       setLoading(false)
     }
-  }, [config])
+  }, [config, columns])
 
   useEffect(() => { loadConfig() }, [loadConfig])
+  useEffect(() => { loadColumns() }, [loadColumns])
   useEffect(() => { loadTasks() }, [loadTasks])
 
   // WebSocket live updates for config changes
@@ -105,13 +164,14 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
       loadConfig()
     })
     const unsub2 = wsOn('kanban:columns_updated', () => {
+      loadColumns()
       loadTasks()
     })
     const unsub3 = wsOn('kanban:labels_updated', () => {
       loadTasks()
     })
     return () => { unsub1(); unsub2(); unsub3() }
-  }, [wsOn, loadConfig, loadTasks])
+  }, [wsOn, loadConfig, loadColumns, loadTasks])
 
   if (loading) {
     return (

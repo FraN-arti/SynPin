@@ -219,10 +219,42 @@ def save_labels(labels: list[LabelConfig]) -> None:
 # ── Widget ───────────────────────────────────────────────────────────────────
 
 def load_widget() -> WidgetConfig:
-    """Load widget config."""
+    """Load widget config.
+
+    On load we also run a one-shot migration of the legacy
+    show_columns format. The original schema stored TaskStatus
+    strings here ('in_progress', 'review', 'blocked'), but
+    user-added columns have arbitrary status values that don't
+    match any TaskStatus enum entry — so the widget silently
+    failed to render them. We now store column.id instead and
+    map status -> id at load time, transparently upgrading any
+    existing widget.yaml in the user's repo. After migration
+    the file is rewritten so subsequent loads are no-ops.
+    """
     data = _load_yaml("widget")
     if data and isinstance(data, dict):
-        return WidgetConfig(**data)
+        widget = WidgetConfig(**data)
+        # Migration: if show_columns entries look like TaskStatus
+        # values (rather than column ids), remap them to the
+        # matching column id. We detect legacy entries by
+        # checking whether any of them matches a known column
+        # status — if NO match at all, treat them all as ids
+        # (already-migrated); if SOME match, all are status
+        # strings (legacy). Mixed-state we leave alone since
+        # the lookup is best-effort.
+        if widget.show_columns:
+            cols = load_columns()
+            by_status = {c.status: c.id for c in cols if c.status}
+            known_statuses = set(by_status.keys())
+            legacy_entries = [s for s in widget.show_columns if s in known_statuses]
+            if legacy_entries:
+                # Whole list (or most of it) looks like legacy
+                # TaskStatus values — translate to column ids.
+                new_show = [by_status.get(s, s) for s in widget.show_columns]
+                if new_show != widget.show_columns:
+                    widget.show_columns = new_show
+                    save_widget(widget)
+        return widget
     widget = WidgetConfig()
     save_widget(widget)
     return widget

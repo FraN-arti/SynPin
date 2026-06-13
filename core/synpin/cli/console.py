@@ -14,6 +14,12 @@ from rich.console import Console
 from rich.theme import Theme
 
 # SynPin CLI brand — orange/amber family, matching the web's CSS vars.
+# The "info" and "success" tones anchor the output in warm orange/gold;
+# "dim" is a soft, warm slate — not the cold industrial grey that
+# Rich's default is, more like sea-breeze-on-sand than
+# raw-concrete. Together with the orange brand colour it gives the
+# output a calm, warm identity without ever looking like a wall of
+# shouty text.
 synpin_theme = Theme({
     "info":     "#f97316",   # --orange
     "success":  "#f59e0b",   # --accent (slightly warmer, reads as gold)
@@ -21,8 +27,8 @@ synpin_theme = Theme({
     "error":    "red",
     "brand":    "bold #f97316",
     "accent":   "bold #f59e0b",
-    "dim":      "#94a3b8",
-    "muted":    "#64748b",
+    "dim":      "#a8b5c4",   # sea-breeze slate: warm grey-blue, not cold
+    "muted":    "#7a8a9c",   # slightly dimmer variant for secondary meta
 })
 
 console = Console(theme=synpin_theme)

@@ -56,10 +56,20 @@ app.add_middleware(
 from ..chat import ProviderRegistry
 from ..chat import router as chat_router
 
-# Resolve config path: prod ~/.synpin/config/ first, then dev core/config/
+# Resolve config path. In dev mode the in-repo config wins so
+# the developer is editing the same file the server is reading.
+# In production we fall back to ~/.synpin/config/. The previous
+# version of this list had production FIRST, which silently
+# picked up stale config files left over from older installs
+# and produced confusing errors (e.g. providers.yaml in the
+# list-as-dict format from a previous release, when the new
+# code expects dict-of-dicts). SYNPIN_DEV is read once at
+# import time and used to swap the order.
+from ..paths import get_config_dir
+_dev_user_dir = get_config_dir()  # respects SYNPIN_DEV at import
 _config_candidates = [
-    Path.home() / ".synpin" / "config" / "providers.yaml",   # production
-    Path(__file__).resolve().parent.parent / "config" / "providers.yaml",  # dev
+    _dev_user_dir / "providers.yaml",                  # dev (preferred)
+    Path.home() / ".synpin" / "config" / "providers.yaml",  # production (fallback)
 ]
 
 _loaded_registry: ProviderRegistry | None = None

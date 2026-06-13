@@ -122,6 +122,13 @@ switch -Regex ($args[0]) {
             Write-Host "[dev] using Python: $pythonExe" -ForegroundColor Gray
         }
 
+        # The cmd 'set' in dev.bat is local to that .bat process, so
+        # $env:SYNPIN_DEV never reaches here. We set it explicitly
+        # so 'synpin dev' knows to use the in-repo config layout
+        # (synpin/config/, synpin/data/) instead of the prod
+        # ~/.synpin/ one.
+        $env:SYNPIN_DEV = "1"
+
         & $pythonExe -m synpin dev
     }
     '^stop$|^--stop$' {

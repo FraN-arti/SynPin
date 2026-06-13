@@ -113,8 +113,17 @@ def get_user_data_dir() -> Path:
             return _USER_DATA_DIR
 
         # 2. Dev mode: project-relative
+        #    Per the structural refactor (commit 2 of 2026-06-13), all
+        #    per-entity data lives INSIDE the synpin package at
+        #    core/synpin/data/ and main configs at core/synpin/config/.
+        #    Pointing the user data dir at core/.synpin (the pre-
+        #    refactor location) would make the running server see an
+        #    empty config tree, even though the YAMLs are sitting
+        #    right next to the package. The "dev" location is now
+        #    the package's own config/ + data/ subdirs — same as
+        #    where they were before the refactor.
         if is_dev_mode():
-            _USER_DATA_DIR = _PROJECT_ROOT / "core" / ".synpin"
+            _USER_DATA_DIR = _PROJECT_ROOT / "core" / "synpin"
             return _USER_DATA_DIR
 
         # 3. Production: user home

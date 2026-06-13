@@ -37,6 +37,65 @@ function Warn($msg) { Write-Host "[WARN] $msg" -ForegroundColor Yellow }
 function Fail($msg) { Write-Host "[FAIL] $msg" -ForegroundColor Red }
 
 # ----------------------------------------------------------------------------
+# Auto-install helpers
+#
+# On Windows 11 / Windows 10 (1809+) the system ships with `winget`,
+# the official Microsoft package manager. We use it to install Python
+# 3.11 and Node.js 20 LTS without the user having to open a browser
+# and click through installers. As with install.sh, every privileged
+# install is gated behind an interactive y/N prompt unless
+# $env:SYNPIN_AUTO_INSTALL is set to '1'.
+# ----------------------------------------------------------------------------
+
+$script:WingetAvailable = $null  # lazy-detect on first use
+
+function Test-Winget {
+    if ($null -ne $script:WingetAvailable) { return $script:WingetAvailable }
+    $wingetCmd = Get-Command winget -ErrorAction SilentlyContinue
+    if ($null -eq $wingetCmd) {
+        $script:WingetAvailable = $false
+    } else {
+        $script:WingetAvailable = $true
+    }
+    return $script:WingetAvailable
+}
+
+function Offer-Install {
+    param(
+        [string]$What,           # human-readable name, e.g. "Python 3.11+"
+        [string]$WingetId,       # winget package id, e.g. "Python.Python.3.11"
+        [string]$WingetExtraArgs = ""  # extra winget flags if needed
+    )
+    if (-not (Test-Winget)) {
+        Warn "Cannot auto-install ${What}: winget not found on this system."
+        Warn "  Install manually from the project website, or upgrade Windows 10 to 1809+."
+        return $false
+    }
+    $cmd = "winget install --id $WingetId --accept-package-agreements --accept-source-agreements $WingetExtraArgs"
+    Write-Host ""
+    Write-Host "  ${What} is missing. The installer can install it via:" -ForegroundColor Yellow
+    Write-Host "    $cmd" -ForegroundColor Gray
+    if ($env:SYNPIN_AUTO_INSTALL -eq "1") {
+        Write-Host "  SYNPIN_AUTO_INSTALL=1 set, installing without prompt..." -ForegroundColor Yellow
+        $reply = "y"
+    } else {
+        $reply = Read-Host "  Install ${What} now? [y/N]"
+    }
+    if ($reply -notin @("y", "Y", "yes", "Yes", "YES")) {
+        Warn "Skipped ${What} install. The script will fail unless you install it manually."
+        return $false
+    }
+    Write-Host "  Running: $cmd" -ForegroundColor Gray
+    & winget install --id $WingetId --accept-package-agreements --accept-source-agreements $WingetExtraArgs
+    if ($LASTEXITCODE -ne 0) {
+        Fail "${What} install failed (winget exit $LASTEXITCODE). Check the output above."
+        return $false
+    }
+    Ok "${What} installed."
+    return $true
+}
+
+# ----------------------------------------------------------------------------
 # Prerequisite checks
 # ----------------------------------------------------------------------------
 
@@ -47,9 +106,23 @@ function Check-Python {
         $pyOut = & python --version 2>&1 | Out-String
         $pyOut = $pyOut.Trim()
     } catch {
-        Fail "python not found in PATH. Install Python $RequiredPythonMajor.$RequiredPythonMinor+"
-        Write-Host "  Download: https://www.python.org/downloads/"
-        exit 1
+        # Python missing. Try to install it via winget.
+        $ok = Offer-Install -What "Python $RequiredPythonMajor.$RequiredPythonMinor+" -WingetId "Python.Python.3.11"
+        if (-not $ok) {
+            Fail "python not found in PATH. Install Python $RequiredPythonMajor.$RequiredPythonMinor+"
+            Write-Host "  Download: https://www.python.org/downloads/"
+            exit 1
+        }
+        # winget puts python on PATH but the new process may not see it
+        # yet. Try once more — if still missing, tell the user to open
+        # a fresh PowerShell.
+        try {
+            $pyOut = & python --version 2>&1 | Out-String
+            $pyOut = $pyOut.Trim()
+        } catch {
+            Fail "python still not on PATH after install. Open a NEW PowerShell window and re-run."
+            exit 1
+        }
     }
     if ($pyOut -notmatch 'Python (\d+)\.(\d+)\.(\d+)') {
         Fail "Could not parse Python version: $pyOut"
@@ -59,6 +132,8 @@ function Check-Python {
     $minor = [int]$Matches[2]
     if ($major -lt $RequiredPythonMajor -or ($major -eq $RequiredPythonMajor -and $minor -lt $RequiredPythonMinor)) {
         Fail "Python $pyOut found, need >= $RequiredPythonMajor.$RequiredPythonMinor"
+        Write-Host "  Set SYNPIN_AUTO_INSTALL=1 to attempt an automatic upgrade."
+        Write-Host "  Or install Python $RequiredPythonMajor.$RequiredPythonMinor+ manually."
         exit 1
     }
     Ok "Python $pyOut"
@@ -87,8 +162,18 @@ function Check-Git {
         $gitOut = & git --version 2>&1 | Out-String
         if ($LASTEXITCODE -ne 0) { throw "git not in PATH" }
     } catch {
-        Fail "git not found. Install from https://git-scm.com/download/win"
-        exit 1
+        $ok = Offer-Install -What "git" -WingetId "Git.Git"
+        if (-not $ok) {
+            Fail "git not found. Install from https://git-scm.com/download/win"
+            exit 1
+        }
+        try {
+            $gitOut = & git --version 2>&1 | Out-String
+            if ($LASTEXITCODE -ne 0) { throw "git still not in PATH" }
+        } catch {
+            Fail "git installed but not on PATH. Open a NEW PowerShell and re-run."
+            exit 1
+        }
     }
     Ok "$($gitOut.Trim())"
 }
@@ -100,9 +185,19 @@ function Check-Node {
         $nodeOut = & node --version 2>&1 | Out-String
         if ($LASTEXITCODE -ne 0) { throw "node not in PATH" }
     } catch {
-        Warn "Node.js not found. Web frontend won't work without it."
-        Warn "  Download from https://nodejs.org/"
-        return
+        $ok = Offer-Install -What "Node.js $RequiredNodeMajor+" -WingetId "OpenJS.NodeJS.LTS"
+        if (-not $ok) {
+            Warn "Node.js not found. Web frontend won't work without it."
+            Warn "  Download from https://nodejs.org/"
+            return
+        }
+        try {
+            $nodeOut = & node --version 2>&1 | Out-String
+            if ($LASTEXITCODE -ne 0) { throw "node still not in PATH" }
+        } catch {
+            Warn "Node.js installed but not on PATH. Open a NEW PowerShell to use it."
+            return
+        }
     }
     $nodeVersion = ($nodeOut.Trim() -replace '^v', '')
     $nodeMajor = 0

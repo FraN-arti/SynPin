@@ -34,6 +34,7 @@ def _get_version() -> str:
 def cmd_start(args):
     """Start SynPin server."""
     import uvicorn
+    from rich.logging import RichHandler
 
     host = os.environ.get("SYNPIN_HOST", "0.0.0.0")
     port = int(os.environ.get("SYNPIN_PORT", "2088"))
@@ -51,7 +52,7 @@ def cmd_start(args):
                     parts = line.split()
                     if parts:
                         old_pid = parts[-1]
-                        console.print(f"[dim]⏳  Port {port} in use (PID {old_pid}) — stopping...[/dim]")
+                        console.print(f"[dim]Port {port} in use (PID {old_pid}) - stopping...[/dim]")
                         subprocess.run(["taskkill", "/F", "/PID", old_pid], capture_output=True)
                         time.sleep(1)
                         break
@@ -63,11 +64,47 @@ def cmd_start(args):
     pid_file.write_text(json.dumps({"pid": os.getpid(), "port": port}))
 
     console.print()
-    console.print(f"[brand]🚀  SynPin v{version}[/brand]")
+    console.print(f"[brand]SynPin v{version}[/brand]")
     console.print(f"   [dim]API:  http://{host}:{port}/api[/dim]")
     console.print(f"   [dim]Web:  http://{host}:{port}[/dim]")
     console.print(f"   [dim]Docs: http://{host}:{port}/docs[/dim]")
     console.print()
+
+    # Configure uvicorn to use Rich's logging handler so its INFO/
+    # WARNING/ERROR/DEBUG lines come out in the brand orange/amber
+    # family rather than uvicorn's default white. We also tighten
+    # the format: '%(message)s' means no "[2026-06-13 12:34:56]"
+    # timestamp prefix — the RichHandler already adds a timestamp
+    # column on the right of the line, so a second prefix is just
+    # noise.
+    log_config = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "rich": {
+                "format": "%(message)s",
+                "datefmt": "[%X]",
+            }
+        },
+        "handlers": {
+            "rich": {
+                "class": "rich.logging.RichHandler",
+                "formatter": "rich",
+                "console": console,            # reuse the brand console
+                "rich_tracebacks": True,
+                "show_path": False,            # we don't need the file:line noise
+                "show_time": True,            # timestamp column on the right
+                "markup": True,                # allow [bold] etc. inside log records
+                "log_time_format": "[%X]",
+            }
+        },
+        "loggers": {
+            "uvicorn":        {"handlers": ["rich"], "level": "INFO", "propagate": False},
+            "uvicorn.error":  {"handlers": ["rich"], "level": "INFO", "propagate": False},
+            "uvicorn.access": {"handlers": ["rich"], "level": "INFO", "propagate": False},
+            "synpin":         {"handlers": ["rich"], "level": "INFO", "propagate": False},
+        },
+    }
 
     try:
         uvicorn.run(
@@ -75,6 +112,7 @@ def cmd_start(args):
             host=host,
             port=port,
             reload=False,
+            log_config=log_config,
         )
     finally:
         if pid_file.exists():

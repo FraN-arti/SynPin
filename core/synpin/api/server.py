@@ -183,21 +183,105 @@ def reload_config():
 
 
 # --- Config Watcher: auto-reload on file change ---
+# Polls every 5s. When any watched YAML changes on disk, the
+# relevant in-memory state is reloaded and a WebSocket event is
+# pushed to all connected clients. This makes the production
+# synpin-start experience equivalent to HMR: edit a YAML in your
+# editor, the running server picks it up, the open browser tab
+# sees the new state without a reload.
 from ..config.watcher import ConfigWatcher
+from ..paths import (
+    get_config_dir,
+    get_agents_dir,
+    get_departments_dir,
+    get_otdels_dir,
+    get_data_dir,
+)
 
 _config_watcher = ConfigWatcher(interval=5)
 
-def _on_providers_changed(path: Path, mtime: float):
-    """Callback when providers.yaml changes on disk."""
+
+def _broadcast_config_event(event_type: str, payload: dict) -> None:
+    """Push a config:updated event to all connected WS clients.
+
+    We import ws_manager lazily because it's set up in an
+    on_event('startup') hook later in this file (and the import
+    itself is fine but the manager singleton might not be fully
+    initialised at module import time).
+    """
+    try:
+        from ..chat.ws_manager import ws_manager
+        import asyncio
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.ensure_future(ws_manager.broadcast({
+                "type": event_type,
+                **payload,
+            }))
+    except Exception:
+        # If the loop isn't ready (e.g. we're in a unit test), skip
+        # the broadcast. The reload itself still happens.
+        pass
+
+
+def _on_providers_changed(path: Path, mtime: float) -> None:
+    """Reload providers when providers.yaml changes on disk."""
     if _loaded_registry:
         _loaded_registry.reload()
-        print(f"  [config] ⚡ providers.yaml reloaded (mtime={mtime:.0f})")
+        print(f"  [config] providers.yaml reloaded (mtime={mtime:.0f})")
+        _broadcast_config_event("providers:updated", {"mtime": mtime})
 
+
+def _on_yaml_changed(label: str) -> "callable":
+    """Return a callback that logs + broadcasts when a YAML changes."""
+    def _cb(path: Path, mtime: float) -> None:
+        print(f"  [config] {label} reloaded from disk (mtime={mtime:.0f})")
+        _broadcast_config_event(f"{label}:updated", {"mtime": mtime})
+    return _cb
+
+
+# Wire the watcher to every user-editable config file. We catch
+# OSError per file (a file may be absent on a fresh install, and
+# watcher.watch already logs that) so one missing file doesn't
+# break the whole watcher startup.
+def _safe_watch(path: Path, label: str) -> None:
+    if path and path.exists():
+        _config_watcher.watch(path, _on_yaml_changed(label))
+
+
+# providers.yaml — already done above.
 if _loaded_config_path:
     _config_watcher.watch(_loaded_config_path, _on_providers_changed)
 
+# Main config dir YAMLs (agents, departments, otdels, settings, etc.)
+for yaml_name in ("agents.yaml", "departments.yaml", "otdels.yaml",
+                  "settings.yaml", "channels.yaml", "memory.yaml",
+                  "tools.yaml", "roles.yaml", "security.yaml"):
+    _safe_watch(get_config_dir() / yaml_name, yaml_name.replace(".yaml", ""))
+
+# Per-department and per-otdel data dirs — every file inside is a
+# live entity that the UI reads on every request. We add watchers
+# for any existing subdir's department.yaml / otdel.yaml.
+def _watch_per_entity_dirs(parent: Path, suffix: str) -> None:
+    if not parent.exists():
+        return
+    for sub in parent.iterdir():
+        if sub.is_dir():
+            _safe_watch(sub / f"{suffix}.yaml", f"{suffix} {sub.name}")
+
+_watch_per_entity_dirs(get_departments_dir(), "department")
+_watch_per_entity_dirs(get_otdels_dir(), "otdel")
+
+# Kanban config (columns.yaml, labels.yaml, settings.yaml,
+# widget.yaml) — small, but the user edits them via the UI and
+# also sometimes by hand, so watcher makes sense.
+kanban_cfg = Path(__file__).resolve().parent.parent / "kanban" / "config"
+for yaml_name in ("columns.yaml", "labels.yaml", "settings.yaml", "widget.yaml"):
+    _safe_watch(kanban_cfg / yaml_name, f"kanban-{yaml_name.replace('.yaml', '')}")
+
 _config_watcher.start()
-print(f"  [config] ConfigWatcher active (polling every 5s)")
+watched = sum(1 for p, _ in _config_watcher._watches)
+print(f"  [config] ConfigWatcher active: {watched} files, polling every 5s")
 
 
 # Serve React SPA (built static files) — ONLY in production

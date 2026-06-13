@@ -31,16 +31,108 @@ warn() { color_yellow "⚠ $*"; }
 fail() { color_red "✗ $*"; }
 
 # ---------------------------------------------------------------------------
+# Auto-install helpers
+#
+# If a required tool is missing, try to install it via the system
+# package manager before bailing out. We never silently sudo — every
+# privileged install is gated behind an interactive y/N prompt and
+# the script clearly states what it's about to do.
+# ---------------------------------------------------------------------------
+
+# Detect the OS / distro once at startup.
+OS_KIND="unknown"
+PKG_INSTALL_CMD=""
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    case "${ID:-}" in
+        ubuntu|debian|linuxmint|pop|elementary|kde neon|zorin)
+            OS_KIND="debian"; PKG_INSTALL_CMD="sudo apt-get install -y" ;;
+        fedora|rhel|centos|rocky|almalinux|nobara)
+            OS_KIND="fedora"; PKG_INSTALL_CMD="sudo dnf install -y" ;;
+        arch|manjaro|endeavouros)
+            OS_KIND="arch"; PKG_INSTALL_CMD="sudo pacman -S --noconfirm" ;;
+        opensuse*|sles)
+            OS_KIND="suse"; PKG_INSTALL_CMD="sudo zypper install -y" ;;
+        alpine)
+            OS_KIND="alpine"; PKG_INSTALL_CMD="sudo apk add" ;;
+    esac
+fi
+if command -v brew >/dev/null 2>&1; then
+    OS_KIND="brew"; PKG_INSTALL_CMD="brew install"
+fi
+
+# Offer to run a privileged install. Returns 0 on success (or if
+# the user accepted the install but it failed — caller will re-check
+# and decide), 1 if the user said no.
+offer_install() {
+    local what="$1"
+    local pkgname="$2"
+    if [ -z "$PKG_INSTALL_CMD" ]; then
+        warn "Cannot auto-install $what: no supported package manager found."
+        warn "  Install $what manually (e.g. from https://python.org/, https://nodejs.org/)."
+        return 1
+    fi
+    printf "\n  $what is missing. The installer can install it via:\n"
+    printf "    $PKG_INSTALL_CMD $pkgname\n"
+    if [ "${SYNPIN_AUTO_INSTALL:-0}" = "1" ]; then
+        color_yellow "  SYNPIN_AUTO_INSTALL=1 set, installing without prompt..."
+        REPLY="y"
+    else
+        read -p "  Install $what now? [y/N] " -n 1 -r REPLY
+        printf "\n"
+    fi
+    if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
+        warn "Skipped $what install. The script will fail unless you install it manually."
+        return 1
+    fi
+    if $PKG_INSTALL_CMD "$pkgname"; then
+        color_green "  ok $what installed."
+        return 0
+    else
+        color_red "  fail $what install failed. Check the output above."
+        return 1
+    fi
+}
+
+# Re-check a command after install attempt.
+recheck() {
+    local cmd="$1"
+    if command -v "$cmd" >/dev/null 2>&1; then
+        return 0
+    fi
+    return 1
+}
+
+# ---------------------------------------------------------------------------
 # Prerequisite checks
 # ---------------------------------------------------------------------------
 
 check_python() {
     step "Checking Python >= ${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR}"
     if ! command -v python3 >/dev/null 2>&1; then
-        fail "python3 not found. Install Python ${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR}+"
-        echo "  macOS:  brew install python@${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR}"
-        echo "  Ubuntu:  sudo apt install python${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR}"
-        exit 1
+        # Pick the right package name for the distro.
+        case "$OS_KIND" in
+            debian)  pkg="python3.11 python3-pip" ;;  # may not be in default repos
+            fedora)  pkg="python3.11" ;;               # may need extra repo
+            arch)    pkg="python python-pip" ;;
+            suse)    pkg="python3 python3-pip" ;;
+            alpine)  pkg="python3 py3-pip" ;;
+            brew)    pkg="python@3.11" ;;
+            *)       pkg="" ;;
+        esac
+        if [ -n "$pkg" ]; then
+            offer_install "Python ${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR}+" "$pkg" || exit 1
+        else
+            fail "python3 not found. Install Python ${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR}+"
+            echo "  macOS:  brew install python@${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR}"
+            echo "  Ubuntu: sudo apt install python${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR}"
+            exit 1
+        fi
+        # Re-check after install attempt.
+        if ! recheck python3; then
+            fail "python3 still not on PATH after install. Try opening a new shell."
+            exit 1
+        fi
     fi
 
     local py_version
@@ -51,8 +143,22 @@ check_python() {
 
     if [ "$py_major" -lt "$REQUIRED_PYTHON_MAJOR" ] || \
        { [ "$py_major" -eq "$REQUIRED_PYTHON_MAJOR" ] && [ "$py_minor" -lt "$REQUIRED_PYTHON_MINOR" ]; }; then
-        fail "Python $py_version found, need >= ${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR}"
-        exit 1
+        # Try to install a newer Python via the package manager. On
+        # Debian/Ubuntu, 3.11 isn't in the default repos of older
+        # releases — we point at the deadsnakes PPA as a last resort
+        # but only if the user opts in.
+        if [ "$OS_KIND" = "debian" ] && [ "${SYNPIN_AUTO_INSTALL:-0}" = "1" ]; then
+            warn "System Python is too old. Adding deadsnakes PPA + installing 3.11..."
+            sudo apt-get install -y software-properties-common
+            sudo add-apt-repository -y ppa:deadsnakes/ppa
+            sudo apt-get update
+            sudo apt-get install -y python3.11 python3.11-venv python3.11-distutils
+        else
+            fail "Python $py_version found, need >= ${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR}"
+            echo "  Set SYNPIN_AUTO_INSTALL=1 to attempt automatic upgrade."
+            echo "  Or install Python ${REQUIRED_PYTHON_MAJOR}.${REQUIRED_PYTHON_MINOR}+ manually."
+            exit 1
+        fi
     fi
     ok "Python $py_version"
 }
@@ -69,18 +175,46 @@ check_pip() {
 check_git() {
     step "Checking git"
     if ! command -v git >/dev/null 2>&1; then
-        fail "git not found. Install git."
-        exit 1
+        case "$OS_KIND" in
+            debian)  pkg="git" ;;
+            fedora)  pkg="git" ;;
+            arch)    pkg="git" ;;
+            suse)    pkg="git" ;;
+            alpine)  pkg="git" ;;
+            brew)    pkg="git" ;;
+            *)       pkg="" ;;
+        esac
+        if [ -n "$pkg" ]; then
+            offer_install "git" "$pkg" || exit 1
+        else
+            fail "git not found."
+            exit 1
+        fi
+        recheck git || { fail "git still missing after install"; exit 1; }
     fi
     ok "git $(git --version | awk '{print $3}')"
 }
 
 check_node() {
-    step "Checking Node.js >= ${REQUIRED_NODE_MAJOR} (optional — only needed for the web frontend)"
+    step "Checking Node.js >= ${REQUIRED_NODE_MAJOR} (optional - only needed for the web frontend)"
     if ! command -v node >/dev/null 2>&1; then
-        warn "Node.js not found. Web frontend won't work without it."
-        warn "  Install from https://nodejs.org/ or via your package manager."
-        return 0
+        case "$OS_KIND" in
+            debian)  pkg="nodejs npm" ;;
+            fedora)  pkg="nodejs npm" ;;
+            arch)    pkg="nodejs npm" ;;
+            suse)    pkg="nodejs npm" ;;
+            alpine)  pkg="nodejs npm" ;;
+            brew)    pkg="node" ;;
+            *)       pkg="" ;;
+        esac
+        if [ -n "$pkg" ]; then
+            offer_install "Node.js ${REQUIRED_NODE_MAJOR}+" "$pkg" || return 0
+        else
+            warn "Node.js not found. Web frontend won't work without it."
+            warn "  Install from https://nodejs.org/ or via your package manager."
+            return 0
+        fi
+        recheck node || { warn "node still missing after install; skipping web"; return 0; }
     fi
     local node_version
     node_version=$(node --version | sed 's/^v//')

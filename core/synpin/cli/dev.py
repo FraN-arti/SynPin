@@ -10,10 +10,21 @@ Behaviour:
   3. Wait for /api/health to respond (max 30s).
   4. Start Vite as a subprocess, print its stdout/stderr with [WEB] prefix.
   5. Wait for either to exit or for SIGINT/SIGTERM; clean up both.
+
+ANSI handling
+-------------
+On Windows, ANSI escape sequences from Vite/Node would otherwise render
+as raw garbage (e.g. "[32m[1mVITE[22m..."). Rich already handles this for
+Python output via colorama, but child processes' output can leak
+through. We wrap the stream so any residual escape codes are stripped
+before they hit the user's terminal. On a real Windows Terminal or any
+VT-aware host, the parent's VT processing is the source of truth and
+this strip is a no-op.
 """
 from __future__ import annotations
 
 import os
+import re
 import signal
 import socket
 import subprocess
@@ -26,6 +37,63 @@ from queue import Empty, Queue
 from typing import Optional
 
 from .console import console
+
+# Strip ANSI escape sequences (CSI / OSC) before they hit the terminal.
+# Rich+colorama already render most of these correctly on modern Windows
+# hosts, but Node/Vite output occasionally emits codes that the parent
+# host doesn't recognise (resulting in literal [32m[1mVITE[22m... in the
+# terminal). This regex catches the common cases.
+_ANSI_ESCAPE_RE = re.compile(
+    r"""
+    \x1B            # ESC
+    (?:
+        \[          # CSI: ESC [
+        [0-?]*      # parameter bytes
+        [ -/]*       # intermediate bytes
+        [@-~]        # final byte
+    |
+        \]          # OSC: ESC ]
+        [^\x07\x1B]* # anything but BEL or ESC
+        (?:\x07|\x1B\\)  # terminated by BEL or ST
+    )
+    """,
+    re.VERBOSE,
+)
+
+
+def _strip_ansi(line: str) -> str:
+    """Remove ANSI escape sequences from a line. Cheap (regex) and
+    safe — if no escape sequences are present (modern Windows Terminal
+    with VT processing) the line is returned unchanged."""
+    return _ANSI_ESCAPE_RE.sub("", line)
+
+
+def _output_printer(queue: Queue, stop_event: threading.Event, strip_ansi: bool) -> None:
+    """Print queued (prefix, line) tuples with consistent formatting.
+
+    If `strip_ansi` is True, residual escape codes from child processes
+    are stripped before printing. Rich+colorama already render Python
+    output correctly, so this only affects lines coming from the
+    subprocess pipes (Vite/uvicorn).
+    """
+    while not stop_event.is_set():
+        try:
+            prefix, line = queue.get(timeout=OUTPUT_POLL_INTERVAL_S)
+        except Empty:
+            continue
+        if strip_ansi:
+            line = _strip_ansi(line)
+        # Vite/Node occasionally emit blank lines or lines that are
+        # only whitespace — skip them so the unified output stays
+        # readable.
+        if not line.strip():
+            continue
+        if prefix == "CORE":
+            console.print(f"[success]{prefix}[/success] {line}")
+        elif prefix == "WEB":
+            console.print(f"[info]{prefix}[/info] {line}")
+        else:
+            console.print(f"{prefix} {line}")
 
 CORE_HOST = "0.0.0.0"
 CORE_PORT = 2088
@@ -68,21 +136,6 @@ def _stream_output(proc: subprocess.Popen, prefix: str, queue: Queue) -> None:
     for line in iter(proc.stdout.readline, ""):
         queue.put((prefix, line.rstrip()))
     proc.stdout.close()
-
-
-def _output_printer(queue: Queue, stop_event: threading.Event) -> None:
-    """Print queued (prefix, line) tuples with consistent formatting."""
-    while not stop_event.is_set():
-        try:
-            prefix, line = queue.get(timeout=OUTPUT_POLL_INTERVAL_S)
-        except Empty:
-            continue
-        if prefix == "CORE":
-            console.print(f"[success]{prefix}[/success] {line}")
-        elif prefix == "WEB":
-            console.print(f"[info]{prefix}[/info] {line}")
-        else:
-            console.print(f"{prefix} {line}")
 
 
 def _wait_for_backend(port: int, core_proc: subprocess.Popen) -> bool:
@@ -221,7 +274,14 @@ def run_dev_server() -> None:
     if hasattr(signal, "SIGTERM"):
         signal.signal(signal.SIGTERM, _shutdown)
 
-    printer = threading.Thread(target=_output_printer, args=(output_queue, printer_stop), daemon=True)
+    # Strip ANSI escapes from child process output on Windows legacy
+    # conhost. Modern Windows Terminal / pty-aware hosts render them
+    # correctly, so we set this conservatively: on Unix we leave them
+    # alone (the terminal is the source of truth), on Windows we strip
+    # because the dev.bat -> dev.ps1 path lands on legacy conhost for
+    # many users.
+    strip_ansi = os.name == "nt"
+    printer = threading.Thread(target=_output_printer, args=(output_queue, printer_stop, strip_ansi), daemon=True)
     printer.start()
 
     # Start Core

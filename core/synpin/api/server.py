@@ -137,10 +137,20 @@ app.include_router(version_router)
 import asyncio
 from ..kanban.service import set_ws_loop
 from ..kanban.config import set_config_broadcast
+# Hooks that wire up async-loop-dependent state. We attempt to do
+# this eagerly at import time (fast happy path) and fall back to
+# on_event('startup') if no loop is running yet. Both branches
+# must remain valid: some test harnesses import this module under
+# plain python -m unittest without uvicorn, others run it under
+# the production server. We register the startup hook ALWAYS, not
+# just inside except — that way the background update-checker (in
+# particular) fires whether or not a loop was available at import.
 try:
     loop = asyncio.get_running_loop()
     set_ws_loop(loop)
 except RuntimeError:
+    # No loop at import time — register a startup hook to set one up
+    # when uvicorn starts the app.
     @app.on_event("startup")
     def _setup_kanban_ws():
         loop = asyncio.get_event_loop()
@@ -149,23 +159,34 @@ except RuntimeError:
         async def _broadcast(event: dict):
             from ..chat.ws_manager import ws_manager
             await ws_manager.broadcast(event)
-        set_config_broadcast(lambda e: asyncio.ensure_future(_broadcast(e)))
+        set_config_broadcast(lambda e: asyncio.ensure_future(_broadcast(event=e)))
 
-    @app.on_event("startup")
-    async def _broadcast_version_on_startup():
-        """Push the current version to all connected clients on boot.
 
-        Clients subscribed via WebSocket receive this immediately and
-        can show the real version without polling /api/version. Clients
-        that connect later also get the version the moment they
-        handshake (the ws_router sends a 'connected' message — we add
-        the version there too).
-        """
-        from ..chat.ws_manager import ws_manager
-        await ws_manager.broadcast({
-            "type": "version:changed",
-            "version": __version__,
-        })
+# ---------------------------------------------------------------------------
+# Background update-checker — registered as a startup hook ALWAYS,
+# not just inside the except branch above. This way the checker
+# fires whether the import-time loop was available or not, and
+# (more importantly) the same code path runs in dev and prod.
+# ---------------------------------------------------------------------------
+
+@app.on_event("startup")
+async def _start_update_checker():
+    """Start the background GitHub update-checker.
+
+    The checker polls every 6 hours and pushes a
+    'version:update_available' event over WebSocket when a
+    newer release is published. It also runs once 2 seconds
+    after startup so users don't have to wait for the first
+    poll to see an "Update available" pill if they're on an
+    older version.
+    """
+    from .version_router import _update_check_loop
+    asyncio.create_task(_update_check_loop())
+    print(
+        f"  [update-check] GitHub update-checker running (every 6h, "
+        f"repo=FraN-arti/SynPin)",
+        flush=True,
+    )
 
 
 @app.get("/api/health")

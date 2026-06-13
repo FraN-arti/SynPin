@@ -53,6 +53,14 @@ core/synpin/config/*.yaml
 # But keep templates tracked
 !core/synpin/config/templates/
 
+# Kanban user config (columns, labels, settings, widget) — per-user
+# state, lives in the synpin package in dev for proximity but
+# shouldn't be shared across users. Templates / defaults should
+# go in core/synpin/kanban/config/templates/ if you want them
+# tracked.
+core/synpin/kanban/config/*.yaml
+!core/synpin/kanban/config/templates/*.yaml
+
 # Agent runtime data
 core/synpin/agents/*/agent.yaml
 .hermes/

@@ -157,7 +157,7 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
   useEffect(() => { loadColumns() }, [loadColumns])
   useEffect(() => { loadTasks() }, [loadTasks])
 
-  // WebSocket live updates for config changes
+  // WebSocket live updates for config changes + task mutations
   useEffect(() => {
     if (!wsOn) return
     const unsub1 = wsOn('kanban:widget_updated', () => {
@@ -170,7 +170,14 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
     const unsub3 = wsOn('kanban:labels_updated', () => {
       loadTasks()
     })
-    return () => { unsub1(); unsub2(); unsub3() }
+    // Task CRUD — drag-drop, create, delete all change the board
+    const unsub4 = wsOn('kanban:task_updated', () => {
+      loadTasks()
+    })
+    const unsub5 = wsOn('kanban:task_created', () => {
+      loadTasks()
+    })
+    return () => { unsub1(); unsub2(); unsub3(); unsub4(); unsub5() }
   }, [wsOn, loadConfig, loadColumns, loadTasks])
 
   if (loading) {

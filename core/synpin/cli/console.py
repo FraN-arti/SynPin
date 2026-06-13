@@ -1,20 +1,28 @@
-"""Shared Rich console with SynPin branding colors."""
+"""Shared Rich console with SynPin branding colors.
+
+Color scheme matches the web app's --orange/--accent CSS variables
+(--orange: #f97316, --accent: #f59e0b), so the CLI and the web
+sidebar share the same brand identity. Use #f97316 for "info" and
+the badge-y #f59e0b for "success" — they read as the same hue
+family, just one warmer (amber) and one cooler (orange).
+
+The CORE / WEB prefixes use the same code as the dev script
+(see synpin.cli.dev): success-styled green for Core, info-styled
+cyan for Web. The banner itself is bold-orange to look "live".
+"""
 from rich.console import Console
 from rich.theme import Theme
 
-# SynPin brand colors (from CSS variables)
-# --green: #15f9a2, --orange: #f97316, --cyan: #22d3ee
-# --text: #f1f5f9, --text-dim: #94a3b8
-
+# SynPin CLI brand — orange/amber family, matching the web's CSS vars.
 synpin_theme = Theme({
-    "info": "cyan",
-    "success": "#15f9a2",
-    "warning": "#f97316",
-    "error": "red",
-    "brand": "bold #15f9a2",
-    "accent": "bold #f97316",
-    "dim": "#94a3b8",
-    "muted": "#64748b",
+    "info":     "#f97316",   # --orange
+    "success":  "#f59e0b",   # --accent (slightly warmer, reads as gold)
+    "warning":  "#fbbf24",   # amber-400
+    "error":    "red",
+    "brand":    "bold #f97316",
+    "accent":   "bold #f59e0b",
+    "dim":      "#94a3b8",
+    "muted":    "#64748b",
 })
 
 console = Console(theme=synpin_theme)

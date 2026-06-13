@@ -38,27 +38,27 @@ from typing import Optional
 
 from .console import console
 
-# Strip ANSI escape sequences (CSI / OSC) before they hit the terminal.
-# Rich+colorama already render most of these correctly on modern Windows
-# hosts, but Node/Vite output occasionally emits codes that the parent
-# host doesn't recognise (resulting in literal [32m[1mVITE[22m... in the
-# terminal). This regex catches the common cases.
-_ANSI_ESCAPE_RE = re.compile(
-    r"""
-    \x1B            # ESC
-    (?:
-        \[          # CSI: ESC [
-        [0-?]*      # parameter bytes
-        [ -/]*       # intermediate bytes
-        [@-~]        # final byte
-    |
-        \]          # OSC: ESC ]
-        [^\x07\x1B]* # anything but BEL or ESC
-        (?:\x07|\x1B\\)  # terminated by BEL or ST
-    )
-    """,
-    re.VERBOSE,
-)
+# Strip ANSI escape sequences before they hit the terminal. We only
+# handle CSI (Control Sequence Introducer, ESC [...X) because that's
+# what Vite/Node/uvicorn emit for colors. OSC sequences (ESC ]) are
+# used for terminal title bars and hyperlinks — none of the things we
+# shell out to use them, so we don't bother matching them.
+_ANSI_ESCAPE_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
+
+# Replace Unicode glyphs that some Windows console fonts lack with their
+# ASCII / 7-bit equivalents. Vite emits "➜" (U+27A8) for "Local:" /
+# "Network:" lines, and a small icon for the "press h + enter" hint;
+# Cascadia Mono / Consolas render some of these as flipped or missing.
+# ASCII-fallbacking them keeps the dev output readable everywhere.
+_UNICODE_GLYPH_MAP = str.maketrans({
+    "➜": ">",   # Vite's "Local: ..." / "Network: ..." prefix
+    "‣": "*",   # misc
+    "—": "-",  # em-dash (some fonts show it as a tofu on old conhost)
+    "–": "-",  # en-dash
+    "·": ".",  # middle dot (not in some legacy fonts)
+    "…": "...",  # ellipsis
+    "•": "*",  # bullet
+})
 
 
 def _strip_ansi(line: str) -> str:
@@ -66,6 +66,12 @@ def _strip_ansi(line: str) -> str:
     safe — if no escape sequences are present (modern Windows Terminal
     with VT processing) the line is returned unchanged."""
     return _ANSI_ESCAPE_RE.sub("", line)
+
+
+def _normalize_glyphs(line: str) -> str:
+    """Replace a handful of Unicode glyphs with their ASCII equivalents
+    so legacy Windows console fonts don't render them as garbage."""
+    return line.translate(_UNICODE_GLYPH_MAP)
 
 
 def _output_printer(queue: Queue, stop_event: threading.Event, strip_ansi: bool) -> None:
@@ -81,17 +87,25 @@ def _output_printer(queue: Queue, stop_event: threading.Event, strip_ansi: bool)
             prefix, line = queue.get(timeout=OUTPUT_POLL_INTERVAL_S)
         except Empty:
             continue
+        # Order matters: strip ANSI first (so we don't match glyph
+        # bytes inside an escape), then swap unicode glyphs for ASCII.
         if strip_ansi:
             line = _strip_ansi(line)
+        line = _normalize_glyphs(line)
         # Vite/Node occasionally emit blank lines or lines that are
         # only whitespace — skip them so the unified output stays
         # readable.
         if not line.strip():
             continue
+        # CORE / WEB prefixes both wear the orange/amber brand family —
+        # CORE a saturated #f97316 (the same --orange as the web),
+        # WEB a softer #f59e0b (the --accent, "gold" tone) so the two
+        # services are visually distinct without drifting out of the
+        # single-hue identity.
         if prefix == "CORE":
-            console.print(f"[success]{prefix}[/success] {line}")
+            console.print(f"[#f97316]{prefix}[/#f97316] {line}")
         elif prefix == "WEB":
-            console.print(f"[info]{prefix}[/info] {line}")
+            console.print(f"[#f59e0b]{prefix}[/#f59e0b] {line}")
         else:
             console.print(f"{prefix} {line}")
 

@@ -202,10 +202,14 @@ def _get_agents_dir() -> Path:
 # ---------------------------------------------------------------------------
 
 def _init_departments_dir() -> Path:
-    prod = Path.home() / ".synpin" / "departments"
-    # paths_legacy.py is at core/synpin/, so .parent.parent is core/.
-    # Original code in agents/manager.py was 3 hops; we need 2.
-    dev = Path(__file__).resolve().parent.parent / "departments"
+    prod = Path.home() / ".synpin" / "data" / "departments"
+    # In dev mode, departments live at core/synpin/data/departments/ —
+    # i.e. inside the package's data/ subdirectory. Originally they
+    # were at core/departments/ (project root, outside the package),
+    # but that broke the "all data inside synpin/" invariant. The
+    # path move is part of the structural refactor (commit 2); this
+    # function definition was updated to match the new layout.
+    dev = _synpin_root() / "data" / "departments"
     return prod if prod.exists() else dev
 
 
@@ -218,9 +222,9 @@ def _get_departments_dir() -> Path:
 # ---------------------------------------------------------------------------
 
 def _init_otdels_dir() -> Path:
-    prod = Path.home() / ".synpin" / "otdels"
-    # Same as departments — 2 hops from paths_legacy.py lands at core/.
-    dev = Path(__file__).resolve().parent.parent / "otdels"
+    prod = Path.home() / ".synpin" / "data" / "otdels"
+    # See _init_departments_dir — moved into the package's data/.
+    dev = _synpin_root() / "data" / "otdels"
     return prod if prod.exists() else dev
 
 

@@ -19,9 +19,9 @@ web/*.tsbuildinfo
 # OS
 .DS_Store
 
-# Runtime data
-core/departments/
-core/otdels/
+# Runtime data (per-entity YAML, lives inside the synpin package in dev)
+core/synpin/data/departments/
+core/synpin/data/otdels/
 Thumbs.db
 
 # Environment
@@ -56,3 +56,10 @@ core/synpin/config/*.yaml
 # Agent runtime data
 core/synpin/agents/*/agent.yaml
 .hermes/
+
+# Per-entity runtime data (kanban tasks, departments, otdels)
+# These live inside the synpin package in dev mode for proximity to
+# the code that uses them; in prod they live at ~/.synpin/data/*.
+core/synpin/data/departments/*/department.yaml
+core/synpin/data/otdels/*/otdel.yaml
+core/synpin/data/tasks/*.yaml

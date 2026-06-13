@@ -204,6 +204,29 @@ def health():
     return {"status": "ok", "version": __version__}
 
 
+@app.on_event("startup")
+def _start_auto_delete():
+    """Start the background auto-delete worker.
+
+    Every hour (or AUTO_DELETE_INTERVAL_S env var) the worker
+    runs a pass that deletes tasks from configured source
+    columns whose last activity is older than
+    auto_archive_days. The user configures both via the Kanban
+    board settings UI.
+    """
+    try:
+        from ..kanban.service import get_service
+        from ..kanban.auto_delete import schedule_auto_delete
+        svc = get_service()
+        task = schedule_auto_delete(svc)
+        if task:
+            print("  [auto-delete] worker running (default 1h, override via AUTO_DELETE_INTERVAL_S)", flush=True)
+        else:
+            print("  [auto-delete] no event loop yet, worker will start on next request", flush=True)
+    except Exception as e:
+        print(f"  [auto-delete] failed to start: {e}", flush=True)
+
+
 @app.post("/api/admin/reload")
 def reload_config():
     """Manual config reload — re-reads providers.yaml."""

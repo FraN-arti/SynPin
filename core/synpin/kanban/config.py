@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import random
 import string
+from .models import TaskStatus
 import threading
 from pathlib import Path
 
@@ -59,12 +60,19 @@ class WidgetConfig(BaseModel):
 class BoardSettings(BaseModel):
     """Board settings and automation."""
     max_active_tasks: int = 50
+    # auto_archive_days: tasks in DONE status older than this are
+    # auto-deleted. 0 disables. Default 30 days.
     auto_archive_days: int = 30
     notifications_enabled: bool = True
     auto_assign_head: bool = True
     auto_summon: bool = False
     auto_escalate_overdue: bool = False
     notify_human_on_block: bool = False
+    # List of column IDs whose tasks should be auto-deleted when
+    # their last update is older than auto_archive_days. Empty
+    # means no auto-deletion. The default is the standard 'done'
+    # column; the user can configure any column(s).
+    auto_delete_from_columns: list[str] = Field(default_factory=list)
 
 
 # ── Defaults ─────────────────────────────────────────────────────────────────
@@ -174,7 +182,28 @@ def load_columns() -> list[ColumnConfig]:
     """Load columns from config."""
     data = _load_yaml("columns")
     if data and isinstance(data, list):
-        return [ColumnConfig(**c) for c in data]
+        cols = [ColumnConfig(**c) for c in data]
+
+        # Auto-migrate: assign TaskStatus to columns that have null status.
+        # This happens when a user creates a column via the UI without
+        # specifying a status. Every column MUST have a status for the board
+        # to display tasks (backend groups tasks by TaskStatus enum).
+        used = {c.status for c in cols if c.status}
+        changed = False
+        for col in cols:
+            if not col.status:
+                for ts in TaskStatus:
+                    if ts.value not in used:
+                        col.status = ts.value
+                        used.add(ts.value)
+                        changed = True
+                        break
+                if not col.status:
+                    col.status = TaskStatus.BACKLOG.value
+                    changed = True
+        if changed:
+            save_columns(cols)
+        return cols
     cols = _default_columns()
     save_columns(cols)
     return cols

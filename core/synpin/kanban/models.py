@@ -20,6 +20,7 @@ class TaskStatus(str, Enum):
     """Lifecycle stages of a task on the Kanban board."""
     BACKLOG = "backlog"        # Created, not yet assigned
     TODO = "todo"              # Assigned to department, awaiting start
+    READY = "ready"            # User-defined intermediate status (e.g. queued for an agent)
     IN_PROGRESS = "in_progress"  # Agents are working
     REVIEW = "review"          # Work done, head is checking
     REVISION = "revision"      # Sent back for rework

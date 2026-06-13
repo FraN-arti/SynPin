@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHand
 import { PROVIDER_CATALOG, providerKey, providerIconUrl, type ProviderInfo } from '../lib/providers'
 import { MemorySection } from './MemorySection'
 import { DropdownMenu, type DropdownOption } from './DropdownMenu'
+import { MultiSelectMenu } from './MultiSelectMenu'
 import { useDraggable } from '@dnd-kit/core'
 
 import { API_BASE } from '../config'
@@ -2825,6 +2826,8 @@ function KanbanColumnsConfig() {
   const DEFAULT_COLUMN_AUTO = '__auto__'
   const [columns, setColumns] = useState<KanbanColumnItem[]>([])
   const [defaultColumn, setDefaultColumn] = useState<string>(DEFAULT_COLUMN_AUTO)
+  const [autoArchiveDays, setAutoArchiveDays] = useState<number>(30)
+  const [autoDeleteColumns, setAutoDeleteColumns] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [widgetSaving, setWidgetSaving] = useState(false)
   const [savedId, setSavedId] = useState<string | null>(null)
@@ -2833,17 +2836,28 @@ function KanbanColumnsConfig() {
   // Undo-toast for column deletion. The hook owns timers/progress;
   // we just supply what to do on expire (real DELETE) and on undo
   // (splice the column back into `columns`).
+  //
+  // Bugfix: previously we passed only {id, label, index} which
+  // meant that if the user pressed "Отменить" within 5 seconds,
+  // the column came back WITHOUT its color, text_color,
+  // description, status, order, or enabled flag. We now pass
+  // the full column data through `extras` so the restore is lossless.
   const { pendingDelete, undoProgress, start: startUndo, undo: undoDelete } =
-    useUndoWithProgress({
+    useUndoWithProgress<KanbanColumnItem>({
       onExpire: ({ id }) => {
         // Real delete — fire and forget; the row is already gone from UI.
         fetch(`${API_BASE}/api/kanban/config/columns/${id}`, { method: 'DELETE' })
           .catch(e => console.error('[kanban] delete column error:', e))
       },
-      onUndo: ({ id, index, label }) => {
+      onUndo: ({ id, index, extras }) => {
+        // Use the full column data captured at delete time so the
+        // restored column looks exactly like it did. Fall back to
+        // a minimal {id, label} if extras is missing (shouldn't
+        // happen in practice, but defensive).
+        const col: KanbanColumnItem = extras ?? ({ id, label: id } as KanbanColumnItem)
         setColumns(prev => {
           const newCols = [...prev]
-          newCols.splice(index, 0, { id, label } as KanbanColumnItem)
+          newCols.splice(index, 0, col)
           return newCols
         })
       },
@@ -2860,6 +2874,21 @@ function KanbanColumnsConfig() {
     fetch(`${API_BASE}/api/kanban/config/widget`)
       .then(r => r.json())
       .then(data => setDefaultColumn(data?.default_column || DEFAULT_COLUMN_AUTO))
+      .catch(() => {})
+  }, [])
+
+  // Load board settings (auto-archive, auto-delete columns)
+  useEffect(() => {
+    fetch(`${API_BASE}/api/kanban/config/settings`)
+      .then(r => r.json())
+      .then(data => {
+        if (typeof data?.auto_archive_days === 'number') {
+          setAutoArchiveDays(data.auto_archive_days)
+        }
+        if (Array.isArray(data?.auto_delete_from_columns)) {
+          setAutoDeleteColumns(data.auto_delete_from_columns)
+        }
+      })
       .catch(() => {})
   }, [])
 
@@ -2984,8 +3013,10 @@ function KanbanColumnsConfig() {
     setColumns(prev => prev.filter(c => c.id !== colId))
 
     // Arm the undo window. Hook fires real DELETE on expire, or our
-    // onUndo (splice back) on click.
-    startUndo({ id: colId, label: col.label, index: idx })
+    // onUndo (splice back) on click. We pass the FULL column through
+    // `extras` so the undo can restore every field (color, text_color,
+    // description, status, order, enabled) — not just id/label.
+    startUndo({ id: colId, label: col.label, index: idx, extras: { ...col } })
   }
 
   const saveDefaultColumn = useCallback(async (value: string | null) => {
@@ -2998,6 +3029,28 @@ function KanbanColumnsConfig() {
       })
     } catch (e) {
       console.error('[kanban] save default column error:', e)
+    } finally {
+      setWidgetSaving(false)
+    }
+  }, [])
+
+  // Auto-archive (auto-delete) settings — saved to /settings, not
+  // /widget, because the auto-delete worker (server side) reads
+  // its config from there. Same debounce strategy as
+  // saveDefaultColumn: fire on every change, server persists.
+  const saveAutoArchive = useCallback(async (days: number, cols: string[]) => {
+    setWidgetSaving(true)
+    try {
+      await fetch(`${API_BASE}/api/kanban/config/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          auto_archive_days: days,
+          auto_delete_from_columns: cols,
+        }),
+      })
+    } catch (e) {
+      console.error('[kanban] save auto-archive error:', e)
     } finally {
       setWidgetSaving(false)
     }
@@ -3074,20 +3127,103 @@ function KanbanColumnsConfig() {
           {saving && savedId === col.id && <span style={{ color: '#22c55e', fontSize: '12px' }}>✓</span>}
         </div>
       ))}
-      <div style={{ display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center' }}>
-        <button className="kanban-create-btn" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={addColumn}>
-          + Добавить колонку
-        </button>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-          <label style={{ color: 'var(--text-secondary)', fontSize: '13px', whiteSpace: 'nowrap' }}>Стандартно в</label>
-          <CustomDropdown
-            value={defaultColumnValue}
-            options={defaultColumnOptions}
-            onChange={handleDefaultColumnChange}
-            disabled={enabledColumns.length === 0}
-            width="220px"
-          />
+      <div style={{ display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+
+        {/*
+         * Settings toolbar group: auto-archive + default-column + add-column.
+         * All three controls live in a single visual frame (shared
+         * background, border, padding) so they read as one widget.
+         */}
+        <div
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: '8px', width: '100%',
+            padding: '6px 12px',
+            background: 'var(--glass-bg)',
+            border: '1px solid var(--glass-border)',
+            borderRadius: 'var(--radius)',
+          }}
+        >
+          {/* Add column button — first, because creating a column is the primary action */}
+          <button
+            className="kanban-create-btn"
+            style={{ padding: '6px 12px', fontSize: '12px' }}
+            onClick={addColumn}
+          >
+            + Добавить колонку
+          </button>
+
+          {/* Separator */}
+          <div style={{
+            width: '1px', height: '28px',
+            background: 'var(--glass-border)',
+            margin: '0 4px', flexShrink: 0,
+          }} />
+
+          {/* Auto-archive group */}
+          <div
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+            }}
+            title="Задачи из выбранных колонок старше N дней будут удаляться автоматически каждый час"
+          >
+            <label style={{ color: 'var(--text-secondary)', fontSize: '13px', whiteSpace: 'nowrap' }}>Удалить через</label>
+            <input
+              type="number"
+              min={0}
+              max={365}
+              value={autoArchiveDays}
+              disabled={enabledColumns.length === 0}
+              onChange={e => {
+                const v = Math.max(0, Math.min(365, parseInt(e.target.value) || 0))
+                setAutoArchiveDays(v)
+                saveAutoArchive(v, autoDeleteColumns)
+              }}
+              style={{
+                width: '50px', padding: '4px 6px',
+                background: 'var(--bg, #0d0d1a)',
+                border: '1px solid var(--border, #2a2a3a)',
+                color: 'var(--text, #e0e0e0)',
+                borderRadius: '4px',
+                fontSize: '12px',
+              }}
+            />
+            <label style={{ color: 'var(--text-secondary)', fontSize: '13px', whiteSpace: 'nowrap' }}>дней из</label>
+            <MultiSelectMenu
+              value={autoDeleteColumns}
+              options={enabledColumns.map(c => ({ value: c.id, label: c.label }))}
+              onChange={arr => {
+                setAutoDeleteColumns(arr)
+                saveAutoArchive(autoArchiveDays, arr)
+              }}
+              disabled={enabledColumns.length === 0}
+              width="160px"
+              placeholder="Выберите колонки"
+            />
+          </div>
+
+          {/* Vertical separator between the two controls */}
+          <div style={{
+            width: '1px', height: '28px',
+            background: 'var(--glass-border)',
+            margin: '0 4px', flexShrink: 0,
+          }} />
+
+          {/* Default-column group */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+          }}>
+            <label style={{ color: 'var(--text-secondary)', fontSize: '13px', whiteSpace: 'nowrap' }}>Стандартно в</label>
+            <CustomDropdown
+              value={defaultColumnValue}
+              options={defaultColumnOptions}
+              onChange={handleDefaultColumnChange}
+              disabled={enabledColumns.length === 0}
+              width="200px"
+            />
+          </div>
         </div>
+
         {widgetSaving && <span style={{ color: '#22c55e', fontSize: '12px' }}>✓</span>}
       </div>
       {/* Undo Toast */}
@@ -3101,7 +3237,7 @@ function KanbanColumnsConfig() {
           </button>
           <div
             className="undo-toast-progress"
-            style={{ width: `${undoProgress}%`, transition: 'width 30ms linear' }}
+            style={{ width: `${undoProgress}%`, transition: 'width 100ms linear' }}
           />
         </div>
       )}
@@ -3125,12 +3261,30 @@ function KanbanLabelsConfig() {
   const [savedId, setSavedId] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const descDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // pendingDelete carries enough state to restore the label (color/text_color/description)
-  // if the user clicks "Отменить" within the toast window.
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string; index: number; color?: string; text_color?: string; description?: string } | null>(null)
-  const [undoProgress, setUndoProgress] = useState(100)
-  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Undo-toast for label deletion. We use the SAME hook as
+  // column deletion (useUndoWithProgress) so both share one
+  // implementation. The previous version had a parallel,
+  // hand-rolled undo with its own undoTimerRef/progressTimerRef
+  // refs, which is exactly the kind of duplication that produced
+  // the static-progress-bar bug for columns. With the hook, the
+  // 30ms/100ms transition and the data-loss on undo are fixed
+  // in one place.
+  const { pendingDelete, undoProgress, start: startUndo, undo: undoDelete } =
+    useUndoWithProgress<KanbanLabelItem>({
+      onExpire: ({ id }) => {
+        fetch(`${API_BASE}/api/kanban/config/labels/${id}`, { method: 'DELETE' })
+          .catch(e => console.error('[kanban] delete label error:', e))
+      },
+      onUndo: ({ id, index, extras }) => {
+        const label: KanbanLabelItem = extras ?? ({ id, name: id } as KanbanLabelItem)
+        setLabels(prev => {
+          const newLabels = [...prev]
+          newLabels.splice(index, 0, label)
+          return newLabels
+        })
+      },
+    })
 
   useEffect(() => {
     fetch(`${API_BASE}/api/kanban/config/labels`)
@@ -3144,14 +3298,6 @@ function KanbanLabelsConfig() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
       if (descDebounceRef.current) clearTimeout(descDebounceRef.current)
-    }
-  }, [])
-
-  // Cleanup undo timers on unmount
-  useEffect(() => {
-    return () => {
-      if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
-      if (progressTimerRef.current) clearInterval(progressTimerRef.current)
     }
   }, [])
 
@@ -3231,65 +3377,23 @@ function KanbanLabelsConfig() {
     const label = labels[index]
     if (!label) return
 
-    // Remove from UI immediately
+    // Remove from UI immediately (optimistic)
     setLabels(prev => prev.filter((_, i) => i !== index))
 
-    // Set pending delete
-    setPendingDelete({
+    // Arm the undo window via the shared hook. Pass the FULL
+    // label through `extras` so undo restores every field
+    // (color, text_color, description) — not just id/name.
+    startUndo({
       id: label.id,
-      name: label.name,
-      color: label.color,
-      text_color: label.text_color,
-      description: label.description || '',
+      label: label.name,
       index,
+      extras: { ...label },
     })
-    setUndoProgress(100)
-
-    // Start countdown (5 seconds)
-    const startTime = Date.now()
-    const duration = 5000
-
-    progressTimerRef.current = setInterval(() => {
-      const elapsed = Date.now() - startTime
-      const remaining = Math.max(0, 100 - (elapsed / duration) * 100)
-      setUndoProgress(remaining)
-      if (remaining <= 0) {
-        clearInterval(progressTimerRef.current!)
-      }
-    }, 30)
-
-    undoTimerRef.current = setTimeout(() => {
-      // Actually delete
-      fetch(`${API_BASE}/api/kanban/config/labels/${label.id}`, { method: 'DELETE' })
-        .catch(e => console.error('[kanban] delete label error:', e))
-      setPendingDelete(null)
-      clearInterval(progressTimerRef.current!)
-    }, duration)
   }
 
-  const undoDelete = () => {
-    if (!pendingDelete) return
-
-    // Cancel the pending delete
-    clearTimeout(undoTimerRef.current!)
-    clearInterval(progressTimerRef.current!)
-
-    // Restore the label
-    const restoreIndex = pendingDelete.index
-    const restored: any = {
-      id: pendingDelete.id,
-      name: pendingDelete.name,
-      color: pendingDelete.color,
-      text_color: pendingDelete.text_color,
-      description: pendingDelete.description || '',
-    }
-    setLabels(prev => {
-      const newLabels = [...prev]
-      newLabels.splice(restoreIndex, 0, restored)
-      return newLabels
-    })
-    setPendingDelete(null)
-  }
+  // undoDelete comes from the useUndoWithProgress hook above
+  // (same one used for column deletion, so both share one impl
+  // and the static-progress bug is fixed in one place).
 
   return (
     <section className="settings-card">
@@ -3357,14 +3461,14 @@ function KanbanLabelsConfig() {
       {pendingDelete && (
         <div className={`undo-toast ${pendingDelete ? 'visible' : ''}`}>
           <span className="undo-toast-text">
-            «{pendingDelete.name}» удалена
+            «{pendingDelete.label}» удалена
           </span>
           <button className="undo-toast-btn" onClick={undoDelete}>
             Отменить
           </button>
           <div
             className="undo-toast-progress"
-            style={{ width: `${undoProgress}%`, transition: 'width 30ms linear' }}
+            style={{ width: `${undoProgress}%`, transition: 'width 100ms linear' }}
           />
         </div>
       )}

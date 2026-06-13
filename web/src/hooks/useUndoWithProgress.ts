@@ -76,16 +76,20 @@ export function useUndoWithProgress<T = unknown>(
     }
   }, [])
 
-  // On unmount: stop timers, fire the expire callback so the delete
-  // isn't left dangling. (Component navigated away during the undo
-  // window — the safest default is to commit the delete.)
+  // On unmount: stop timers, but DO NOT fire the expire callback.
+  // Firing expire on unmount was a bug: it meant that navigating
+  // away from Settings during the 5-second undo window would
+  // silently commit the deletion — the user pressed "Отменить"
+  // (or just navigated elsewhere) but the delete went through
+  // anyway. The safer default is: if the user navigates away,
+  // the deletion is paused (timers stop), and the item is dropped
+  // from the toast. If we wanted the "auto-commit on unmount"
+  // behaviour we'd have a separate `commit()` method.
   useEffect(() => {
     return () => {
-      const item = currentItemRef.current
       clearTimers()
-      if (item) onExpire(item)
     }
-  }, [clearTimers, onExpire])
+  }, [clearTimers])
 
   const start = useCallback(
     (item: UndoItem<T>) => {

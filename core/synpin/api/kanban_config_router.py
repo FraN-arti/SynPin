@@ -7,6 +7,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import Field
 from ._base import BaseRequest
+from ..kanban.models import TaskStatus
 
 from ..kanban.config import (
     ColumnConfig,
@@ -40,16 +41,19 @@ class ColumnRequest(BaseRequest):
 
 
 class ColumnPatchRequest(BaseRequest):
-    """Partial update — all fields optional. Excludes `status` because
-    mapping a column to a TaskStatus is a structural config change
-    (used by the global Kanban board to look up tasks by column), not
-    a partial mutation. Change `status` by editing columns.yaml directly
-    or via PUT /api/kanban/config/columns with the full new list."""
+    """Partial update — all fields optional. Includes `status` so
+    users can map a column to one of the TaskStatus enum values
+    from the Settings UI (otherwise you'd have to edit columns.yaml
+    by hand, which is awkward). We validate the string against the
+    enum server-side; passing an invalid value returns 400 with a
+    helpful list of allowed values.
+    """
     label: str | None = None
     description: str | None = None
     color: str | None = None
     order: int | None = None
     enabled: bool | None = None
+    status: str | None = None  # Must be a TaskStatus value or None
 
 
 class LabelRequest(BaseRequest):
@@ -86,6 +90,7 @@ class BoardSettingsRequest(BaseRequest):
     auto_summon: bool | None = None
     auto_escalate_overdue: bool | None = None
     notify_human_on_block: bool | None = None
+    auto_delete_from_columns: list[str] | None = None
 
 
 # ── Columns ──────────────────────────────────────────────────────────────────
@@ -120,6 +125,21 @@ def add_column(col: ColumnRequest) -> dict:
     """Add a new column (auto-generates ID)."""
     cols = load_columns()
     col_id = col.id or generate_id()
+
+    # Auto-assign TaskStatus if not provided.
+    # When a user creates a column via the UI, they don't set a status —
+    # but the board API groups tasks by TaskStatus enum, so every column
+    # MUST have one to display tasks. We pick the first unused status.
+    status = col.status
+    if not status:
+        used = {c.status for c in cols if c.status}
+        for ts in TaskStatus:
+            if ts.value not in used:
+                status = ts.value
+                break
+        if not status:
+            status = TaskStatus.BACKLOG.value
+
     new_col = ColumnConfig(
         id=col_id,
         label=col.label,
@@ -127,7 +147,7 @@ def add_column(col: ColumnRequest) -> dict:
         color=col.color,
         order=col.order if col.order != 0 else len(cols),
         enabled=col.enabled,
-        status=col.status,
+        status=status,
     )
     cols.append(new_col)
     save_columns(cols)
@@ -196,6 +216,21 @@ def update_column(column_id: str, col: ColumnPatchRequest) -> dict:
                 c.order = col.order
             if col.enabled is not None:
                 c.enabled = col.enabled
+            if "status" in col.model_fields_set:
+                # User explicitly set status. If it's a string, it
+                # MUST be a valid TaskStatus enum value; if not, we
+                # 400 with the list of allowed values so the user
+                # can fix the form, not silently misroute their
+                # tasks to /todo.
+                from synpin.kanban.models import TaskStatus
+                valid = {s.value for s in TaskStatus}
+                if col.status is not None and col.status not in valid:
+                    raise HTTPException(
+                        400,
+                        f"Invalid column status '{col.status}'. "
+                        f"Allowed: {sorted(valid)} or null to clear.",
+                    )
+                c.status = col.status
             save_columns(cols)
             return c.model_dump()
     raise HTTPException(404, f"Column '{column_id}' not found")
@@ -353,6 +388,21 @@ def set_settings(req: BoardSettingsRequest) -> dict:
         settings.auto_summon = req.auto_summon
     if req.auto_escalate_overdue is not None:
         settings.auto_escalate_overdue = req.auto_escalate_overdue
+    if req.auto_delete_from_columns is not None:
+        # Validate: every entry must be a real column id, otherwise
+        # we'd be auto-deleting from a column that doesn't exist.
+        # This is a soft validation — we don't 400 on unknown ids,
+        # we just filter them out and log a warning.
+        cols = load_columns()
+        valid_ids = {c.id for c in cols}
+        filtered = [c for c in req.auto_delete_from_columns if c in valid_ids]
+        if len(filtered) != len(req.auto_delete_from_columns):
+            import logging
+            logging.getLogger("synpin.kanban").warning(
+                "[auto-delete] filtered out unknown column ids: %s",
+                set(req.auto_delete_from_columns) - valid_ids,
+            )
+        settings.auto_delete_from_columns = filtered
     if req.notify_human_on_block is not None:
         settings.notify_human_on_block = req.notify_human_on_block
     save_settings(settings)

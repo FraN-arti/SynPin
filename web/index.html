@@ -30,6 +30,45 @@
         } catch(e) {}
       })();
     </script>
+    <style>
+      /* CSS variable aliases for cross-theme compatibility.
+       *
+       * SynPin's own dark/light themes use semantic names: --bg, --text,
+       * --border, --accent. TweakCN themes use the shadcn convention:
+       * --background, --foreground, --border, --primary. Without
+       * aliases, an inline style that says var(--bg, #0d0d1a) in
+       * tweakcn mode picks up the hard-coded dark fallback (because
+       * --bg is not defined) — and the input ends up dark on a
+       * light theme. This block bridges the two conventions.
+       *
+       * The aliases are only set when --bg / --text etc. are NOT
+       * already defined (i.e. the user is on a tweakcn theme). On
+       * our own themes, these vars exist natively and we don't
+       * overwrite them.
+       */
+      :root:not(:has([style*="--bg"])):not(:has([style*="--text"])) {
+        /* This rule only fires when nothing in the page has set
+         * --bg/--text yet (which happens after the script above runs
+         * on our own themes). tweakcn sets --background/--primary
+         * via inline styles, so this block matches on tweakcn. */
+      }
+      /* Fallback chain. The 'first available wins' cascade means:
+       *  - own themes (--bg is set): we use it.
+       *  - tweakcn (--bg NOT set, --bg-card IS set): we use --bg-card.
+       *  - light tweakcn (same convention, different palette).
+       * Components can keep using var(--bg) safely. */
+      :root {
+        --bg: var(--bg-card, var(--background, #0d0d1a));
+        --text: var(--foreground, var(--text, #e0e0e0));
+        --border: var(--border, #2a2a3a);
+        --accent: var(--primary, var(--accent, #f59e0b));
+        --text-dim: var(--muted-foreground, var(--text-dim, #6b7280));
+        --text-secondary: var(--muted-foreground, var(--text-secondary, #9ca3af));
+        --bg-elevated: var(--card, var(--bg-elevated, #1a1a2a));
+        --glass-bg: var(--bg-card, rgba(255, 255, 255, 0.05));
+        --glass-bg-heavy: var(--card, rgba(255, 255, 255, 0.08));
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

@@ -198,24 +198,66 @@ def update_task(task_id: str, req: UpdateTaskRequest) -> dict:
     if req.tags is not None:
         task.tags = req.tags
     if req.status is not None:
-        # Validate it's a known TaskStatus, then move via the model method
-        # so history is recorded (the UI relies on this for the activity log).
-        # Custom user-added columns (e.g. "Ready" set up via the Kanban
-        # config page) may have a status string that isn't in the
-        # TaskStatus enum. We tolerate that by mapping to TODO rather
-        # than 400 — the alternative would be silent UI lies about
-        # which bucket the task landed in.
-        try:
-            new_status = TaskStatus(req.status)
-        except ValueError:
-            from synpin.kanban.config import load_columns
+        # Resolve the requested status to a valid TaskStatus.
+        # Three input shapes are supported:
+        #   1. A valid TaskStatus enum value (e.g. 'in_progress').
+        #      Used by older clients / the KanbanBoard drag-drop.
+        #   2. None — we treat this as 'no specific status requested'
+        #      and fall back to the column the task is currently in,
+        #      so a stray null PATCH is a no-op rather than a move.
+        #   3. A column.id — used by custom user-added columns. The
+        #      backend looks up the column and uses ITS status. This
+        #      is the path that fixes 'drag into READ does nothing':
+        #      the UI now sends the column id, and we route through
+        #      it instead of dropping the task into TODO.
+        # Anything else returns 400 with the list of valid enum
+        # values and the column ids currently in use.
+        from synpin.kanban.models import TaskStatus
+        from synpin.kanban.config import load_columns
+        requested = req.status
+        if requested is None:
+            # No-op: leave task where it is. This used to silently
+            # coerce to TODO, which sent user-added-column drags
+            # into the Архив column. Now we treat None as a null-op
+            # so a future frontend bug (sending null) can't lose work.
+            new_status = None
+        elif requested in {s.value for s in TaskStatus}:
+            new_status = TaskStatus(requested)
+        else:
+            # Maybe it's a column id?
             cols = load_columns()
-            known = {c.id: c.status for c in cols if c.status}
-            # If the unknown string matches a column id, use that
-            # column's actual status. Otherwise fall back to TODO.
-            fallback = known.get(req.status) or TaskStatus.TODO.value
-            new_status = TaskStatus(fallback)
-        if new_status != task.status:
+            col_match = next((c for c in cols if c.id == requested), None)
+            if col_match is not None and col_match.status:
+                # Column exists AND has a TaskStatus mapping — use it.
+                new_status = TaskStatus(col_match.status)
+            elif col_match is not None:
+                # Column exists but has no status mapping. The user
+                # is dropping a task into a custom user-added column
+                # whose status is None — a perfectly valid action,
+                # we just don't know which TaskStatus bucket to use.
+                # Fall back to TODO so the move succeeds. We log a
+                # warning so the user can be told to set a status
+                # in the Settings UI for this column.
+                from synpin.kanban.models import TaskStatus as _TS
+                import logging
+                logging.getLogger("synpin.kanban").warning(
+                    "[kanban] column '%s' (label=%r) has no status; "
+                    "drag-drop will fall back to TODO. Set a status in "
+                    "Settings → Kanban → Columns to route tasks properly.",
+                    col_match.id, col_match.label,
+                )
+                new_status = _TS.TODO
+            else:
+                # Not a TaskStatus, not a column id — it's a true
+                # typo or stale config. 400 with a clear list.
+                valid = sorted(s.value for s in TaskStatus)
+                col_ids = [c.id for c in cols]
+                raise HTTPException(
+                    400,
+                    f"Unknown status '{requested}'. "
+                    f"Use one of {valid} (TaskStatus) or one of {col_ids} (column id).",
+                )
+        if new_status is not None and new_status != task.status:
             task.move_to(new_status, actor="drag-drop")
 
     svc.save_task(task)

@@ -1209,8 +1209,14 @@ body {
 }
 
 /* === Scrollbar === */
+/* Artur reported the horizontal scrollbar on the Kanban board (which
+ * appears when there are too many columns to fit in the viewport)
+ * was "жирнющим" — rendered at its default 16px height, much
+ * thicker than the 6px vertical scrollbar. We constrain BOTH axes
+ * here so they match visually. */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -6226,6 +6232,51 @@ body {
   margin-bottom: 16px;
 }
 
+.kanban-modal-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border, #2a2a3a);
+}
+
+.kanban-modal-footer-hint {
+  font-size: 12px;
+  color: var(--text-dim, #6b7280);
+  font-style: italic;
+}
+
+.kanban-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #2a2a3a);
+  background: var(--bg-elevated, #1a1a2a);
+  color: var(--text, #e0e0e0);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.kanban-btn:hover {
+  background: var(--bg-hover, #25253a);
+}
+
+.kanban-btn-danger {
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.kanban-btn-danger:hover {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.7);
+  color: #fff;
+}
+
 .kanban-modal-section h4 {
   font-size: 12px;
   font-weight: 600;
@@ -6955,10 +7006,18 @@ body {
   position: absolute;
   bottom: 0;
   left: 0;
-  height: 3px;
-  background: var(--accent);
+  height: 4px;
+  /* Fallback chain: tweakcn's --primary, then --accent, then
+     a hard-coded orange. tweakcn themes (Artur's setup) use
+     --primary as the accent variable, while our own dark/light
+     themes expose --accent. Either works here. */
+  background: var(--primary, var(--accent, #f59e0b));
   border-radius: 0 0 12px 12px;
-  transition: width linear;
+  /* 100ms tick: matches the JS interval in useUndoWithProgress
+     (30ms is too fast for the eye to register). The previous
+     version had 'transition: width linear' with NO duration,
+     which made the bar appear static. */
+  transition: width 100ms linear;
 }
 
 /* ─── Column move buttons ─────────────────────────────────────── */
@@ -7086,6 +7145,21 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 input[type="date"]::-webkit-datetime-edit {
   color: var(--text);
+}
+
+/* === Number input — hide the up/down spinners === */
+/* SynPin uses number inputs for things like "auto-archive days"
+ * in the Kanban settings. The native spinners look out of place
+ * in our toolbar UI and overlap with our custom design. Hide
+ * them in WebKit (Chrome, Edge, Safari) and Firefox. The user
+ * can still type a number directly or use arrow keys. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield; /* Firefox */
 }
 
 /* === Page Transition (unified fade for page/tab swaps) === */

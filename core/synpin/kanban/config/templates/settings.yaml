@@ -5,3 +5,6 @@ auto_assign_head: true
 auto_summon: false
 auto_escalate_overdue: false
 notify_human_on_block: false
+# IDs of columns whose tasks get auto-deleted after
+# auto_archive_days of inactivity. Empty = no auto-deletion.
+auto_delete_from_columns: []

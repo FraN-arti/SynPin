@@ -188,8 +188,16 @@ function SortableColumn({
     setNodeRef: setDroppableRef,
     isOver,
   } = useDroppable({
-    id: `col-body-${col.status || col.id}`,
-    data: { type: 'column-body', status: col.status || col.id },
+    // The droppable id is always the column id — never the status.
+    // Statuses are an internal state-machine concern; the UI
+    // doesn't need to know about them. Two columns with the same
+    // status would otherwise collide (e.g. two custom "In Progress"
+    // columns — we don't support that today, but the id is the
+    // only stable handle).
+    id: `col-body-${col.id}`,
+    // We pass the column id (and label) explicitly. The drop handler
+    // resolves this to a status via the columns list at drop time.
+    data: { type: 'column-body', columnId: col.id, label: col.label },
   })
 
   const containerRef = useCallback(
@@ -358,6 +366,31 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
     }
   }, [])
 
+  // ── Delete task ─────────────────────────────────────────────
+  // Manual deletion: invoked from the task-detail modal. We do a
+  // confirm() before the API call so an accidental click in the
+  // modal doesn't permanently lose work. After a successful
+  // delete we close the modal and refresh the board so the
+  // neighbouring columns don't show stale data.
+  const handleDeleteTask = async (taskId: string) => {
+    if (!window.confirm(`Удалить задачу? Это нельзя отменить.`)) return
+    try {
+      const res = await fetch(`${API_BASE}/api/kanban/tasks/${taskId}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        setSelectedTask(null)
+        loadBoard()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        alert(`Не удалось удалить: ${data.detail || res.statusText}`)
+      }
+    } catch (e) {
+      console.error('[kanban] delete task error:', e)
+      alert('Ошибка сети при удалении')
+    }
+  }
+
   useEffect(() => {
     loadBoard()
     loadColumns()
@@ -413,11 +446,15 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
 
   const totalTasks = Object.values(board).reduce((sum, col) => sum + col.length, 0)
 
-  // Resolve default column ID → status for task creation
+  // Resolve default column ID → status for task creation.
+  // We always end up with a real TaskStatus enum value, even
+  // when the default column is a custom user-added one without
+  // a TaskStatus mapping. In that case we fall back to TODO,
+  // which is the right semantic default for "queue this for an
+  // agent to pick up".
   const defaultColId = defaultColumn || columns.find(c => c.enabled)?.id || null
-  const defaultTaskStatus = defaultColId
-    ? columns.find(c => c.id === defaultColId)?.status || 'backlog'
-    : 'backlog'
+  const defaultCol = defaultColId ? columns.find(c => c.id === defaultColId) : null
+  const defaultTaskStatus = (defaultCol && defaultCol.status) || 'todo'
 
   const effectiveColumns = columns.length > 0 ? columns : []
 
@@ -447,39 +484,72 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
     // Task drag between columns.
     // Drop target may be EITHER:
     //  - column-body (dropped on empty column or its background)
-    //  - another task (dropped on a card) — in that case the target column
-    //    is the column of the card we dropped on.
+    //  - another task (dropped on a card) — in that case the target
+    //    column is the column of the card we dropped on.
+    //
+    // The UI doesn't deal in TaskStatus values directly — it deals
+    // in column ids. We resolve the column id to a status at drop
+    // time via the columns list, then PATCH with that status (or the
+    // column id itself as fallback if the column has no status —
+    // backend will then look up the column and use its status).
+    // The board bucket key after the optimistic update is the
+    // resolved status, NOT the column id, so the board's state
+    // shape stays in sync with /api/kanban/tasks/board.
     if (activeData?.type === 'task') {
       const task = activeData.task as Task
 
-      // Resolve target column status. Prefer explicit column-body data,
-      // fall back to the status of the task we dropped on.
-      let newStatus: string | null = null
+      // Find the target column. Try column-body drop first, then
+      // fall back to "the column the dropped-on card lives in".
+      let targetColId: string | null = null
       if (overData?.type === 'column-body') {
-        newStatus = overData.status as string
+        targetColId = (overData.columnId as string) ?? null
       } else if (overData?.type === 'task') {
         const overTask = overData.task as Task
-        // The card we dropped on lives in its own column; use its status.
-        // If the dropped-on card has no status (legacy data), find which
-        // board bucket contains it.
+        // The card we dropped on lives in its own column; use that
+        // column's id. Find the column whose status bucket contains
+        // this task. If the task itself has a status, the column
+        // for that status is the right one.
         if (overTask.status) {
-          newStatus = overTask.status
-        } else {
-          for (const [s, list] of Object.entries(board)) {
+          // Look up: which column has overTask.status?
+          // (board is grouped by status, so we can search the values.)
+          for (const [status, list] of Object.entries(board)) {
             if ((list || []).some(t => t.id === overTask.id)) {
-              newStatus = s
+              // Find the column with this status.
+              const col = effectiveColumns.find(c => c.status === status)
+              if (col) {
+                targetColId = col.id
+                break
+              }
+              // No column has that status (data drift). Fall back
+              // to using status directly — backend will accept it.
+              targetColId = status
               break
             }
           }
         }
       }
 
-      // No resolvable target column — nothing to do.
-      if (!newStatus) return
+      if (!targetColId) return
 
-      // Same column: dnd-kit fires this for in-column reorder. We don't
-      // support reordering tasks within a column, so just no-op.
-      if (newStatus === task.status) return
+      // Resolve the column id to a TaskStatus enum value. If the
+      // column has no status (e.g. brand-new user-added column with
+      // no mapping), we send the column id itself — backend will
+      // look it up and fall back to TODO.
+      const targetCol = effectiveColumns.find(c => c.id === targetColId)
+      const resolvedStatus = targetCol?.status
+      const patchValue = resolvedStatus || targetColId
+      // For the optimistic board update, the bucket key is the
+      // status we expect the backend to assign. If we have no
+      // status mapping, we don't know which bucket the task will
+      // land in until the PATCH comes back — skip the optimistic
+      // move in that case (we'll re-render once loadBoard() runs
+      // after the PATCH). The task won't visually "move" until
+      // then, but the PATCH still succeeds.
+      const optimisticBucket = resolvedStatus
+
+      // Same column: dnd-kit fires this for in-column reorder. We
+      // don't support reordering tasks within a column, so no-op.
+      if (resolvedStatus && resolvedStatus === task.status) return
 
       // Optimistic update: move task locally
       setBoard(prev => {
@@ -488,9 +558,13 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
         if (next[task.status]) {
           next[task.status] = (next[task.status] || []).filter(t => t.id !== task.id)
         }
-        // Add to new status
-        const movedTask = { ...task, status: newStatus! }
-        next[newStatus!] = [...(next[newStatus!] || []), movedTask]
+        // Add to new status — only if we know the bucket. Without
+        // a status mapping, we just delete from old bucket and
+        // let the next loadBoard() populate the right one.
+        if (optimisticBucket) {
+          const movedTask = { ...task, status: optimisticBucket }
+          next[optimisticBucket] = [...(next[optimisticBucket] || []), movedTask]
+        }
         return next
       })
 
@@ -498,7 +572,7 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
       fetch(`${API_BASE}/api/kanban/tasks/${task.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: patchValue }),
       }).catch(e => {
         console.error('[kanban] task move error:', e)
         loadBoard() // Revert on error
@@ -715,6 +789,33 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
                 </div>
               </div>
             )}
+
+            {/* Footer with destructive action — tucked into the
+                bottom-right corner of the modal so it doesn't take
+                up a full row. The "необратимо" hint sits as a tiny
+                italic aside. */}
+            <div
+              className="kanban-modal-footer"
+              style={{
+                justifyContent: 'flex-end',
+                paddingTop: '12px',
+                marginTop: '16px',
+                borderTop: '1px solid var(--border, #2a2a3a)',
+              }}
+            >
+              <span className="kanban-modal-footer-hint" style={{ marginRight: 'auto' }}>
+                Действие необратимо
+              </span>
+              <button
+                type="button"
+                className="kanban-btn kanban-btn-danger"
+                style={{ padding: '4px 10px', fontSize: '12px' }}
+                onClick={() => handleDeleteTask(selectedTask.id)}
+                data-testid="kanban-delete-task"
+              >
+                🗑 Удалить
+              </button>
+            </div>
           </div>
         </div>
       )}

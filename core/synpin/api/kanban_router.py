@@ -200,10 +200,21 @@ def update_task(task_id: str, req: UpdateTaskRequest) -> dict:
     if req.status is not None:
         # Validate it's a known TaskStatus, then move via the model method
         # so history is recorded (the UI relies on this for the activity log).
+        # Custom user-added columns (e.g. "Ready" set up via the Kanban
+        # config page) may have a status string that isn't in the
+        # TaskStatus enum. We tolerate that by mapping to TODO rather
+        # than 400 — the alternative would be silent UI lies about
+        # which bucket the task landed in.
         try:
             new_status = TaskStatus(req.status)
         except ValueError:
-            raise HTTPException(400, f"Unknown status: {req.status}")
+            from synpin.kanban.config import load_columns
+            cols = load_columns()
+            known = {c.id: c.status for c in cols if c.status}
+            # If the unknown string matches a column id, use that
+            # column's actual status. Otherwise fall back to TODO.
+            fallback = known.get(req.status) or TaskStatus.TODO.value
+            new_status = TaskStatus(fallback)
         if new_status != task.status:
             task.move_to(new_status, actor="drag-drop")
 

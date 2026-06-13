@@ -76,13 +76,19 @@ export function PageTransition({ pageKey, children }: PageTransitionProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageKey, renderedKey])
 
+  // During 'in' phase, render live `children` so that prop changes
+  // (e.g. open/closed state of a modal) are reflected immediately.
+  // During 'out' phase, render the stale `renderedChildren` so the
+  // fade-out animation shows the OLD content before swapping.
+  const displayChildren = phase === 'in' ? children : renderedChildren
+
   return (
     <div
       className="page-transition"
       data-phase={phase}
       aria-busy={phase === 'out' ? 'true' : undefined}
     >
-      {renderedChildren}
+      {displayChildren}
     </div>
   )
 }

@@ -201,6 +201,59 @@ def _find_free_port(start: int, max_attempts: int = 10) -> int:
     return start  # fall back; uvicorn will error if it's actually taken
 
 
+def _kill_orphan_vite() -> None:
+    """Kill any orphan Vite process from a previous synpin dev run.
+
+    On Windows, Ctrl+C of the synpin dev Python process tree can
+    leave the underlying node.exe (Vite) alive — particularly if
+    Vite had spawned esbuild workers that adopted the orphaned
+    state. The next 'synpin dev' would then skip the default port
+    and bind to 2100/2101/..., which is technically correct but
+    confusing for the user (they expect 2099).
+
+    We detect orphans by asking the OS what's listening on 2099 and
+    2088. Anything there that isn't us is killed. We only kill
+    processes whose parent or whose image basename looks like
+    'node' / 'python' to avoid nuking unrelated services.
+    """
+    if os.name != "nt":
+        return  # Unix: signal propagation is reliable, no orphans
+    for port in (CORE_PORT, WEB_PORT):
+        if port == 0:
+            continue
+        # Ask Windows who's listening on this port.
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             f"Get-NetTCPConnection -LocalPort {port} -State Listen -ErrorAction SilentlyContinue "
+             f"| Select-Object -ExpandProperty OwningProcess -Unique"],
+            capture_output=True, text=True, timeout=5,
+        )
+        pids = {int(x) for x in result.stdout.split() if x.strip().isdigit()}
+        for pid in pids:
+            if pid == 0 or pid == os.getpid():
+                continue
+            # Sanity check: only kill if it's node or python.
+            # We don't want to nuke a Postgres or a Redis that
+            # happens to listen on 2088.
+            info = subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 f"(Get-Process -Id {pid} -ErrorAction SilentlyContinue).ProcessName"],
+                capture_output=True, text=True, timeout=5,
+            )
+            name = info.stdout.strip().lower()
+            if name in ("node", "node.exe", "python", "python.exe"):
+                console.print(
+                    f"[dim]Cleaning up orphan {name} (pid {pid}) on port {port}[/dim]"
+                )
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(pid)],
+                    capture_output=True, timeout=5,
+                )
+        # Brief settle so the kernel reclaims the port.
+        if pids:
+            time.sleep(0.5)
+
+
 def _stream_output(proc: subprocess.Popen, prefix: str, queue: Queue) -> None:
     """Forward a subprocess's stdout to a queue, line by line.
 
@@ -299,6 +352,13 @@ def run_dev_server() -> None:
     from .commands import _get_version
 
     _check_prerequisites()
+
+    # On Windows, a previous dev run can leave a Vite process
+    # bound to 2099 if Ctrl+C didn't propagate all the way down
+    # the node tree. Clean those up before we look for ports, so
+    # the new run gets the canonical defaults (2088 + 2099) and
+    # not bumped-to-2100 fallback values.
+    _kill_orphan_vite()
 
     core_port = _find_free_port(CORE_PORT)
     web_port = _find_free_port(WEB_PORT)

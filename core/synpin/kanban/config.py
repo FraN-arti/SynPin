@@ -97,9 +97,16 @@ _config_lock = threading.Lock()
 
 
 def _get_config_dir() -> Path:
-    """Resolve kanban config directory."""
+    """Resolve kanban config directory.
+
+    Kanban uses its own subdirectory (`kanban/`) under the main config
+    dir so kanban configs don't pollute the top-level config. In dev
+    mode it sits at core/synpin/kanban/config/ to keep the project's
+    kanban config in version control; in prod it's ~/.synpin/config/kanban/.
+    """
+    from ..paths_legacy import _get_config_dir as _main_config_dir
+    prod = _main_config_dir() / "kanban"
     dev = Path(__file__).resolve().parent / "config"
-    prod = Path.home() / ".synpin" / "config" / "kanban"
 
     if os.environ.get("SYNPIN_DEV") == "1":
         dev.mkdir(parents=True, exist_ok=True)

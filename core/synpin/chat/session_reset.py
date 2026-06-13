@@ -27,28 +27,10 @@ logger = logging.getLogger(__name__)
 _last_reset: dict[str, float] = {}
 
 
-def _get_data_dir() -> Path | None:
-    """Resolve data directory."""
-    candidates = [
-        Path.home() / ".synpin" / "data",
-        Path(__file__).resolve().parent.parent.parent / "data",
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return None
-
-
-def _get_config_dir() -> Path | None:
-    """Resolve config directory."""
-    candidates = [
-        Path.home() / ".synpin" / "config",
-        Path(__file__).resolve().parent.parent / "config",
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return None
+from ..paths_legacy import (
+    _get_data_dir_or_none_session_reset as _get_data_dir,
+    _get_config_dir_or_none_session_reset as _get_config_dir,
+)
 
 
 def _load_yaml(path: Path) -> dict:

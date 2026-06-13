@@ -28,29 +28,10 @@ registry: ProviderRegistry | None = None
 MAX_TOOL_ITERATIONS = 5
 
 # Shared data dir for memory (resolved once)
-_DATA_DIR: Path | None = None
-
 # Max messages to keep in history per channel
 MAX_HISTORY_MESSAGES = 100
 
-
-def _get_data_dir() -> Path | None:
-    """Resolve data directory (same logic as memory_router)."""
-    global _DATA_DIR
-    if _DATA_DIR is not None:
-        return _DATA_DIR
-    candidates = [
-        Path.home() / ".synpin" / "data",
-        Path(__file__).resolve().parent.parent.parent / "data",
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            _DATA_DIR = candidate
-            return _DATA_DIR
-    # Create first candidate
-    _DATA_DIR = candidates[0]
-    _DATA_DIR.mkdir(parents=True, exist_ok=True)
-    return _DATA_DIR
+from ..paths_legacy import _get_data_dir as _get_data_dir  # re-export
 
 
 def _get_history_path(agent_slug: str, channel_id: str) -> Path | None:

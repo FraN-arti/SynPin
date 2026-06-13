@@ -34,21 +34,7 @@ def _get_lock(otdel_id: str) -> asyncio.Lock:
     return _otdel_locks[otdel_id]
 
 
-def _get_data_dir() -> Path:
-    global _DATA_DIR
-    if _DATA_DIR is not None:
-        return _DATA_DIR
-    candidates = [
-        Path.home() / ".synpin" / "data",
-        Path(__file__).resolve().parent.parent.parent / "data",
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            _DATA_DIR = candidate
-            return _DATA_DIR
-    _DATA_DIR = candidates[0]
-    _DATA_DIR.mkdir(parents=True, exist_ok=True)
-    return _DATA_DIR
+from ..paths_legacy import _get_data_dir as _get_data_dir  # re-export
 
 
 # ── History Storage ────────────────────────────────────────────────────────

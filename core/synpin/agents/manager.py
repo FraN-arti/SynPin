@@ -26,43 +26,12 @@ def _generate_long_id(length: int = 12) -> str:
     return ''.join(random.choices(chars, k=length))
 
 
-def _get_config_dir() -> Path:
-    """Get config directory.
-    SYNPIN_DEV=1 → always use dev path (core/synpin/config/)
-    Otherwise → ~/.synpin/config/ (prod) with fallback to dev.
-    On first prod run, copies templates to user home."""
-    global _CONFIG_DIR
-    if _CONFIG_DIR is not None:
-        return _CONFIG_DIR
-    prod = Path.home() / ".synpin" / "config"
-    dev = Path(__file__).resolve().parent.parent / "config"
-
-    # Dev mode: always use project directory
-    if os.environ.get("SYNPIN_DEV") == "1":
-        _CONFIG_DIR = dev
-        return _CONFIG_DIR
-
-    if not prod.exists():
-        # First run — copy templates to user home
-        templates_dir = dev / "templates"
-        if templates_dir.exists():
-            prod.mkdir(parents=True, exist_ok=True)
-            import shutil
-            for tpl in templates_dir.glob("*.yaml"):
-                shutil.copy2(str(tpl), str(prod / tpl.name))
-
-    _CONFIG_DIR = prod if prod.exists() else dev
-    return _CONFIG_DIR
-
-
-def _get_agents_dir() -> Path:
-    global _AGENTS_DIR
-    if _AGENTS_DIR is not None:
-        return _AGENTS_DIR
-    prod = Path.home() / ".synpin" / "agents"
-    dev = Path(__file__).resolve().parent.parent / "agents"
-    _AGENTS_DIR = prod if prod.exists() else dev
-    return _AGENTS_DIR
+from ..paths_legacy import (
+    _get_config_dir as _get_config_dir,
+    _get_agents_dir as _get_agents_dir,
+    _get_departments_dir as _get_departments_dir,
+    _get_otdels_dir as _get_otdels_dir,
+)
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
@@ -641,12 +610,6 @@ def save_roles(roles: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 # ─── Departments (full CRUD with directories) ────────────────────
 
-def _get_departments_dir() -> Path:
-    """Get departments directory (~/.synpin/departments/)."""
-    prod = Path.home() / ".synpin" / "departments"
-    dev = Path(__file__).resolve().parent.parent.parent / "departments"
-    return prod if prod.exists() else dev
-
 
 def load_departments() -> list[dict[str, Any]]:
     """Load departments from config/departments.yaml."""
@@ -789,12 +752,6 @@ def delete_department(dept_id: str) -> bool:
 # NOTE: Otdels are SEPARATE from Departments (agent groupings).
 # Departments = categories in Agents tab (departments.yaml, departmentsid)
 # Otdels = org units with chat channels (otdels.yaml, otdelid)
-
-def _get_otdels_dir() -> Path:
-    """Get otdels directory (~/.synpin/otdels/)."""
-    prod = Path.home() / ".synpin" / "otdels"
-    dev = Path(__file__).resolve().parent.parent.parent / "otdels"
-    return prod if prod.exists() else dev
 
 
 def load_otdels() -> list[dict[str, Any]]:

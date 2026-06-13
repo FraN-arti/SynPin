@@ -58,8 +58,13 @@ _data_dir_lock = threading.Lock()
 
 
 def _get_data_dir() -> Path:
-    """Resolve kanban data directory (same pattern as config/agents)."""
-    dev = Path(__file__).resolve().parent.parent / "data" / "tasks"
+    """Resolve kanban data directory (kanban uses its own subdirectory).
+
+    Kanban's tasks live at <data>/tasks/, not at <data>/ itself, so
+    we can't reuse the general _get_data_dir from paths_legacy.
+    """
+    from ..paths_legacy import _get_data_dir as _main_data_dir
+    dev = _main_data_dir() / "tasks"
     prod = Path.home() / ".synpin" / "data" / "tasks"
 
     if os.environ.get("SYNPIN_DEV") == "1":

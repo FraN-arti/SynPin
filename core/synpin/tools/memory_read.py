@@ -5,25 +5,7 @@ Built-in tool: always enabled, not shown in agent UI.
 from pathlib import Path
 from typing import Any
 
-# Resolved lazily
-_DATA_DIR: Path | None = None
-
-
-def _get_data_dir() -> Path:
-    global _DATA_DIR
-    if _DATA_DIR is not None:
-        return _DATA_DIR
-    candidates = [
-        Path.home() / ".synpin" / "data",
-        Path(__file__).resolve().parent.parent.parent.parent / "data",
-    ]
-    for c in candidates:
-        if c.exists():
-            _DATA_DIR = c
-            return _DATA_DIR
-    _DATA_DIR = candidates[0]
-    _DATA_DIR.mkdir(parents=True, exist_ok=True)
-    return _DATA_DIR
+from ..paths_legacy import _get_data_dir_tools as _get_data_dir
 
 
 async def memory_read(params: dict[str, Any]) -> dict[str, Any]:

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# SynPin CLI launcher (Unix).
+#
+# Resolves the repo root, picks the right Python interpreter (preferring
+# a project-local venv if present, falling back to the system python3),
+# and invokes `python -m synpin <args>`. This makes `synpin` callable
+# from anywhere on the system once /usr/local/bin (or equivalent) holds
+# a symlink to this file.
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Prefer project-local venv if it exists; otherwise system python3
+if [ -x "$REPO_ROOT/core/.venv/bin/python" ]; then
+    PYTHON="$REPO_ROOT/core/.venv/bin/python"
+else
+    PYTHON="$(command -v python3 || command -v python)"
+    if [ -z "$PYTHON" ]; then
+        echo "synpin: python3 not found in PATH. Run ./install.sh first." >&2
+        exit 1
+    fi
+fi
+
+cd "$REPO_ROOT/core"
+exec "$PYTHON" -m synpin "$@"

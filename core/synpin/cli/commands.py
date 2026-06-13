@@ -397,3 +397,9 @@ def cmd_doctor(args):
         table.add_row("Git", "[warning]⚠️[/warning]", "unknown")
 
     console.print(table)
+
+
+def cmd_dev(args):
+    """Run Core + Web together with unified output (dev mode)."""
+    from .dev import run_dev_server
+    run_dev_server()

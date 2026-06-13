@@ -140,23 +140,28 @@ def _get_config_dir() -> Path:
 # ---------------------------------------------------------------------------
 
 def _init_data_dir_general() -> Path:
-    """Default candidate pattern: <project>/data (where project = core/).
+    """Default candidate pattern: <package>/data (where package = synpin/).
 
-    paths_legacy.py lives in core/synpin/, so .parent.parent is the
-    project root (core/). Original code lived one level deeper (chat/,
-    api/, etc.), so it needed .parent.parent.parent. We need one hop
-    fewer.
+    paths_legacy.py lives in core/synpin/, so .parent is the synpin
+    package root. Original code in chat/, api/, etc. lived one level
+    deeper and needed .parent.parent to reach synpin/, then .parent
+    again to reach core/, then /data -> core/data. We want the new
+    layout: data lives INSIDE the synpin package at synpin/data/, so
+    the dev path is just synpin/ + "data" (one hop from this file).
     """
-    return Path(__file__).resolve().parent.parent / "data"
+    return _synpin_root() / "data"
 
 
 def _init_data_dir_tools() -> Path:
-    """Tool layer pattern: <project>/data (one level deeper than _init_data_dir_general).
+    """Tool layer pattern: same as _init_data_dir_general — tools/ is
+    one level deeper than the other modules, so the original code used
+    4 hops; we sit one level shallower, so 3 hops to the same dest.
 
-    Original tools/memory_*.py code used 4 .parent hops; we sit one
-    level shallower, so we use 3 hops. Same destination on disk.
+    In commit 3 of the structural refactor, the dev path moved from
+    core/data (outside the package) to synpin/data (inside the
+    package), so both legacy variants now point to the same place.
     """
-    return Path(__file__).resolve().parent.parent / "data"
+    return _synpin_root() / "data"
 
 
 def _get_data_dir() -> Path:

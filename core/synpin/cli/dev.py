@@ -93,6 +93,39 @@ def _normalize_glyphs(line: str) -> str:
     return "".join(c if (0x20 <= ord(c) <= 0x7E or c in "\t\n") else "?" for c in out)
 
 
+# Uvicorn and most Python loggers prefix each line with a level tag
+# ('INFO:', 'WARNING:', 'ERROR:', 'DEBUG:', 'CRITICAL:') optionally
+# surrounded by spaces. We colour the tag inline so the eye can pick
+# out severity at a glance, but leave the message text in the default
+# colour so it stays readable.
+_LOG_LEVEL_RE = re.compile(r"^(\s*)(INFO|WARNING|ERROR|DEBUG|CRITICAL)(\s*:)(.*)$")
+
+
+def _color_log_level(line: str) -> str:
+    """Wrap a uvicorn-style log line's level tag in a Rich colour tag.
+
+    Returns the line unchanged if it doesn't match the expected shape —
+    Vite output, plain stdout from a custom tool, or anything that
+    doesn't start with a recognised level tag just passes through.
+    """
+    m = _LOG_LEVEL_RE.match(line)
+    if not m:
+        return line
+    indent, level, colon, rest = m.groups()
+    colors = {
+        "INFO":     "#f59e0b",   # gold (brand accent, calm/normal)
+        "WARNING":  "#fbbf24",   # amber-400 (warmer, attention)
+        "ERROR":    "red",       # red (alarm)
+        "DEBUG":    "dim",       # low-emphasis
+        "CRITICAL": "bold red",  # bold red (severe)
+    }
+    color = colors.get(level, "dim")
+    # Use Rich's [color]text[/color] markup. We mark the indent and
+    # the message body as plain so the surrounding colour tags from
+    # the CORE/WEB prefix don't bleed into the level tag's colour.
+    return f"{indent}[{color}]{level}[/{color}]{colon}{rest}"
+
+
 def _output_printer(queue: Queue, stop_event: threading.Event, strip_ansi: bool) -> None:
     """Print queued (prefix, line) tuples with consistent formatting.
 
@@ -121,12 +154,19 @@ def _output_printer(queue: Queue, stop_event: threading.Event, strip_ansi: bool)
         # WEB a softer #f59e0b (the --accent, "gold" tone) so the two
         # services are visually distinct without drifting out of the
         # single-hue identity.
+        #
+        # Uvicorn-style log lines start with an uppercase level tag
+        # (INFO, WARNING, ERROR, DEBUG) followed by ':'. When we see
+        # one, we colour the tag inline so the eye can pick out
+        # "which severity is this?" at a glance. INFO is gold
+        # (#f59e0b, the brand accent — calm/normal), WARNING is a
+        # warmer amber (#fbbf24), ERROR is red, DEBUG is dim.
         if prefix == "CORE":
-            console.print(f"[#f97316]{prefix}[/#f97316] {line}")
+            console.print(f"[#f97316]{prefix}[/#f97316] {_color_log_level(line)}")
         elif prefix == "WEB":
-            console.print(f"[#f59e0b]{prefix}[/#f59e0b] {line}")
+            console.print(f"[#f59e0b]{prefix}[/#f59e0b] {_color_log_level(line)}")
         else:
-            console.print(f"{prefix} {line}")
+            console.print(f"{prefix} {_color_log_level(line)}")
 
 CORE_HOST = "0.0.0.0"
 CORE_PORT = 2088

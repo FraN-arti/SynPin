@@ -70,8 +70,27 @@ def _strip_ansi(line: str) -> str:
 
 def _normalize_glyphs(line: str) -> str:
     """Replace a handful of Unicode glyphs with their ASCII equivalents
-    so legacy Windows console fonts don't render them as garbage."""
-    return line.translate(_UNICODE_GLYPH_MAP)
+    so legacy Windows console fonts don't render them as garbage.
+
+    We also strip any other non-ASCII character that we didn't
+    explicitly map. Vite/Node occasionally emit glyphs the local
+    font can't render (Cascadia Mono on legacy conhost is a common
+    offender — em-dashes, en-dashes, and the U+27A8 arrow show up
+    as mojibake like 'вћњ'). Rather than enumerate every possible
+    glyph, we just neuter anything we can't represent: replace with
+    '?' for control-ish or punctuation glyphs, drop for whitespace
+    ones. ASCII letters and digits always pass through.
+
+    The trade-off: a Russian/Chinese/emoji text line would lose its
+    script characters here. We don't expect that from Vite/uvicorn
+    output, but if it ever shows up we can add an allow-list.
+    """
+    # First: explicit mappings we know we want to keep meaningful
+    out = line.translate(_UNICODE_GLYPH_MAP)
+    # Second: nuke remaining non-ASCII. ASCII letters/digits/punct
+    # (0x20..0x7E) and tab/newline pass through. Anything else
+    # becomes '?'.
+    return "".join(c if (0x20 <= ord(c) <= 0x7E or c in "\t\n") else "?" for c in out)
 
 
 def _output_printer(queue: Queue, stop_event: threading.Event, strip_ansi: bool) -> None:

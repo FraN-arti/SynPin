@@ -7,6 +7,8 @@ import { SettingsPage } from './components/SettingsPage'
 import { OtdelChatView } from './components/OtdelChatView'
 import { OtdelSettingsPanel } from './components/OtdelSettingsPanel'
 import { KanbanBoard } from './components/KanbanBoard'
+import { ChatSkeleton } from './components/ChatSkeleton'
+import { PageTransition } from './components/PageTransition'
 import {
   WidgetDropZone,
   useWidgetLayout,
@@ -158,7 +160,8 @@ function App() {
   const [page, setPage] = useState<'chat' | 'settings' | 'kanban'>('chat')
   const [activeOtdelId, setActiveOtdelId] = useState<string | null>(null)
   const [otdelSettingsOpen, setOtdelSettingsOpen] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([])
+  // null = not loaded yet (show skeleton), [] = loaded but empty chat
+  const [messages, setMessages] = useState<Message[] | null>(null)
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -170,6 +173,11 @@ function App() {
   const [revealedMeta, setRevealedMeta] = useState<Set<string>>(new Set())
   const [activeAgent, setActiveAgent] = useState<AgentConfig | null>(null)
   const [availableAgents, setAvailableAgents] = useState<AgentConfig[]>([])
+  // false until the initial /api/agents fetch resolves. Used to keep
+  // <ChatSkeleton> on screen during the F5 "flash of empty state"
+  // window — before the primary agent has been resolved and history
+  // loading can start.
+  const [agentsLoaded, setAgentsLoaded] = useState(false)
   const [agentSearch, setAgentSearch] = useState('')
   const [primarySlug, setPrimarySlug] = useState('')
   // Otdels for sidebar — loaded from /api/otdels
@@ -215,7 +223,7 @@ function App() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const activeAgentRef = useRef<AgentConfig | null>(null)
-  const messagesRef = useRef<Message[]>([])
+  const messagesRef = useRef<Message[] | null>(null)
 
   // Keep refs in sync with state
   activeAgentRef.current = activeAgent
@@ -242,7 +250,7 @@ function App() {
 
     // Reveal metadata 0.5s after streaming completes
     useEffect(() => {
-      if (!isTyping && messages.length > 0) {
+      if (!isTyping && messages && messages.length > 0) {
         const timer = setTimeout(() => {
           setRevealedMeta(prev => {
             const next = new Set(prev)
@@ -368,8 +376,10 @@ function App() {
           const primary = primarySlug ? allAgents.find(a => a.slug === primarySlug) : null
           setActiveAgent(primary || allAgents[0])
         }
+        setAgentsLoaded(true)
       } catch (e) {
         console.error('[agents] load error:', e)
+        setAgentsLoaded(true) // unblock UI even on error so user sees something
       }
     }
     loadAgents()
@@ -381,7 +391,12 @@ function App() {
     const loadHistory = async () => {
       try {
         const res = await fetch(`${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web`)
-        if (!res.ok) return
+        if (!res.ok) {
+          // Backend failure (5xx, 4xx other than empty) — unblock UI
+          // so the user doesn't see a permanent skeleton.
+          setMessages([])
+          return
+        }
         const data = await res.json()
         const msgs = data.messages || []
 
@@ -420,7 +435,11 @@ function App() {
           setMessages([])
         }
       } catch (e) {
+        // Network error / fetch threw — unblock UI. Without this the
+        // skeleton would be permanent and the user would assume the
+        // app is broken.
         console.error('[history] load error:', e)
+        setMessages([])
       }
     }
     loadHistory()
@@ -433,7 +452,7 @@ function App() {
 
     const pollInterval = setInterval(async () => {
       // Check for empty assistant placeholder using ref (always current)
-      const hasEmptyPlaceholder = messagesRef.current.some(m => m.role === 'assistant' && !m.content)
+      const hasEmptyPlaceholder = (messagesRef.current ?? []).some(m => m.role === 'assistant' && !m.content)
       if (!hasEmptyPlaceholder) return
 
       try {
@@ -449,18 +468,19 @@ function App() {
 
         // Find the placeholder (empty assistant) and fill it
         setMessages(prev => {
-          const placeholderId = prev.map(m => m.id).reverse().find(id => {
-            const msg = prev.find(m => m.id === id)
+          const list = prev ?? []
+          const placeholderId = list.map(m => m.id).reverse().find(id => {
+            const msg = list.find(m => m.id === id)
             return msg?.role === 'assistant' && !msg.content
           })
           if (placeholderId) {
             setIsTyping(false)
-            return prev.map(m => m.id === placeholderId
+            return list.map(m => m.id === placeholderId
               ? { ...m, content: lastServerMsg.content, model: lastServerMsg.model, agent_name: lastServerMsg.agent_name }
               : m
             )
           }
-          return prev
+          return list
         })
       } catch (e) {
         // Polling failed — silent
@@ -512,7 +532,7 @@ function App() {
 
     // Create user message + assistant placeholder in one atomic update
     const assistantId = (Date.now() + 1).toString()
-    setMessages(prev => [...prev, userMsg, {
+    setMessages(prev => [...(prev ?? []), userMsg, {
       id: assistantId,
       role: 'assistant',
       content: '',
@@ -561,7 +581,7 @@ function App() {
     // ── Hermes agents: keep SSE (separate endpoint) ──────────────
     if (isHermesAgent) {
       try {
-        const history = messagesRef.current.map(m => ({ role: m.role, content: m.content }))
+        const history = (messagesRef.current ?? []).map(m => ({ role: m.role, content: m.content }))
         const response = await fetch(`${API_BASE}/api/chat/hermes/stream`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -597,21 +617,21 @@ function App() {
             try { parsed = JSON.parse(line.slice(6)) } catch { continue }
             if (parsed.type === 'chunk' && typeof parsed.content === 'string') {
               fullContent += parsed.content
-              setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: fullContent } : m))
+              setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, content: fullContent } : m))
             } else if (parsed.type === 'tool_start') {
               const toolName = String(parsed.tool || '')
               if (HIDDEN_TOOLS.has(toolName)) { toolIndex++; continue }
               const tc: ToolCall = { id: `${assistantId}-tool-${toolIndex++}`, name: toolName, params: (parsed.params as Record<string, unknown>) || {}, status: 'running' }
               activeTools.push(tc)
-              setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, tools: [...(m.tools || []), tc] } : m))
+              setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, tools: [...(m.tools || []), tc] } : m))
             } else if (parsed.type === 'tool_end') {
               const toolName = String(parsed.tool || '')
               if (HIDDEN_TOOLS.has(toolName)) { continue }
               const idx = activeTools.findIndex(t => t.name === toolName && t.status === 'running')
               if (idx !== -1 && activeTools[idx]) { activeTools[idx].status = parsed.success ? 'completed' : 'error'; activeTools[idx].result = String(parsed.result || '') }
-              setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, tools: [...activeTools] } : m))
+              setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, tools: [...activeTools] } : m))
             } else if (parsed.type === 'done') {
-              setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, model: parsed.model as string, agent_name: parsed.agent_name as string } : m))
+              setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, model: parsed.model as string, agent_name: parsed.agent_name as string } : m))
               streamDone = true; break
             } else if (parsed.type === 'error') { throw new Error(String(parsed.message || 'Stream error')) }
           }
@@ -619,7 +639,7 @@ function App() {
         }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Unknown error'
-        setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: m.content || `⚠️ Ошибка: ${errorMsg}` } : m))
+        setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, content: m.content || `⚠️ Ошибка: ${errorMsg}` } : m))
       } finally {
         setIsTyping(false)
       }
@@ -632,7 +652,7 @@ function App() {
     const onChunk = wsOn('chat:chunk', (msg) => {
       if (msg.agent_slug !== activeAgent?.slug) return
       fullContent += msg.content
-      setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: fullContent } : m))
+      setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, content: fullContent } : m))
     })
 
     const onToolStart = wsOn('chat:tool_start', (msg) => {
@@ -641,7 +661,7 @@ function App() {
       if (HIDDEN_TOOLS.has(toolName)) { toolIndex++; return }
       const tc: ToolCall = { id: `${assistantId}-tool-${toolIndex++}`, name: toolName, params: (msg.params as Record<string, unknown>) || {}, status: 'running' }
       activeTools.push(tc)
-      setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, tools: [...(m.tools || []), tc] } : m))
+      setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, tools: [...(m.tools || []), tc] } : m))
     })
 
     const onToolEnd = wsOn('chat:tool_end', (msg) => {
@@ -654,18 +674,18 @@ function App() {
         activeTools[idx].result = String(msg.result || '')
         activeTools[idx].error = msg.error ? String(msg.error) : undefined
       }
-      setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, tools: [...activeTools] } : m))
+      setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, tools: [...activeTools] } : m))
     })
 
     const onDone = wsOn('chat:done', (msg) => {
       if (msg.agent_slug !== activeAgent?.slug) return
-      setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, model: msg.model || 'assistant', agent_name: msg.agent_name } : m))
+      setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, model: msg.model || 'assistant', agent_name: msg.agent_name } : m))
       cleanup()
     })
 
     const onError = wsOn('chat:error', (msg) => {
       cleanup()
-      setMessages(prev => prev.map(m => m.id === assistantId ? { ...m, content: m.content || `⚠️ Ошибка: ${msg.message || 'Stream error'}` } : m))
+      setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, content: m.content || `⚠️ Ошибка: ${msg.message || 'Stream error'}` } : m))
     })
 
     const cleanup = () => {
@@ -936,80 +956,113 @@ function App() {
             activeOtdelId={activeOtdelId}
           />
           <main className="main-area">
-        {page === 'kanban' ? (
-          <KanbanBoard onBack={() => setPage('chat')} wsOn={wsOn} />
-        ) : page === 'settings' ? (
-          <SettingsPage onBack={() => setPage('chat')} onAgentsChange={refreshAgents} onDepartmentsChange={refreshDepartments} />
-        ) : activeOtdelId ? (() => {
-          const otdel = sidebarDepartments.find(d => d.id === activeOtdelId)
-          if (!otdel) return null
-          return (
-            <>
-              <OtdelChatView
-                key={otdel.id}
-                otdel={{ ...otdel, otdelid: otdel.id }}
-                onBack={() => setActiveOtdelId(null)}
-                onOpenSettings={() => setOtdelSettingsOpen(true)}
-                wsSend={wsSend}
-                wsOn={wsOn}
-                wsConnected={wsConnected}
-              />
-              <OtdelSettingsPanel
-                key={`settings-${otdel.id}`}
-                otdel={{ ...otdel, otdelid: otdel.id }}
-                open={otdelSettingsOpen}
-                onClose={() => setOtdelSettingsOpen(false)}
-                onSaved={refreshDepartments}
-              />
-            </>
-          )
-        })() : messages.length === 0 ? (
-          <div className="empty-state">
-            <img src={synpinLogo} alt="SynPin" className="empty-logo-img" />
-            <h1 className="empty-title">Чем могу помочь?</h1>
-            {renderInput()}
-          </div>
-        ) : (
-          <>
-            <div className="messages-area">
-              <div className="messages-container">
-                {messages.map((msg) => {
-                  const isLastAssistant = msg.role === 'assistant' && msg.id === messages[messages.length - 1]?.id && isTyping
-                  return (
-                    <div key={msg.id} className={`message-row ${msg.role}`}>
-                      <div className={`message-avatar ${msg.role} ${isLastAssistant ? 'streaming' : ''}`}>
-                        {msg.role === 'assistant' ? (
-                          <img src={synpinLogo} alt="S" className="avatar-logo" />
-                        ) : 'U'}
-                      </div>
-                      {/* Tool timeline — collapsible action flow */}
-                      {msg.tools && msg.tools.length > 0 && (
-                        <ToolTimeline
-                          tools={msg.tools}
-                          isLive={isLastAssistant && isTyping}
-                          toolNames={TOOL_DISPLAY_NAMES}
-                        />
-                      )}
-                      <div className={`message-wrapper ${isLastAssistant ? 'streaming' : ''}`}>
-                        <div className="message-bubble">
-                          <MarkdownRenderer content={msg.content} isStreaming={isLastAssistant} />
-                        </div>
-                      </div>
-                      <div className={`message-footer ${msg.role} ${msg.role === 'user' || revealedMeta.has(msg.id) ? 'visible' : ''}`}>
-                        {msg.role === 'user' || revealedMeta.has(msg.id) ? renderMeta(msg) : null}
-                      </div>
-                    </div>
-                  )
-                })}
-                <div ref={messagesEndRef} />
-              </div>
-            </div>
+        {(() => {
+          // Compute a single pageKey that uniquely identifies the
+          // currently-rendered "page". When any of these change, we
+          // fade out + swap + fade in. First render skips the animation
+          // (see PageTransition's isFirstRender ref).
+          let pageKey: string
+          if (page === 'kanban') pageKey = 'kanban'
+          else if (page === 'settings') pageKey = 'settings'
+          else if (activeOtdelId) pageKey = `otdel-${activeOtdelId}`
+          else if (!agentsLoaded || (activeAgent && messages === null)) pageKey = 'chat-loading'
+          else if (!activeAgent || !messages || messages.length === 0) pageKey = 'chat-empty'
+          else pageKey = `chat-${activeAgent.slug}`
 
-            <div className="bottom-input">
-              {renderInput()}
-            </div>
-          </>
-        )}
+          let body: React.ReactNode
+          if (page === 'kanban') {
+            body = <KanbanBoard onBack={() => setPage('chat')} wsOn={wsOn} />
+          } else if (page === 'settings') {
+            body = <SettingsPage onBack={() => setPage('chat')} onAgentsChange={refreshAgents} onDepartmentsChange={refreshDepartments} />
+          } else if (activeOtdelId) {
+            const otdel = sidebarDepartments.find(d => d.id === activeOtdelId)
+            if (otdel) {
+              body = (
+                <>
+                  <OtdelChatView
+                    key={otdel.id}
+                    otdel={{ ...otdel, otdelid: otdel.id }}
+                    onBack={() => setActiveOtdelId(null)}
+                    onOpenSettings={() => setOtdelSettingsOpen(true)}
+                    wsSend={wsSend}
+                    wsOn={wsOn}
+                    wsConnected={wsConnected}
+                  />
+                  <OtdelSettingsPanel
+                    key={`settings-${otdel.id}`}
+                    otdel={{ ...otdel, otdelid: otdel.id }}
+                    open={otdelSettingsOpen}
+                    onClose={() => setOtdelSettingsOpen(false)}
+                    onSaved={refreshDepartments}
+                  />
+                </>
+              )
+            } else {
+              body = null
+            }
+          } else if (!agentsLoaded || (activeAgent && messages === null)) {
+            // Either the initial agent list is still loading (no agent
+            // resolved yet, and we don't want to flash the empty state),
+            // or an agent is set and its history is being fetched. In
+            // both cases show the skeleton — it reserves layout space and
+            // signals "loading" with no entrance animation. The skeleton
+            // disappears the moment the relevant data arrives.
+            body = <ChatSkeleton />
+          } else if (!activeAgent || !messages || messages.length === 0) {
+            // No agent selected (or no messages in the conversation) —
+            // show the friendly empty state.
+            body = (
+              <div className="empty-state">
+                <img src={synpinLogo} alt="SynPin" className="empty-logo-img" />
+                <h1 className="empty-title">Чем могу помочь?</h1>
+                {renderInput()}
+              </div>
+            )
+          } else {
+            body = (
+              <>
+                <div className="messages-area">
+                  <div className="messages-container">
+                    {messages.map((msg) => {
+                      const isLastAssistant = msg.role === 'assistant' && msg.id === messages[messages.length - 1]?.id && isTyping
+                      return (
+                        <div key={msg.id} className={`message-row ${msg.role}`}>
+                          <div className={`message-avatar ${msg.role} ${isLastAssistant ? 'streaming' : ''}`}>
+                            {msg.role === 'assistant' ? (
+                              <img src={synpinLogo} alt="S" className="avatar-logo" />
+                            ) : 'U'}
+                          </div>
+                          {/* Tool timeline — collapsible action flow */}
+                          {msg.tools && msg.tools.length > 0 && (
+                            <ToolTimeline
+                              tools={msg.tools}
+                              isLive={isLastAssistant && isTyping}
+                              toolNames={TOOL_DISPLAY_NAMES}
+                            />
+                          )}
+                          <div className={`message-wrapper ${isLastAssistant ? 'streaming' : ''}`}>
+                            <div className="message-bubble">
+                              <MarkdownRenderer content={msg.content} isStreaming={isLastAssistant} />
+                            </div>
+                          </div>
+                          <div className={`message-footer ${msg.role} ${msg.role === 'user' || revealedMeta.has(msg.id) ? 'visible' : ''}`}>
+                            {msg.role === 'user' || revealedMeta.has(msg.id) ? renderMeta(msg) : null}
+                          </div>
+                        </div>
+                      )
+                    })}
+                    <div ref={messagesEndRef} />
+                  </div>
+                </div>
+
+                <div className="bottom-input">
+                  {renderInput()}
+                </div>
+              </>
+            )
+          }
+          return <PageTransition pageKey={pageKey}>{body}</PageTransition>
+        })()}
           </main>
           <WidgetDropZone
             side="right"

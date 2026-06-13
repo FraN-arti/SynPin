@@ -5,7 +5,7 @@ import httpx
 from pathlib import Path
 from colorsys import rgb_to_hls, hls_to_rgb
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from ._base import BaseRequest
 
 router = APIRouter(prefix="/api/themes", tags=["themes"])
 
@@ -359,11 +359,11 @@ def _map_to_synpin_vars(tweakcn: dict) -> dict:
 
 # --- API Endpoints ---
 
-class ThemeImportRequest(BaseModel):
+class ThemeImportRequest(BaseRequest):
     url: str
 
 
-class ThemeSaveRequest(BaseModel):
+class ThemeSaveRequest(BaseRequest):
     id: str
     name: str
     url: str

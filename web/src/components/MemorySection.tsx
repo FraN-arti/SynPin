@@ -1,43 +1,21 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 
 // ─── Memory Section ──────────────────────────────────────────
 
 import { API_BASE as API } from '../config'
+import { DropdownMenu, type DropdownOption } from './DropdownMenu'
 
-// Local dropdown (same CSS as SettingsPage CustomDropdown)
-interface DropdownOption { value: string; label: string; disabled?: boolean; badge?: string }
-function SmallDropdown({ value, options, onChange }: { value: string; options: DropdownOption[]; onChange: (v: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  const selected = options.find(o => o.value === value)
-  useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [])
-  return (
-    <div className="custom-dropdown" ref={ref} style={{ width: '100%' }}>
-      <button className={`custom-dropdown-trigger ${open ? 'open' : ''}`} onClick={() => setOpen(!open)} type="button">
-        <span className="dropdown-selected">{selected?.label || value}</span>
-        <svg className="dropdown-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6" /></svg>
-      </button>
-      <div className={`custom-dropdown-menu ${open ? 'open' : ''}`}>
-        {options.map(option => (
-          <button
-            key={option.value}
-            className={`custom-dropdown-item ${option.value === value ? 'selected' : ''} ${option.disabled ? 'disabled' : ''}`}
-            onClick={() => { if (!option.disabled) { onChange(option.value); setOpen(false) } }}
-            disabled={option.disabled}
-          >
-            <span>{option.label}</span>
-            {option.badge && <span className="settings-card-badge" style={{ marginLeft: 6, fontSize: 9 }}>{option.badge}</span>}
-            {option.value === value && <svg className="dropdown-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 12l5 5L20 7" /></svg>}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
+// Re-use the global portal-based DropdownMenu. See DropdownMenu.tsx — the
+// portal escapes any clipping/stacking-context ancestor, so the menu can
+// never be hidden by surrounding sections.
+type SmallDropdownProps = {
+  value: string
+  options: DropdownOption[]
+  onChange: (v: string) => void
 }
+const SmallDropdown = ({ value, options, onChange }: SmallDropdownProps) => (
+  <DropdownMenu value={value} options={options} onChange={onChange} width="100%" />
+)
 
 // Parse entry into structured {key, value} or return raw text
 function parseEntry(entry: string): { key: string; value: string } {

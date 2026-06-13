@@ -5,10 +5,11 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ..kanban.service import KanbanService
 from ..kanban.models import Priority, TaskStatus
+from ._base import BaseRequest
 
 router = APIRouter(prefix="/api/kanban", tags=["kanban"])
 
@@ -25,7 +26,7 @@ def _get_service() -> KanbanService:
 
 # ── Request models ───────────────────────────────────────────────────────────
 
-class CreateTaskRequest(BaseModel):
+class CreateTaskRequest(BaseRequest):
     title: str
     department: str = ""
     description: str = ""
@@ -36,46 +37,47 @@ class CreateTaskRequest(BaseModel):
     required_skills: list[str] = Field(default_factory=list)
 
 
-class UpdateTaskRequest(BaseModel):
+class UpdateTaskRequest(BaseRequest):
     title: str | None = None
     description: str | None = None
     department: str | None = None
     priority: str | None = None
     deadline: str | None = None
     tags: list[str] | None = None
+    status: str | None = None  # column move: backlog/todo/in_progress/review/done/blocked
 
 
-class AssignHeadRequest(BaseModel):
+class AssignHeadRequest(BaseRequest):
     head_agent_id: str
 
 
-class AssignWorkerRequest(BaseModel):
+class AssignWorkerRequest(BaseRequest):
     agent_id: str
     subtask: str
 
 
-class ActionRequest(BaseModel):
+class ActionRequest(BaseRequest):
     actor: str = "system"
     detail: str = ""
 
 
-class SummonRequest(BaseModel):
+class SummonRequest(BaseRequest):
     target_department: str
     reason: str
     actor: str = "head"
 
 
-class EscalateRequest(BaseModel):
+class EscalateRequest(BaseRequest):
     reason: str
     report: str
 
 
-class RejectRequest(BaseModel):
+class RejectRequest(BaseRequest):
     feedback: str
     actor: str = "head"
 
 
-class AddResultRequest(BaseModel):
+class AddResultRequest(BaseRequest):
     file_path: str
     description: str = ""
     created_by: str = ""
@@ -195,6 +197,15 @@ def update_task(task_id: str, req: UpdateTaskRequest) -> dict:
         task.deadline = _parse_deadline(req.deadline)
     if req.tags is not None:
         task.tags = req.tags
+    if req.status is not None:
+        # Validate it's a known TaskStatus, then move via the model method
+        # so history is recorded (the UI relies on this for the activity log).
+        try:
+            new_status = TaskStatus(req.status)
+        except ValueError:
+            raise HTTPException(400, f"Unknown status: {req.status}")
+        if new_status != task.status:
+            task.move_to(new_status, actor="drag-drop")
 
     svc.save_task(task)
     return _task_to_dict(task)

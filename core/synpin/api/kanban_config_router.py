@@ -5,7 +5,8 @@ All changes auto-save and broadcast via WebSocket for live sync.
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import Field
+from ._base import BaseRequest
 
 from ..kanban.config import (
     ColumnConfig,
@@ -28,7 +29,7 @@ router = APIRouter(prefix="/api/kanban/config", tags=["kanban-config"])
 
 # ── Request models ───────────────────────────────────────────────────────────
 
-class ColumnRequest(BaseModel):
+class ColumnRequest(BaseRequest):
     id: str | None = None         # Auto-generated if not provided
     label: str = ""
     description: str = ""
@@ -38,17 +39,20 @@ class ColumnRequest(BaseModel):
     status: str | None = None
 
 
-class ColumnPatchRequest(BaseModel):
-    """Partial update — all fields optional."""
+class ColumnPatchRequest(BaseRequest):
+    """Partial update — all fields optional. Excludes `status` because
+    mapping a column to a TaskStatus is a structural config change
+    (used by the global Kanban board to look up tasks by column), not
+    a partial mutation. Change `status` by editing columns.yaml directly
+    or via PUT /api/kanban/config/columns with the full new list."""
     label: str | None = None
     description: str | None = None
     color: str | None = None
     order: int | None = None
     enabled: bool | None = None
-    status: str | None = None
 
 
-class LabelRequest(BaseModel):
+class LabelRequest(BaseRequest):
     id: str | None = None         # Auto-generated if not provided
     name: str = ""
     color: str = "#6b7280"
@@ -56,7 +60,7 @@ class LabelRequest(BaseModel):
     description: str = ""
 
 
-class LabelPatchRequest(BaseModel):
+class LabelPatchRequest(BaseRequest):
     """Partial update — all fields optional."""
     name: str | None = None
     color: str | None = None
@@ -64,7 +68,7 @@ class LabelPatchRequest(BaseModel):
     description: str | None = None
 
 
-class WidgetRequest(BaseModel):
+class WidgetRequest(BaseRequest):
     mode: str | None = None
     max_items: int | None = None
     show_columns: list[str] | None = None
@@ -74,7 +78,7 @@ class WidgetRequest(BaseModel):
     compact: bool | None = None
 
 
-class BoardSettingsRequest(BaseModel):
+class BoardSettingsRequest(BaseRequest):
     max_active_tasks: int | None = None
     auto_archive_days: int | None = None
     notifications_enabled: bool | None = None

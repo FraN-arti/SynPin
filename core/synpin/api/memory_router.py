@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from ._base import BaseRequest
 
 from ..memory import MemoryManager
 from ..memory.store import USER_CHAR_LIMIT
@@ -95,35 +95,35 @@ def get_manager(agent_id: str) -> MemoryManager:
 
 # ── Request/Response Models ──────────────────────────────────────────────
 
-class AddRequest(BaseModel):
+class AddRequest(BaseRequest):
     target: str = "memory"  # "memory" or "user"
     content: str
 
 
-class ReplaceRequest(BaseModel):
+class ReplaceRequest(BaseRequest):
     target: str = "memory"
     old_text: str
     new_content: str
 
 
-class RemoveRequest(BaseModel):
+class RemoveRequest(BaseRequest):
     target: str = "memory"
     old_text: str
 
 
-class AddFactRequest(BaseModel):
+class AddFactRequest(BaseRequest):
     topic: str
     content: str
     date: Optional[str] = None
 
 
-class SearchRequest(BaseModel):
+class SearchRequest(BaseRequest):
     query: str
     file_type: Optional[str] = None
     limit: int = 10
 
 
-class SetSessionRequest(BaseModel):
+class SetSessionRequest(BaseRequest):
     channel: str
     session_id: str
     last_position: int = 0

@@ -1,14 +1,14 @@
 """REST API for external agent detection and management."""
 import logging
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from ._base import BaseRequest
 from ..agents import external
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["external-agents"])
 
 
-class ExternalAgentUpdate(BaseModel):
+class ExternalAgentUpdate(BaseRequest):
     name: str | None = None
     role: str | None = None
     department: str | None = None

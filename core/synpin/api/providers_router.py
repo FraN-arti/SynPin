@@ -1,12 +1,12 @@
 """REST API for managing LLM providers configuration."""
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from ._base import BaseRequest
 from ..config import manager
 
 router = APIRouter(prefix="/api/providers", tags=["providers"])
 
 
-class ProviderCreate(BaseModel):
+class ProviderCreate(BaseRequest):
     name: str
     type: str  # openai | openai-compatible | anthropic
     base_url: str = ""
@@ -15,7 +15,7 @@ class ProviderCreate(BaseModel):
     default: bool = False
 
 
-class ProviderUpdate(BaseModel):
+class ProviderUpdate(BaseRequest):
     type: str | None = None
     base_url: str | None = None
     api_key: str | None = None

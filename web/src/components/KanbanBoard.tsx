@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { API_BASE } from '../config'
-import { DndContext, closestCenter, useDraggable, useDroppable, DragEndEvent } from '@dnd-kit/core'
+import { DndContext, pointerWithin, useDraggable, useDroppable, DragEndEvent, DragOverlay, DragStartEvent } from '@dnd-kit/core'
 import { SortableContext, useSortable, arrayMove, horizontalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { PickerMenu } from './PickerMenu'
 
 interface Task {
   id: string
@@ -112,16 +113,19 @@ function DraggableTaskCard({
   deptMap: Record<string, string>
   onSelect: (task: Task) => void
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `task-${task.id}`,
     data: { type: 'task', task },
   })
 
+  // Inline (placeholder) card: invisible while dragging — the visible "ghost"
+  // is rendered by <DragOverlay> in the parent <DndContext>. This is what
+  // fixes the "card hidden behind neighbour column" bug: DragOverlay lives
+  // at document.body level and is not trapped by any column's stacking
+  // context. Same pattern as the global DropdownMenu fix.
   const style: React.CSSProperties = {
-    transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 1 : 1,
-    zIndex: isDragging ? 9999 : 'auto',
     borderLeft: `3px solid ${PRIORITY_COLORS[task.priority] || '#22c55e'}`,
+    opacity: isDragging ? 0 : 1,
   }
 
   const deptName = deptMap[task.department] || task.department || ''
@@ -130,7 +134,7 @@ function DraggableTaskCard({
     <div
       ref={setNodeRef}
       style={style}
-      className={`kanban-card ${isDragging ? 'kanban-card-dragging' : ''}`}
+      className="kanban-card"
       onClick={() => {
         if (!isDragging) onSelect(task)
       }}
@@ -142,7 +146,6 @@ function DraggableTaskCard({
         {...attributes}
         title="Перетащить"
       >⠿</span>
-      {/* Task: compact view — priority dot + title + dept */}
       <div className="kanban-card-top">
         <span
           className="kanban-card-priority"
@@ -151,9 +154,7 @@ function DraggableTaskCard({
         />
         <span className="kanban-card-title">{task.title}</span>
       </div>
-      {deptName && (
-        <div className="kanban-card-dept">{deptName}</div>
-      )}
+      {deptName && <div className="kanban-card-dept">{deptName}</div>}
       {task.deadline && (
         <div className="kanban-card-deadline">⏰ {formatDate(task.deadline)}</div>
       )}
@@ -420,43 +421,88 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
 
   const effectiveColumns = columns.length > 0 ? columns : []
 
+  // ── DragOverlay state ───────────────────────────────────────────────────
+  // The dragged task is rendered both inline (as a hidden placeholder so the
+  // layout doesn't shift) and inside <DragOverlay> (the visible "ghost" that
+  // follows the cursor). The overlay is portal-rendered at document.body,
+  // so it escapes every stacking-context ancestor — column transforms,
+  // modals, headers, etc. This is the global fix for "card hidden behind
+  // neighbour column" and works in combination with the global DropdownMenu.
+  const [activeTask, setActiveTask] = useState<Task | null>(null)
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const data = (event.active.data as any).current
+    if (data?.type === 'task') setActiveTask(data.task as Task)
+  }
+
   // Task 4: Handle drag end — supports both column reorder and task move between columns
   const handleDragEnd = (event: DragEndEvent) => {
+    setActiveTask(null)
     const { active, over } = event
     if (!over || active.id === over.id) return
 
     const activeData = (active.data as any).current
     const overData = (over.data as any).current
 
-    // Task drag between columns
+    // Task drag between columns.
+    // Drop target may be EITHER:
+    //  - column-body (dropped on empty column or its background)
+    //  - another task (dropped on a card) — in that case the target column
+    //    is the column of the card we dropped on.
     if (activeData?.type === 'task') {
       const task = activeData.task as Task
-      const newStatus = overData?.type === 'column-body' ? overData.status : null
 
-      if (newStatus && newStatus !== task.status) {
-        // Optimistic update: move task locally
-        setBoard(prev => {
-          const next = { ...prev }
-          // Remove from old status
-          if (next[task.status]) {
-            next[task.status] = (next[task.status] || []).filter(t => t.id !== task.id)
+      // Resolve target column status. Prefer explicit column-body data,
+      // fall back to the status of the task we dropped on.
+      let newStatus: string | null = null
+      if (overData?.type === 'column-body') {
+        newStatus = overData.status as string
+      } else if (overData?.type === 'task') {
+        const overTask = overData.task as Task
+        // The card we dropped on lives in its own column; use its status.
+        // If the dropped-on card has no status (legacy data), find which
+        // board bucket contains it.
+        if (overTask.status) {
+          newStatus = overTask.status
+        } else {
+          for (const [s, list] of Object.entries(board)) {
+            if ((list || []).some(t => t.id === overTask.id)) {
+              newStatus = s
+              break
+            }
           }
-          // Add to new status
-          const movedTask = { ...task, status: newStatus }
-          next[newStatus] = [...(next[newStatus] || []), movedTask]
-          return next
-        })
-
-        // PATCH to backend
-        fetch(`${API_BASE}/api/kanban/tasks/${task.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: newStatus }),
-        }).catch(e => {
-          console.error('[kanban] task move error:', e)
-          loadBoard() // Revert on error
-        })
+        }
       }
+
+      // No resolvable target column — nothing to do.
+      if (!newStatus) return
+
+      // Same column: dnd-kit fires this for in-column reorder. We don't
+      // support reordering tasks within a column, so just no-op.
+      if (newStatus === task.status) return
+
+      // Optimistic update: move task locally
+      setBoard(prev => {
+        const next = { ...prev }
+        // Remove from old status
+        if (next[task.status]) {
+          next[task.status] = (next[task.status] || []).filter(t => t.id !== task.id)
+        }
+        // Add to new status
+        const movedTask = { ...task, status: newStatus! }
+        next[newStatus!] = [...(next[newStatus!] || []), movedTask]
+        return next
+      })
+
+      // PATCH to backend
+      fetch(`${API_BASE}/api/kanban/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      }).catch(e => {
+        console.error('[kanban] task move error:', e)
+        loadBoard() // Revert on error
+      })
       return
     }
 
@@ -502,7 +548,7 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
       {loading ? (
         <div className="kanban-loading">Загрузка доски...</div>
       ) : (
-        <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <DndContext collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <SortableContext
             items={effectiveColumns.map(c => c.id)}
             strategy={horizontalListSortingStrategy}
@@ -519,6 +565,30 @@ export function KanbanBoard({ onBack, wsOn }: KanbanBoardProps) {
               ))}
             </div>
           </SortableContext>
+          <DragOverlay dropAnimation={null}>
+            {activeTask ? (
+              <div
+                className="kanban-card kanban-card-overlay"
+                style={{ borderLeft: `3px solid ${PRIORITY_COLORS[activeTask.priority] || '#22c55e'}` }}
+              >
+                <span className="kanban-card-drag-handle">⠿</span>
+                <div className="kanban-card-top">
+                  <span
+                    className="kanban-card-priority"
+                    style={{ background: PRIORITY_COLORS[activeTask.priority] || '#22c55e' }}
+                    title={PRIORITY_LABELS[activeTask.priority] || activeTask.priority}
+                  />
+                  <span className="kanban-card-title">{activeTask.title}</span>
+                </div>
+                {deptMap[activeTask.department] && (
+                  <div className="kanban-card-dept">{deptMap[activeTask.department]}</div>
+                )}
+                {activeTask.deadline && (
+                  <div className="kanban-card-deadline">⏰ {formatDate(activeTask.deadline)}</div>
+                )}
+              </div>
+            ) : null}
+          </DragOverlay>
         </DndContext>
       )}
 
@@ -687,18 +757,12 @@ function CreateTaskModal({
   // Auto-expanding textarea
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Department searchable dropdown
+  // Department searchable dropdown — picker state lives inside <PickerMenu>.
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
-  const [deptSearch, setDeptSearch] = useState('')
-  const [deptOpen, setDeptOpen] = useState(false)
-  const deptDropdownRef = useRef<HTMLDivElement>(null)
-  const deptSearchInputRef = useRef<HTMLInputElement>(null)
 
-  // Tag picker
+  // Tag picker — state (selected tag names) is owned here; the picker
+  // UI itself lives inside <PickerMenu multi>.
   const [availableLabels, setAvailableLabels] = useState<LabelConfig[]>([])
-  const [tagsOpen, setTagsOpen] = useState(false)
-  const tagsPopupRef = useRef<HTMLDivElement>(null)
-  const tagsTriggerRef = useRef<HTMLDivElement>(null)
 
   // ── Fetch departments & labels ──
   useEffect(() => {
@@ -717,41 +781,9 @@ function CreateTaskModal({
       .catch(() => {})
   }, [])
 
-  // ── Click outside handlers ──
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (deptDropdownRef.current && !deptDropdownRef.current.contains(e.target as Node)) {
-        setDeptOpen(false)
-      }
-    }
-    if (deptOpen) document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [deptOpen])
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (
-        tagsPopupRef.current &&
-        !tagsPopupRef.current.contains(e.target as Node) &&
-        tagsTriggerRef.current &&
-        !tagsTriggerRef.current.contains(e.target as Node)
-      ) {
-        setTagsOpen(false)
-      }
-    }
-    if (tagsOpen) document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [tagsOpen])
-
   // ── Filtered departments ──
-  const filteredDepts = departments.filter(d =>
-    d.name.toLowerCase().includes(deptSearch.toLowerCase()),
-  )
-
-  const selectedDept = departments.find(d => {
-    const id = d.id || d.otdelid || d.departmentsid
-    return id === department || d.name === department
-  })
+  // PickerMenu handles its own search filtering when `searchable` is true,
+  // so we hand it the full list.
 
   // ── Auto-resize textarea ──
   const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -759,20 +791,6 @@ function CreateTaskModal({
     el.style.height = 'auto'
     el.style.height = Math.min(el.scrollHeight, 160) + 'px'
     setDescription(el.value)
-  }
-
-  // ── Toggle department ──
-  const selectDept = (d: DepartmentItem) => {
-    const id = d.id || d.otdelid || d.departmentsid
-    setDepartment(id || d.name)
-    setDeptOpen(false)
-    setDeptSearch('')
-    setDeptError(false)
-  }
-
-  // ── Toggle tag ──
-  const toggleTag = (name: string) => {
-    setTags(prev => (prev.includes(name) ? prev.filter(t => t !== name) : [...prev, name]))
   }
 
   // ── Submit — Task 10: validate department required ──
@@ -866,57 +884,37 @@ function CreateTaskModal({
 
           {/* Department searchable dropdown — Task 10: required field */}
           <div className="kanban-form-row">
-            <div
-              className="kanban-form-group"
-              style={{ position: 'relative' }}
-              ref={deptDropdownRef}
-            >
+            <div className="kanban-form-group">
               <label>
                 Отдел *{' '}
                 {deptError && <span className="kanban-field-error">Выберите отдел</span>}
               </label>
-              <div
-                className={`kanban-dept-trigger ${deptError ? 'kanban-dept-error' : ''}`}
-                onClick={() => {
-                  setDeptOpen(prev => !prev)
-                  setDeptError(false)
-                  setTimeout(() => deptSearchInputRef.current?.focus(), 0)
+              <PickerMenu
+                value={department || null}
+                options={departments.map(d => {
+                  const id = String(d.otdelid || d.id || d.departmentsid || d.name)
+                  return {
+                    id,
+                    label: d.name,
+                    searchText: d.name,
+                  }
+                })}
+                onSelect={(id) => {
+                  const d = departments.find(x =>
+                    String(x.otdelid || x.id || x.departmentsid || x.name) === id
+                  )
+                  if (d) {
+                    setDepartment(String(d.otdelid || d.id || d.departmentsid || d.name))
+                    setDeptError(false)
+                  }
                 }}
-              >
-                <span className={selectedDept ? '' : 'kanban-dept-placeholder'}>
-                  {selectedDept?.name || 'Не указан'}
-                </span>
-                <span className="kanban-dept-arrow">{deptOpen ? '▴' : '▾'}</span>
-              </div>
-              {deptOpen && (
-                <div className="kanban-dept-dropdown">
-                  <input
-                    ref={deptSearchInputRef}
-                    className="kanban-dept-search"
-                    value={deptSearch}
-                    onChange={e => setDeptSearch(e.target.value)}
-                    placeholder="Поиск отдела..."
-                  />
-                  <div className="kanban-dept-list">
-                    {filteredDepts.length === 0 && (
-                      <div className="kanban-dept-empty">Нет результатов</div>
-                    )}
-                    {filteredDepts.map(d => (
-                      <div
-                        key={d.otdelid || d.id || d.name}
-                        className={`kanban-dept-item ${
-                          department === (d.otdelid || d.id || d.departmentsid || d.name)
-                            ? 'active'
-                            : ''
-                        }`}
-                        onClick={() => selectDept(d)}
-                      >
-                        <span>{d.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                placeholder="Не указан"
+                searchable
+                searchPlaceholder="Поиск отдела..."
+                emptyMessage="Нет результатов"
+                triggerWidth="100%"
+                triggerClassName={deptError ? 'picker-trigger kanban-dept-error' : 'picker-trigger kanban-dept-trigger'}
+              />
             </div>
 
             {/* Deadline */}
@@ -926,63 +924,28 @@ function CreateTaskModal({
             </div>
           </div>
 
-          {/* Tags as clickable chips + popup */}
-          <div className="kanban-form-group" style={{ position: 'relative' }}>
+          {/* Tags as clickable chips + popup — uses multi-select PickerMenu */}
+          <div className="kanban-form-group">
             <label>Теги</label>
-            <div className="kanban-tags-row">
-              {/* Selected tags as chips */}
-              {tags.map(tagName => {
-                const label = availableLabels.find(l => l.name === tagName)
-                return (
-                  <span
-                    key={tagName}
-                    className="kanban-tag-chip"
-                    style={label ? { background: label.color, color: label.text_color } : undefined}
-                    onClick={() => toggleTag(tagName)}
-                    title={
-                      label?.description
-                        ? `${label.description}\nНажмите чтобы убрать`
-                        : 'Нажмите чтобы убрать'
-                    }
-                  >
-                    {tagName} ✕
-                  </span>
-                )
-              })}
-              {/* Add button */}
-              <div
-                ref={tagsTriggerRef}
-                className="kanban-tag-add"
-                onClick={() => setTagsOpen(prev => !prev)}
-                title="Добавить тег"
-              >
-                +
-              </div>
-            </div>
-            {/* Tag picker popup */}
-            {tagsOpen && (
-              <div
-                ref={tagsPopupRef}
-                className="tag-picker-popup"
-                onMouseLeave={() => setTagsOpen(false)}
-              >
-                {availableLabels.length === 0 && (
-                  <div className="tag-picker-empty">Нет тегов</div>
-                )}
-                {availableLabels.map(label => (
-                  <div
-                    key={label.id}
-                    className={`tag-block ${tags.includes(label.name) ? 'selected' : ''}`}
-                    style={{ background: label.color, color: label.text_color }}
-                    onClick={() => toggleTag(label.name)}
-                    title={label.description || label.name}
-                  >
-                    {tags.includes(label.name) && <span className="tag-check">✓</span>}
-                    {label.name}
-                  </div>
-                ))}
-              </div>
-            )}
+            <PickerMenu
+              multi
+              value={tags}
+              onChange={setTags}
+              options={availableLabels.map(label => ({
+                id: label.name,
+                label: label.name,
+                searchText: label.name,
+              }))}
+              placeholder="Выберите теги..."
+              emptyMessage="Нет тегов"
+              triggerWidth="100%"
+              triggerClassName="picker-trigger kanban-tags-trigger"
+              formatTriggerLabel={(selected) =>
+                selected.length === 0
+                  ? 'Выберите теги...'
+                  : selected.map(o => o.label).join(', ')
+              }
+            />
           </div>
 
           {/* Actions */}

@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { PROVIDER_CATALOG, providerKey, providerIconUrl, type ProviderInfo } from '../lib/providers'
 import { MemorySection } from './MemorySection'
+import { DropdownMenu, type DropdownOption } from './DropdownMenu'
 import { useDraggable } from '@dnd-kit/core'
 
 import { API_BASE } from '../config'
+import { useUndoWithProgress } from '../hooks/useUndoWithProgress'
+import { PageTransition } from './PageTransition'
 
 // Tabs that can be dragged to widget zones
 const DRAGGABLE_TABS = new Set(['departments', 'kanban'])
@@ -163,16 +166,23 @@ export function SettingsPage({ onBack, onAgentsChange, onDepartmentsChange }: Se
           ))}
         </nav>
 
-        {/* Tab content with fade animation */}
-        <div className="settings-body" key={activeTab}>
-          {activeTab === 'general' && <GeneralSection />}
-          {activeTab === 'agents' && <AgentsSection onAgentsChange={onAgentsChange} />}
-          {activeTab === 'providers' && <ProvidersSection ref={providersRef} onAddProvider={(type) => setActiveModal(`add-provider-${type}`)} onAddFromCatalog={(p) => setAddingProvider(p)} onEditProvider={(p) => setEditingProvider(p)} />}
-          {activeTab === 'memory' && <MemorySection />}
-          {activeTab === 'channels' && <ChannelsSection onAddChannel={() => setActiveModal('add-channel')} />}
-          {activeTab === 'departments' && <DepartmentsSection onDepartmentsChange={onDepartmentsChange} />}
-          {activeTab === 'skills' && <SkillsSection />}
-          {activeTab === 'kanban' && <KanbanSection />}
+        {/* Tab content with unified fade — PageTransition handles the
+            300ms fade-out / swap / 300ms fade-in. First render after
+            entering SettingsPage skips the animation (PageTransition's
+            isFirstRender ref). Note: PageTransition lives in the same
+            layout slot as the old key={activeTab} div, so flex/scroll
+            context of `.settings-body` is preserved. */}
+        <div className="settings-body">
+          <PageTransition pageKey={activeTab}>
+            {activeTab === 'general' && <GeneralSection />}
+            {activeTab === 'agents' && <AgentsSection onAgentsChange={onAgentsChange} />}
+            {activeTab === 'providers' && <ProvidersSection ref={providersRef} onAddProvider={(type) => setActiveModal(`add-provider-${type}`)} onAddFromCatalog={(p) => setAddingProvider(p)} onEditProvider={(p) => setEditingProvider(p)} />}
+            {activeTab === 'memory' && <MemorySection />}
+            {activeTab === 'channels' && <ChannelsSection onAddChannel={() => setActiveModal('add-channel')} />}
+            {activeTab === 'departments' && <DepartmentsSection onDepartmentsChange={onDepartmentsChange} />}
+            {activeTab === 'skills' && <SkillsSection />}
+            {activeTab === 'kanban' && <KanbanSection />}
+          </PageTransition>
         </div>
       </div>
     </>
@@ -180,77 +190,15 @@ export function SettingsPage({ onBack, onAgentsChange, onDepartmentsChange }: Se
 }
 
 // ─── Custom Dropdown ─────────────────────────────────────────
-
-interface DropdownOption {
-  value: string
-  label: string
-  disabled?: boolean
-}
-
-interface CustomDropdownProps {
-  value: string
-  options: DropdownOption[]
-  onChange: (value: string) => void
-  width?: string
-  disabled?: boolean
-}
-
-function CustomDropdown({ value, options, onChange, width, disabled }: CustomDropdownProps) {
-  const [open, setOpen] = useState(false)
-  const [highlighted, setHighlighted] = useState(-1)
-  const ref = useRef<HTMLDivElement>(null)
-  const selected = options.find(o => o.value === value)
-
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [])
-
-  const handleSelect = (option: DropdownOption) => {
-    if (option.disabled) return
-    onChange(option.value)
-    setOpen(false)
-    setHighlighted(-1)
-  }
-
-  return (
-    <div className={`custom-dropdown ${disabled ? 'disabled' : ''}`} ref={ref} style={{ width }}>
-      <button
-        className={`custom-dropdown-trigger ${open ? 'open' : ''}`}
-        onClick={() => !disabled && setOpen(!open)}
-        type="button"
-        disabled={disabled}
-      >
-        <span className="dropdown-selected">{selected?.label || value}</span>
-        <svg className="dropdown-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </button>
-
-      <div className={`custom-dropdown-menu ${open ? 'open' : ''}`}>
-        {options.map((option, i) => (
-          <button
-            key={option.value}
-            className={`custom-dropdown-item ${option.value === value ? 'selected' : ''} ${option.disabled ? 'disabled' : ''} ${i === highlighted ? 'highlighted' : ''}`}
-            onClick={() => handleSelect(option)}
-            onMouseEnter={() => setHighlighted(i)}
-            disabled={option.disabled}
-          >
-            {option.label}
-            {option.value === value && (
-              <svg className="dropdown-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                <path d="M5 12l5 5L20 7" />
-              </svg>
-            )}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
+// DropdownMenu renders its menu through a React Portal in document.body,
+// so it escapes any clipping / stacking-context ancestor (.settings-page,
+// .agent-expanded-content, .kanban-column, etc). See DropdownMenu.tsx.
+// The legacy local CustomDropdown (inline-positioned) was removed because
+// it caused recurring "menu hidden behind lower section" bugs and required
+// per-call-site overflow:visible band-aids. Portal is the global fix.
+const CustomDropdown = DropdownMenu
+// Re-export the option type so existing call-sites keep working unchanged.
+export type { DropdownOption }
 
 // ─── General Section ─────────────────────────────────────────
 
@@ -2881,10 +2829,25 @@ function KanbanColumnsConfig() {
   const [widgetSaving, setWidgetSaving] = useState(false)
   const [savedId, setSavedId] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; label: string; index: number } | null>(null)
-  const [undoProgress, setUndoProgress] = useState(100)
-  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Undo-toast for column deletion. The hook owns timers/progress;
+  // we just supply what to do on expire (real DELETE) and on undo
+  // (splice the column back into `columns`).
+  const { pendingDelete, undoProgress, start: startUndo, undo: undoDelete } =
+    useUndoWithProgress({
+      onExpire: ({ id }) => {
+        // Real delete — fire and forget; the row is already gone from UI.
+        fetch(`${API_BASE}/api/kanban/config/columns/${id}`, { method: 'DELETE' })
+          .catch(e => console.error('[kanban] delete column error:', e))
+      },
+      onUndo: ({ id, index, label }) => {
+        setColumns(prev => {
+          const newCols = [...prev]
+          newCols.splice(index, 0, { id, label } as KanbanColumnItem)
+          return newCols
+        })
+      },
+    })
 
   useEffect(() => {
     fetch(`${API_BASE}/api/kanban/config/columns`)
@@ -2904,21 +2867,6 @@ function KanbanColumnsConfig() {
   useEffect(() => {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [])
-
-  // Cleanup undo timers on unmount
-  useEffect(() => {
-    return () => {
-      if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
-      if (progressTimerRef.current) clearInterval(progressTimerRef.current)
-    }
-  }, [])
-
-  const genId = () => {
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-    let id = ''
-    for (let i = 0; i < 14; i++) id += chars[Math.floor(Math.random() * chars.length)]
-    return id
-  }
 
   const patchColumn = async (id: string, updates: Partial<KanbanColumnItem>) => {
     setSaving(true)
@@ -3032,51 +2980,12 @@ function KanbanColumnsConfig() {
     if (!col) return
 
     // Remove from UI immediately
+    const idx = columns.findIndex(c => c.id === colId)
     setColumns(prev => prev.filter(c => c.id !== colId))
 
-    // Set pending delete
-    const idx = columns.findIndex(c => c.id === colId)
-    setPendingDelete({ id: colId, label: col.label, index: idx })
-    setUndoProgress(100)
-
-    // Start countdown (5 seconds)
-    const startTime = Date.now()
-    const duration = 5000
-
-    progressTimerRef.current = setInterval(() => {
-      const elapsed = Date.now() - startTime
-      const remaining = Math.max(0, 100 - (elapsed / duration) * 100)
-      setUndoProgress(remaining)
-      if (remaining <= 0) {
-        clearInterval(progressTimerRef.current!)
-      }
-    }, 30)
-
-    undoTimerRef.current = setTimeout(() => {
-      // Actually delete
-      fetch(`${API_BASE}/api/kanban/config/columns/${colId}`, { method: 'DELETE' })
-        .catch(e => console.error('[kanban] delete column error:', e))
-      setPendingDelete(null)
-      clearInterval(progressTimerRef.current!)
-    }, duration)
-  }
-
-  const undoDelete = () => {
-    if (!pendingDelete) return
-
-    // Cancel the pending delete
-    clearTimeout(undoTimerRef.current!)
-    clearInterval(progressTimerRef.current!)
-
-    // Restore the column
-    const restoreIndex = pendingDelete.index
-    const restored: any = { id: pendingDelete.id, label: pendingDelete.label }
-    setColumns(prev => {
-      const newCols = [...prev]
-      newCols.splice(restoreIndex, 0, restored)
-      return newCols
-    })
-    setPendingDelete(null)
+    // Arm the undo window. Hook fires real DELETE on expire, or our
+    // onUndo (splice back) on click.
+    startUndo({ id: colId, label: col.label, index: idx })
   }
 
   const saveDefaultColumn = useCallback(async (value: string | null) => {
@@ -3165,7 +3074,7 @@ function KanbanColumnsConfig() {
           {saving && savedId === col.id && <span style={{ color: '#22c55e', fontSize: '12px' }}>✓</span>}
         </div>
       ))}
-      <div style={{ display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center', overflow: 'visible' }}>
+      <div style={{ display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center' }}>
         <button className="kanban-create-btn" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={addColumn}>
           + Добавить колонку
         </button>
@@ -3216,7 +3125,9 @@ function KanbanLabelsConfig() {
   const [savedId, setSavedId] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const descDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string; index: number } | null>(null)
+  // pendingDelete carries enough state to restore the label (color/text_color/description)
+  // if the user clicks "Отменить" within the toast window.
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string; index: number; color?: string; text_color?: string; description?: string } | null>(null)
   const [undoProgress, setUndoProgress] = useState(100)
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -3243,13 +3154,6 @@ function KanbanLabelsConfig() {
       if (progressTimerRef.current) clearInterval(progressTimerRef.current)
     }
   }, [])
-
-  const genId = () => {
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-    let id = ''
-    for (let i = 0; i < 14; i++) id += chars[Math.floor(Math.random() * chars.length)]
-    return id
-  }
 
   const patchLabel = async (id: string, updates: Partial<KanbanLabelItem>) => {
     setSaving(true)

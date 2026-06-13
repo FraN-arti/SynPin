@@ -4,8 +4,11 @@ import yaml
 import os
 import random
 import string
+import logging
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 _AGENTS_DIR = None
 _CONFIG_DIR = None
@@ -508,7 +511,17 @@ def cleanup_orphaned_agent_memberships() -> dict[str, Any]:
 
 
 def save_agent(slug: str, updates: dict[str, Any]) -> dict[str, Any]:
-    """Save agent updates. Operational → agents.yaml, personalization + role/dept → agent.yaml."""
+    """Save agent updates. Operational → agents.yaml, personalization + role/dept → agent.yaml.
+
+    The union of operational_keys and personalization_keys is the set of
+    fields AgentUpdate accepts. Any other key in `updates` is logged
+    as a warning and written through to the YAML anyway — better to
+    have a noisy warning than to silently drop a field. The front end
+    can only send fields defined in the Pydantic schema (extra=forbid
+    on BaseRequest), so unknown keys here mean either a programmatic
+    caller (test/seed) or a future field added to the schema without
+    updating this allow-list.
+    """
     # Operational fields → agents.yaml (role & department NOT here — they go to agent.yaml)
     operational_keys = {"enabled", "model", "provider", "skills", "is_primary"}
     operational = {k: v for k, v in updates.items() if k in operational_keys}
@@ -518,6 +531,24 @@ def save_agent(slug: str, updates: dict[str, Any]) -> dict[str, Any]:
                            "system_prompt", "max_iterations", "temperature", "max_tokens", "memory",
                            "tools", "context_window"}
     personalization = {k: v for k, v in updates.items() if k in personalization_keys}
+
+    # Loud-not-silent: anything not in the allow-list. Pydantic forbids extras
+    # at the API boundary, so anything reaching this branch is either a
+    # future schema field (good — update the allow-list) or a programmatic
+    # caller. In neither case should we silently drop.
+    known = operational_keys | personalization_keys
+    unknown = {k: v for k, v in updates.items() if k not in known}
+    if unknown:
+        logger.warning(
+            "[agent %s] save_agent got fields outside the allow-list: %s. "
+            "These will be written to the YAML. If this is a new schema field, "
+            "add it to operational_keys or personalization_keys in save_agent.",
+            slug, sorted(unknown.keys()),
+        )
+        # Send unknown fields to agent.yaml — they're likely something
+        # the schema accepts but we haven't enumerated. Better to persist
+        # than to lose, and the warning makes the divergence visible.
+        personalization = {**personalization, **unknown}
 
     # Update agents.yaml
     if operational:

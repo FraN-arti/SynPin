@@ -526,14 +526,9 @@ body {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  animation: fadeIn 0.4s ease;
-  /* Initial load: appear after sidebar is ready (2s delay) */
-  animation: mainContentFadeIn 0.5s ease 2s both;
-}
-
-@keyframes mainContentFadeIn {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  /* No entrance animation: same reason as .messages-area / .bottom-input
+     — translateY(12px→0) caused a viewport-width "throb" when scrollbar
+     appeared/resolved at animation end. */
 }
 
 .empty-logo-img {
@@ -630,8 +625,9 @@ body {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
-  /* Initial load: appear after sidebar is ready (2s delay) */
-  animation: mainContentFadeIn 0.5s ease 2s both;
+  /* No entrance animation: the translateY(12px→0) caused scrollbar
+     visibility to flip at the end → viewport width micro-jump ("throb").
+     Instant mount prevents the layout shift. */
 }
 
 .messages-container {
@@ -1151,8 +1147,11 @@ body {
 .bottom-input {
   border-top: 1px solid var(--glass-border);
   padding: 16px;
-  /* Initial load: appear after sidebar is ready (2s delay) */
-  animation: mainContentFadeIn 0.5s ease 2s both;
+  /* No entrance animation: mainContentFadeIn's translateY(12px→0) caused
+     a visible "throb" at the end because scrollbar visibility in
+     .messages-area flips as the transform resolves. Instant mount is
+     cleaner — the rest of the page (header, sidebar) provides enough
+     entrance motion. */
 }
 
 .bottom-input .input-container {
@@ -1765,6 +1764,39 @@ body {
   overflow-y: auto;
   opacity: 1;
   transform: translateY(0);
+}
+
+/* Portal variant — menu is detached from trigger (rendered in document.body).
+   Needs full border (no longer visually fused with the trigger) and
+   no top:100%/left:0/right:0 from the base rule (position:fixed overrides). */
+.custom-dropdown-menu.open.portal {
+  border-top: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: var(--radius);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  /* Subtle slide-in matched to placement: bottom vs top */
+  animation: dropdownPortalIn 0.15s ease-out;
+}
+.custom-dropdown-menu.open.portal[data-placement="top"] {
+  animation-name: dropdownPortalInTop;
+}
+@keyframes dropdownPortalIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes dropdownPortalInTop {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.custom-dropdown-item-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.custom-dropdown-item-badge {
+  font-size: 9px;
+  opacity: 0.8;
 }
 
 .custom-dropdown-item {
@@ -4858,8 +4890,10 @@ body {
   height: 100%;
   position: relative;
   background: transparent;
-  animation: fadeIn 0.3s ease;
   overflow: hidden;
+  /* No entrance animation — the previous fadeIn 0.3s caused a visible
+     "throb" at the end (viewport height micro-jump as layout settled
+     after streamed content arrived). Instant mount is cleaner. */
 }
 
 .otdel-chat-header {
@@ -5959,9 +5993,22 @@ body {
   border-color: var(--accent, #f97316);
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
-.kanban-card-dragging {
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+/* Floating "ghost" card rendered inside <DragOverlay> at document.body.
+   DragOverlay positions the outer element with its own transform — DO NOT
+   set transform here, or the card will stop following the cursor. We only
+   style the look: shadow, accent ring, glow. */
+.kanban-card-overlay {
+  cursor: grabbing;
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.45),
+    0 0 0 1px var(--accent, #f97316),
+    0 0 24px rgba(249, 115, 22, 0.25);
   border-color: var(--accent, #f97316);
+  background: var(--bg-card, #1a1a2e);
+}
+.kanban-card-overlay .kanban-card-drag-handle {
+  cursor: grabbing;
+  color: var(--accent, #f97316);
 }
 
 .kanban-modal-divider {
@@ -6340,7 +6387,6 @@ body {
 .kanban-form-row {
   display: flex;
   gap: 12px;
-  overflow: visible;
 }
 .kanban-form-row .kanban-form-group { flex: 1; }
 
@@ -7040,4 +7086,212 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 input[type="date"]::-webkit-datetime-edit {
   color: var(--text);
+}
+
+/* === Page Transition (unified fade for page/tab swaps) === */
+/* Opacity-only by design. transform-based page transitions caused
+   "throb" bugs in this app (scrollbar visibility flips when
+   translateY resolves). opacity composites on the GPU, no reflow.
+
+   NB: do NOT use `display: contents` here. `display: contents` makes
+   the element transparent to layout, but the browser also ignores
+   `opacity`, `animation`, `transform`, etc. on such elements (the
+   properties only apply to actual rendered boxes). We need a real
+   box for the fade to actually render.
+
+   Timing values must match the constants in PageTransition.tsx
+   (FADE_OUT_MS, FADE_IN_MS). Mismatch causes a visible "stuck at
+   opacity 0" gap. */
+.page-transition {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0; /* let the flex child shrink inside overflow: auto parents */
+}
+.page-transition[data-phase="in"] {
+  animation: pageFadeIn 150ms ease-out;
+}
+.page-transition[data-phase="out"] {
+  animation: pageFadeOut 200ms ease-out;
+  pointer-events: none; /* don't let users click into fading-out content */
+}
+@keyframes pageFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes pageFadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* === Chat Skeleton (loading state) === */
+/* Reserves the chat's layout (messages-area + bottom-input) so the
+   real content swap doesn't shift the page. Empty on purpose: no
+   placeholder bars, no shimmer. The user sees a brief "still loading"
+   then the actual chat. */
+.chat-skeleton {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+/* === Picker Menu (portal-based search/select) === */
+/* Used by NewTaskModal: dept picker, tag picker. Replaces the
+   inline-positioned .kanban-dept-dropdown and .tag-picker-popup
+   that were getting clipped by .kanban-modal's overflow +
+   backdrop-filter. Same global fix as DropdownMenu. */
+.picker-menu-root {
+  position: relative;
+}
+.picker-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-card, #1a1a2e);
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: var(--radius);
+  color: var(--text, #fff);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+  text-align: left;
+}
+.picker-trigger:hover {
+  border-color: var(--accent, #f97316);
+}
+.picker-trigger.open {
+  border-color: var(--accent, #f97316);
+  box-shadow: 0 0 0 1px var(--accent, #f97316);
+}
+.picker-trigger.has-value {
+  color: var(--text, #fff);
+}
+.picker-trigger:not(.has-value) .picker-trigger-text {
+  color: var(--text-dim, rgba(255,255,255,0.5));
+}
+.picker-trigger-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.picker-arrow {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.picker-menu {
+  background: var(--bg-card, #1a1a2e);
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: var(--radius);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  max-height: 240px;
+  display: flex;
+  flex-direction: column;
+  animation: pickerMenuIn 0.15s ease-out;
+  overflow: hidden;
+}
+.picker-menu[data-placement="top"] {
+  animation-name: pickerMenuInTop;
+}
+@keyframes pickerMenuIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pickerMenuInTop {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.picker-search-wrap {
+  padding: 8px;
+  border-bottom: 1px solid var(--border, rgba(255,255,255,0.1));
+  flex-shrink: 0;
+}
+.picker-search {
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--bg-secondary, #2a2a3e);
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: 6px;
+  color: var(--text, #fff);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+.picker-search:focus {
+  border-color: var(--accent, #f97316);
+}
+.picker-options {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px;
+}
+.picker-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text, #fff);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  text-align: left;
+}
+.picker-option:hover:not(.disabled) {
+  background: var(--bg-hover, rgba(255,255,255,0.05));
+  color: var(--accent, #f97316);
+}
+.picker-option.active {
+  color: var(--accent, #f97316);
+  font-weight: 500;
+}
+.picker-option.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.picker-option-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.picker-option-badge {
+  font-size: 9px;
+  opacity: 0.7;
+}
+.picker-check {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border, rgba(255,255,255,0.2));
+  border-radius: 3px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: transparent;
+  background: transparent;
+  transition: all 0.1s ease;
+}
+.picker-check.checked {
+  background: var(--accent, #f97316);
+  border-color: var(--accent, #f97316);
+  color: #fff;
+}
+.picker-empty {
+  padding: 16px 12px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
 }

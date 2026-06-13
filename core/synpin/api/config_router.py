@@ -13,7 +13,7 @@ from typing import Any, Dict, Optional
 
 import yaml
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from ._base import BaseRequest
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ def _deep_merge(base: dict, override: dict) -> dict:
 
 # ── Request Model ─────────────────────────────────────────────────────────
 
-class MemoryConfigUpdate(BaseModel):
+class MemoryConfigUpdate(BaseRequest):
     """Partial update for memory.yaml config sections."""
     context_window: Optional[Dict[str, Any]] = None
     compaction: Optional[Dict[str, Any]] = None
@@ -166,7 +166,7 @@ async def update_memory_config(req: MemoryConfigUpdate):
 
 # ── Primary Agent ───────────────────────────────────────────────────
 
-class PrimaryAgentUpdate(BaseModel):
+class PrimaryAgentUpdate(BaseRequest):
     slug: str
 
 
@@ -200,7 +200,7 @@ async def set_primary_agent(req: PrimaryAgentUpdate):
 # ── General Settings CRUD ────────────────────────────────────────────────────
 
 
-class SettingsUpdate(BaseModel):
+class SettingsUpdate(BaseRequest):
     """Partial update for settings.yaml."""
     server: Optional[Dict[str, Any]] = None
     ui: Optional[Dict[str, Any]] = None

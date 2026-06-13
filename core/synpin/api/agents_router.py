@@ -2,14 +2,14 @@
 import logging
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from ._base import BaseRequest
 from ..agents import manager
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["agents"])
 
 
-class AgentUpdate(BaseModel):
+class AgentUpdate(BaseRequest):
     enabled: bool | None = None
     role: str | None = None
     department: str | None = None
@@ -29,7 +29,7 @@ class AgentUpdate(BaseModel):
     is_primary: bool | None = None
 
 
-class AgentCreate(BaseModel):
+class AgentCreate(BaseRequest):
     name: str
     role: str = ""
     department: str = ""
@@ -174,14 +174,14 @@ async def update_roles(req: dict):
 
 # ─── Departments ──────────────────────────────────────────────────
 
-class DepartmentCreate(BaseModel):
+class DepartmentCreate(BaseRequest):
     name: str
     description: str = ""
     color: str = "#f97316"
     mentor_role: str = ""
     escalation: str = ""
 
-class DepartmentUpdate(BaseModel):
+class DepartmentUpdate(BaseRequest):
     name: str | None = None
     description: str | None = None
     color: str | None = None
@@ -268,7 +268,7 @@ async def delete_department(dept_id: str):
 
 # ─── Otdels (Organizational units with chat channels) ─────────────
 
-class OtdelCreate(BaseModel):
+class OtdelCreate(BaseRequest):
     name: str
     description: str = ""
     color: str = "#f97316"
@@ -278,7 +278,7 @@ class OtdelCreate(BaseModel):
     workers: list[str] = []
 
 
-class OtdelUpdate(BaseModel):
+class OtdelUpdate(BaseRequest):
     name: str | None = None
     description: str | None = None
     color: str | None = None

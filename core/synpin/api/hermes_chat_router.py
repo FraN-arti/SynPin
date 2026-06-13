@@ -18,7 +18,7 @@ import asyncio
 from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from ._base import BaseRequest
 
 from ..chat.task_manager import task_manager
 
@@ -83,7 +83,7 @@ def _save_chat_history(agent_slug: str, channel_id: str, messages: list[dict]):
         logger.warning("Failed to save history for %s/%s: %s", agent_slug, channel_id, e)
 
 
-class HermesChatRequest(BaseModel):
+class HermesChatRequest(BaseRequest):
     message: str
     history: list[dict[str, str]] = []
     system_prompt: str | None = None

@@ -3,7 +3,7 @@
 name = "synpin-core"
 version = "0.2.5.2"
 description = "Agent-driven organization platform"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 
 dependencies = [
     "fastapi>=0.115",

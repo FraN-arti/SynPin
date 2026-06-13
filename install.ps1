@@ -24,6 +24,12 @@ Set-Location $ScriptDir
 
 $RequiredPythonMajor = 3
 $RequiredPythonMinor = 11
+# We pin an upper bound because some Python versions introduce
+# private-API breakages in stdlib that SynPin relies on (notably
+# pathlib internals in 3.14, and chromadb dependencies have
+# lagged behind on 3.13 alphas). Bump this when we've verified
+# on the newer release.
+$RequiredPythonMaxMinor = 13
 $RequiredNodeMajor = 18
 
 # ----------------------------------------------------------------------------
@@ -130,6 +136,12 @@ function Check-Python {
     }
     $major = [int]$Matches[1]
     $minor = [int]$Matches[2]
+    if ($major -gt $RequiredPythonMajor -and $minor -gt $RequiredPythonMaxMinor) {
+        Fail "Python $pyOut found, but SynPin has not been tested on $major.$minor+ yet (max supported: $RequiredPythonMajor.$RequiredPythonMaxMinor)."
+        Write-Host "  Please install Python $RequiredPythonMajor.$RequiredPythonMinor..$RequiredPythonMajor.$RequiredPythonMaxMinor."
+        Write-Host "  Or set SYNPIN_AUTO_INSTALL=1 to attempt an automatic downgrade."
+        exit 1
+    }
     if ($major -lt $RequiredPythonMajor -or ($major -eq $RequiredPythonMajor -and $minor -lt $RequiredPythonMinor)) {
         Fail "Python $pyOut found, need >= $RequiredPythonMajor.$RequiredPythonMinor"
         Write-Host "  Set SYNPIN_AUTO_INSTALL=1 to attempt an automatic upgrade."

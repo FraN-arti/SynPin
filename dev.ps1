@@ -68,26 +68,88 @@ function Show-Help {
 
 switch -Regex ($args[0]) {
     '^$|^start$|^dev$' {
-        # Make sure the editable install is in place. We don't fail hard
-        # if pip install fails (user might intentionally run without it),
-        # but we warn.
-        $installed = $false
-        try {
-            $pipShow = & python -m pip show synpin-core 2>&1
-            if ($LASTEXITCODE -eq 0 -and $pipShow -match 'Name:\s*synpin-core') {
-                $installed = $true
+        # Find a Python interpreter that has synpin-core available.
+        # Plain 'python' on PATH often points to a tool venv (e.g.
+        # Hermes-agent's venv) that doesn't have our package. Walking
+        # through PATH in order would still pick the wrong one, so
+        # we test each candidate for the actual import. If none
+        # work, fall back to the system Python and auto-install.
+        $pythonExe = $null
+        $candidates = @()
+        foreach ($p in ($env:PATH -split ';')) {
+            if ($p -and (Test-Path (Join-Path $p 'python.exe'))) {
+                $candidates += (Join-Path $p 'python.exe')
             }
-        } catch { }
+        }
+        # Add the canonical Windows install locations that may
+        # not be on PATH (install-for-me without admin) to the
+        # candidate list. We use a here-string for the path
+        # templates and Replace the env var at run time, which
+        # sidesteps the PowerShell-5.1 single-quote parsing
+        # quirks that were tripping up the parser on backslashes.
+        $localApp = $env:LOCALAPPDATA
+        $candidates += @(
+            "$localApp\Programs\Python\Python311\python.exe"
+            "$localApp\Programs\Python\Python312\python.exe"
+            "$localApp\Programs\Python\Python313\python.exe"
+            "$localApp\Python\python.exe"
+            "$localApp\Python\bin\python.exe"
+            'C:\Python311\python.exe'
+            'C:\Python312\python.exe'
+        ) | Where-Object { Test-Path $_ }
 
-        if (-not $installed) {
-            Write-Host "[!] synpin-core is not pip-installed in editable mode." -ForegroundColor Yellow
-            Write-Host "    Run .\install.ps1 once to set this up. Attempting to continue anyway..." -ForegroundColor Yellow
-            Write-Host ""
+        foreach ($py in ($candidates | Select-Object -Unique)) {
+            $ok = $false
+            try {
+                $out = & $py -c "import synpin; print(synpin.__file__)" 2>$null
+                if ($LASTEXITCODE -eq 0 -and $out) {
+                    $pythonExe = $py
+                    Write-Host "[dev] using Python: $py" -ForegroundColor Gray
+                    Write-Host "[dev] synpin located at: $out" -ForegroundColor Gray
+                    # Warn if this Python is 3.14+ — SynPin has not
+                    # been tested on it yet and may fail at startup
+                    # (Python 3.14 changed several pathlib internals
+                    # that the codebase relies on). See
+                    # pyproject.toml for the current bound.
+                    try {
+                        $verOut = & $py -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>$null
+                        if ($LASTEXITCODE -eq 0 -and $verOut) {
+                            $parts = $verOut.Split('.')
+                            if ($parts.Length -ge 2) {
+                                $pyMaj = [int]$parts[0]
+                                $pyMin = [int]$parts[1]
+                                if ($pyMaj -ge 3 -and $pyMin -ge 14) {
+                                    Write-Host "[dev] WARNING: Python $verOut is not yet supported (max 3.13). If SynPin fails to start, install Python 3.11-3.13." -ForegroundColor Yellow
+                                }
+                            }
+                        }
+                    } catch { }
+                    break
+                }
+            } catch { }
         }
 
-        # Suppress the old green "Starting SynPin Development..." echo and
-        # let synpin dev's own Rich banner do the talking.
-        & python -m synpin dev
+        if (-not $pythonExe) {
+            # No Python on PATH has synpin-core. Try the one that
+            # was used to install the package most recently (look for
+            # an editable install under core/.synpin/ in site-packages
+            # of any reachable Python).
+            Write-Host "[!] synpin-core is not pip-installed in any Python on PATH." -ForegroundColor Yellow
+            Write-Host "    Attempting to install into the first Python on PATH..." -ForegroundColor Yellow
+            $firstPy = (& where.exe python.exe 2>$null | Select-Object -First 1)
+            if (-not $firstPy) { $firstPy = "python" }
+            & $firstPy -m pip install -e "$ScriptDir\core" --quiet
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "[FAIL] auto-install failed. Run .\install.ps1 first." -ForegroundColor Red
+                exit 1
+            }
+            $pythonExe = $firstPy
+            Write-Host "[dev] installed into $pythonExe, continuing." -ForegroundColor Green
+        }
+
+        # Suppress the old green "Starting SynPin Development..." echo
+        # and let synpin dev's own Rich banner do the talking.
+        & $pythonExe -m synpin dev
     }
     '^stop$|^--stop$' {
         Write-Host "Stopping SynPin Dev..." -ForegroundColor Yellow

@@ -178,6 +178,23 @@ def create_task(req: CreateTaskRequest) -> dict:
         task.escalation_reason = f"Referenced departments: {', '.join(refs)}"
         svc.save_task(task)
 
+    # Auto-assign head from otdel if department is an otdel ID
+    if req.department:
+        try:
+            from ..agents.manager import load_otdels
+            otdels = load_otdels()
+            for o in otdels:
+                otdel_id = o.get("otdelid") or o.get("id") or o.get("departmentsid") or ""
+                if otdel_id == req.department:
+                    head_slug = o.get("head", "")
+                    if head_slug:
+                        from ..kanban.models import HeadAssignment
+                        task.assigned_head = head_slug
+                        svc.save_task(task)
+                    break
+        except Exception:
+            pass  # Non-critical — task is still created
+
     return _task_to_dict(task)
 
 

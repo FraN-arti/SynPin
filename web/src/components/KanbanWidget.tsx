@@ -59,6 +59,7 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
   })
   const [columns, setColumns] = useState<Column[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
+  const [deptMap, setDeptMap] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
 
   const loadConfig = useCallback(async () => {
@@ -81,6 +82,23 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
       }
     } catch (e) {
       console.error('[kanban-widget] columns error:', e)
+    }
+  }, [])
+
+  const loadDeptMap = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/otdels`)
+      if (res.ok) {
+        const otdels = await res.json()
+        const map: Record<string, string> = {}
+        for (const o of otdels) {
+          const id = o.otdelid || o.id || o.departmentsid || ''
+          if (id) map[id] = o.name || id
+        }
+        setDeptMap(map)
+      }
+    } catch (e) {
+      // non-critical
     }
   }, [])
 
@@ -155,6 +173,7 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
 
   useEffect(() => { loadConfig() }, [loadConfig])
   useEffect(() => { loadColumns() }, [loadColumns])
+  useEffect(() => { loadDeptMap() }, [loadDeptMap])
   useEffect(() => { loadTasks() }, [loadTasks])
 
   // WebSocket live updates for config changes + task mutations
@@ -206,7 +225,7 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
           />
           <span className="kanban-widget-task-title">{task.title}</span>
           {config.show_department && task.department && (
-            <span className="kanban-widget-task-dept">{task.department}</span>
+            <span className="kanban-widget-task-dept">{deptMap[task.department] || task.department}</span>
           )}
           {config.show_deadline && task.deadline && (
             <span className="kanban-widget-task-deadline">

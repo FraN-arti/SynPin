@@ -41,13 +41,18 @@ interface SettingsPageProps {
 
 type Tab = 'general' | 'agents' | 'providers' | 'memory' | 'channels' | 'departments' | 'skills' | 'kanban'
 
-const TABS: { id: Tab; label: string }[] = [
+interface TabDef { id: Tab; label: string }
+
+const SYSTEM_TABS: TabDef[] = [
   { id: 'general', label: 'Основное' },
-  { id: 'agents', label: 'Агенты' },
   { id: 'providers', label: 'Провайдеры' },
   { id: 'memory', label: 'Память' },
+]
+
+const SPACE_TABS: TabDef[] = [
+  { id: 'agents', label: 'Агенты' },
   { id: 'channels', label: 'Каналы' },
-  { id: 'departments', label: 'Департаменты' },
+  { id: 'departments', label: 'Отделы' },
   { id: 'skills', label: 'Скиллы' },
   { id: 'kanban', label: 'Канбан' },
 ]
@@ -58,7 +63,7 @@ const SECTION_INFO: Record<Tab, { title: string; description: string }> = {
   providers: { title: 'Провайдеры', description: 'Подключённые провайдеры и доступные для подключения' },
   memory: { title: 'Память', description: 'Архитектура памяти: агентская, командная, системная' },
   channels: { title: 'Каналы связи', description: 'Feishu, WhatsApp, Telegram — мультимодальная связь с системой' },
-  departments: { title: 'Департаменты', description: 'Организационные единицы для командной работы агентов' },
+  departments: { title: 'Отделы', description: 'Организационные единицы для командной работы агентов' },
   skills: { title: 'Скиллы', description: 'База скиллов системы — подходы, шаблоны, процедуры' },
   kanban: { title: 'Канбан', description: 'Глобальная доска задач — настройки, автоматизация, архивация' },
 }
@@ -157,14 +162,32 @@ export function SettingsPage({ onBack, onAgentsChange, onDepartmentsChange }: Se
 
         {/* Horizontal tab navigation */}
         <nav className="settings-nav-tabs">
-          {TABS.map(tab => (
-            <DraggableTab
-              key={tab.id}
-              tab={tab}
-              isActive={activeTab === tab.id}
-              onClick={() => handleTabChange(tab.id)}
-            />
-          ))}
+          <div className="settings-nav-group">
+            <span className="settings-nav-group-label">Система</span>
+            <div className="settings-nav-group-items">
+              {SYSTEM_TABS.map(tab => (
+                <DraggableTab
+                  key={tab.id}
+                  tab={tab}
+                  isActive={activeTab === tab.id}
+                  onClick={() => handleTabChange(tab.id)}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="settings-nav-group">
+            <span className="settings-nav-group-label">Пространство</span>
+            <div className="settings-nav-group-items">
+              {SPACE_TABS.map(tab => (
+                <DraggableTab
+                  key={tab.id}
+                  tab={tab}
+                  isActive={activeTab === tab.id}
+                  onClick={() => handleTabChange(tab.id)}
+                />
+              ))}
+            </div>
+          </div>
         </nav>
 
         {/* Tab content with unified fade — PageTransition handles the
@@ -540,8 +563,6 @@ function GeneralSection() {
         </div>
       </section>
 
-      <div className="settings-divider" />
-
       {/* ─── 🖥 Сервер ─── */}
       <section className="settings-card settings-card-disabled">
         <h2 className="settings-card-title">🖥 Сервер <span className="settings-card-badge">требует перезапуск</span></h2>
@@ -584,8 +605,6 @@ function GeneralSection() {
             requests_per_minute: settings.server.rate_limit?.requests_per_minute ?? 60,
           })} />
       </section>
-
-      <div className="settings-divider" />
 
       <div className="settings-row-2">
         {/* ─── 🎨 Интерфейс ─── */}
@@ -740,8 +759,6 @@ function GeneralSection() {
         </section>
       </div>
 
-      <div className="settings-divider" />
-
       {/* ─── 📡 Лента активности ─── */}
       <section className="settings-card settings-card-disabled">
         <h2 className="settings-card-title">📡 Лента активности <span className="settings-card-badge">скоро</span></h2>
@@ -816,8 +833,6 @@ function GeneralSection() {
           </div>
         </div>
       </section>
-
-      <div className="settings-divider" />
     </div>
   )
 }
@@ -2324,7 +2339,7 @@ function ChannelsSection({ onAddChannel }: { onAddChannel: () => void }) {
   )
 }
 
-// ─── Otdels (Департаменты) ──────────────────────────────────────
+// ─── Otdels (Отделы) ──────────────────────────────────────────
 
 interface Otdel {
   otdelid: string
@@ -2484,7 +2499,7 @@ function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChange?: () 
 
       {otdels.length === 0 && (
         <div className="settings-empty-state">
-          <p>Департаменты не созданы</p>
+          <p>Отделы не созданы</p>
           <p className="settings-empty-hint">Создайте первый отдел для организации командной работы агентов</p>
         </div>
       )}

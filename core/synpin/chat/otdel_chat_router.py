@@ -30,7 +30,7 @@ router = APIRouter(prefix="/api/otdels", tags=["otdel-chat"])
 registry: ProviderRegistry | None = None
 
 # Import shared history + helpers from otdel_helpers (single source of truth)
-from .ws_router import create_head_state
+from .ws_router import create_head_state, get_head_state
 from .otdel_helpers import (
     _load_history,
     _save_history,
@@ -251,26 +251,43 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                 responses.append(agent_msg)
                 
                 if is_head:
-                    # Head's first response — check for @mentions (delegation)
-                    new_mentions = _parse_mentions(full_response)
-                    logger.info("Otdel %s Head response mentions=%s", otdel_id, new_mentions)
-                    
-                    for slug in worker_slugs:
-                        if slug == head_slug or slug == agent_slug_val:
-                            continue
-                        mentioned_agent = get_agent(slug)
-                        if not mentioned_agent:
-                            continue
-                        mentioned_name_lower = mentioned_agent.get("name", "").lower()
-                        mentioned_slug_lower = slug.lower()
-                        if mentioned_name_lower in new_mentions or mentioned_slug_lower in new_mentions:
-                            expected_workers.add(slug)
-                            # Add to queue only if not already processed/queued
-                            if slug not in processed_slugs:
-                                # Clean trigger: strip [Name]: prefix so worker doesn't echo it
-                                trigger = re.sub(r'^\[.*?\]:\s*', '', full_response.strip())
-                                agent_queue.append((mentioned_agent, False, trigger))
-                                logger.info("Otdel %s gather: expecting %s", otdel_id, mentioned_agent.get("name"))
+                    # Check HeadState first — head_delegate tool sets expected_workers there
+                    hs = get_head_state(otdel_id)
+                    if hs and hs.expected_workers:
+                        for slug in hs.expected_workers:
+                            if slug in worker_slugs and slug != head_slug and slug != agent_slug_val:
+                                if slug not in processed_slugs:
+                                    agent = get_agent(slug)
+                                    if agent:
+                                        expected_workers.add(slug)
+                                        delegation = hs.current_delegation or {}
+                                        workers_list = delegation.get("workers", [])
+                                        task_text = ""
+                                        for w in workers_list:
+                                            if w.get("slug") == slug:
+                                                task_text = w.get("task", full_response.strip())
+                                                break
+                                        agent_queue.append((agent, False, task_text or full_response.strip()))
+                                        logger.info("Otdel %s head_delegate: queueing %s (task=%s)", otdel_id, agent.get("name"), task_text[:60] if task_text else "")
+                    else:
+                        # Fallback: check @mentions in text (for models that don't use tools)
+                        new_mentions = _parse_mentions(full_response)
+                        logger.info("Otdel %s Head response mentions=%s (fallback)", otdel_id, new_mentions)
+                        
+                        for slug in worker_slugs:
+                            if slug == head_slug or slug == agent_slug_val:
+                                continue
+                            mentioned_agent = get_agent(slug)
+                            if not mentioned_agent:
+                                continue
+                            mentioned_name_lower = mentioned_agent.get("name", "").lower()
+                            mentioned_slug_lower = slug.lower()
+                            if mentioned_name_lower in new_mentions or mentioned_slug_lower in new_mentions:
+                                expected_workers.add(slug)
+                                if slug not in processed_slugs:
+                                    trigger = re.sub(r'^\[.*?\]:\s*', '', full_response.strip())
+                                    agent_queue.append((mentioned_agent, False, trigger))
+                                    logger.info("Otdel %s gather: expecting %s", otdel_id, mentioned_agent.get("name"))
                     
                     if expected_workers:
                         head_delegating = True
@@ -310,10 +327,17 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
             context_messages = _build_head_context(history, head_slug, exclude_last=False)
             
             if head_delegating:
+                # Find original user message for context
+                original_task = ""
+                for m in history:
+                    if m.get("sender") == "user":
+                        original_task = m.get("content", "")
                 acknowledge_trigger = (
-                    "Все работники отдела ответили. "
-                    "Проанализируй их ответы и сформируй итог для пользователя. "
-                    "Кратко — что сделано, есть ли проблемы."
+                    "Работники отдела ответили. Проанализируй их ответы.\n"
+                    f"Исходная задача пользователя: «{original_task}»\n"
+                    "Если задача многоэтапная и есть ещё невыполненные этапы — "
+                    "продолжай, вызывай head_delegate для следующего этапа.\n"
+                    "Если задача полностью выполнена — сформируй итог для пользователя."
                 )
             else:
                 acknowledge_trigger = "Работники отдела ответили. Посмотри их ответы и прокомментируй, если нужно."

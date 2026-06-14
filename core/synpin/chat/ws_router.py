@@ -529,7 +529,10 @@ async def _handle_otdel_send(user_id: str, msg: dict):
             if not missing:
                 should_followup = True
             else:
-                log.warning("Otdel %s missing responses from %s", otdel_id, missing)
+                # Some workers haven't responded — still follow up so head can
+                # either wait, delegate to others, or finalize
+                logger.info("Otdel %s follow-up: %d workers still pending, asking head", otdel_id, len(missing))
+                should_followup = True
         elif head_processed and workers_responded > 0 and not head_delegating:
             should_followup = True
 
@@ -539,14 +542,27 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         context_messages = _build_head_context(history, head_slug, exclude_last=False)
 
         if head_delegating:
-            acknowledge_trigger = (
-                "Все работники отдела ответили. "
-                "Проанализируй их ответы.\n"
-                "Если задача требует дополнительных действий (делегировать другому агенту, "
-                "отправить на доработку, передать результат следующему этапу) — ПРОДОЛЖАЙ, "
-                "вызывай head_delegate или другие инструменты.\n"
-                "Если задача полностью выполнена — сформируй итог для пользователя."
-            )
+            missing = expected_workers - responded_workers
+            if missing:
+                missing_names = []
+                for s in missing:
+                    a = get_agent(s)
+                    missing_names.append(a.get("name", s) if a else s)
+                acknowledge_trigger = (
+                    f"Некоторые работники ещё не ответили: {', '.join(missing_names)}. "
+                    "Жди их ответов в чате. "
+                    "Если нужно — отправь задачу повторно через head_delegate. "
+                    "НЕ ПИШИ что все ответили — это неправда."
+                )
+            else:
+                acknowledge_trigger = (
+                    "Все работники отдела ответили. "
+                    "Проанализируй их ответы.\n"
+                    "Если задача требует дополнительных действий (делегировать другому агенту, "
+                    "отправить на доработку, передать результат следующему этапу) — ПРОДОЛЖАЙ, "
+                    "вызывай head_delegate или другие инструменты.\n"
+                    "Если задача полностью выполнена — сформируй итог для пользователя."
+                )
         else:
             acknowledge_trigger = "Работники отдела ответили. Посмотри их ответы и прокомментируй, если нужно."
 

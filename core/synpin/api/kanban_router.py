@@ -170,6 +170,14 @@ def create_task(req: CreateTaskRequest) -> dict:
         tags=req.tags,
         required_skills=req.required_skills,
     )
+
+    # Parse #DepartmentID references from description
+    from ..kanban.models import parse_department_refs
+    refs = parse_department_refs(req.description)
+    if refs:
+        task.escalation_reason = f"Referenced departments: {', '.join(refs)}"
+        svc.save_task(task)
+
     return _task_to_dict(task)
 
 
@@ -393,6 +401,32 @@ def add_result(task_id: str, req: AddResultRequest) -> dict:
     )
     if not task:
         raise HTTPException(404, f"Task {task_id} not found")
+    return _task_to_dict(task)
+
+
+class AddHistoryRequest(BaseRequest):
+    actor: str = "head"
+    action: str
+    detail: str = ""
+    target_department: str | None = None
+    target_agent: str | None = None
+
+
+@router.post("/tasks/{task_id}/history")
+def add_history(task_id: str, req: AddHistoryRequest) -> dict:
+    """Add a history entry to the task."""
+    svc = _get_service()
+    task = svc.get_task(task_id)
+    if not task:
+        raise HTTPException(404, f"Task {task_id} not found")
+    task.add_history(
+        actor=req.actor,
+        action=req.action,
+        detail=req.detail,
+        target_department=req.target_department,
+        target_agent=req.target_agent,
+    )
+    svc.save_task(task)
     return _task_to_dict(task)
 
 

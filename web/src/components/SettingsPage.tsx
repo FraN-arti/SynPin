@@ -47,7 +47,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'providers', label: 'Провайдеры' },
   { id: 'memory', label: 'Память' },
   { id: 'channels', label: 'Каналы' },
-  { id: 'departments', label: 'Отделы' },
+  { id: 'departments', label: 'Департаменты' },
   { id: 'skills', label: 'Скиллы' },
   { id: 'kanban', label: 'Канбан' },
 ]
@@ -58,7 +58,7 @@ const SECTION_INFO: Record<Tab, { title: string; description: string }> = {
   providers: { title: 'Провайдеры', description: 'Подключённые провайдеры и доступные для подключения' },
   memory: { title: 'Память', description: 'Архитектура памяти: агентская, командная, системная' },
   channels: { title: 'Каналы связи', description: 'Feishu, WhatsApp, Telegram — мультимодальная связь с системой' },
-  departments: { title: 'Отделы', description: 'Организационные единицы для командной работы агентов' },
+  departments: { title: 'Департаменты', description: 'Организационные единицы для командной работы агентов' },
   skills: { title: 'Скиллы', description: 'База скиллов системы — подходы, шаблоны, процедуры' },
   kanban: { title: 'Канбан', description: 'Глобальная доска задач — настройки, автоматизация, архивация' },
 }
@@ -888,6 +888,8 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
   const [overlayShift, setOverlayShift] = useState<Record<string, number>>({})
   const [roles, setRoles] = useState<{rolesid: string; name: string; description: string; color: string}[]>([])
   const [departments, setDepartments] = useState<{departmentsid: string; name: string; description: string; color: string}[]>([])
+  const [defaultRole, setDefaultRole] = useState<string>('')
+  const [defaultDept, setDefaultDept] = useState<string>('')
   const [newRole, setNewRole] = useState({ name: '', description: '', color: '#f59e0b' })
   const [newDept, setNewDept] = useState({ name: '', description: '', color: '#3b82f6' })
   const [externalAgents, setExternalAgents] = useState<ExternalAgentData[]>([])
@@ -933,7 +935,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
     const updated = [...roles, { rolesid, ...newRole }]
     const res = await fetch(`${API_BASE}/api/roles`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roles: updated }),
+      body: JSON.stringify({ roles: updated, is_default: defaultRole }),
     })
     if (res.ok) {
       const data = await res.json()
@@ -958,13 +960,15 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
   const handleRemoveRole = async (rolesid: string) => {
     const updated = roles.filter(r => r.rolesid !== rolesid)
+    const newDefault = defaultRole === rolesid ? '' : defaultRole
     const res = await fetch(`${API_BASE}/api/roles`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roles: updated }),
+      body: JSON.stringify({ roles: updated, is_default: newDefault }),
     })
     if (res.ok) {
       const data = await res.json()
       setRoles(data.roles)
+      setDefaultRole(data.is_default || '')
     }
   }
 
@@ -973,13 +977,26 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
     try {
       const res = await fetch(`${API_BASE}/api/roles`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roles: updated }),
+        body: JSON.stringify({ roles: updated, is_default: defaultRole }),
       })
       if (res.ok) {
         const data = await res.json()
         setRoles(data.roles)
       }
     } catch (e) { console.error('[roles] color change error:', e) }
+  }
+
+  const handleSetDefaultRole = async (rolesid: string) => {
+    const newDefault = defaultRole === rolesid ? '' : rolesid
+    try {
+      const res = await fetch(`${API_BASE}/api/roles`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roles, is_default: newDefault }),
+      })
+      if (res.ok) {
+        fetchRoles()
+      }
+    } catch (e) { console.error('[roles] set default error:', e) }
   }
 
   const handleDeptColorChange = async (departmentsid: string, newColor: string) => {
@@ -992,6 +1009,19 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
         fetchDepartments()
       }
     } catch (e) { console.error('[departments] color change error:', e) }
+  }
+
+  const handleSetDefaultDept = async (departmentsid: string) => {
+    const newDefault = defaultDept === departmentsid ? '' : departmentsid
+    try {
+      const res = await fetch(`${API_BASE}/api/departments`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ departments, is_default: newDefault }),
+      })
+      if (res.ok) {
+        fetchDepartments()
+      }
+    } catch (e) { console.error('[departments] set default error:', e) }
   }
 
   const handleRemoveDept = async (departmentsid: string) => {
@@ -1055,6 +1085,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
       if (res.ok) {
         const data = await res.json()
         setRoles(data.roles || [])
+        setDefaultRole(data.is_default || '')
       }
     } catch (e) {
       console.error('[roles] fetch error:', e)
@@ -1067,6 +1098,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
       if (res.ok) {
         const data = await res.json()
         setDepartments(data.departments || [])
+        setDefaultDept(data.is_default || '')
       }
     } catch (e) {
       console.error('[departments] fetch error:', e)
@@ -1354,6 +1386,13 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
             <div className="roles-depts-list">
               {roles.map(role => (
                 <div key={role.rolesid} className="roles-depts-item">
+                  <button
+                    className={`roles-depts-default ${defaultRole === role.rolesid ? 'active' : ''}`}
+                    onClick={() => handleSetDefaultRole(role.rolesid)}
+                    title={defaultRole === role.rolesid ? 'Убрать роль по умолчанию' : 'Назначить роль по умолчанию'}
+                  >
+                    <span className="roles-depts-default-dot" />
+                  </button>
                   <label className="roles-depts-color clickable" style={{ background: role.color }} title="Изменить цвет">
                     <input type="color" value={role.color} onChange={e => handleRoleColorChange(role.rolesid, e.target.value)} />
                   </label>
@@ -1378,11 +1417,18 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
 
           {/* Departments column */}
           <div className="roles-depts-column">
-            <h3 className="roles-depts-title">Отделы</h3>
+            <h3 className="roles-depts-title">Департаменты</h3>
             <p className="roles-depts-hint">Определяют область специализации агента. Влияют на контекст системного промта и распределение задач.</p>
             <div className="roles-depts-list">
               {departments.map(dept => (
                 <div key={dept.departmentsid} className="roles-depts-item">
+                  <button
+                    className={`roles-depts-default ${defaultDept === dept.departmentsid ? 'active' : ''}`}
+                    onClick={() => handleSetDefaultDept(dept.departmentsid)}
+                    title={defaultDept === dept.departmentsid ? 'Убрать отдел по умолчанию' : 'Назначить отдел по умолчанию'}
+                  >
+                    <span className="roles-depts-default-dot" />
+                  </button>
                   <label className="roles-depts-color clickable" style={{ background: dept.color }} title="Изменить цвет">
                     <input type="color" value={dept.color} onChange={e => handleDeptColorChange(dept.departmentsid, e.target.value)} />
                   </label>
@@ -2278,7 +2324,7 @@ function ChannelsSection({ onAddChannel }: { onAddChannel: () => void }) {
   )
 }
 
-// ─── Otdels (Отделы) ──────────────────────────────────────────
+// ─── Otdels (Департаменты) ──────────────────────────────────────
 
 interface Otdel {
   otdelid: string
@@ -2438,7 +2484,7 @@ function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChange?: () 
 
       {otdels.length === 0 && (
         <div className="settings-empty-state">
-          <p>Отделы не созданы</p>
+          <p>Департаменты не созданы</p>
           <p className="settings-empty-hint">Создайте первый отдел для организации командной работы агентов</p>
         </div>
       )}

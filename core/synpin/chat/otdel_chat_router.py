@@ -199,7 +199,7 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
             
             # Determine tools for this agent
             if is_head:
-                head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_decide"]
+                head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_decide", "kanban_task"]
                 tool_names = list(agent.get("tools", [])) + head_protocol_tools
             else:
                 tool_names = agent.get("tools", [])

@@ -768,6 +768,83 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
             },
         },
     },
+    "kanban_task": {
+        "type": "function",
+        "function": {
+            "name": "kanban_task",
+            "description": "Работа с канбан-тасками: создание, запись истории, переназначение, закрытие, доработка, статус.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "type": "string",
+                        "enum": ["create", "history", "reassign", "complete", "rework", "status"],
+                        "description": "Команда: create=создать, history=история, reassign=переназначить, complete=завершить, rework=доработка, status=статус",
+                    },
+                    "task_id": {
+                        "type": "string",
+                        "description": "ID таска (T-001, T-002, ...)",
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Название таска (для create)",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Описание/промт таска (для create)",
+                    },
+                    "department": {
+                        "type": "string",
+                        "description": "ID отдела (для create)",
+                    },
+                    "priority": {
+                        "type": "string",
+                        "enum": ["low", "medium", "high", "critical"],
+                        "description": "Приоритет (для create)",
+                    },
+                    "deadline": {
+                        "type": "string",
+                        "description": "Дедлайн в ISO формате (для create)",
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Теги (для create)",
+                    },
+                    "action": {
+                        "type": "string",
+                        "enum": ["delegated", "responded", "rework", "completed", "comment", "assigned", "accepted", "work_started", "work_completed"],
+                        "description": "Тип действия (для history)",
+                    },
+                    "detail": {
+                        "type": "string",
+                        "description": "Описание действия (для history)",
+                    },
+                    "target_department": {
+                        "type": "string",
+                        "description": "ID целевого отдела (для reassign, history)",
+                    },
+                    "target_agent": {
+                        "type": "string",
+                        "description": "Slug агента (для history)",
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Причина (для reassign, rework)",
+                    },
+                    "summary": {
+                        "type": "string",
+                        "description": "Итог (для complete)",
+                    },
+                    "actor": {
+                        "type": "string",
+                        "description": "Кто выполняет действие (по умолчанию: head)",
+                    },
+                },
+                "required": ["command"],
+            },
+        },
+    },
 }
 
 
@@ -809,7 +886,7 @@ async def execute_tool(tool_name: str, params: dict, agent_slug: str | None = No
             params = {**params, "agent_id": agent_slug}
 
         # Inject otdel_id for head protocol tools
-        head_protocol_tools = ("head_delegate", "head_evaluate", "head_retry", "head_decide")
+        head_protocol_tools = ("head_delegate", "head_evaluate", "head_retry", "head_decide", "kanban_task")
         if otdel_id and tool_name in head_protocol_tools:
             params = {**params, "otdel_id": otdel_id}
 

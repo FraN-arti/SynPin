@@ -215,9 +215,9 @@ def _start_auto_delete():
     board settings UI.
     """
     try:
-        from ..kanban.service import get_service
+        from ..kanban.service import KanbanService
         from ..kanban.auto_delete import schedule_auto_delete
-        svc = get_service()
+        svc = KanbanService()
         task = schedule_auto_delete(svc)
         if task:
             print("  [auto-delete] worker running (default 1h, override via AUTO_DELETE_INTERVAL_S)", flush=True)
@@ -247,7 +247,6 @@ from ..config.watcher import ConfigWatcher
 from ..paths import (
     get_config_dir,
     get_agents_dir,
-    get_departments_dir,
     get_otdels_dir,
     get_data_dir,
 )
@@ -323,7 +322,6 @@ def _watch_per_entity_dirs(parent: Path, suffix: str) -> None:
         if sub.is_dir():
             _safe_watch(sub / f"{suffix}.yaml", f"{suffix} {sub.name}")
 
-_watch_per_entity_dirs(get_departments_dir(), "department")
 _watch_per_entity_dirs(get_otdels_dir(), "otdel")
 
 # Kanban config (columns.yaml, labels.yaml, settings.yaml,

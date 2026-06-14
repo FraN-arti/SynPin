@@ -26,10 +26,14 @@ def _generate_long_id(length: int = 12) -> str:
     return ''.join(random.choices(chars, k=length))
 
 
+def _is_hash_id(value: str) -> bool:
+    """Check if a value looks like a generated hash ID (12-char alphanumeric)."""
+    return len(value) == 12 and all(c in string.ascii_lowercase + string.digits for c in value)
+
+
 from ..paths_legacy import (
     _get_config_dir as _get_config_dir,
     _get_agents_dir as _get_agents_dir,
-    _get_departments_dir as _get_departments_dir,
     _get_otdels_dir as _get_otdels_dir,
 )
 
@@ -185,8 +189,10 @@ def load_agents() -> dict[str, Any]:
         # Resolve role/department IDs to human-readable names
         role_id = agent_data.get("role", cfg.get("role", "worker"))
         dept_id = agent_data.get("department", cfg.get("department", "dev"))
-        roles_list = load_roles()
-        depts_list = load_departments()
+        roles_data = load_roles()
+        roles_list = roles_data.get("roles", [])
+        depts_data = load_departments()
+        depts_list = depts_data.get("departments", [])
         role_name = next((r["name"] for r in roles_list if r.get("rolesid") == role_id or r.get("id") == role_id), role_id)
         dept_name = next((d["name"] for d in depts_list if d.get("departmentsid") == dept_id or d.get("id") == dept_id), dept_id)
 
@@ -237,6 +243,18 @@ def create_agent(name: str, role: str = "", department: str = "",
                  tone: str = "", style: str = "", traits: list[str] | None = None,
                  temperature: float = 0.7, max_tokens: int | None = None) -> dict[str, Any]:
     """Create a new agent from scratch. Returns the created agent."""
+    # Use default role from config if not provided
+    if not role:
+        roles_data = load_roles()
+        default_role = roles_data.get("is_default")
+        role = default_role or "worker"
+
+    # Use default department from config if not provided
+    if not department:
+        depts_data = load_departments()
+        default_dept = depts_data.get("is_default")
+        department = default_dept or "dev"
+
     # Generate agentid first — it becomes the slug (directory name + key)
     agentid = _generate_agentid()
     slug = agentid
@@ -332,14 +350,6 @@ def _remove_agent_from_groups(slug: str) -> None:
         if changed:
             dept_data["departments"] = departments
             _save_yaml(departments_path, dept_data)
-            # Also update department.yaml inside each department directory
-            for dept in departments:
-                dept_id = dept.get("departmentsid")
-                if not dept_id:
-                    continue
-                dept_dir = _get_departments_dir() / dept_id
-                if dept_dir.exists():
-                    _save_yaml(dept_dir / "department.yaml", dept)
 
     # Clean otdels.yaml
     otdels_path = _get_config_dir() / "otdels.yaml"
@@ -468,13 +478,6 @@ def cleanup_orphaned_agent_memberships() -> dict[str, Any]:
         if cleaned_departments:
             dept_data["departments"] = departments
             _save_yaml(departments_path, dept_data)
-            for dept in departments:
-                dept_id = dept.get("departmentsid")
-                if not dept_id:
-                    continue
-                dept_dir = _get_departments_dir() / dept_id
-                if dept_dir.exists():
-                    _save_yaml(dept_dir / "department.yaml", dept)
 
     return {"otdels": cleaned_otdels, "departments": cleaned_departments}
 
@@ -574,7 +577,7 @@ def save_agent(slug: str, updates: dict[str, Any]) -> dict[str, Any]:
 
 # ─── Roles & Departments ─────────────────────────────────────────
 
-def load_roles() -> list[dict[str, Any]]:
+def load_roles() -> dict[str, Any]:
     """Load roles from config/roles.yaml with migration."""
     config_path = _get_config_dir() / "roles.yaml"
     data = _load_yaml(config_path)
@@ -588,43 +591,63 @@ def load_roles() -> list[dict[str, Any]]:
                 role.pop("id")  # Remove old id
             role["rolesid"] = _generate_long_id()
             migrated = True
+        elif not _is_hash_id(role["rolesid"]):
+            # Migration: replace non-hash rolesid with generated hash
+            old_id = role["rolesid"]
+            role["rolesid"] = _generate_long_id()
+            migrated = True
 
     if migrated:
         _save_yaml(config_path, {"roles": roles})
 
-    return roles
+    return {"roles": roles, "is_default": data.get("is_default")}
 
 
-def save_roles(roles: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def save_roles(roles: list[dict[str, Any]], is_default: str = None) -> list[dict[str, Any]]:
     """Save roles list to config/roles.yaml."""
     config_path = _get_config_dir() / "roles.yaml"
+
+    # Preserve existing is_default if not provided
+    if is_default is None:
+        data = _load_yaml(config_path)
+        is_default = data.get("is_default")
 
     # Ensure each role has rolesid
     for role in roles:
         if not role.get("rolesid"):
             role["rolesid"] = _generate_long_id()
 
-    _save_yaml(config_path, {"roles": roles})
+    save_data = {"roles": roles}
+    if is_default is not None:
+        save_data["is_default"] = is_default
+    _save_yaml(config_path, save_data)
     return roles
 
 
 # ─── Departments (full CRUD with directories) ────────────────────
 
 
-def load_departments() -> list[dict[str, Any]]:
+def load_departments() -> dict[str, Any]:
     """Load departments from config/departments.yaml."""
     config_path = _get_config_dir() / "departments.yaml"
     data = _load_yaml(config_path)
-    return data.get("departments", [])
+    return {"departments": data.get("departments", []), "is_default": data.get("is_default")}
 
 
-def save_departments(departments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def save_departments(departments: list[dict[str, Any]], is_default: str = None) -> list[dict[str, Any]]:
     """Save departments list to config/departments.yaml."""
     config_path = _get_config_dir() / "departments.yaml"
+    # Preserve existing is_default if not provided
+    if is_default is None:
+        data = _load_yaml(config_path)
+        is_default = data.get("is_default")
     for dept in departments:
         if not dept.get("departmentsid"):
             dept["departmentsid"] = _generate_long_id()
-    _save_yaml(config_path, {"departments": departments})
+    save_data = {"departments": departments}
+    if is_default is not None:
+        save_data["is_default"] = is_default
+    _save_yaml(config_path, save_data)
     return departments
 
 
@@ -644,7 +667,7 @@ def _count_agents_in_department(dept_id: str) -> int:
 
 def get_departments_with_agents() -> list[dict[str, Any]]:
     """Load departments with agent counts resolved."""
-    departments = load_departments()
+    departments = load_departments().get("departments", [])
     for dept in departments:
         dept_id = dept.get("departmentsid", "")
         dept["agent_count"] = _count_agents_in_department(dept_id)
@@ -653,7 +676,7 @@ def get_departments_with_agents() -> list[dict[str, Any]]:
 
 def get_department(dept_id: str) -> dict[str, Any] | None:
     """Get a single department by ID."""
-    departments = load_departments()
+    departments = load_departments().get("departments", [])
     for dept in departments:
         if dept.get("departmentsid") == dept_id:
             dept["agent_count"] = _count_agents_in_department(dept_id)
@@ -663,13 +686,9 @@ def get_department(dept_id: str) -> dict[str, Any] | None:
 
 def create_department(name: str, description: str = "", color: str = "#f97316",
                       mentor_role: str = "", escalation: str = "") -> dict[str, Any]:
-    """Create a new department: generates ID, creates directory + department.yaml, saves to config."""
+    """Create a new department: generates ID, saves to config."""
     dept_id = _generate_long_id()
-    departments_dir = _get_departments_dir()
-    dept_dir = departments_dir / dept_id
-    dept_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create department.yaml inside the directory
     dept_data = {
         "departmentsid": dept_id,
         "name": name,
@@ -678,10 +697,6 @@ def create_department(name: str, description: str = "", color: str = "#f97316",
         "mentor_role": mentor_role,
         "escalation": escalation,
     }
-    _save_yaml(dept_dir / "department.yaml", dept_data)
-
-    # Create subdirectories for future use
-    (dept_dir / "agents").mkdir(exist_ok=True)
 
     # Add to departments.yaml config
     config_path = _get_config_dir() / "departments.yaml"
@@ -714,20 +729,11 @@ def update_department(dept_id: str, updates: dict[str, Any]) -> dict[str, Any] |
     data["departments"] = departments
     _save_yaml(config_path, data)
 
-    # Also update department.yaml inside directory
-    departments_dir = _get_departments_dir()
-    dept_dir = departments_dir / dept_id
-    if dept_dir.exists():
-        _save_yaml(dept_dir / "department.yaml",
-                   next(d for d in departments if d["departmentsid"] == dept_id))
-
     return get_department(dept_id)
 
 
 def delete_department(dept_id: str) -> bool:
-    """Delete a department: remove from config + delete directory recursively."""
-    import shutil
-
+    """Delete a department: remove from config."""
     config_path = _get_config_dir() / "departments.yaml"
     data = _load_yaml(config_path)
     departments = data.get("departments", [])
@@ -738,12 +744,6 @@ def delete_department(dept_id: str) -> bool:
 
     data["departments"] = new_departments
     _save_yaml(config_path, data)
-
-    # Remove department directory (department.yaml, agents subdir, etc.)
-    departments_dir = _get_departments_dir()
-    dept_dir = departments_dir / dept_id
-    if dept_dir.exists():
-        shutil.rmtree(str(dept_dir))
 
     return True
 

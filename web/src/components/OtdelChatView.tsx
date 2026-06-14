@@ -237,11 +237,10 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
           : [{ slug: params?.worker || params?.target || '', task: taskForAll }]
         for (const w of workersList) {
           if (!w?.slug) continue
-          const workerAgent = agents.find(a => a.slug === w.slug)
           setDelegations(prev => [...prev, {
             id: `${message_id}-del-${w.slug}-${index ?? Date.now()}`,
             worker: w.slug,
-            workerName: workerAgent?.name || w.slug,
+            workerName: '', // resolved at render time
             task: typeof w.task === 'string' ? w.task : taskForAll,
             status: 'pending',
           }])
@@ -479,12 +478,15 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
       {/* Delegation Cards — compact one-line blocks */}
       {delegations.length > 0 && (
         <div className="otdel-delegations">
-          {delegations.map(d => (
-            <div key={d.id} className={`otdel-delegation-chip ${d.status}`}>
-              <span className={`otdel-delegation-dot ${d.status}`} />
-              <span className="otdel-delegation-name">{d.workerName}</span>
-            </div>
-          ))}
+          {delegations.map(d => {
+            const agent = agents.find(a => a.slug === d.worker)
+            return (
+              <div key={d.id} className={`otdel-delegation-chip ${d.status}`}>
+                <span className={`otdel-delegation-dot ${d.status}`} />
+                <span className="otdel-delegation-name">{agent?.name || d.worker}</span>
+              </div>
+            )
+          })}
         </div>
       )}
 

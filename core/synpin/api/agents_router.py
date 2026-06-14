@@ -155,7 +155,7 @@ async def get_agent_avatar(slug: str):
 async def get_roles():
     """Get all roles."""
     try:
-        return {"roles": manager.load_roles()}
+        return manager.load_roles()
     except Exception as e:
         logger.error("Failed to load roles: %s", e)
         raise HTTPException(500, "Failed to load roles")
@@ -166,7 +166,8 @@ async def update_roles(req: dict):
     """Replace all roles."""
     try:
         roles = req.get("roles", [])
-        return {"roles": manager.save_roles(roles)}
+        is_default = req.get("is_default")
+        return {"roles": manager.save_roles(roles, is_default)}
     except Exception as e:
         logger.error("Failed to update roles: %s", e)
         raise HTTPException(500, "Failed to update roles")
@@ -193,10 +194,22 @@ class DepartmentUpdate(BaseRequest):
 async def get_departments():
     """Get all departments with agent counts."""
     try:
-        return {"departments": manager.get_departments_with_agents()}
+        return manager.load_departments()
     except Exception as e:
         logger.error("Failed to load departments: %s", e)
         raise HTTPException(500, "Failed to load departments")
+
+
+@router.put("/departments")
+async def update_departments(req: dict):
+    """Replace all departments."""
+    try:
+        departments = req.get("departments", [])
+        is_default = req.get("is_default")
+        return {"departments": manager.save_departments(departments, is_default)}
+    except Exception as e:
+        logger.error("Failed to update departments: %s", e)
+        raise HTTPException(500, "Failed to update departments")
 
 
 @router.get("/departments/{dept_id}")

@@ -333,7 +333,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         if is_head:
             # Head gets their configured tools + head protocol tools (builtin, otdel-only)
             agent_tools = list(agent.get("tools", []))
-            head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_decide"]
+            head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_decide", "kanban_task"]
             tool_names = agent_tools + head_protocol_tools
         else:
             tool_names = agent.get("tools", [])
@@ -520,25 +520,32 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         processed_count += 1
 
     # ── Head follow-up (gather pattern) ──────────────────────────────
-    should_followup = False
-    if head_delegating and expected_workers:
-        missing = expected_workers - responded_workers
-        if not missing:
+    # Loop: follow-up may trigger new head_delegate → new workers → follow-up again
+    followup_rounds = 0
+    while followup_rounds < 5:
+        should_followup = False
+        if head_delegating and expected_workers:
+            missing = expected_workers - responded_workers
+            if not missing:
+                should_followup = True
+            else:
+                log.warning("Otdel %s missing responses from %s", otdel_id, missing)
+        elif head_processed and workers_responded > 0 and not head_delegating:
             should_followup = True
-        else:
-            log.warning("Otdel %s missing responses from %s", otdel_id, missing)
-    elif head_processed and workers_responded > 0 and not head_delegating:
-        should_followup = True
 
-    if should_followup and processed_count < max_iterations:
+        if not should_followup or processed_count >= max_iterations:
+            break
         history = _load_history(otdel_id)
         context_messages = _build_head_context(history, head_slug, exclude_last=False)
 
         if head_delegating:
             acknowledge_trigger = (
                 "Все работники отдела ответили. "
-                "Проанализируй их ответы и сформируй итог для пользователя. "
-                "Кратко — что сделано, есть ли проблемы."
+                "Проанализируй их ответы.\n"
+                "Если задача требует дополнительных действий (делегировать другому агенту, "
+                "отправить на доработку, передать результат следующему этапу) — ПРОДОЛЖАЙ, "
+                "вызывай head_delegate или другие инструменты.\n"
+                "Если задача полностью выполнена — сформируй итог для пользователя."
             )
         else:
             acknowledge_trigger = "Работники отдела ответили. Посмотри их ответы и прокомментируй, если нужно."
@@ -554,7 +561,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
 
         # Head gets head protocol tools in follow-up too
         head_agent_tools = list(head_agent.get("tools", []))
-        head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_decide"]
+        head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_decide", "kanban_task"]
         tool_names = head_agent_tools + head_protocol_tools
 
         # Stream follow-up response
@@ -647,6 +654,184 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 "message_id": followup_msg_id,
                 "message": agent_msg,
             })
+
+            # Check if head_delegate was called again in follow-up
+            # If so, need to process the new workers
+            hs = get_head_state(otdel_id)
+            if hs and hs.expected_workers:
+                new_workers = hs.expected_workers - responded_workers
+                if new_workers:
+                    for slug in new_workers:
+                        agent = get_agent(slug)
+                        if agent:
+                            agent_queue.append((agent, False, ""))
+                            logger.info("Otdel %s follow-up delegation: queueing %s", otdel_id, agent.get("name"))
+
+        # If head didn't call any tools in follow-up, retry once with stronger prompt
+        if followup_rounds > 0 and not tools_called:
+            retry_trigger = (
+                "Ты не вызвал head_delegate. Твоя задача — делегировать работу агентам через инструменты.\n"
+                "Если все задачи выполнены — напиши итог и заверши.\n"
+                "Если нужна дополнительная работа — вызови head_delegate."
+            )
+            messages.append(ChatMessage(role="user", content=retry_trigger))
+            followup_msg_id = f"r-{uuid.uuid4().hex[:8]}"
+            tools_called = []
+            try:
+                async for chunk in base_stream(
+                    provider_name=provider_name,
+                    messages=messages,
+                    model=model,
+                    temperature=head_agent.get("temperature", 0.7),
+                    max_tokens=head_agent.get("max_tokens", 4096),
+                    system_prompt=system_prompt,
+                    agent_name=head_name,
+                    agent_slug=head_slug,
+                    tool_names=tool_names,
+                    otdel_id=otdel_id,
+                ):
+                    try:
+                        payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
+                        msg_type = payload.get("type", "")
+                        if msg_type == "chunk":
+                            content = payload.get("content", "")
+                            if content:
+                                full_response += content
+                                await ws_manager.send(user_id, {
+                                    "type": "otdel:chunk",
+                                    "otdel_id": otdel_id,
+                                    "message_id": followup_msg_id,
+                                    "content": content,
+                                    "sender": head_slug,
+                                    "sender_name": head_name,
+                                    "is_head": True,
+                                })
+                        elif msg_type == "tool_start":
+                            tools_called.append(payload)
+                    except Exception:
+                        pass
+            except Exception as e:
+                logger.error("Head retry failed in otdel %s: %s", otdel_id, e)
+
+            # If still no tools called, auto-finalize
+            if not tools_called:
+                auto_msg = (
+                    "⚠️ Глава не ответила на повторный запрос. Задача не завершена автоматически.\n"
+                    "Пожалуйста, уточните задачу вручную."
+                )
+                await ws_manager.send(user_id, {
+                    "type": "otdel:chunk",
+                    "otdel_id": otdel_id,
+                    "message_id": f"sys-{uuid.uuid4().hex[:8]}",
+                    "content": auto_msg,
+                    "sender": "system",
+                    "sender_name": "Система",
+                    "is_head": False,
+                })
+                # Save auto-message to history
+                auto_history_entry = {
+                    "role": "assistant",
+                    "sender": "system",
+                    "content": auto_msg,
+                    "message_id": f"sys-{uuid.uuid4().hex[:8]}",
+                }
+                _append_history(otdel_id, auto_history_entry)
+                break
+
+
+    # ── Second pass: process workers queued by follow-up delegations ──
+    while agent_queue and processed_count < max_iterations:
+        agent, is_head, trigger_message = agent_queue.pop(0)
+        agent_slug_val = agent.get("slug", "")
+        agent_name_val = agent.get("name", "")
+
+        system_prompt = _build_otdel_system_prompt(otdel, agent, is_head)
+        history = _load_history(otdel_id)
+
+        if is_head:
+            context_messages = _build_head_context(history, agent_slug_val)
+        else:
+            context_messages = _build_worker_context(history, agent_slug_val, head_slug, head_name)
+
+        messages = [ChatMessage(role=m["role"], content=m["content"]) for m in context_messages]
+        messages.append(ChatMessage(role="user", content=trigger_message))
+
+        model = agent.get("model", "default")
+        provider_name = agent.get("provider")
+        if provider_name and model.startswith(f"{provider_name}/"):
+            model = model[len(provider_name) + 1:]
+
+        if is_head:
+            tool_names = list(agent.get("tools", [])) + ["head_delegate", "head_evaluate", "head_retry", "head_decide", "kanban_task"]
+        else:
+            tool_names = agent.get("tools", [])
+
+        agent_msg_id = f"a-{uuid.uuid4().hex[:8]}"
+        full_response = ""
+
+        try:
+            from .router import stream_response as base_stream
+            async for chunk in base_stream(
+                provider_name=provider_name,
+                messages=messages,
+                model=model,
+                temperature=agent.get("temperature", 0.7),
+                max_tokens=agent.get("max_tokens", 4096),
+                system_prompt=system_prompt,
+                agent_name=agent_name_val,
+                agent_slug=agent_slug_val,
+                tool_names=tool_names,
+                otdel_id=otdel_id,
+            ):
+                try:
+                    payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
+                    msg_type = payload.get("type", "")
+                    if msg_type == "chunk":
+                        content = payload.get("content", "")
+                        if content:
+                            full_response += content
+                            await ws_manager.send(user_id, {
+                                "type": "otdel:chunk", "otdel_id": otdel_id,
+                                "message_id": agent_msg_id, "content": content,
+                                "sender": agent_slug_val, "sender_name": agent_name_val, "is_head": is_head,
+                            })
+                    elif msg_type in ("tool_start", "tool_end"):
+                        await ws_manager.send(user_id, {
+                            "type": f"otdel:{msg_type}", "otdel_id": otdel_id,
+                            "message_id": agent_msg_id, "tool": payload.get("tool"),
+                            "params": payload.get("params"), "result": payload.get("result"),
+                            "success": payload.get("success"), "error": payload.get("error"),
+                            "index": payload.get("index"),
+                        })
+                    elif msg_type == "error":
+                        full_response = f"⚠️ Ошибка: {payload.get('message', 'Unknown error')}"
+                except Exception:
+                    pass
+        except Exception as e:
+            full_response = f"⚠️ Ошибка: {e}"
+
+        full_response = re.sub(r'<tool_call>.*?</tool_call>', '', full_response, flags=re.DOTALL).strip()
+
+        if full_response:
+            agent_msg = {
+                "id": agent_msg_id, "role": "assistant",
+                "sender": agent_slug_val, "sender_name": agent_name_val,
+                "content": full_response, "is_head": is_head,
+                "timestamp": datetime.now().isoformat(),
+            }
+            history = _load_history(otdel_id)
+            history.append(agent_msg)
+            _save_history(otdel_id, history)
+            await ws_manager.send(user_id, {
+                "type": "otdel:done", "otdel_id": otdel_id,
+                "message_id": agent_msg_id, "message": agent_msg,
+            })
+
+        processed_slugs.add(agent_slug_val)
+        if not is_head:
+            responded_workers.add(agent_slug_val)
+            workers_responded += 1
+        processed_count += 1
 
     # Signal done
     await ws_manager.send(user_id, {

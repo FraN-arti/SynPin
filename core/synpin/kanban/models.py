@@ -5,6 +5,7 @@ The model handles validation, serialization, and business logic.
 """
 from __future__ import annotations
 
+import re
 import yaml
 from datetime import datetime
 from enum import Enum
@@ -40,6 +41,10 @@ class ActionType(str, Enum):
     CREATED = "created"
     ACCEPTED = "accepted"
     ASSIGNED = "assigned"
+    DELEGATED = "delegated"       # Head delegates to worker
+    RESPONDED = "responded"       # Worker responded with result
+    REWORK = "rework"             # Sent back for rework
+    COMPLETED = "completed"       # Task completed
     WORK_STARTED = "work_started"
     WORK_COMPLETED = "work_completed"
     REVIEW_PASSED = "review_passed"
@@ -306,3 +311,19 @@ def load_all_tasks(tasks_dir: Path) -> list[Task]:
         except Exception as e:
             print(f"Warning: Failed to load {filepath.name}: {e}")
     return tasks
+
+
+# ── Utilities ────────────────────────────────────────────────────────────────
+
+def parse_department_refs(text: str) -> list[str]:
+    """Extract #DepartmentID references from text.
+
+    Matches patterns like:
+      - #h1urnetgjr5q ( department ID)
+      - #pw6flsdgw48m
+
+    Returns list of department IDs found.
+    """
+    if not text:
+        return []
+    return re.findall(r'#([a-zA-Z0-9]{10,})', text)

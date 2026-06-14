@@ -122,8 +122,10 @@ def load_external_agents() -> list[dict[str, Any]]:
     agents = config.get("agents", {})
 
     # Resolve role/department names
-    roles_list = manager.load_roles()
-    depts_list = manager.load_departments()
+    roles_data = manager.load_roles()
+    roles_list = roles_data.get("roles", [])
+    depts_data = manager.load_departments()
+    depts_list = depts_data.get("departments", [])
 
     result = []
     for slug, cfg in agents.items():

@@ -35,7 +35,7 @@ export interface Department {
 // ─── Widget metadata ─────────────────────────────────────────────
 
 export const WIDGET_META: Record<WidgetType, { label: string; icon: string }> = {
-  departments: { label: 'Отделы', icon: '🏢' },
+  departments: { label: 'Департаменты', icon: '🏢' },
   kanban: { label: 'Канбан', icon: '📋' },
 }
 

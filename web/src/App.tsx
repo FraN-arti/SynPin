@@ -883,6 +883,7 @@ function App() {
                   onClick={() => {
                     setActiveAgent(primary)
                     setMessages([])
+                    setView({ type: 'chat' })
                   }}
                 >
                   <span className="agent-list-avatar" style={{ background: primary.is_external ? '#f97316' : '#6b7280' }}>
@@ -945,6 +946,7 @@ function App() {
                       setActiveAgent(agent)
                       setMessages([])
                       setAgentSearch('')
+                      setView({ type: 'chat' })
                     }}
                   >
                     <span className="agent-list-avatar" style={{ background: agent.is_external ? '#f97316' : '#6b7280' }}>

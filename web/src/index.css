@@ -505,6 +505,12 @@ body {
   color: var(--white);
 }
 
+.settings-btn.active {
+  background: var(--orange-soft, rgba(249, 115, 22, 0.12));
+  border-color: var(--orange);
+  color: var(--orange);
+}
+
 /* === Main Area === */
 .main-area {
   flex: 1;

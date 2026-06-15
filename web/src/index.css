@@ -1116,7 +1116,26 @@ body {
 }
 
 .meta-badge.gold {
-  color: #fbbf24;
+  color: var(--orange);
+}
+
+.meta-badge.dim {
+  color: var(--text-dim);
+}
+
+/* ── Otdel message meta info block ────────────────────── */
+
+.otdel-msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0 0 0;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.msg-meta-time {
+  color: var(--text-dim);
 }
 
 .message-footer.user {
@@ -1665,9 +1684,11 @@ body {
 }
 
 .settings-card-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--orange);
   margin: 0 0 14px 0;
 }
 

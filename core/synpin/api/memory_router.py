@@ -46,21 +46,10 @@ router = APIRouter(prefix="/api/memory", tags=["memory"])
 
 # ── Data Directory ───────────────────────────────────────────────────────
 
-# Resolve data path: prod ~/.synpin/data first, then dev core/data/
-_data_candidates = [
-    Path.home() / ".synpin" / "data",  # production
-    Path(__file__).resolve().parent.parent.parent / "data",  # dev
-]
+# Use the same DATA_DIR as tools (paths_legacy)
+from ..paths_legacy import _get_data_dir_tools as _get_data_dir
 
-DATA_DIR: Optional[Path] = None
-for candidate in _data_candidates:
-    if candidate.exists():
-        DATA_DIR = candidate
-        break
-
-if DATA_DIR is None:
-    DATA_DIR = _data_candidates[0]
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR: Path = _get_data_dir()
 
 # ── Manager Cache ────────────────────────────────────────────────────────
 

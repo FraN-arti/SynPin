@@ -27,6 +27,10 @@ interface ChatMessage {
   streaming?: boolean
   tools?: ToolCall[]
   compaction?: boolean
+  model?: string
+  provider?: string
+  prompt_tokens?: number
+  completion_tokens?: number
 }
 
 interface ToolCall {
@@ -338,6 +342,10 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
               is_head: oldMsg.is_head,
               timestamp: finalMsg.timestamp,
               streaming: false,
+              model: (finalMsg as any).model || oldMsg.model,
+              provider: (finalMsg as any).provider || oldMsg.provider,
+              prompt_tokens: (finalMsg as any).prompt_tokens || oldMsg.prompt_tokens,
+              completion_tokens: (finalMsg as any).completion_tokens || oldMsg.completion_tokens,
             }
             return updated
           }
@@ -351,6 +359,10 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
             is_head: finalMsg.is_head,
             timestamp: finalMsg.timestamp,
             streaming: false,
+            model: (finalMsg as any).model,
+            provider: (finalMsg as any).provider,
+            prompt_tokens: (finalMsg as any).prompt_tokens,
+            completion_tokens: (finalMsg as any).completion_tokens,
           }]
         })
       }
@@ -544,8 +556,32 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
                       } : undefined}
                     >
                       <MarkdownRenderer content={msg.content} isStreaming={isStreaming} />
-                    </div>
-                    {msg.tools && msg.tools.length > 0 && (
+                      </div>
+                      {/* Message meta info — time · agent · model */}
+                      {msg.role === 'assistant' && (msg.model || msg.sender_name) && !isStreaming && (
+                        <div className="otdel-msg-meta">
+                          <span className="msg-meta-time">{new Date(msg.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
+                          {msg.sender_name && (
+                            <>
+                              <span className="meta-sep"> — </span>
+                              <span className="meta-badge gold">{msg.sender_name}</span>
+                            </>
+                          )}
+                          {msg.model && (
+                            <>
+                              <span className="meta-dot"> · </span>
+                              <span className="meta-badge">{msg.model}</span>
+                            </>
+                          )}
+                          {msg.prompt_tokens && (
+                            <>
+                              <span className="meta-dot"> · </span>
+                              <span className="meta-badge dim">{msg.prompt_tokens} tok</span>
+                            </>
+                          )}
+                        </div>
+                      )}
+                      {msg.tools && msg.tools.length > 0 && (
                       <div className="otdel-msg-tools">
                         {msg.tools.map(tc => (
                           <div key={tc.id} className={`otdel-tool-call ${tc.status}`}>
@@ -617,13 +653,13 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
           <EmojiPicker onSelect={handleEmojiSelect} />
           <textarea
             className="chat-textarea"
-            placeholder={sending ? 'Агенты работают... (Enter — отправить ещё)' : 'Спроси что-нибудь...'}
+            placeholder={compacting ? 'Компакция истории...' : sending ? 'Агенты работают... (Enter — отправить ещё)' : 'Спроси что-нибудь...'}
             value={input}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
             rows={1}
           />
-          <button className="send-btn" onClick={handleSend} disabled={!input.trim()}>
+          <button className="send-btn" onClick={handleSend} disabled={!input.trim() || !!compacting}>
             →
           </button>
         </div>

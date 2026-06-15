@@ -50,7 +50,7 @@ const SYSTEM_TABS: TabDef[] = [
 ]
 
 const SPACE_TABS: TabDef[] = [
-  { id: 'agents', label: 'Агенты' },
+  { id: 'agents', label: 'AI Агенты' },
   { id: 'channels', label: 'Каналы' },
   { id: 'departments', label: 'Отделы' },
   { id: 'skills', label: 'Скиллы' },
@@ -534,9 +534,9 @@ function GeneralSection() {
 
   return (
     <div className="general-settings">
-      {/* ─── 📊 Обзор системы ─── */}
+      {/* ─── Обзор системы ─── */}
       <section className="settings-card">
-        <h2 className="settings-card-title">📊 Обзор системы</h2>
+        <h2 className="settings-card-title">Обзор системы</h2>
         <div className="stats-summary">
           <div className="stats-card">
             <span className="stats-card-value">{overview?.agents ?? '—'}</span>
@@ -563,9 +563,9 @@ function GeneralSection() {
         </div>
       </section>
 
-      {/* ─── 🖥 Сервер ─── */}
+      {/* ─── Сервер ─── */}
       <section className="settings-card settings-card-disabled">
-        <h2 className="settings-card-title">🖥 Сервер <span className="settings-card-badge">требует перезапуск</span></h2>
+        <h2 className="settings-card-title">Сервер <span className="settings-card-badge">требует перезапуск</span></h2>
         <div className="settings-row-2">
           <div className="settings-field">
             <label>Хост</label>
@@ -759,9 +759,9 @@ function GeneralSection() {
         </section>
       </div>
 
-      {/* ─── 📡 Лента активности ─── */}
+      {/* ─── Лента активности ─── */}
       <section className="settings-card settings-card-disabled">
-        <h2 className="settings-card-title">📡 Лента активности <span className="settings-card-badge">скоро</span></h2>
+        <h2 className="settings-card-title">Лента активности <span className="settings-card-badge">скоро</span></h2>
         <div className="settings-row-2">
           <div className="settings-field">
             <label>Макс. записей</label>
@@ -2768,7 +2768,7 @@ function SkillsSection() {
   return (
     <div className="settings-sections">
       <section className="settings-card">
-        <h2 className="settings-card-title">🧠 Скиллы системы</h2>
+        <h2 className="settings-card-title">Скиллы системы</h2>
         <p style={{ color: 'var(--gray-500)', fontSize: '14px', lineHeight: '1.6' }}>
           База скиллов — подходы, шаблоны и процедуры, которые система использует для решения задач.
         </p>
@@ -2796,7 +2796,7 @@ function KanbanSection() {
     <div className="settings-sections">
       {/* Stats Overview */}
       <section className="settings-card">
-        <h2 className="settings-card-title">📋 Глобальный Канбан</h2>
+        <h2 className="settings-card-title">Глобальный Канбан</h2>
         <p style={{ color: 'var(--gray-500)', fontSize: '14px', lineHeight: '1.6', marginBottom: '16px' }}>
           Глобальная доска задач для управления работой всех отделов и агентов.
         </p>
@@ -2828,7 +2828,7 @@ function KanbanSection() {
 
       {/* Board Settings */}
       <section className="settings-card">
-        <h2 className="settings-card-title">⚙️ Настройки доски</h2>
+        <h2 className="settings-card-title">Настройки доски</h2>
         <div className="settings-row-2">
           <div className="settings-field">
             <label>Максимум активных задач</label>
@@ -2852,7 +2852,7 @@ function KanbanSection() {
 
       {/* Automation */}
       <section className="settings-card">
-        <h2 className="settings-card-title">🤖 Автоматизация</h2>
+        <h2 className="settings-card-title">Автоматизация</h2>
         <Toggle label="Авто назначение главы" defaultChecked={true} onChange={() => {}} />
         <Toggle label="Summon при завершении — автоматически передавать задачу следующему отделу" defaultChecked={false} onChange={() => {}} />
         <Toggle label="Эскалация при простое — эскалировать при превышении дедлайна" defaultChecked={false} onChange={() => {}} />
@@ -2861,7 +2861,7 @@ function KanbanSection() {
 
       {/* Coming Soon */}
       <section className="settings-card" style={{ opacity: 0.5, pointerEvents: 'none' }}>
-        <h2 className="settings-card-title">🔒 Скоро</h2>
+        <h2 className="settings-card-title">Скоро</h2>
         <Toggle label="Drag & Drop — перетаскивание тасков между колонками" defaultChecked={false} onChange={() => {}} />
         <Toggle label="Интеграция с Forum — обсуждения задач в форуме агентов" defaultChecked={false} onChange={() => {}} />
         <Toggle label="Canvas связей — визуализация потока задач между отделами" defaultChecked={false} onChange={() => {}} />
@@ -3134,7 +3134,7 @@ function KanbanColumnsConfig() {
 
   return (
     <section className="settings-card">
-      <h2 className="settings-card-title">📊 Конфигурация колонок</h2>
+      <h2 className="settings-card-title">Конфигурация колонок</h2>
       <p className="settings-hint">Настройте колонки доски: цвета, порядок, видимость</p>
       <div className="settings-divider-thin" />
       {columns.map((col, i) => (
@@ -3458,7 +3458,7 @@ function KanbanLabelsConfig() {
 
   return (
     <section className="settings-card">
-      <h2 className="settings-card-title">🏷️ Конфигурация меток</h2>
+      <h2 className="settings-card-title">Конфигурация меток</h2>
       <p className="settings-hint">Настройте метки (теги) для задач: цвет фона и текста</p>
       <div className="settings-divider-thin" />
       {labels.map((label, i) => (
@@ -3639,7 +3639,7 @@ function KanbanWidgetConfig() {
 
   return (
     <section className={`settings-card${saving ? ' saving' : ''}`}>
-      <h2 className="settings-card-title">📦 Конфигурация виджета</h2>
+      <h2 className="settings-card-title">Конфигурация виджета</h2>
       <p className="settings-hint">Настройте виджет канбан-доски на главной странице</p>
       <div className="settings-divider-thin" />
       <div className="settings-row-2">

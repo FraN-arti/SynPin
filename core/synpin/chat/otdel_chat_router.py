@@ -56,6 +56,20 @@ async def get_otdel_chat_history(otdel_id: str):
     return {"messages": messages}
 
 
+async def _notify_compaction(chat_task, save_result: dict):
+    """Send compaction notification via WebSocket."""
+    try:
+        event = json.dumps({
+            "type": "otdel:compacting",
+            "otdel_id": chat_task.otdel_id,
+            "before": save_result.get("before", 0),
+            "after": save_result.get("after", 0),
+        }, ensure_ascii=False)
+        await chat_task.queue.put(event)
+    except Exception:
+        pass
+
+
 @router.post("/{otdel_id}/chat/send")
 async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
     """Send a message to otdel chat and trigger agent responses.
@@ -86,7 +100,9 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
         "timestamp": datetime.now().isoformat(),
     }
     history.append(user_msg)
-    _save_history(otdel_id, history)
+    save_result = _save_history(otdel_id, history)
+    if save_result.get("was_compacted"):
+        await _notify_compaction(chat_task, save_result)
     
     # Parse @mentions from user message
     user_mentions = _parse_mentions(req.message)
@@ -132,7 +148,7 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
         """Process agents iteratively until no new @mentions."""
         log = logging.getLogger("synpin.otdel")
         responses = []
-        
+
         # Queue of agents to process: (agent, is_head, trigger_message)
         agent_queue = [(agent, True, req.message) for agent in [head_agent] if agent]
         
@@ -166,6 +182,7 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
         responded_workers = set()  # Slugs of workers who actually responded
         head_delegating = False    # True when Head delegated (suppress first response)
         processed_slugs = set()    # Deduplication — don't process same agent twice
+        followup_done = False      # Only allow ONE follow-up per request
         
         while agent_queue and processed_count < max_iterations:
             agent, is_head, trigger_message = agent_queue.pop(0)
@@ -245,6 +262,8 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                     "content": full_response,
                     "is_head": is_head,
                     "timestamp": datetime.now().isoformat(),
+                    "model": model,
+                    "provider": provider_name,
                 }
                 history.append(agent_msg)
                 _save_history(otdel_id, history)
@@ -322,7 +341,8 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
             # Workers were @mentioned by user directly (not by Head)
             should_followup = True
         
-        if should_followup and processed_count < max_iterations:
+        if should_followup and processed_count < max_iterations and not followup_done:
+            followup_done = True
             history = _load_history(otdel_id)
             context_messages = _build_head_context(history, head_slug, exclude_last=False)
             
@@ -386,6 +406,8 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                     "content": full_response,
                     "is_head": True,
                     "timestamp": datetime.now().isoformat(),
+                    "model": model,
+                    "provider": provider_name,
                 }
                 history.append(agent_msg)
                 _save_history(otdel_id, history)

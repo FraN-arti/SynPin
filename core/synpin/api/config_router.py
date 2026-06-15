@@ -87,6 +87,7 @@ class MemoryConfigUpdate(BaseRequest):
     context_window: Optional[Dict[str, Any]] = None
     compaction: Optional[Dict[str, Any]] = None
     sessions: Optional[Dict[str, Any]] = None
+    otdel_compaction: Optional[Dict[str, Any]] = None
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────
@@ -112,6 +113,10 @@ async def get_memory_config():
                 "auto_reset": {"enabled": True, "mode": "daily", "reset_time": "00:00", "interval_hours": 24},
                 "archive_on_reset": True,
                 "max_history": 100,
+            }),
+            "otdel_compaction": full.get("otdel_compaction", {
+                "enabled": True,
+                "compaction_limit": 100,
             }),
         }
     except Exception as e:
@@ -150,6 +155,14 @@ async def update_memory_config(req: MemoryConfigUpdate):
                 req.sessions,
             )
 
+        if req.otdel_compaction is not None:
+            full["otdel_compaction"] = _deep_merge(
+                full.get("otdel_compaction", {
+                    "enabled": True, "compaction_limit": 100,
+                }),
+                req.otdel_compaction,
+            )
+
         _save_yaml(path, full)
         logger.info("memory.yaml updated via API")
 
@@ -158,6 +171,7 @@ async def update_memory_config(req: MemoryConfigUpdate):
             "context_window": full.get("context_window"),
             "compaction": full.get("compaction"),
             "sessions": full.get("sessions"),
+            "otdel_compaction": full.get("otdel_compaction"),
         }
     except Exception as e:
         logger.error("Failed to update memory config: %s", e)

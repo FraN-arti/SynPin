@@ -1088,8 +1088,7 @@ async def stream_response(
             _log.info("LLM response: text=%d chars, tool_calls=%d, finish_reason=%s",
                       len(full_text), len(model_tool_calls),
                       "unknown" if not model_tool_calls else "has_calls")
-
-            # Determine if tool calls came from native API or text fallback
+            # Determine
             is_text_fallback = False
             if not model_tool_calls:
                 text_tool_calls = _parse_text_tool_calls(full_text)
@@ -1316,6 +1315,7 @@ async def chat_stream(req: ChatRequest):
         """Run LLM in background — survives client disconnect."""
         try:
             full_response = ""
+            usage_data = None
             async for chunk in stream_response(
                 provider_name=provider_name,
                 messages=messages,
@@ -1328,7 +1328,7 @@ async def chat_stream(req: ChatRequest):
                 tool_names=req.tools or [],
             ):
                 await chat_task.queue.put(chunk)
-                # Capture chunk content for history
+                # Capture chunk content + usage for history
                 if '"type": "chunk"' in chunk:
                     try:
                         payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
@@ -1336,12 +1336,29 @@ async def chat_stream(req: ChatRequest):
                             full_response += payload.get("content", "")
                     except Exception:
                         pass
+                elif '"type": "done"' in chunk:
+                    try:
+                        payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
+                        if payload.get("type") == "done":
+                            usage_data = payload.get("usage")
+                    except Exception:
+                        pass
 
             # Save assistant response after streaming completes
             if agent_slug and channel_id and full_response:
+                assistant_msg = {"role": "assistant", "content": full_response}
+                if req.agent_name:
+                    assistant_msg["agent_name"] = req.agent_name
+                if model:
+                    assistant_msg["model"] = model
+                if provider_name:
+                    assistant_msg["provider"] = provider_name
+                if usage_data:
+                    assistant_msg["prompt_tokens"] = usage_data.get("prompt_tokens", 0)
+                    assistant_msg["completion_tokens"] = usage_data.get("completion_tokens", 0)
                 new_messages = history_before + [
                     {"role": "user", "content": user_message},
-                    {"role": "assistant", "content": full_response},
+                    assistant_msg,
                 ]
                 _save_chat_history(agent_slug, channel_id, new_messages)
 

@@ -70,6 +70,8 @@ interface Message {
   timestamp: Date
   model?: string
   agent_name?: string
+  prompt_tokens?: number
+  completion_tokens?: number
   tools?: ToolCall[]
 }
 
@@ -278,9 +280,9 @@ function App() {
         const timer = setTimeout(() => {
           setRevealedMeta(prev => {
             const next = new Set(prev)
-            // Reveal ALL assistant messages that have model or agent_name (from history or done streaming)
+            // Reveal ALL assistant messages — show meta for every assistant reply
             for (const msg of messages) {
-              if (msg.role === 'assistant' && (msg.model || msg.agent_name)) {
+              if (msg.role === 'assistant') {
                 next.add(msg.id)
               }
             }
@@ -409,9 +411,9 @@ function App() {
     loadAgents()
   }, [])
 
-  // Load chat history when active agent changes
+  // Load chat history when active agent changes OR when returning from otdel
   useEffect(() => {
-    if (!activeAgent) return
+    if (!activeAgent || activeOtdelId) return  // skip if otdel is active
     const loadHistory = async () => {
       try {
         const res = await fetch(`${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web`)
@@ -429,13 +431,15 @@ function App() {
         const hasPendingTask = lastMsg?.role === 'user'
 
         if (msgs.length > 0) {
-          let restored: Message[] = msgs.map((m: { role: string; content: string; model?: string; agent_name?: string }, i: number) => ({
+          let restored: Message[] = msgs.map((m: { role: string; content: string; model?: string; agent_name?: string; prompt_tokens?: number; completion_tokens?: number }, i: number) => ({
             id: `restored-${i}`,
             role: m.role as 'user' | 'assistant',
             content: m.content,
             timestamp: new Date(),
             model: m.model,
             agent_name: m.agent_name,
+            prompt_tokens: m.prompt_tokens,
+            completion_tokens: m.completion_tokens,
           }))
 
           // Check if restored messages already end with empty assistant (from SSE)
@@ -455,6 +459,12 @@ function App() {
           }
 
           setMessages(restored)
+          // Scroll to bottom after history loads (double rAF ensures DOM is painted)
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+            })
+          })
         } else {
           setMessages([])
         }
@@ -500,7 +510,7 @@ function App() {
           if (placeholderId) {
             setIsTyping(false)
             return list.map(m => m.id === placeholderId
-              ? { ...m, content: lastServerMsg.content, model: lastServerMsg.model, agent_name: lastServerMsg.agent_name }
+              ? { ...m, content: lastServerMsg.content, model: lastServerMsg.model, agent_name: lastServerMsg.agent_name, prompt_tokens: lastServerMsg.prompt_tokens, completion_tokens: lastServerMsg.completion_tokens }
               : m
             )
           }
@@ -512,10 +522,12 @@ function App() {
     }, 3000) // Poll every 3 seconds
 
     return () => clearInterval(pollInterval)
-  }, [activeAgent])
+  }, [activeAgent, activeOtdelId])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+    })
   }, [messages])
 
   // Scroll to bottom when returning from settings to chat
@@ -655,7 +667,8 @@ function App() {
               if (idx !== -1 && activeTools[idx]) { activeTools[idx].status = parsed.success ? 'completed' : 'error'; activeTools[idx].result = String(parsed.result || '') }
               setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, tools: [...activeTools] } : m))
             } else if (parsed.type === 'done') {
-              setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, model: parsed.model as string, agent_name: parsed.agent_name as string } : m))
+              const usage = parsed.usage as Record<string, number> | undefined
+              setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, model: parsed.model as string, agent_name: parsed.agent_name as string, prompt_tokens: usage?.prompt_tokens, completion_tokens: usage?.completion_tokens } : m))
               streamDone = true; break
             } else if (parsed.type === 'error') { throw new Error(String(parsed.message || 'Stream error')) }
           }
@@ -743,7 +756,7 @@ function App() {
     if (msg.role === 'user') {
       return <span className="message-time">{formatTime(msg.timestamp)}</span>
     }
-    // Assistant: time — agent_name · model
+    // Assistant: time — agent_name · model · tokens
     return (
       <>
         <span className="message-time">{formatTime(msg.timestamp)}</span>
@@ -756,6 +769,12 @@ function App() {
         )}
         {msg.model && msg.model !== msg.agent_name && (
           <span className="meta-badge">{msg.model}</span>
+        )}
+        {msg.prompt_tokens && (
+          <>
+            <span className="meta-dot"> · </span>
+            <span className="meta-badge dim">{msg.prompt_tokens} tok</span>
+          </>
         )}
       </>
     )

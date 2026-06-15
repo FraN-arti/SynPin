@@ -65,19 +65,16 @@ def _save_history(otdel_id: str, messages: list[dict]) -> dict:
     compaction_limit = None
     keep_recent = None
     try:
-        from ..api.config_router import _get_config_dir, _load_yaml
-        config_dir = _get_config_dir()
-        if config_dir:
-            mem_cfg = _load_yaml(config_dir / "memory.yaml")
-            compaction = mem_cfg.get("compaction", {})
-            if compaction.get("enabled", True):
-                # Convert trigger_percent to message count
-                # trigger_percent=80 means compact at 80% of context_window
-                # For message-based compaction, use a reasonable default
-                # based on trigger_percent: 80% → ~100 messages
-                trigger_pct = compaction.get("trigger_percent", 80)
-                compaction_limit = max(20, int(200 * trigger_pct / 100))
-                keep_recent = compaction.get("keep_recent", 10)
+        from ..api.config_router import CONFIG_DIR, _load_yaml
+        if CONFIG_DIR:
+            mem_cfg = _load_yaml(CONFIG_DIR / "memory.yaml")
+            # Compaction limit from otdel_compaction
+            otdel_comp = mem_cfg.get("otdel_compaction", {})
+            if otdel_comp.get("enabled", True):
+                compaction_limit = otdel_comp.get("compaction_limit", 40)
+            # keep_recent and strategy from main compaction
+            main_comp = mem_cfg.get("compaction", {})
+            keep_recent = main_comp.get("keep_recent", 10)
     except Exception:
         pass
     
@@ -274,16 +271,21 @@ def _build_otdel_system_prompt(otdel: dict, agent: dict, is_head: bool) -> str:
 6. Передавай полный контекст между этапами (копируй тексты работников)
 
 ## Когда делай САМ (без инструментов)
-- Приветствия, "как дела?", стратегия отдела
+- Приветствия, "как дела?" (обращённые К ТЕБЕ лично)
+- Стратегия отдела, общие вопросы
 
-## Когда делегируй (через head_delegate + kanban_task)
+## Когда делегируй (через head_delegate)
+- "Как дела у [работника]?", "Что [работник] делает?" — спроси РОВНО У ТОГО работника
 - "напиши", "составь", "сделай", "проанализируй" — ВСЕГДА делегируй
+- Любые вопросы о конкретном работнике — спроси его через head_delegate
 - Сложные задачи требующие экспертизы
 - Многоэтапные процессы
 
 ## АБСОЛЮТНО ЗАПРЕЩЕНО
 - Говорить "работников нет" если они есть в списке
 - Отвечать за работников от своего имени
+- Писать @ИмяРаботника текстом вместо вызова head_delegate — это ГАЛЛЮЦИНАЦИЯ, а не делегирование
+- Вызывать memory_read/memory_write по своему усмотрению
 - Описывать tool call текстом вместо реального вызова"""
 
     parts.append(rules)

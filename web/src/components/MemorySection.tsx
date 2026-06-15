@@ -92,6 +92,10 @@ export function MemorySection() {
   const [memorySettings, setMemorySettings] = useState<MemorySettingsConfig>({
     enabled: true, max_chars: 10000, auto_refactor: false,
   })
+  const [otdelCompaction, setOtdelCompaction] = useState({
+    enabled: true, compaction_limit: 100,
+  })
+  const [contextWindowDefault, setContextWindowDefault] = useState(128000)
 
   // Load data on mount
   useEffect(() => {
@@ -119,6 +123,8 @@ export function MemorySection() {
         if (data.compaction) setCompactionForm(data.compaction)
         if (data.memory_provider) setProviderForm(data.memory_provider)
         if (data.memory) setMemorySettings(data.memory)
+        if (data.otdel_compaction) setOtdelCompaction(data.otdel_compaction)
+        if (data.context_window?.default) setContextWindowDefault(data.context_window.default)
       }
     } catch (e) {
       console.error('[memory] config load error:', e)
@@ -147,7 +153,7 @@ export function MemorySection() {
     <div className="memory-section">
       {/* Block 1: User Profile (Global, Read-Only) */}
       <section className="settings-card">
-        <h2 className="settings-card-title">👤 Профиль пользователя</h2>
+        <h2 className="settings-card-title">Профиль пользователя</h2>
         <p className="memory-card-desc">Общая информация о пользователе. Доступна всем агентам. Заполняется автоматически при общении.</p>
 
         <div className="memory-header">
@@ -217,7 +223,7 @@ export function MemorySection() {
       <div className="memory-settings-row">
         {/* Block 2: Compaction */}
         <section className="settings-card memory-settings-half">
-          <h2 className="settings-card-title">🗜 Компакция</h2>
+          <h2 className="settings-card-title">Компакция</h2>
           <p className="memory-card-desc">Автоматическое сжатие истории сообщений когда контекст заполняется. Не даёт диалогу «упасть» из-за переполнения.</p>
 
           <div className="memory-config-form">
@@ -294,7 +300,7 @@ export function MemorySection() {
 
         {/* Block 3: Memory Provider */}
         <section className="settings-card memory-settings-half">
-          <h2 className="settings-card-title">🧠 Memory Provider</h2>
+          <h2 className="settings-card-title">Memory Provider</h2>
           <p className="memory-card-desc">Где агенты хранят долгосрочную память. Built-in использует MEMORY.md / USER.md файлы.</p>
 
           <div className="memory-config-form">
@@ -361,7 +367,7 @@ export function MemorySection() {
 
         {/* Block 4: Memory Settings */}
         <section className="settings-card memory-settings-half">
-          <h2 className="settings-card-title">⚙️ Настройка памяти</h2>
+          <h2 className="settings-card-title">Настройка памяти</h2>
           <p className="memory-card-desc">Параметры работы долгосрочной памяти агентов.</p>
 
           <div className="memory-config-form">
@@ -396,6 +402,22 @@ export function MemorySection() {
               />
             </div>
 
+            <div className="settings-field">
+              <div className="settings-field-label">
+                <label>Контекстное окно (токены)</label>
+                <span className="settings-field-hint">Глобальный лимит контекста для новых агентов. Можно переопределить в карточке агента.</span>
+              </div>
+              <input
+                type="number"
+                className="settings-input"
+                min={4000}
+                max={1000000}
+                value={contextWindowDefault}
+                onChange={e => setContextWindowDefault(Math.min(1000000, Math.max(4000, Number(e.target.value))) )}
+                onBlur={() => saveConfig({ context_window: { default: contextWindowDefault } })}
+              />
+            </div>
+
             <div className="settings-field-row">
               <label className="settings-toggle">
                 <input
@@ -410,6 +432,49 @@ export function MemorySection() {
                 <span>Авто-рефакторинг</span>
               </label>
               <span className="settings-field-hint-inline">Автоматически объединять дублирующие записи (скоро)</span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div className="memory-settings-row">
+        {/* Block 4: Otdel Compaction */}
+        <section className="settings-card memory-settings-half">
+          <h2 className="settings-card-title">Отделы</h2>
+          <p className="memory-card-desc">Настройки компакции чатов отделов. Глобальные правила для всех отделов.</p>
+
+          <div className="memory-config-form">
+            <div className="settings-field-row">
+              <label className="settings-toggle">
+                <input
+                  type="checkbox"
+                  checked={otdelCompaction.enabled}
+                  onChange={e => {
+                    const next = { ...otdelCompaction, enabled: e.target.checked }
+                    setOtdelCompaction(next)
+                    saveConfig({ otdel_compaction: next })
+                  }}
+                />
+                <span>Компакция чатов</span>
+              </label>
+              <span className="settings-field-hint-inline">Автоматически сжимать историю сообщений в отделах</span>
+            </div>
+
+            <div className="settings-field-row">
+              <label>Лимит сообщений</label>
+              <input
+                type="number"
+                className="settings-input"
+                value={otdelCompaction.compaction_limit}
+                min={20}
+                max={500}
+                onChange={e => {
+                  const next = { ...otdelCompaction, compaction_limit: Math.max(20, parseInt(e.target.value) || 20) }
+                  setOtdelCompaction(next)
+                }}
+                onBlur={() => saveConfig({ otdel_compaction: otdelCompaction })}
+              />
+              <span className="settings-field-hint-inline">При превышении — старые сообщения заменяются summary</span>
             </div>
           </div>
         </section>

@@ -205,7 +205,14 @@ async def _handle_chat_send(user_id: str, msg: dict):
 
     # Save assistant response to history
     if full_response:
-        history.append({"role": "assistant", "content": full_response, "timestamp": datetime.now().isoformat()})
+        assistant_entry = {"role": "assistant", "content": full_response, "timestamp": datetime.now().isoformat()}
+        if model:
+            assistant_entry["model"] = model
+        if provider_name:
+            assistant_entry["provider"] = provider_name
+        if agent_data and agent_data.get("name"):
+            assistant_entry["agent_name"] = agent_data["name"]
+        history.append(assistant_entry)
         _save_chat_history(agent_slug, channel_id, history)
 
     # Signal done
@@ -384,6 +391,8 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                                 "sender": agent_slug_val,
                                 "sender_name": agent_name_val,
                                 "is_head": is_head,
+                                "model": model,
+                                "provider": provider_name,
                             })
                     elif msg_type in ("tool_start", "tool_end"):
                         # Forward tool events via WS
@@ -452,6 +461,8 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 "sender": agent_slug_val,
                 "sender_name": agent_name_val,
                 "is_head": is_head,
+                "model": model,
+                "provider": provider_name,
             })
 
         if full_response:
@@ -463,6 +474,8 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 "content": full_response,
                 "is_head": is_head,
                 "timestamp": datetime.now().isoformat(),
+                "model": model,
+                "provider": provider_name,
             }
             history.append(agent_msg)
             save_stats = _save_history(otdel_id, history)
@@ -520,24 +533,21 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         processed_count += 1
 
     # ── Head follow-up (gather pattern) ──────────────────────────────
-    # Loop: follow-up may trigger new head_delegate → new workers → follow-up again
-    followup_rounds = 0
-    while followup_rounds < 5:
-        should_followup = False
-        if head_delegating and expected_workers:
-            missing = expected_workers - responded_workers
-            if not missing:
-                should_followup = True
-            else:
-                # Some workers haven't responded — still follow up so head can
-                # either wait, delegate to others, or finalize
-                logger.info("Otdel %s follow-up: %d workers still pending, asking head", otdel_id, len(missing))
-                should_followup = True
-        elif head_processed and workers_responded > 0 and not head_delegating:
+    # ONE follow-up: workers respond → head summarizes → DONE
+    should_followup = False
+    if head_delegating and expected_workers:
+        missing = expected_workers - responded_workers
+        if not missing:
             should_followup = True
+        else:
+            # Some workers haven't responded — still follow up so head can
+            # either wait, delegate to others, or finalize
+            logger.info("Otdel %s follow-up: %d workers still pending, asking head", otdel_id, len(missing))
+            should_followup = True
+    elif head_processed and workers_responded > 0 and not head_delegating:
+        should_followup = True
 
-        if not should_followup or processed_count >= max_iterations:
-            break
+    if should_followup and processed_count < max_iterations:
         history = _load_history(otdel_id)
         context_messages = _build_head_context(history, head_slug, exclude_last=False)
 
@@ -653,6 +663,8 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 "content": full_response,
                 "is_head": True,
                 "timestamp": datetime.now().isoformat(),
+                "model": model,
+                "provider": provider_name,
             }
             history.append(agent_msg)
             save_stats = _save_history(otdel_id, history)
@@ -682,77 +694,6 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                         if agent:
                             agent_queue.append((agent, False, ""))
                             logger.info("Otdel %s follow-up delegation: queueing %s", otdel_id, agent.get("name"))
-
-        # If head didn't call any tools in follow-up, retry once with stronger prompt
-        if followup_rounds > 0 and not tools_called:
-            retry_trigger = (
-                "Ты не вызвал head_delegate. Твоя задача — делегировать работу агентам через инструменты.\n"
-                "Если все задачи выполнены — напиши итог и заверши.\n"
-                "Если нужна дополнительная работа — вызови head_delegate."
-            )
-            messages.append(ChatMessage(role="user", content=retry_trigger))
-            followup_msg_id = f"r-{uuid.uuid4().hex[:8]}"
-            tools_called = []
-            try:
-                async for chunk in base_stream(
-                    provider_name=provider_name,
-                    messages=messages,
-                    model=model,
-                    temperature=head_agent.get("temperature", 0.7),
-                    max_tokens=head_agent.get("max_tokens", 4096),
-                    system_prompt=system_prompt,
-                    agent_name=head_name,
-                    agent_slug=head_slug,
-                    tool_names=tool_names,
-                    otdel_id=otdel_id,
-                ):
-                    try:
-                        payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
-                        msg_type = payload.get("type", "")
-                        if msg_type == "chunk":
-                            content = payload.get("content", "")
-                            if content:
-                                full_response += content
-                                await ws_manager.send(user_id, {
-                                    "type": "otdel:chunk",
-                                    "otdel_id": otdel_id,
-                                    "message_id": followup_msg_id,
-                                    "content": content,
-                                    "sender": head_slug,
-                                    "sender_name": head_name,
-                                    "is_head": True,
-                                })
-                        elif msg_type == "tool_start":
-                            tools_called.append(payload)
-                    except Exception:
-                        pass
-            except Exception as e:
-                logger.error("Head retry failed in otdel %s: %s", otdel_id, e)
-
-            # If still no tools called, auto-finalize
-            if not tools_called:
-                auto_msg = (
-                    "⚠️ Глава не ответила на повторный запрос. Задача не завершена автоматически.\n"
-                    "Пожалуйста, уточните задачу вручную."
-                )
-                await ws_manager.send(user_id, {
-                    "type": "otdel:chunk",
-                    "otdel_id": otdel_id,
-                    "message_id": f"sys-{uuid.uuid4().hex[:8]}",
-                    "content": auto_msg,
-                    "sender": "system",
-                    "sender_name": "Система",
-                    "is_head": False,
-                })
-                # Save auto-message to history
-                auto_history_entry = {
-                    "role": "assistant",
-                    "sender": "system",
-                    "content": auto_msg,
-                    "message_id": f"sys-{uuid.uuid4().hex[:8]}",
-                }
-                _append_history(otdel_id, auto_history_entry)
-                break
 
 
     # ── Second pass: process workers queued by follow-up delegations ──
@@ -834,6 +775,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 "sender": agent_slug_val, "sender_name": agent_name_val,
                 "content": full_response, "is_head": is_head,
                 "timestamp": datetime.now().isoformat(),
+                "model": model, "provider": provider_name,
             }
             history = _load_history(otdel_id)
             history.append(agent_msg)

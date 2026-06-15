@@ -34,7 +34,6 @@ function DraggableTab({ tab, isActive, onClick }: { tab: { id: string; label: st
 }
 
 interface SettingsPageProps {
-  onBack: () => void
   onAgentsChange?: () => void
   onDepartmentsChange?: () => void
 }
@@ -68,22 +67,12 @@ const SECTION_INFO: Record<Tab, { title: string; description: string }> = {
   kanban: { title: 'Канбан', description: 'Глобальная доска задач — настройки, автоматизация, архивация' },
 }
 
-export function SettingsPage({ onBack, onAgentsChange, onDepartmentsChange }: SettingsPageProps) {
+export function SettingsPage({ onAgentsChange, onDepartmentsChange }: SettingsPageProps) {
   const [activeTab, setActiveTab] = useState<Tab>('general')
-  const [visible, setVisible] = useState(false)
   const [activeModal, setActiveModal] = useState<string | null>(null)
   const [addingProvider, setAddingProvider] = useState<ProviderInfo | null>(null)
   const [editingProvider, setEditingProvider] = useState<ApiProvider | null>(null)
   const providersRef = useRef<{ refresh: () => void }>(null)
-
-  useEffect(() => {
-    requestAnimationFrame(() => setVisible(true))
-  }, [])
-
-  const handleBack = () => {
-    setVisible(false)
-    setTimeout(onBack, 300)
-  }
 
   const handleTabChange = (tab: Tab) => {
     setActiveTab(tab)
@@ -146,14 +135,9 @@ export function SettingsPage({ onBack, onAgentsChange, onDepartmentsChange }: Se
         )
       })()}
 
-      <div className={`settings-page ${visible ? 'visible' : ''}`}>
+      <div className="settings-page">
         {/* Header */}
         <div className="settings-top-bar">
-          <button className="nav-back-btn" onClick={handleBack}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
-          </button>
           <div className="settings-section-header">
             <h1 className="settings-section-title">{SECTION_INFO[activeTab].title}</h1>
             <p className="settings-section-desc">{SECTION_INFO[activeTab].description}</p>

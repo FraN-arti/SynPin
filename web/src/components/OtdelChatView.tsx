@@ -59,14 +59,13 @@ type WsOn = (type: string, handler: (data: any) => void) => () => void
 
 interface OtdelChatViewProps {
   otdel: OtdelData
-  onBack: () => void
   onOpenSettings: () => void
   wsSend: WsSend
   wsOn: WsOn
   wsConnected: boolean
 }
 
-export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: OtdelChatViewProps) {
+export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChatViewProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [agents, setAgents] = useState<Agent[]>([])
@@ -439,11 +438,6 @@ export function OtdelChatView({ otdel, onBack, onOpenSettings, wsSend, wsOn }: O
     <div className="otdel-chat-view">
       {/* Header */}
       <div className="otdel-chat-header">
-        <button className="nav-back-btn" onClick={onBack} title="Назад">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-        </button>
         <div className="otdel-header-info">
           <span className="otdel-header-dot" style={{ background: otdel.color }} />
           <div>

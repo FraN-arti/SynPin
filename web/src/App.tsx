@@ -159,8 +159,16 @@ function ToolTimeline({ tools, isLive, toolNames }: ToolTimelineProps) {
 }
 
 function App() {
-  const [page, setPage] = useState<'chat' | 'settings' | 'kanban'>('chat')
-  const [activeOtdelId, setActiveOtdelId] = useState<string | null>(null)
+  // Unified navigation: one state variable for everything in the
+  // central area. The sidebar is the only navigator — every "back"
+  // button was a workaround for having two navigation state variables
+  // (page + activeOtdelId) that could desync. Single source of truth.
+  type View =
+    | { type: 'chat' }
+    | { type: 'otdel'; id: string }
+    | { type: 'settings' }
+    | { type: 'kanban' }
+  const [view, setView] = useState<View>({ type: 'chat' })
   const [otdelSettingsOpen, setOtdelSettingsOpen] = useState(false)
   // null = not loaded yet (show skeleton), [] = loaded but empty chat
   const [messages, setMessages] = useState<Message[] | null>(null)
@@ -411,9 +419,9 @@ function App() {
     loadAgents()
   }, [])
 
-  // Load chat history when active agent changes OR when returning from otdel
+  // Load chat history when active agent changes OR when returning to chat view
   useEffect(() => {
-    if (!activeAgent || activeOtdelId) return  // skip if otdel is active
+    if (!activeAgent || view.type !== 'chat') return  // skip if not in chat view
     const loadHistory = async () => {
       try {
         const res = await fetch(`${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web`)
@@ -477,12 +485,12 @@ function App() {
       }
     }
     loadHistory()
-  }, [activeAgent])
+  }, [activeAgent, view])
 
   // ─── Polling: check for background task completion ──────────────────
-  // Only runs after page reload when a task was running (history has user without assistant)
+  // Load chat history when active agent changes OR when returning to chat view
   useEffect(() => {
-    if (!activeAgent) return
+    if (!activeAgent || view.type !== 'chat') return  // skip if not in chat view
 
     const pollInterval = setInterval(async () => {
       // Check for empty assistant placeholder using ref (always current)
@@ -522,7 +530,7 @@ function App() {
     }, 3000) // Poll every 3 seconds
 
     return () => clearInterval(pollInterval)
-  }, [activeAgent, activeOtdelId])
+  }, [activeAgent, view])
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -530,14 +538,19 @@ function App() {
     })
   }, [messages])
 
-  // Scroll to bottom when returning from settings to chat
+  // Scroll to bottom whenever the central area returns to chat view.
+  // Single dependency on `view` covers all "back" scenarios — leaving
+  // settings, kanban, or any otdel all funnel through setView({type:'chat'}).
   useEffect(() => {
-    if (page === 'chat') {
+    if (view.type === 'chat') {
+      // Double rAF: first waits for React render, second waits for DOM paint
       requestAnimationFrame(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+        requestAnimationFrame(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+        })
       })
     }
-  }, [page])
+  }, [view])
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value)
@@ -966,10 +979,10 @@ function App() {
           })()}
 
           <div className="sidebar-footer">
-            <button className={`settings-btn ${page === 'kanban' ? 'active' : ''}`} onClick={() => { setPage('kanban'); setActiveOtdelId(null) }}>
+            <button className={`settings-btn ${view.type === 'kanban' ? 'active' : ''}`} onClick={() => setView({ type: 'kanban' })}>
               <span>📋</span> Задачи
             </button>
-            <button className="settings-btn" onClick={() => setPage('settings')}>
+            <button className={`settings-btn ${view.type === 'settings' ? 'active' : ''}`} onClick={() => setView({ type: 'settings' })}>
               <span>⚙️</span> Настройки
             </button>
             <div className="version-bar">
@@ -995,8 +1008,8 @@ function App() {
             departments={sidebarDepartments}
             onRemove={removeWidget}
             isDragging={!!activeDragId}
-            onDepartmentClick={(id) => { setActiveOtdelId(id); setPage('chat') }}
-            activeOtdelId={activeOtdelId}
+            onDepartmentClick={(id) => setView({ type: 'otdel', id })}
+            activeOtdelId={view.type === 'otdel' ? view.id : null}
             wsOn={wsOn}
           />
           <main className="main-area">
@@ -1006,27 +1019,26 @@ function App() {
           // fade out + swap + fade in. First render skips the animation
           // (see PageTransition's isFirstRender ref).
           let pageKey: string
-          if (page === 'kanban') pageKey = 'kanban'
-          else if (page === 'settings') pageKey = 'settings'
-          else if (activeOtdelId) pageKey = `otdel-${activeOtdelId}`
+          if (view.type === 'kanban') pageKey = 'kanban'
+          else if (view.type === 'settings') pageKey = 'settings'
+          else if (view.type === 'otdel') pageKey = `otdel-${view.id}`
           else if (!agentsLoaded || (activeAgent && messages === null)) pageKey = 'chat-loading'
           else if (!activeAgent || !messages || messages.length === 0) pageKey = 'chat-empty'
           else pageKey = `chat-${activeAgent.slug}`
 
           let body: React.ReactNode
-          if (page === 'kanban') {
-            body = <KanbanBoard onBack={() => setPage('chat')} wsOn={wsOn} />
-          } else if (page === 'settings') {
-            body = <SettingsPage onBack={() => setPage('chat')} onAgentsChange={refreshAgents} onDepartmentsChange={refreshDepartments} />
-          } else if (activeOtdelId) {
-            const otdel = sidebarDepartments.find(d => d.id === activeOtdelId)
+          if (view.type === 'kanban') {
+            body = <KanbanBoard wsOn={wsOn} />
+          } else if (view.type === 'settings') {
+            body = <SettingsPage onAgentsChange={refreshAgents} onDepartmentsChange={refreshDepartments} />
+          } else if (view.type === 'otdel') {
+            const otdel = sidebarDepartments.find(d => d.id === view.id)
             if (otdel) {
               body = (
                 <>
                   <OtdelChatView
                     key={otdel.id}
                     otdel={{ ...otdel, otdelid: otdel.id }}
-                    onBack={() => setActiveOtdelId(null)}
                     onOpenSettings={() => setOtdelSettingsOpen(true)}
                     wsSend={wsSend}
                     wsOn={wsOn}
@@ -1114,8 +1126,8 @@ function App() {
             departments={sidebarDepartments}
             onRemove={removeWidget}
             isDragging={!!activeDragId}
-            onDepartmentClick={(id) => { setActiveOtdelId(id); setPage('chat') }}
-            activeOtdelId={activeOtdelId}
+            onDepartmentClick={(id) => setView({ type: 'otdel', id })}
+            activeOtdelId={view.type === 'otdel' ? view.id : null}
             wsOn={wsOn}
           />
         </div>

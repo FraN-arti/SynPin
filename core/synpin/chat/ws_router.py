@@ -348,7 +348,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         # Stream LLM response via WebSocket chunks
         agent_msg_id = f"a-{uuid.uuid4().hex[:8]}"
         full_response = ""
-        streaming = True
+        # Track tool calls made during streaming
         tools_called = []  # Track tool calls made during streaming
 
         # Notify client that this agent is thinking

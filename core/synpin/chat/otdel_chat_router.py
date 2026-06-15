@@ -422,7 +422,7 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
     
     # Start background task
     chat_task.task = asyncio.create_task(_process_agents())
-    
+
     # Return immediately — frontend polls for responses
     return {
         "ok": True,

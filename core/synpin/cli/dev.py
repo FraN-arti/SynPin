@@ -292,6 +292,7 @@ def _start_core(port: int) -> subprocess.Popen:
         "synpin.api.server:app",
         "--host", CORE_HOST,
         "--port", str(port),
+        "--reload",
         "--log-level", "info",
     ]
     return subprocess.Popen(

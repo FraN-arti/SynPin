@@ -1114,6 +1114,9 @@ async def stream_response(
                     yield f"data: {json.dumps(done_data)}\n\n"
                     return
 
+            with open("D:\\synpin\\stream_debug.log", "a", encoding="utf-8") as _df:
+                _df.write(f"[PHASE1-RESULT] iter={iteration} text_len={len(full_text)} tool_calls={len(model_tool_calls)}\n")
+
             # Execute all tool calls and collect results
             tool_results_for_msg = []  # For text fallback: [(name, result_text)]
 
@@ -1185,7 +1188,7 @@ async def stream_response(
                 non_tool_msgs = [m for m in chat_messages if m.role != "tool"]
                 chat_messages = non_tool_msgs + tool_msgs
 
-    # ── Phase 2: Stream final response ──
+    # ── Phase 2: Stream final text response ──
     # No tools in Phase 2 — tool loop already exhausted; stream text + usage only
     try:
         async for chunk in provider.chat(

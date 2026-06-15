@@ -467,12 +467,8 @@ function App() {
           }
 
           setMessages(restored)
-          // Scroll to bottom after history loads (double rAF ensures DOM is painted)
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
-            })
-          })
+          // Scroll is handled by the [messages, view, activeAgent] effect
+          // below — no need to scroll here, that effect fires on setMessages.
         } else {
           setMessages([])
         }
@@ -532,25 +528,18 @@ function App() {
     return () => clearInterval(pollInterval)
   }, [activeAgent, view])
 
+  // Scroll to bottom on any messages change (initial restore, new send,
+  // streaming chunk, return from settings, agent switch). This is the
+  // single source of truth — scroll fires only after messages is real.
   useEffect(() => {
+    if (view.type !== 'chat' || !activeAgent || !messages) return
+    // Double rAF: first waits for React render, second waits for DOM paint
     requestAnimationFrame(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
-    })
-  }, [messages])
-
-  // Scroll to bottom whenever the central area returns to chat view.
-  // Single dependency on `view` covers all "back" scenarios — leaving
-  // settings, kanban, or any otdel all funnel through setView({type:'chat'}).
-  useEffect(() => {
-    if (view.type === 'chat') {
-      // Double rAF: first waits for React render, second waits for DOM paint
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
-        })
+        messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
       })
-    }
-  }, [view])
+    })
+  }, [messages, view, activeAgent])
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value)

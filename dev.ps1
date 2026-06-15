@@ -133,7 +133,16 @@ switch -Regex ($args[0]) {
     }
     '^stop$|^--stop$' {
         Write-Host "Stopping SynPin Dev..." -ForegroundColor Yellow
-        & taskkill /F /FI "WINDOWTITLE eq SynPin Dev*" /T 2>$null
+        # Kill uvicorn and node processes on known ports (2088, 2099)
+        # without /T to avoid killing the batch file itself
+        $ports = @(2088, 2099)
+        foreach ($port in $ports) {
+            $conns = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue |
+                     Where-Object { $_.OwningProcess -gt 0 }
+            foreach ($conn in $conns) {
+                Stop-Process -Id $conn.OwningProcess -Force -ErrorAction SilentlyContinue
+            }
+        }
         Write-Host "Done." -ForegroundColor Green
     }
     '^doctor$' {

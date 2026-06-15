@@ -2125,7 +2125,7 @@ function AddFromCatalogModal({ provider, editProvider, onClose, onSaved }: {
     setError('')
     try {
       const body: Record<string, unknown> = {
-        name: isEdit ? editProvider!.name : key,
+        ...(isEdit ? {} : { name: key }),
         type: provider.type,
         base_url: provider.baseUrl,
         api_key: isNoAuth ? '' : (apiKey === '••••••••' ? '' : apiKey),
@@ -2619,7 +2619,7 @@ function AddProviderModal({ type, onClose, onSaved }: { type: 'openai' | 'anthro
 }
 
 function EditCustomProviderModal({ provider, onClose, onSaved }: { provider: ApiProvider; onClose: () => void; onSaved: () => void }) {
-  const [name, setName] = useState(provider.name)
+  const [name] = useState(provider.name)
   const [baseUrl, setBaseUrl] = useState(provider.base_url)
   const [model, setModel] = useState(provider.models.join(', '))
   const [apiKey, setApiKey] = useState('')
@@ -2636,7 +2636,6 @@ function EditCustomProviderModal({ provider, onClose, onSaved }: { provider: Api
     try {
       const models = model.split(',').map(m => m.trim()).filter(Boolean)
       const body: Record<string, unknown> = {
-        name: name,
         type: provider.type,
         base_url: baseUrl,
         api_key: apiKey || undefined,
@@ -2668,7 +2667,7 @@ function EditCustomProviderModal({ provider, onClose, onSaved }: { provider: Api
         <div className="settings-field">
           <label>Название</label>
           <input type="text" className="settings-input" value={name}
-            onChange={e => setName(e.target.value)} />
+            disabled />
         </div>
         <div className="settings-field">
           <label>Base URL</label>

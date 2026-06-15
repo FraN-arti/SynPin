@@ -1,8 +1,11 @@
 """Config manager for reading/writing YAML configuration files."""
 import yaml
 import os
+import threading
 from pathlib import Path
 from typing import Any
+
+_LOCK = threading.Lock()
 
 from ..paths_legacy import _get_config_dir as _get_config_dir  # re-export
 

@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="synpin.png" alt="SynPin" width="120" />
+<img src="synpin.png" alt="SynPin" width="400">
 
 **Команда ИИ-агентов, которая работает как настоящая организация.**
 

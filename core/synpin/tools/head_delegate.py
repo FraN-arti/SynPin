@@ -69,7 +69,7 @@ async def head_delegate(params: dict[str, Any]) -> ToolResult:
         f"Delegation {delegation_id} created. "
         f"Workers: {worker_names}. "
         f"Strategy: {strategy}. Timeout: {timeout_ms//1000}s. "
-        f"Now call head_await to wait for responses."
+        f"Workers will respond automatically — do NOT write 'waiting for response'."
     )
     
     return make_success(guidance)

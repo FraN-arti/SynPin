@@ -1114,9 +1114,6 @@ async def stream_response(
                     yield f"data: {json.dumps(done_data)}\n\n"
                     return
 
-            with open("D:\\synpin\\stream_debug.log", "a", encoding="utf-8") as _df:
-                _df.write(f"[PHASE1-RESULT] iter={iteration} text_len={len(full_text)} tool_calls={len(model_tool_calls)}\n")
-
             # Execute all tool calls and collect results
             tool_results_for_msg = []  # For text fallback: [(name, result_text)]
 

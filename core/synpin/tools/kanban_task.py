@@ -4,10 +4,14 @@ Tool for heads to create tasks, write history, reassign, complete, etc.
 """
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from typing import Any
 
 from .base import ToolResult, make_success, make_error
+
+# Configurable API base URL (defaults to standard dev port)
+_API_BASE = os.environ.get("SYNPIN_API_BASE", "http://127.0.0.1:2088")
 
 
 async def kanban_task(params: dict[str, Any]) -> ToolResult:
@@ -86,7 +90,7 @@ async def _create(params: dict[str, Any]) -> ToolResult:
         payload["deadline"] = deadline
 
     async with httpx.AsyncClient() as client:
-        res = await client.post("http://127.0.0.1:2088/api/kanban/tasks", json=payload)
+        res = await client.post(f"{_API_BASE}/api/kanban/tasks", json=payload)
         if res.status_code != 200:
             return make_error(f"Failed to create task: {res.text}")
         task = res.json()
@@ -126,7 +130,7 @@ async def _history(params: dict[str, Any]) -> ToolResult:
 
     async with httpx.AsyncClient() as client:
         res = await client.post(
-            f"http://127.0.0.1:2088/api/kanban/tasks/{task_id}/history",
+            f"{_API_BASE}/api/kanban/tasks/{task_id}/history",
             json={
                 "actor": params.get("actor", "head"),
                 "action": action,
@@ -172,7 +176,7 @@ async def _reassign(params: dict[str, Any]) -> ToolResult:
 
     async with httpx.AsyncClient() as client:
         res = await client.post(
-            f"http://127.0.0.1:2088/api/kanban/tasks/{task_id}/summon",
+            f"{_API_BASE}/api/kanban/tasks/{task_id}/summon",
             json={
                 "target_department": target,
                 "reason": reason,
@@ -219,7 +223,7 @@ async def _complete(params: dict[str, Any]) -> ToolResult:
     # Update status to done
     async with httpx.AsyncClient() as client:
         res = await client.patch(
-            f"http://127.0.0.1:2088/api/kanban/tasks/{task_id}",
+            f"{_API_BASE}/api/kanban/tasks/{task_id}",
             json={"status": "done"},
         )
         if res.status_code != 200:
@@ -264,7 +268,7 @@ async def _rework(params: dict[str, Any]) -> ToolResult:
     # Update status to revision
     async with httpx.AsyncClient() as client:
         res = await client.patch(
-            f"http://127.0.0.1:2088/api/kanban/tasks/{task_id}",
+            f"{_API_BASE}/api/kanban/tasks/{task_id}",
             json={"status": "revision"},
         )
         if res.status_code != 200:
@@ -294,7 +298,7 @@ async def _status(params: dict[str, Any]) -> ToolResult:
         return make_error("task_id required")
 
     async with httpx.AsyncClient() as client:
-        res = await client.get(f"http://127.0.0.1:2088/api/kanban/tasks/{task_id}")
+        res = await client.get(f"{_API_BASE}/api/kanban/tasks/{task_id}")
         if res.status_code != 200:
             return make_error(f"Task {task_id} not found")
         task = res.json()

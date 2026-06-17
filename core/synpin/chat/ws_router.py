@@ -360,6 +360,10 @@ async def _handle_otdel_send(user_id: str, msg: dict):
             "is_head": is_head,
         })
 
+        # Debug: log available tools for head
+        if is_head:
+            logger.info("Otdel %s HEAD tools available: %s", otdel_id, tool_names)
+
         try:
             from .router import stream_response as base_stream
             async for chunk in base_stream(
@@ -436,6 +440,11 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         ).strip()
         # If empty response but tools were called, generate a placeholder
         if not full_response and tools_called:
+            # Debug: log what tools were called
+            tool_names_called = [tc["name"] for tc in tools_called]
+            logger.info("Otdel %s HEAD called tools: %s (head_delegate present: %s)", 
+                       otdel_id, tool_names_called, "head_delegate" in tool_names_called)
+            
             # Build placeholder from tool calls
             delegate_targets = []
             for tc in tools_called:
@@ -452,6 +461,8 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 full_response = f"📋 Делегирую: {', '.join(delegate_targets)}"
             else:
                 full_response = "📋 Обрабатываю задачу..."
+                logger.warning("Otdel %s HEAD did NOT call head_delegate! Tools called: %s", 
+                              otdel_id, tool_names_called)
             # Send placeholder as chunk so frontend can display it
             await ws_manager.send(user_id, {
                 "type": "otdel:chunk",

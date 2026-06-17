@@ -405,8 +405,11 @@ def run_dev_server() -> None:
         sys.exit(0)
 
     signal.signal(signal.SIGINT, _shutdown)
-    if hasattr(signal, "SIGTERM"):
-        signal.signal(signal.SIGTERM, _shutdown)
+    # NOTE: Do NOT register SIGTERM handler — uvicorn reloader sends SIGTERM
+    # to restart the server process. Catching it here kills the reloader
+    # and shuts down everything instead of hot-reloading.
+    # if hasattr(signal, "SIGTERM"):
+    #     signal.signal(signal.SIGTERM, _shutdown)
 
     # Strip ANSI escapes from child process output on Windows legacy
     # conhost. Modern Windows Terminal / pty-aware hosts render them

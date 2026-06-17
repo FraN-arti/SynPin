@@ -383,7 +383,7 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                     system_prompt=system_prompt,
                     agent_name=head_name,
                     agent_slug=head_slug,
-                    tool_names=["head_delegate", "head_await", "head_evaluate", "head_retry", "head_decide"],
+                    tool_names=["head_delegate", "head_evaluate", "head_retry", "head_decide", "kanban_task"],
                     otdel_id=otdel_id,
                 ):
                     if '"type": "chunk"' in chunk:

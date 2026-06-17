@@ -425,7 +425,6 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
     setInput(prev => prev + emoji)
   }
 
-  const getAgentName = (slug: string) => agents.find(a => a.slug === slug)?.name || slug
 
   const isLeftSide = (msg: ChatMessage) => {
     return msg.role === 'user' || msg.sender === 'user' || msg.is_head === true
@@ -521,7 +520,6 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
               if (!hasContent && !hasTools) return null
               if (!hasValidSender && !hasContent) return null
               const left = isLeftSide(msg)
-              const senderName = msg.sender === 'user' ? 'Вы' : (msg.sender_name || getAgentName(msg.sender))
               const isHead = msg.is_head === true
               const isStreaming = msg.streaming === true
 
@@ -536,9 +534,6 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
                     {left ? '👤' : '🏢'}
                   </div>
                   <div className="otdel-msg-body">
-                    <div className={`otdel-msg-name ${left ? 'left' : 'right'} ${isHead ? 'head' : ''}`}>
-                      {senderName}
-                    </div>
                     <div
                       className={`otdel-msg-bubble ${left ? 'left' : 'right'} ${isHead ? 'head' : ''}`}
                       style={workerColor ? {

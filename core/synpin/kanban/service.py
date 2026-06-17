@@ -61,10 +61,10 @@ def _get_data_dir() -> Path:
     """Resolve kanban data directory (kanban uses its own subdirectory).
 
     Kanban's tasks live at <data>/tasks/, not at <data>/ itself, so
-    we can't reuse the general _get_data_dir from paths_legacy.
+    we use get_tasks_dir() from paths.py.
     """
-    from ..paths_legacy import _get_data_dir as _main_data_dir
-    dev = _main_data_dir() / "tasks"
+    from ..paths import get_tasks_dir
+    dev = get_tasks_dir()
     prod = Path.home() / ".synpin" / "data" / "tasks"
 
     if os.environ.get("SYNPIN_DEV") == "1":

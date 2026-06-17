@@ -7,7 +7,7 @@ from typing import Any
 
 _LOCK = threading.Lock()
 
-from ..paths_legacy import _get_config_dir as _get_config_dir  # re-export
+from ..paths import get_config_dir as _get_config_dir
 
 
 def _resolve_path(filename: str) -> Path:

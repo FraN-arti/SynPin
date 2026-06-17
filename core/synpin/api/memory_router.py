@@ -46,8 +46,8 @@ router = APIRouter(prefix="/api/memory", tags=["memory"])
 
 # ── Data Directory ───────────────────────────────────────────────────────
 
-# Use the same DATA_DIR as tools (paths_legacy)
-from ..paths_legacy import _get_data_dir_tools as _get_data_dir
+# Use the same DATA_DIR as tools (paths.py)
+from ..paths import get_data_dir as _get_data_dir
 
 DATA_DIR: Path = _get_data_dir()
 

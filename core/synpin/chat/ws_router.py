@@ -465,8 +465,6 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 full_response = f"📋 Делегирую: {', '.join(delegate_targets)}"
             else:
                 full_response = "📋 Обрабатываю задачу..."
-                logger.warning("Otdel %s HEAD did NOT call head_delegate! Tools called: %s", 
-                              otdel_id, tool_names_called)
             # Send placeholder as chunk so frontend can display it
             await ws_manager.send(user_id, {
                 "type": "otdel:chunk",

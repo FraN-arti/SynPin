@@ -1,0 +1,317 @@
+/* === Number input — hide the up/down spinners === */
+/* SynPin uses number inputs for things like "auto-archive days"
+ * in the Kanban settings. The native spinners look out of place
+ * in our toolbar UI and overlap with our custom design. Hide
+ * them in WebKit (Chrome, Edge, Safari) and Firefox. The user
+ * can still type a number directly or use arrow keys. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield; /* Firefox */
+}
+
+/* === Page Transition (unified fade for page/tab swaps) === */
+/* Opacity-only by design. transform-based page transitions caused
+   "throb" bugs in this app (scrollbar visibility flips when
+   translateY resolves). opacity composites on the GPU, no reflow.
+
+   NB: do NOT use `display: contents` here. `display: contents` makes
+   the element transparent to layout, but the browser also ignores
+   `opacity`, `animation`, `transform`, etc. on such elements (the
+   properties only apply to actual rendered boxes). We need a real
+   box for the fade to actually render.
+
+   Timing values must match the constants in PageTransition.tsx
+   (FADE_OUT_MS, FADE_IN_MS). Mismatch causes a visible "stuck at
+   opacity 0" gap. */
+.page-transition {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0; /* let the flex child shrink inside overflow: auto parents */
+}
+.page-transition[data-phase="in"] {
+  animation: pageFadeIn 150ms ease-out;
+}
+.page-transition[data-phase="out"] {
+  animation: pageFadeOut 200ms ease-out;
+  pointer-events: none; /* don't let users click into fading-out content */
+}
+@keyframes pageFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes pageFadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* === Chat Skeleton (loading state) === */
+/* Reserves the chat's layout (messages-area + bottom-input) so the
+   real content swap doesn't shift the page. Empty on purpose: no
+   placeholder bars, no shimmer. The user sees a brief "still loading"
+   then the actual chat. */
+.chat-skeleton {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+/* Inside the skeleton, center the loading spinner vertically in the
+   available messages-area space rather than letting it sit near the top. */
+.chat-skeleton .messages-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* === Picker Menu (portal-based search/select) === */
+/* Used by NewTaskModal: dept picker, tag picker. Replaces the
+   inline-positioned .kanban-dept-dropdown and .tag-picker-popup
+   that were getting clipped by .kanban-modal's overflow +
+   backdrop-filter. Same global fix as DropdownMenu. */
+.picker-menu-root {
+  position: relative;
+}
+.picker-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-card, #1a1a2e);
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: var(--radius);
+  color: var(--text, #fff);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+  text-align: left;
+}
+.picker-trigger:hover {
+  border-color: var(--accent, #f97316);
+}
+.picker-trigger.open {
+  border-color: var(--accent, #f97316);
+  box-shadow: 0 0 0 1px var(--accent, #f97316);
+}
+.picker-trigger.has-value {
+  color: var(--text, #fff);
+}
+.picker-trigger:not(.has-value) .picker-trigger-text {
+  color: var(--text-dim, rgba(255,255,255,0.5));
+}
+.picker-trigger-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.picker-arrow {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.picker-menu {
+  background: var(--bg-card, #1a1a2e);
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: var(--radius);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  max-height: 240px;
+  display: flex;
+  flex-direction: column;
+  animation: pickerMenuIn 0.15s ease-out;
+  overflow: hidden;
+}
+.picker-menu[data-placement="top"] {
+  animation-name: pickerMenuInTop;
+}
+@keyframes pickerMenuIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pickerMenuInTop {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.picker-search-wrap {
+  padding: 8px;
+  border-bottom: 1px solid var(--border, rgba(255,255,255,0.1));
+  flex-shrink: 0;
+}
+.picker-search {
+  width: 100%;
+  padding: 6px 10px;
+  background: var(--bg-secondary, #2a2a3e);
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: 6px;
+  color: var(--text, #fff);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+.picker-search:focus {
+  border-color: var(--accent, #f97316);
+}
+.picker-options {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px;
+}
+.picker-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text, #fff);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  text-align: left;
+}
+.picker-option:hover:not(.disabled) {
+  background: var(--bg-hover, rgba(255,255,255,0.05));
+  color: var(--accent, #f97316);
+}
+.picker-option.active {
+  color: var(--accent, #f97316);
+  font-weight: 500;
+}
+.picker-option.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.picker-option-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.picker-option-badge {
+  font-size: 9px;
+  opacity: 0.7;
+}
+.picker-check {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border, rgba(255,255,255,0.2));
+  border-radius: 3px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: transparent;
+  background: transparent;
+  transition: all 0.1s ease;
+}
+.picker-check.checked {
+  background: var(--accent, #f97316);
+  border-color: var(--accent, #f97316);
+  color: #fff;
+}
+.picker-empty {
+  padding: 16px 12px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+/* ─── Loading Spinner (Neural Pulse) ─────────────────────── */
+/* Reusable centered spinner for any loading state. */
+.loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 40px 20px;
+  min-height: 120px;
+}
+
+.loading-ring {
+  position: relative;
+  width: 44px;
+  height: 44px;
+}
+
+.loading-ring::before,
+.loading-ring::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+/* Outer ring — rotates */
+.loading-ring::before {
+  border: 2px solid transparent;
+  border-top-color: var(--accent, #f97316);
+  border-right-color: color-mix(in srgb, var(--accent, #f97316) 40%, transparent);
+  animation: spinner-rotate 1.2s linear infinite;
+}
+
+/* Inner glow — pulses */
+.loading-ring::after {
+  border: 2px solid transparent;
+  border-bottom-color: var(--accent, #f97316);
+  border-left-color: color-mix(in srgb, var(--accent, #f97316) 40%, transparent);
+  animation: spinner-rotate 1.2s linear infinite reverse;
+  filter: blur(1px);
+}
+
+/* Soft ambient glow behind the ring */
+.loading-ring-glow {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent, #f97316) 15%, transparent) 0%, transparent 70%);
+  animation: spinner-pulse 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.loading-text {
+  font-size: 13px;
+  color: var(--text-muted, rgba(255,255,255,0.4));
+  letter-spacing: 0.02em;
+  animation: spinner-text-pulse 2s ease-in-out infinite;
+}
+
+@keyframes spinner-rotate {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spinner-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+@keyframes spinner-text-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+/* ─── Widget scroll + loading ─────────────────────────────── */
+.widget-card-body {
+  padding: 4px 0;
+}
+.widget-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  min-height: 80px;
+}

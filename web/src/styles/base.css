@@ -1,0 +1,175 @@
+/* === Base === */
+:root {
+  --orange: #f97316;
+  --orange-hover: #ea580c;
+  --orange-muted: rgba(249, 115, 22, 0.1);
+  --accent: #f97316;
+  --accent-bg: rgba(249, 115, 22, 0.1);
+  --accent-glow: rgba(249, 115, 22, 0.4);
+  --black: #07070d;
+  --gray-950: #07070d;
+  --gray-900: rgba(20, 20, 32, 0.7);
+  --gray-800: rgba(30, 30, 48, 0.5);
+  --gray-700: rgba(55, 55, 75, 0.5);
+  --gray-600: #525252;
+  --gray-500: #737373;
+  --gray-400: #a3a3a3;
+  --gray-300: #d4d4d4;
+  --white: rgba(250, 250, 250, 0.87);
+  --text: rgba(250, 250, 250, 0.87);
+  --bg-elevated: rgba(15, 15, 28, 0.6);
+  --radius: 8px;
+  --bg-card: rgba(15, 15, 28, 0.5);
+  --bg-hover: rgba(35, 35, 55, 0.6);
+  --border: rgba(255, 255, 255, 0.06);
+  --text-dim: rgba(255, 255, 255, 0.4);
+  --text-secondary: rgba(255, 255, 255, 0.55);
+  /* Glassmorphism */
+  --glass-bg: rgba(15, 15, 28, 0.55);
+  --glass-bg-heavy: rgba(10, 10, 20, 0.75);
+  --agent-overlay-bg: rgba(10, 10, 20, 0.92);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-blur: 20px;
+  /* Glow */
+  --glow-orange: 0 0 20px rgba(249, 115, 22, 0.15), 0 0 40px rgba(249, 115, 22, 0.05);
+  --glow-orange-strong: 0 0 15px rgba(249, 115, 22, 0.25), 0 0 45px rgba(249, 115, 22, 0.1);
+  --glow-border: rgba(249, 115, 22, 0.2);
+}
+
+/* Light Theme */
+.light-theme {
+  --orange: #ea580c;
+  --orange-hover: #c2410c;
+  --orange-muted: rgba(234, 88, 12, 0.1);
+  --accent: #ea580c;
+  --accent-bg: rgba(234, 88, 12, 0.1);
+  --accent-glow: rgba(234, 88, 12, 0.4);
+  --black: #faf8f5;
+  --gray-950: #faf8f5;
+  --gray-900: rgba(245, 243, 240, 0.85);
+  --gray-800: rgba(235, 232, 228, 0.7);
+  --gray-700: rgba(210, 206, 200, 0.6);
+  --gray-600: #a3a3a3;
+  --gray-500: #737373;
+  --gray-400: #525252;
+  --gray-300: #262626;
+  --white: #1a1a1a;
+  --text: rgba(26, 26, 26, 0.87);
+  --bg-elevated: rgba(255, 255, 255, 0.7);
+  --bg-card: rgba(255, 255, 255, 0.6);
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --border: rgba(0, 0, 0, 0.08);
+  --text-dim: rgba(0, 0, 0, 0.35);
+  --text-secondary: rgba(0, 0, 0, 0.5);
+  /* Glassmorphism — light */
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-bg-heavy: rgba(255, 255, 255, 0.8);
+  --agent-overlay-bg: rgba(255, 255, 255, 0.92);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --glass-blur: 20px;
+  /* Glow — softer for light */
+  --glow-orange: 0 0 15px rgba(234, 88, 12, 0.08), 0 0 30px rgba(234, 88, 12, 0.03);
+  --glow-orange-strong: 0 0 12px rgba(234, 88, 12, 0.12), 0 0 35px rgba(234, 88, 12, 0.05);
+  --glow-border: rgba(234, 88, 12, 0.25);
+}
+
+/* OLED Theme - pure black */
+.oled-theme {
+  --black: #000000;
+  --gray-950: #000000;
+  --gray-900: rgba(5, 5, 5, 0.95);
+  --gray-800: rgba(15, 15, 15, 0.9);
+  --glass-bg: rgba(5, 5, 5, 0.9);
+  --glass-bg-heavy: rgba(0, 0, 0, 0.95);
+  --agent-overlay-bg: rgba(0, 0, 0, 0.97);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--black);
+  color: var(--white);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* === Animated Background — deep space + neural network === */
+.app-container {
+  display: flex;
+  height: 100vh;
+  color: var(--white);
+  overflow: hidden;
+  position: relative;
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 90%, var(--orange-muted) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 50% at 90% 10%, var(--glow-border) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 40% at 50% 50%, var(--black) 0%, transparent 70%),
+    linear-gradient(170deg, var(--black) 0%, var(--glass-bg-heavy) 30%, var(--glass-bg) 60%, var(--black) 100%);
+}
+
+/* Subtle grid pattern overlay */
+.app-container::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 1px 1px, var(--glass-border) 1px, transparent 0);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Floating gradient orbs — ambient life */
+.app-container::after {
+  content: '';
+  position: fixed;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--orange-muted) 0%, transparent 70%);
+  top: -200px;
+  right: -100px;
+  pointer-events: none;
+  z-index: 0;
+  animation: orb-float 20s ease-in-out infinite alternate;
+}
+
+@keyframes orb-float {
+  0% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+  50% { transform: translate(-80px, 60px) scale(1.15); opacity: 0.9; }
+  100% { transform: translate(30px, -40px) scale(0.9); opacity: 0.5; }
+}
+
+/* === Light Theme Overrides for Background & Pseudo-elements === */
+.light-theme .app-container::before {
+  background-image:
+    radial-gradient(circle at 1px 1px, var(--glass-border) 1px, transparent 0);
+}
+
+.light-theme .app-container::after {
+  background: radial-gradient(circle, var(--orange-muted) 0%, transparent 70%);
+}
+
+/* Light theme modal — more opaque white glass */
+.light-theme .modal-content {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* === OLED Theme Overrides === */
+.oled-theme .app-container {
+  background: #000000;
+}
+
+.oled-theme .app-container::before {
+  background-image: none;
+}
+
+.oled-theme .app-container::after {
+  background: radial-gradient(circle, rgba(249, 115, 22, 0.02) 0%, transparent 70%);
+}
+

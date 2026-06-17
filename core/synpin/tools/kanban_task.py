@@ -20,6 +20,7 @@ async def kanban_task(params: dict[str, Any]) -> ToolResult:
 
     Commands:
       create   — create a new task
+      list     — list tasks for your department
       history  — write a history entry
       reassign — transfer to another department
       complete — mark task as done
@@ -32,11 +33,13 @@ async def kanban_task(params: dict[str, Any]) -> ToolResult:
     """
     command = params.get("command", "")
     if not command:
-        return make_error("command required: create, history, reassign, complete, rework, status")
+        return make_error("command required: create, list, history, reassign, complete, rework, status")
 
     try:
         if command == "create":
             return await _create(params)
+        elif command == "list":
+            return await _list(params)
         elif command == "history":
             return await _history(params)
         elif command == "reassign":
@@ -73,7 +76,7 @@ async def _create(params: dict[str, Any]) -> ToolResult:
     if not title:
         return make_error("title required")
 
-    department = params.get("department", "")
+    department = params.get("department", "") or params.get("otdel_id", "")
     if not department:
         return make_error("department required (department ID)")
 
@@ -99,6 +102,59 @@ async def _create(params: dict[str, Any]) -> ToolResult:
         "task_id": task["id"],
         "status": task["status"],
         "message": f"Task created in column '{task['status']}'",
+    })
+
+
+# ── list ────────────────────────────────────────────────────────────────
+
+async def _list(params: dict[str, Any]) -> ToolResult:
+    """
+    List tasks for a department.
+
+    Params:
+      department: str (optional) — department ID (otdel slug).
+                  Falls back to otdel_id (auto-injected by system for head agents).
+      status: str (optional) — filter by status (backlog/todo/in_progress/review/done/blocked)
+    """
+    import httpx
+
+    # Accept both 'department' and 'otdel_id' (system-injected for head agents)
+    department = params.get("department", "") or params.get("otdel_id", "")
+    if not department:
+        return make_error("department required (department ID / otdel slug)")
+
+    status_filter = params.get("status", "")
+
+    async with httpx.AsyncClient() as client:
+        res = await client.get(f"{_API_BASE}/api/kanban/tasks/board")
+        if res.status_code != 200:
+            return make_error(f"Failed to get tasks: {res.text}")
+
+        board = res.json()
+
+    # Collect tasks for this department
+    tasks = []
+    for status_key, status_tasks in board.items():
+        if isinstance(status_tasks, list):
+            for t in status_tasks:
+                if t.get("department") == department or t.get("current_department") == department:
+                    if status_filter and status_key != status_filter:
+                        continue
+                    tasks.append({
+                        "id": t.get("id", ""),
+                        "title": t.get("title", ""),
+                        "status": status_key,
+                        "priority": t.get("priority", "medium"),
+                        "assigned_head": t.get("assigned_head"),
+                    })
+
+    if not tasks:
+        return make_success({"tasks": [], "message": f"No tasks found for department {department}"})
+
+    return make_success({
+        "tasks": tasks,
+        "count": len(tasks),
+        "department": department,
     })
 
 

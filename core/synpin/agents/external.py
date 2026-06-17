@@ -1,4 +1,5 @@
 """External agents — detection and management of external agent integrations."""
+import os
 import httpx
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,8 @@ EXTERNAL_AGENT_REGISTRY: list[dict[str, Any]] = [
         "default_department": "dev",
         "icon_letter": "H",
         "color": "#f97316",
+        "api_key_env": "HERMES_API_SERVER_KEY",  # env var name for the API key
+        "api_key_default": "change-me-local-dev",  # fallback if env not set
     },
 ]
 
@@ -49,9 +52,13 @@ async def detect_external_agents() -> list[dict[str, Any]]:
 
                     # Get available models
                     try:
+                        api_key = os.environ.get(
+                            agent_def.get("api_key_env", ""),
+                            agent_def.get("api_key_default", ""),
+                        )
                         models_resp = await client.get(
                             agent_def["models_url"],
-                            headers={"Authorization": "Bearer test"},
+                            headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
                         )
                         if models_resp.status_code == 200:
                             models_data = models_resp.json()

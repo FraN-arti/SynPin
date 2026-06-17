@@ -112,6 +112,10 @@ app.include_router(agents_router)
 from .external_agents_router import router as external_agents_router
 app.include_router(external_agents_router)
 
+# Connections — inter-department relationships
+from .connections_router import router as connections_router
+app.include_router(connections_router)
+
 # Hermes Agent chat proxy
 from .hermes_chat_router import router as hermes_chat_router
 app.include_router(hermes_chat_router)
@@ -148,6 +152,7 @@ app.include_router(version_router)
 import asyncio
 from ..kanban.service import set_ws_loop
 from ..kanban.config import set_config_broadcast
+from ..connections.service import set_ws_loop as set_connections_ws_loop
 # Hooks that wire up async-loop-dependent state. We attempt to do
 # this eagerly at import time (fast happy path) and fall back to
 # on_event('startup') if no loop is running yet. Both branches
@@ -159,6 +164,7 @@ from ..kanban.config import set_config_broadcast
 try:
     loop = asyncio.get_running_loop()
     set_ws_loop(loop)
+    set_connections_ws_loop(loop)
 except RuntimeError:
     # No loop at import time — register a startup hook to set one up
     # when uvicorn starts the app.
@@ -166,6 +172,7 @@ except RuntimeError:
     def _setup_kanban_ws():
         loop = asyncio.get_event_loop()
         set_ws_loop(loop)
+        set_connections_ws_loop(loop)
         # Wire up config broadcast
         async def _broadcast(event: dict):
             from ..chat.ws_manager import ws_manager
@@ -225,6 +232,46 @@ def _start_auto_delete():
             console.print("  [auto-delete] no event loop yet, worker will start on next request")
     except Exception as e:
         console.print(f"  [auto-delete] failed to start: {e}")
+
+
+@app.on_event("startup")
+def _start_deadline_checker():
+    """Start the background deadline checker.
+
+    Every 5 minutes (or DEADLINE_CHECK_INTERVAL_S env var) checks
+    all tasks with deadlines. Warns at <1h remaining, auto-escalates
+    overdue tasks to BLOCKED.
+    """
+    try:
+        from ..kanban.service import KanbanService
+        from ..kanban.deadline import schedule_deadline_checker
+        svc = KanbanService()
+        task = schedule_deadline_checker(svc)
+        if task:
+            console.print("  [deadline] checker running (default 5min, override via DEADLINE_CHECK_INTERVAL_S)")
+        else:
+            console.print("  [deadline] no event loop yet, checker will start on next request")
+    except Exception as e:
+        console.print(f"  [deadline] failed to start: {e}")
+
+
+@app.on_event("startup")
+def _start_auto_escalation():
+    """Start the background auto-escalation worker.
+
+    Every 5 minutes (or AUTO_ESCALATION_INTERVAL_S env var) checks
+    connections with auto_trigger configured. Escalates blocked tasks
+    to parent departments after timeout.
+    """
+    try:
+        from ..connections.auto_escalation import schedule_auto_escalation
+        task = schedule_auto_escalation()
+        if task:
+            console.print("  [auto-escalation] worker running (default 5min, override via AUTO_ESCALATION_INTERVAL_S)")
+        else:
+            console.print("  [auto-escalation] no event loop yet, worker will start on next request")
+    except Exception as e:
+        console.print(f"  [auto-escalation] failed to start: {e}")
 
 
 @app.post("/api/admin/reload")

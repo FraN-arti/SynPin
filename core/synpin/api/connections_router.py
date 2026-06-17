@@ -1,0 +1,169 @@
+"""REST API for connections — CRUD, graph, escalation, history."""
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+from ._base import BaseRequest
+from ..connections import service as svc
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/api/connections", tags=["connections"])
+
+
+# ── Request models ───────────────────────────────────────────────────────────
+
+class ConnectionCreate(BaseRequest):
+    from_otdel: str
+    to_otdel: str
+    type: str = "peer"
+    label: str = ""
+    description: str = ""
+    auto_trigger: dict[str, Any] | None = None
+
+
+class ConnectionUpdate(BaseRequest):
+    label: str | None = None
+    description: str | None = None
+    active: bool | None = None
+    type: str | None = None
+    auto_trigger: dict[str, Any] | None = None
+
+
+class EscalationCreate(BaseRequest):
+    task_id: str
+    from_otdel: str
+    to_otdel: str | None = None
+    reason: str = ""
+    report: str = ""
+
+
+class EscalationComplete(BaseRequest):
+    resolution: str = ""
+
+
+class PositionsUpdate(BaseRequest):
+    positions: dict[str, dict[str, float]]
+    viewport: dict[str, float] | None = None
+
+
+# ── Endpoints ────────────────────────────────────────────────────────────────
+
+@router.get("")
+async def list_connections():
+    """List all connections."""
+    connections = svc.list_connections()
+    return {"connections": [svc._conn_to_dict(c) for c in connections]}
+
+
+@router.post("")
+async def create_connection(req: ConnectionCreate):
+    """Create a new connection."""
+    try:
+        conn = svc.create_connection(
+            from_otdel=req.from_otdel,
+            to_otdel=req.to_otdel,
+            conn_type=req.type,
+            label=req.label,
+            description=req.description,
+            auto_trigger=req.auto_trigger,
+        )
+        return svc._conn_to_dict(conn)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.get("/graph")
+async def get_graph():
+    """Get graph for React Flow rendering."""
+    graph = svc.build_graph()
+    return {
+        "nodes": [{"id": n.id, "type": n.type, "position": {"x": n.position.x, "y": n.position.y}, "data": n.data} for n in graph.nodes],
+        "edges": [{"id": e.id, "source": e.source, "target": e.target, "type": e.type, "label": e.label, "animated": e.animated, "data": e.data} for e in graph.edges],
+    }
+
+
+@router.get("/history")
+async def get_history(
+    task_id: str | None = None,
+    from_otdel: str | None = None,
+    to_otdel: str | None = None,
+    status: str | None = None,
+):
+    """Get escalation history with optional filters."""
+    records = svc.list_history(task_id=task_id, from_otdel=from_otdel, to_otdel=to_otdel, status=status)
+    return {"history": [
+        {
+            "id": r.id,
+            "task_id": r.task_id,
+            "from": r.from_otdel,
+            "to": r.to_otdel,
+            "connection_id": r.connection_id,
+            "reason": r.reason,
+            "report": r.report,
+            "status": r.status.value,
+            "timestamp": r.timestamp.isoformat(),
+            "resolved_at": r.resolved_at.isoformat() if r.resolved_at else None,
+            "resolution": r.resolution,
+        }
+        for r in records
+    ]}
+
+
+@router.put("/positions")
+async def update_positions(req: PositionsUpdate):
+    """Save canvas node positions."""
+    svc.save_positions(req.positions, req.viewport)
+    return {"ok": True}
+
+
+@router.post("/escalate")
+async def escalate(req: EscalationCreate):
+    """Escalate a task to another department."""
+    record = svc.escalate_task(
+        task_id=req.task_id,
+        from_otdel=req.from_otdel,
+        to_otdel=req.to_otdel,
+        reason=req.reason,
+        report=req.report,
+    )
+    if not record:
+        raise HTTPException(404, "No escalation connection found between these departments")
+    return {
+        "id": record.id,
+        "task_id": record.task_id,
+        "from": record.from_otdel,
+        "to": record.to_otdel,
+        "status": record.status.value,
+    }
+
+
+@router.put("/{conn_id}")
+async def update_connection(conn_id: str, req: ConnectionUpdate):
+    """Update a connection."""
+    updates = req.model_dump(exclude_none=True)
+    conn = svc.update_connection(conn_id, updates)
+    if not conn:
+        raise HTTPException(404, f"Connection not found: {conn_id}")
+    return svc._conn_to_dict(conn)
+
+
+@router.delete("/{conn_id}")
+async def delete_connection(conn_id: str):
+    """Delete a connection (Clean Delete)."""
+    ok = svc.delete_connection(conn_id)
+    if not ok:
+        raise HTTPException(404, f"Connection not found: {conn_id}")
+    return {"ok": True}
+
+
+@router.put("/history/{escalation_id}/complete")
+async def complete_escalation(escalation_id: str, req: EscalationComplete):
+    """Mark an escalation as completed."""
+    ok = svc.complete_escalation(escalation_id, req.resolution)
+    if not ok:
+        raise HTTPException(404, f"Escalation not found: {escalation_id}")
+    return {"ok": True}

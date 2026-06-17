@@ -32,7 +32,7 @@ HERMES_API_KEY = ""  # Will be loaded from config
 # History storage — Hermes keeps long history for context continuity
 MAX_HISTORY_MESSAGES = 1000  # Large limit — Hermes manages its own context
 
-from ..paths_legacy import _get_data_dir as _get_data_dir  # re-export
+from ..paths import get_data_dir as _get_data_dir
 
 
 def _get_history_path(agent_slug: str, channel_id: str):
@@ -76,6 +76,8 @@ class HermesChatRequest(BaseRequest):
     agent_name: str | None = None
     agent_slug: str | None = None  # For history persistence
     channel_id: str | None = None  # For history persistence
+    model: str | None = None       # Model identifier (e.g. "hermes-agent")
+    provider: str | None = None    # Provider name (e.g. "9router")
 
 
 def _get_hermes_key() -> str:

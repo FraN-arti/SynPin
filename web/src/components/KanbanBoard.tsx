@@ -155,9 +155,18 @@ function DraggableTaskCard({
         <span className="kanban-card-title">{task.title}</span>
       </div>
       {deptName && <div className="kanban-card-dept">{deptName}</div>}
-      {task.deadline && (
-        <div className="kanban-card-deadline">⏰ {formatDate(task.deadline)}</div>
-      )}
+      {task.deadline && (() => {
+        const deadlineDate = new Date(task.deadline)
+        const now = new Date()
+        const hoursLeft = (deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60)
+        const isOverdue = hoursLeft < 0
+        const isUrgent = hoursLeft >= 0 && hoursLeft < 1
+        const deadlineClass = isOverdue ? 'kanban-card-deadline overdue' : isUrgent ? 'kanban-card-deadline urgent' : 'kanban-card-deadline'
+        const icon = isOverdue ? '🚨' : isUrgent ? '⚠️' : '⏰'
+        return (
+          <div className={deadlineClass}>{icon} {formatDate(task.deadline)}</div>
+        )
+      })()}
     </div>
   )
 }
@@ -419,12 +428,23 @@ export function KanbanBoard({ wsOn }: KanbanBoardProps) {
     const unsub5 = wsOn('kanban:widget_updated', () => {
       loadWidgetConfig()
     })
+    // Deadline notifications
+    const unsub6 = wsOn('kanban:deadline_warning', (data: { task_id: string; title: string; minutes_left: number }) => {
+      console.warn(`[kanban] ⏰ Deadline approaching: "${data.title}" — ${data.minutes_left} min left`)
+      loadBoard()
+    })
+    const unsub7 = wsOn('kanban:deadline_overdue', (data: { task_id: string; title: string; overdue_hours: number }) => {
+      console.error(`[kanban] 🚨 Deadline OVERDUE: "${data.title}" — ${data.overdue_hours}h overdue, escalated to blocked`)
+      loadBoard()
+    })
     return () => {
       unsub1()
       unsub2()
       unsub3()
       unsub4()
       unsub5()
+      unsub6()
+      unsub7()
     }
   }, [wsOn, loadBoard, loadColumns, loadLabels, loadWidgetConfig])
 

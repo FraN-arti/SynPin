@@ -247,6 +247,23 @@ def project_root() -> Path:
     return _PROJECT_ROOT
 
 
+# ---------------------------------------------------------------------------
+# Optional variants — return None when the directory doesn't exist.
+# Used by session_reset.py which must not crash on a missing data dir.
+# ---------------------------------------------------------------------------
+
+def get_data_dir_or_none() -> Path | None:
+    """Like get_data_dir() but returns None if the directory doesn't exist."""
+    p = get_data_dir()
+    return p if p.exists() else None
+
+
+def get_config_dir_or_none() -> Path | None:
+    """Like get_config_dir() but returns None if the directory doesn't exist."""
+    p = get_config_dir()
+    return p if p.exists() else None
+
+
 # Re-export for older callers that imported a private symbol
 __all__ = [
     "is_dev_mode",
@@ -262,5 +279,7 @@ __all__ = [
     "get_templates_dir",
     "get_logs_dir",
     "get_cache_dir",
+    "get_data_dir_or_none",
+    "get_config_dir_or_none",
     "project_root",
 ]

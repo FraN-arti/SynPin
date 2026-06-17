@@ -411,6 +411,31 @@ def run_dev_server() -> None:
     # if hasattr(signal, "SIGTERM"):
     #     signal.signal(signal.SIGTERM, _shutdown)
 
+    # --- SIGINT handler: ignore if uvicorn is reloading ----------------
+    # uvicorn's reloader sends SIGINT (signum=2) to the parent process
+    # when it restarts the worker. The default _shutdown handler kills
+    # everything, breaking hot-reload. Instead, we check if the core
+    # port is still alive — if yes, it's a reload and we swallow the
+    # signal. If the port is down, it's a real Ctrl+C and we shut down.
+
+    def _sigint_handler(signum: int, frame) -> None:
+        """Handle SIGINT: real Ctrl+C = shutdown, uvicorn reload = ignore."""
+        import socket as _sock
+        try:
+            with _sock.socket(_sock.AF_INET, _sock.SOCK_STREAM) as s:
+                s.settimeout(0.5)
+                alive = s.connect_ex(("127.0.0.1", core_port)) == 0
+        except OSError:
+            alive = False
+        if alive:
+            # Port is still up — this is a uvicorn reload signal, not Ctrl+C
+            console.print("[dim](SIGINT during reload — ignored)[/dim]")
+            return
+        # Port is down — real shutdown
+        _shutdown(signum, frame)
+
+    signal.signal(signal.SIGINT, _sigint_handler)
+
     # Strip ANSI escapes from child process output on Windows legacy
     # conhost. Modern Windows Terminal / pty-aware hosts render them
     # correctly, so we set this conservatively: on Unix we leave them
@@ -441,14 +466,64 @@ def run_dev_server() -> None:
     console.print()
 
     # Wait for any process to exit, or for shutdown
+    # When uvicorn --reload restarts, the core process may exit and a
+    # new one spawns on the same port. We detect reload by checking if
+    # the port is still being served, rather than relying on poll().
+    core_reloaded = False
+    core_exit_time: float | None = None
+    CORE_RELOAD_GRACE_S = 10.0  # uvicorn reload typically takes <5s
+
+    def _port_alive(port: int) -> bool:
+        """Check if something is listening on the given port."""
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(0.5)
+                return s.connect_ex(("127.0.0.1", port)) == 0
+        except OSError:
+            return False
+
     try:
         while not printer_stop.is_set():
             for proc in processes:
                 if proc.poll() is not None:
-                    console.print(
-                        f"[error]❌  {('Core' if proc is core_proc else 'Web')} exited with code {proc.returncode}[/error]"
-                    )
+                    if proc is core_proc and not core_reloaded:
+                        # Core exited — might be a reload.
+                        if core_exit_time is None:
+                            core_exit_time = time.time()
+                        # Check if port is still being served (uvicorn reloaded)
+                        if _port_alive(core_port):
+                            console.print("[success]Core reloaded — watching port for further changes.[/success]")
+                            core_reloaded = True
+                            continue
+                        # Port is down — check grace period
+                        if time.time() - core_exit_time > CORE_RELOAD_GRACE_S:
+                            console.print(
+                                f"[error]❌  Core exited with code {proc.returncode} (port {core_port} down for >{CORE_RELOAD_GRACE_S}s)[/error]"
+                            )
+                            _shutdown()
+                        # else: still waiting for reload
+                    elif proc is not core_proc:
+                        console.print(
+                            f"[error]❌  Web exited with code {proc.returncode}[/error]"
+                        )
+                        _shutdown()
+                    # If core_reloaded is True, skip poll — we monitor port instead
+
+            # After first reload, monitor the port for subsequent reloads/crashes
+            if core_reloaded and not _port_alive(core_port):
+                # Port went down — might be another reload cycle
+                # Wait grace period to see if it comes back
+                grace_start = time.time()
+                while time.time() - grace_start < CORE_RELOAD_GRACE_S:
+                    if _port_alive(core_port):
+                        console.print("[success]Core reloaded again.[/success]")
+                        break
+                    time.sleep(0.5)
+                else:
+                    # Grace period expired — port still down = real crash
+                    console.print(f"[error]❌  Core port {core_port} is down (real crash, not reload).[/error]")
                     _shutdown()
+
             time.sleep(0.5)
     except KeyboardInterrupt:
         _shutdown()

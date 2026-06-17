@@ -5,7 +5,7 @@ Built-in tool: always enabled, not shown in agent UI.
 from pathlib import Path
 from typing import Any
 
-from ..paths_legacy import _get_data_dir_tools as _get_data_dir
+from ..paths import get_data_dir as _get_data_dir
 
 
 async def memory_read(params: dict[str, Any]) -> dict[str, Any]:

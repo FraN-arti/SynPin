@@ -2,17 +2,7 @@
 chcp 65001 >nul 2>&1
 cd /d "%~dp0"
 
-REM First-time use: run install.ps1 to set up the Python venv, install
-REM the synpin-core package in editable mode, and pull web deps. dev.bat
-REM assumes that setup has been run; if you see "No module named synpin"
-REM at startup, run install.ps1 first.
-REM
-REM This .bat is a thin wrapper around dev.ps1. We use PowerShell
-REM because it supports ANSI VT processing natively (cmd does not),
-REM which is what Vite/Rich output needs to render in color instead of
-REM emitting raw [32m[1mVITE[22m... escape sequences. If you prefer to skip
-REM the .bat and call dev.ps1 directly, that works too.
-
+if /i "%~1"=="" goto :run
 if /i "%~1"=="stop" goto :stop
 if /i "%~1"=="--stop" goto :stop
 if /i "%~1"=="doctor" goto :doctor
@@ -26,18 +16,16 @@ echo.
 echo   Starting SynPin Development...
 echo.
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0dev.ps1" %*
-goto :end
+exit /b %ERRORLEVEL%
 
 :stop
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0dev.ps1" stop
-goto :end
+exit /b %ERRORLEVEL%
 
 :doctor
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0dev.ps1" doctor
-goto :end
+exit /b %ERRORLEVEL%
 
 :help
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0dev.ps1" help
-goto :end
-
-:end
+exit /b %ERRORLEVEL%

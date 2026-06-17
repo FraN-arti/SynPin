@@ -31,7 +31,7 @@ MAX_TOOL_ITERATIONS = 5
 # Max messages to keep in history per channel
 MAX_HISTORY_MESSAGES = 100
 
-from ..paths_legacy import _get_data_dir as _get_data_dir  # re-export
+from ..paths import get_data_dir as _get_data_dir
 
 
 def _get_history_path(agent_slug: str, channel_id: str) -> Path | None:
@@ -337,10 +337,14 @@ def _load_memory_block(agent_slug: str) -> str:
             "- memory_write(action='add', target='memory', content='...') — save your own notes\n"
             "- memory_write(action='add', target='user', content='...') — save info about the user\n"
             "- memory_read(target='memory'/'user'/'facts') — recall saved information\n\n"
-            "When to save to USER (about the user):\n"
-            "- Only when the user explicitly shares personal info (name, role, preferences)\n"
-            "- Or when they say 'remember this' / 'запомни'\n"
-            "- Do NOT save on every message — be selective\n\n"
+            "When to save to USER (about the user — ONLY about the human you're talking to):\n"
+            "- Only when the user explicitly shares personal info about THEMSELVES (name, role, preferences, timezone)\n"
+            "- Or when they say 'remember this' / 'запомни' about themselves\n"
+            "- Do NOT save task descriptions, delegation requests, or work items here\n"
+            "- Do NOT save info about other agents or departments here\n"
+            "- Do NOT save on every message — be selective\n"
+            "- WRONG: 'QA Инженер просит написать шутки' → this is a task, use target='memory'\n"
+            "- RIGHT: 'Имя: Артур. Роль: разработчик.' → this IS about the user\n\n"
             "When to save to MEMORY (your notes):\n"
             "- Important decisions and their reasoning\n"
             "- Errors encountered and how they were fixed\n"
@@ -798,18 +802,18 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
         "type": "function",
         "function": {
             "name": "kanban_task",
-            "description": "Работа с канбан-тасками: создание, запись истории, переназначение, закрытие, доработка, статус.",
+            "description": "Работа с канбан-тасками: список задач отдела, создание, запись истории, переназначение, закрытие, доработка, статус.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "command": {
                         "type": "string",
-                        "enum": ["create", "history", "reassign", "complete", "rework", "status"],
-                        "description": "Команда: create=создать, history=история, reassign=переназначить, complete=завершить, rework=доработка, status=статус",
+                        "enum": ["create", "list", "history", "reassign", "complete", "rework", "status"],
+                        "description": "Команда: list=список задач отдела, create=создать, history=история, reassign=переназначить, complete=завершить, rework=доработка, status=статус",
                     },
                     "task_id": {
                         "type": "string",
-                        "description": "ID таска (T-001, T-002, ...)",
+                        "description": "ID таска (T-001, T-002, ...) — для status/history/complete/rework",
                     },
                     "title": {
                         "type": "string",
@@ -821,7 +825,7 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
                     },
                     "department": {
                         "type": "string",
-                        "description": "ID отдела (для create)",
+                        "description": "ID отдела (для create; для list необязательно — система автоматически подставляет ваш отдел. Для create тоже можно не указывать если вы в отделе)",
                     },
                     "priority": {
                         "type": "string",
@@ -1204,6 +1208,7 @@ async def stream_response(
                     tool_calls=model_tool_calls,
                 )
                 chat_messages.append(assistant_msg)
+
                 # Tool results were already appended in the loop above — need to reorder
                 # Move tool messages after assistant by rebuilding the list
                 # Find and reposition tool messages

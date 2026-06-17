@@ -1,0 +1,135 @@
+"""Head Protocol: Escalate tasks to other departments via connections."""
+from __future__ import annotations
+
+from typing import Any
+
+from .base import ToolResult, make_success, make_error
+
+
+async def head_escalate(params: dict[str, Any]) -> ToolResult:
+    """
+    Escalate a task to another department through a connection.
+
+    Params:
+        otdel_id: str (injected by execute_tool) — current department
+        task_id: str (required) — kanban task ID (T-xxx)
+        target_otdel: str (optional) — target department slug.
+                      If omitted, auto-detects escalation connection.
+        reason: str (required) — why escalating
+        report: str (optional) — detailed report for target department
+
+    Returns:
+        {escalation_id, from, to, task_id, status, message}
+    """
+    otdel_id = params.get("otdel_id")
+    if not otdel_id:
+        return make_error("otdel_id required (should be injected by system)")
+
+    task_id = params.get("task_id", "")
+    if not task_id:
+        return make_error("task_id required (e.g. 'T-001')")
+
+    reason = params.get("reason", "")
+    if not reason:
+        return make_error("reason required — explain why you're escalating")
+
+    target_otdel = params.get("target_otdel") or None
+    report = params.get("report", "")
+
+    try:
+        from ..connections.service import escalate_task
+
+        record = escalate_task(
+            task_id=task_id,
+            from_otdel=otdel_id,
+            to_otdel=target_otdel,
+            reason=reason,
+            report=report,
+        )
+
+        if not record:
+            # Find available connections for better error message
+            from ..connections.config import load_connections
+            from ..connections.models import ConnectionType
+            connections = load_connections()
+            available = [
+                c.to_otdel for c in connections
+                if c.from_otdel == otdel_id and c.type == ConnectionType.ESCALATION and c.active
+            ]
+            if available:
+                return make_error(
+                    f"No escalation connection to '{target_otdel}'. "
+                    f"Available targets from {otdel_id}: {available}"
+                )
+            else:
+                return make_error(
+                    f"No escalation connections from {otdel_id}. "
+                    f"Create a connection in Settings → Связи first."
+                )
+
+        return make_success({
+            "escalation_id": record.id,
+            "from": record.from_otdel,
+            "to": record.to_otdel,
+            "task_id": record.task_id,
+            "status": record.status.value,
+            "message": (
+                f"Task {task_id} escalated from {record.from_otdel} to {record.to_otdel}. "
+                f"Reason: {reason}"
+            ),
+        })
+
+    except Exception as e:
+        return make_error(f"Escalation failed: {e}")
+
+
+async def head_escalation_status(params: dict[str, Any]) -> ToolResult:
+    """
+    Check escalation status or list recent escalations.
+
+    Params:
+        otdel_id: str (injected by execute_tool)
+        task_id: str (optional) — filter by task
+        status: str (optional) — filter by status (pending/completed/rejected)
+
+    Returns:
+        {escalations: [...]}
+    """
+    otdel_id = params.get("otdel_id")
+    if not otdel_id:
+        return make_error("otdel_id required (should be injected by system)")
+
+    task_id = params.get("task_id") or None
+    status = params.get("status") or None
+
+    try:
+        from ..connections.service import list_history
+
+        records = list_history(
+            task_id=task_id,
+            from_otdel=otdel_id,
+            status=status,
+        )
+
+        escalations = [
+            {
+                "id": r.id,
+                "task_id": r.task_id,
+                "from": r.from_otdel,
+                "to": r.to_otdel,
+                "reason": r.reason,
+                "status": r.status.value,
+                "timestamp": r.timestamp.isoformat(),
+                "resolved_at": r.resolved_at.isoformat() if r.resolved_at else None,
+                "resolution": r.resolution,
+            }
+            for r in records
+        ]
+
+        return make_success({"escalations": escalations})
+
+    except Exception as e:
+        return make_error(f"Failed to get escalation status: {e}")
+
+
+__all__ = ["head_escalate", "head_escalation_status"]

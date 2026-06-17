@@ -31,10 +31,10 @@ def _is_hash_id(value: str) -> bool:
     return len(value) == 12 and all(c in string.ascii_lowercase + string.digits for c in value)
 
 
-from ..paths_legacy import (
-    _get_config_dir as _get_config_dir,
-    _get_agents_dir as _get_agents_dir,
-    _get_otdels_dir as _get_otdels_dir,
+from ..paths import (
+    get_config_dir as _get_config_dir,
+    get_agents_dir as _get_agents_dir,
+    get_otdels_dir as _get_otdels_dir,
 )
 
 

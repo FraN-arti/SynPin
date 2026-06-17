@@ -112,7 +112,7 @@ def _get_config_dir() -> Path:
     mode it sits at core/synpin/kanban/config/ to keep the project's
     kanban config in version control; in prod it's ~/.synpin/config/kanban/.
     """
-    from ..paths_legacy import _get_config_dir as _main_config_dir
+    from ..paths import get_config_dir as _main_config_dir
     prod = _main_config_dir() / "kanban"
     dev = Path(__file__).resolve().parent / "config"
 

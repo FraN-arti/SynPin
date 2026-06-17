@@ -39,6 +39,7 @@ from .head_evaluate import head_evaluate
 from .head_retry import head_retry
 from .head_decide import head_decide
 from .head_block import head_block
+from .head_escalate import head_escalate, head_escalation_status
 from .kanban_task import kanban_task
 
 # Registry dict mapping tool names to handler functions (loaded lazily)
@@ -68,6 +69,8 @@ def get_tool_registry() -> dict[str, ToolHandler]:
             "head_retry": head_retry,
             "head_decide": head_decide,
             "head_block": head_block,
+            "head_escalate": head_escalate,
+            "head_escalation_status": head_escalation_status,
             "kanban_task": kanban_task,
         }
     return _tool_handlers
@@ -94,6 +97,8 @@ __all__ = [
     "head_await",
     "head_evaluate",
     "head_retry",
-    "head_decide",
+    "head_block",
+    "head_escalate",
+    "head_escalation_status",
     "kanban_task",
 ]

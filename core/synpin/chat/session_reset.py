@@ -27,9 +27,9 @@ logger = logging.getLogger(__name__)
 _last_reset: dict[str, float] = {}
 
 
-from ..paths_legacy import (
-    _get_data_dir_or_none_session_reset as _get_data_dir,
-    _get_config_dir_or_none_session_reset as _get_config_dir,
+from ..paths import (
+    get_data_dir_or_none as _get_data_dir,
+    get_config_dir_or_none as _get_config_dir,
 )
 
 

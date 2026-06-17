@@ -18,7 +18,7 @@ USER_CHAR_LIMIT = 1375
 
 DELIM = "\n§\n"
 
-from ..paths_legacy import _get_data_dir_tools as _get_data_dir
+from ..paths import get_data_dir as _get_data_dir
 
 
 def _read_entries(path: Path) -> list[str]:

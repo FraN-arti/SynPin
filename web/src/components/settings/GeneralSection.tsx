@@ -1,0 +1,360 @@
+/**
+ * General settings section — server, UI, themes, models, feed.
+ * Extracted from SettingsPage.tsx (lines 270-820).
+ */
+
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { API_BASE } from '../../config'
+import { SettingsCard } from '../SettingsCard'
+import { DropdownMenu as CustomDropdown } from '../DropdownMenu'
+import { LoadingSpinner } from '../LoadingSpinner'
+import { Toggle } from './Toggle'
+import type { SettingsData, OverviewStats } from './types'
+
+export function GeneralSection() {
+  const [settings, setSettings] = useState<SettingsData | null>(null)
+  const [overview, setOverview] = useState<OverviewStats | null>(null)
+  const [availableModels, setAvailableModels] = useState<{ provider: string; model: string }[]>([])
+  const [customThemes, setCustomThemes] = useState<{ id: string; name: string; source_url: string; dark?: Record<string, string>; light?: Record<string, string>; raw?: { light: Record<string, string>; dark: Record<string, string> } }[]>([])
+  const [tweakcnUrl, setTweakcnUrl] = useState('')
+  const [tweakcnLoading, setTweakcnLoading] = useState(false)
+  const [tweakcnError, setTweakcnError] = useState('')
+  const [tweakcnSuccess, setTweakcnSuccess] = useState('')
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/config/settings`).then(r => r.ok ? r.json() : null).then(data => { if (data) setSettings(data) }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/providers`).then(r => r.ok ? r.json() : null).then(data => {
+      if (data?.providers) {
+        const models: { provider: string; model: string }[] = []
+        for (const p of data.providers) { for (const m of (p.models || [])) { models.push({ provider: p.name, model: m }) } }
+        setAvailableModels(models)
+      }
+    }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/stats/overview`).then(r => r.ok ? r.json() : null).then(data => { if (data) setOverview(data) }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/themes/tweakcn/list`).then(r => r.ok ? r.json() : null).then(data => { if (data?.themes) setCustomThemes(data.themes) }).catch(() => {})
+  }, [])
+
+  const tweakcnVarsRef = useRef<Record<string, string> | null>(null)
+
+  const applyThemeLocally = useCallback(async (theme: string, cnThemes?: typeof customThemes, directVars?: Record<string, string>) => {
+    const root = document.documentElement
+    root.classList.remove('light-theme', 'dark-theme', 'oled-theme')
+
+    const existingVars = root.style
+    for (let i = existingVars.length - 1; i >= 0; i--) {
+      const prop = existingVars[i]
+      if (prop && prop.startsWith('--')) { root.style.removeProperty(prop) }
+    }
+
+    const themeCache: { name: string; vars?: Record<string, string> } = { name: theme }
+
+    if (theme === 'dark') {
+      // Default dark
+    } else if (theme === 'dark-oled') {
+      root.classList.add('oled-theme')
+    } else if (theme === 'light') {
+      root.classList.add('light-theme')
+    } else if (theme === 'tweakcn') {
+      root.classList.add('dark-theme')
+      let vars = directVars
+      if (!vars) {
+        const themes = cnThemes || customThemes
+        const current = themes.find(t => t.id === 'current') || themes[0]
+        if (current) vars = current.dark || current.light
+      }
+      if (!vars && tweakcnVarsRef.current) { vars = tweakcnVarsRef.current }
+      if (!vars) {
+        try {
+          const res = await fetch(`${API_BASE}/api/themes/tweakcn/list`)
+          if (res.ok) { const data = await res.json(); const saved = data?.themes?.[0]; if (saved) vars = saved.dark || saved.light }
+        } catch {}
+      }
+      if (vars) {
+        Object.entries(vars).forEach(([key, value]) => { root.style.setProperty(key, value as string) })
+        themeCache.vars = vars as Record<string, string>
+        tweakcnVarsRef.current = vars as Record<string, string>
+      }
+    }
+
+    localStorage.setItem('synpin_theme', JSON.stringify(themeCache))
+  }, [customThemes])
+
+  const saveSettings = useCallback((patch: Partial<SettingsData>) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(async () => {
+      try {
+        await fetch(`${API_BASE}/api/config/settings`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+        })
+      } catch {}
+    }, 400)
+  }, [])
+
+  const updateServer = useCallback((key: string, value: unknown) => {
+    setSettings(prev => prev ? { ...prev, server: { ...prev.server, [key]: value } } : prev)
+    saveSettings({ server: { [key]: value } } as unknown as Partial<SettingsData>)
+  }, [saveSettings])
+
+  const updateUI = useCallback((path: string, value: string | boolean | number) => {
+    setSettings(prev => {
+      if (!prev) return prev
+      const ui = { ...prev.ui }
+      if (path.startsWith('chat.')) {
+        const key = path.slice(5) as keyof typeof ui.chat
+        ui.chat = { ...ui.chat, [key]: value }
+      } else if (path.startsWith('sidebar.')) {
+        const key = path.slice(8) as keyof typeof ui.sidebar
+        ui.sidebar = { ...ui.sidebar, [key]: value }
+      } else {
+        ;(ui as Record<string, unknown>)[path] = value
+      }
+      if (path === 'theme') { applyThemeLocally(value as string) }
+      return { ...prev, ui }
+    })
+    const parts = path.split('.')
+    if (parts.length === 1) {
+      saveSettings({ ui: { [path]: value } } as unknown as Partial<SettingsData>)
+    } else {
+      const key0 = parts[0]!
+      const key1 = parts[1]!
+      saveSettings({ ui: { [key0]: { [key1]: value } } } as unknown as Partial<SettingsData>)
+    }
+  }, [saveSettings, applyThemeLocally])
+
+  const updateModels = useCallback((key: string, value: string) => {
+    setSettings(prev => prev ? { ...prev, models: { ...prev.models, [key]: value } } : prev)
+    saveSettings({ models: { [key]: value } } as unknown as Partial<SettingsData>)
+  }, [saveSettings])
+
+  const updateFeed = useCallback((key: string, value: string | number | boolean) => {
+    setSettings(prev => {
+      if (!prev) return prev
+      const feed = { ...prev.feed }
+      if (key.startsWith('filters.')) {
+        const fkey = key.slice(8) as keyof typeof feed.filters
+        feed.filters = { ...feed.filters, [fkey]: value as boolean }
+      } else {
+        ;(feed as Record<string, unknown>)[key] = value
+      }
+      return { ...prev, feed }
+    })
+    if (key.startsWith('filters.')) {
+      saveSettings({ feed: { filters: { [key.slice(8)]: value } } } as unknown as Partial<SettingsData>)
+    } else {
+      saveSettings({ feed: { [key]: value } } as unknown as Partial<SettingsData>)
+    }
+  }, [saveSettings])
+
+  const handleTweakcnImport = useCallback(async () => {
+    if (!tweakcnUrl.trim()) return
+    setTweakcnLoading(true); setTweakcnError(''); setTweakcnSuccess('')
+    try {
+      const res = await fetch(`${API_BASE}/api/themes/tweakcn/import`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: tweakcnUrl.trim() }),
+      })
+      if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Failed to import theme') }
+      const data = await res.json()
+      const saveRes = await fetch(`${API_BASE}/api/themes/tweakcn/save`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: 'current', name: data.name, url: data.source_url, light: data.light, dark: data.dark, raw: data.raw }),
+      })
+      if (!saveRes.ok) throw new Error('Failed to save theme')
+      applyThemeLocally('tweakcn', [{ id: 'current', name: data.name, dark: data.dark, light: data.light } as Record<string, unknown> as typeof customThemes[number]])
+      const listRes = await fetch(`${API_BASE}/api/themes/tweakcn/list`)
+      if (listRes.ok) { const listData = await listRes.json(); if (listData?.themes) setCustomThemes(listData.themes) }
+      setTweakcnSuccess(`Тема "${data.name}" загружена и применена!`)
+      setTweakcnUrl('')
+      setTimeout(() => setTweakcnSuccess(''), 3000)
+    } catch (err: unknown) {
+      setTweakcnError((err as Error).message || 'Ошибка при загрузке темы')
+    } finally { setTweakcnLoading(false) }
+  }, [tweakcnUrl, applyThemeLocally])
+
+  if (!settings) { return <LoadingSpinner text="Загрузка..." /> }
+
+  return (
+    <div className="general-settings">
+      {/* Обзор системы */}
+      <SettingsCard title="Обзор системы">
+        <div className="stats-summary">
+          <div className="stats-card">
+            <span className="stats-card-value">{overview?.agents ?? '—'}</span>
+            <span className="stats-card-label">Агентов</span>
+            <span className="stats-card-detail">{overview?.agents_internal ?? 0} внутр. + {overview?.agents_external ?? 0} внешн.</span>
+          </div>
+          <div className="stats-card">
+            <span className="stats-card-value">{overview?.total_messages ?? '—'}</span>
+            <span className="stats-card-label">Сообщений</span>
+            <span className="stats-card-detail">{overview?.total_sessions ?? 0} сессий</span>
+          </div>
+          <div className="stats-card">
+            <span className="stats-card-value">{overview?.config_files ?? '—'}</span>
+            <span className="stats-card-label">Конфигов</span>
+            <span className="stats-card-detail">YAML файлов</span>
+          </div>
+          <div className="stats-card">
+            <span className="stats-card-value">{overview?.uptime ?? '—'}</span>
+            <span className="stats-card-label">Аптайм</span>
+            <span className="stats-card-detail">с момента запуска</span>
+          </div>
+        </div>
+      </SettingsCard>
+
+      <SettingsCard title="Сервер" badge="требует перезапуск" disabled>
+        <div className="settings-row-2">
+          <div className="settings-field">
+            <label>Хост</label>
+            <input type="text" className="settings-input" value={settings.server.host} onChange={e => updateServer('host', e.target.value)} />
+          </div>
+          <div className="settings-field">
+            <label>Порт API</label>
+            <input type="number" className="settings-input" value={settings.server.port} onChange={e => updateServer('port', parseInt(e.target.value) || 2088)} />
+          </div>
+        </div>
+        <div className="settings-row-2">
+          <div className="settings-field">
+            <label>Порт Dev (Vite)</label>
+            <input type="number" className="settings-input" value={settings.server.dev_port} onChange={e => updateServer('dev_port', parseInt(e.target.value) || 2099)} />
+          </div>
+          <div className="settings-field">
+            <label>Rate Limit (req/min)</label>
+            <input type="number" className="settings-input" value={settings.server.rate_limit?.requests_per_minute ?? 60}
+              onChange={e => updateServer('rate_limit', { enabled: settings.server.rate_limit?.enabled ?? true, requests_per_minute: parseInt(e.target.value) || 60 })} />
+          </div>
+        </div>
+        <Toggle label="Rate Limiting" checked={settings.server.rate_limit?.enabled ?? true}
+          onChange={v => updateServer('rate_limit', { enabled: v, requests_per_minute: settings.server.rate_limit?.requests_per_minute ?? 60 })} />
+      </SettingsCard>
+
+      <div className="settings-row-2">
+        <SettingsCard title="Интерфейс">
+          <div className="settings-row-2">
+            <div className="settings-field">
+              <label>Тема</label>
+              <CustomDropdown value={settings.ui.theme} onChange={v => updateUI('theme', v)} options={[
+                { value: 'dark', label: 'Тёмная' }, { value: 'dark-oled', label: 'Тёмная (OLED)' },
+                { value: 'light', label: 'Светлая' }, { value: 'tweakcn', label: 'TweakCN' },
+              ]} />
+            </div>
+            <div className="settings-field" style={{ opacity: 0.5 }}>
+              <label>Язык <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>🚧 скоро</span></label>
+              <CustomDropdown value={settings.ui.language} onChange={() => {}} options={[
+                { value: 'ru', label: 'Русский' }, { value: 'en', label: 'English' },
+              ]} disabled />
+            </div>
+          </div>
+          {settings.ui.theme !== 'tweakcn' && (
+            <>
+              <div className="settings-divider-thin" />
+              <div className="settings-field">
+                <label>Скругление углов: <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{settings.ui.border_radius ?? 8}px</span></label>
+                <div className="radius-slider-row">
+                  <span className="radius-label">1px</span>
+                  <input type="range" min={1} max={20} value={settings.ui.border_radius ?? 8}
+                    onChange={e => { const val = parseInt(e.target.value); updateUI('border_radius', val); document.documentElement.style.setProperty('--radius', `${val}px`) }}
+                    className="radius-slider" />
+                  <span className="radius-label">20px</span>
+                </div>
+              </div>
+            </>
+          )}
+          {settings.ui.theme === 'tweakcn' && (
+            <div className="tweakcn-section">
+              <div className="settings-divider-thin" />
+              <h3 className="settings-subsection-title">TweakCN Theme</h3>
+              <div className="tweakcn-input-row">
+                <input type="text" className="settings-input" placeholder="https://tweakcn.com/themes/..."
+                  value={tweakcnUrl} onChange={e => setTweakcnUrl(e.target.value)} disabled={tweakcnLoading} />
+                <button className="settings-btn-primary" onClick={handleTweakcnImport} disabled={tweakcnLoading || !tweakcnUrl.trim()}>
+                  {tweakcnLoading ? 'Загрузка...' : 'Сохранить'}
+                </button>
+              </div>
+              {tweakcnError && <div className="tweakcn-error">{tweakcnError}</div>}
+              {tweakcnSuccess && <div className="tweakcn-success">{tweakcnSuccess}</div>}
+              {customThemes.length > 0 && customThemes[0] && (
+                <div className="tweakcn-saved-info"><span className="tweakcn-saved-label">Текущая тема: {customThemes[0].name}</span></div>
+              )}
+            </div>
+          )}
+        </SettingsCard>
+
+        <SettingsCard title="Настройка моделей" badge="скоро" disabled description="Модели для специализированных задач">
+          <div className="settings-field">
+            <label>Визион (анализ изображений)</label>
+            <CustomDropdown value={settings.models?.vision || ''} onChange={v => updateModels('vision', v)}
+              options={[{ value: '', label: 'Не настроено' }, ...availableModels.map(m => ({ value: `${m.provider}/${m.model}`, label: `${m.model} (${m.provider})` }))]} />
+          </div>
+          <div className="settings-field">
+            <label>Генерация изображений</label>
+            <CustomDropdown value={settings.models?.image_gen || ''} onChange={v => updateModels('image_gen', v)}
+              options={[{ value: '', label: 'Не настроено' }, ...availableModels.map(m => ({ value: `${m.provider}/${m.model}`, label: `${m.model} (${m.provider})` }))]} />
+          </div>
+          <div className="settings-field">
+            <label>Веб-поиск</label>
+            <CustomDropdown value={settings.models?.web_search || ''} onChange={v => updateModels('web_search', v)}
+              options={[{ value: '', label: 'Не настроено' }, ...availableModels.map(m => ({ value: `${m.provider}/${m.model}`, label: `${m.model} (${m.provider})` }))]} />
+          </div>
+          <div className="settings-field">
+            <label>Веб-экстракт</label>
+            <CustomDropdown value={settings.models?.web_extract || ''} onChange={v => updateModels('web_extract', v)}
+              options={[{ value: '', label: 'Не настроено' }, ...availableModels.map(m => ({ value: `${m.provider}/${m.model}`, label: `${m.model} (${m.provider})` }))]} />
+          </div>
+          <div className="settings-field">
+            <label>Суммаризация</label>
+            <CustomDropdown value={settings.models?.summarization || ''} onChange={v => updateModels('summarization', v)}
+              options={[{ value: '', label: 'Не настроено' }, ...availableModels.map(m => ({ value: `${m.provider}/${m.model}`, label: `${m.model} (${m.provider})` }))]} />
+          </div>
+        </SettingsCard>
+      </div>
+
+      {/* Лента активности */}
+      <SettingsCard title="Лента активности" badge="скоро" disabled>
+        <div className="settings-row-2">
+          <div className="settings-field">
+            <label>Макс. записей</label>
+            <input type="number" className="settings-input" value={settings.feed.max_items} onChange={e => updateFeed('max_items', parseInt(e.target.value) || 50)} />
+          </div>
+          <div className="settings-field">
+            <label>Период</label>
+            <CustomDropdown value={settings.feed.time_range} onChange={v => updateFeed('time_range', v)} options={[
+              { value: '1h', label: '1 час' }, { value: '6h', label: '6 часов' }, { value: '24h', label: '24 часа' },
+              { value: '7d', label: '7 дней' }, { value: '30d', label: '30 дней' },
+            ]} />
+          </div>
+        </div>
+        <Toggle label="Лента включена" checked={settings.feed.enabled} onChange={v => updateFeed('enabled', v)} />
+        <div className="settings-divider-thin" />
+        <h3 className="settings-subsection-title">Фильтры</h3>
+        <Toggle label="Новые идеи" checked={settings.feed.filters.new_ideas} onChange={v => updateFeed('filters.new_ideas', v)} />
+        <Toggle label="Обновления задач" checked={settings.feed.filters.task_updates} onChange={v => updateFeed('filters.task_updates', v)} />
+        <Toggle label="Обновления памяти" checked={settings.feed.filters.memory_updates} onChange={v => updateFeed('filters.memory_updates', v)} />
+        <Toggle label="Обновления канбана" checked={settings.feed.filters.board_updates} onChange={v => updateFeed('filters.board_updates', v)} />
+        <div className="settings-divider-thin" />
+        <div className="settings-row-2">
+          <div className="settings-field">
+            <label>Сортировка</label>
+            <CustomDropdown value={settings.feed.sort} onChange={v => updateFeed('sort', v)} options={[
+              { value: 'newest', label: 'Сначала новые' }, { value: 'oldest', label: 'Сначала старые' },
+            ]} />
+          </div>
+          <div className="settings-field">
+            <label>Группировка</label>
+            <CustomDropdown value={settings.feed.group_by} onChange={v => updateFeed('group_by', v)} options={[
+              { value: 'none', label: 'Без группировки' }, { value: 'department', label: 'По отделу' }, { value: 'type', label: 'По типу' },
+            ]} />
+          </div>
+        </div>
+      </SettingsCard>
+    </div>
+  )
+}

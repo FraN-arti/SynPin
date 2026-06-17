@@ -235,16 +235,16 @@ function Install-PythonDeps {
 }
 
 function Install-WebDeps {
-    if (Test-Path "web/node_modules") {
-        Step "Web dependencies already installed (web/node_modules exists). Skipping."
-        return
-    }
     $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
     if ($null -eq $npmCmd) {
         Warn "npm not available, skipping web install. Run 'npm install' in web/ manually."
         return
     }
-    Step "Installing web dependencies (npm install in web/)"
+    if (Test-Path "web/node_modules") {
+        Step "Web dependencies exist — checking for updates..."
+    } else {
+        Step "Installing web dependencies (npm install in web/)"
+    }
     Push-Location web
     & npm install --no-fund --no-audit
     Pop-Location

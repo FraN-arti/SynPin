@@ -20,6 +20,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["ws"])
 
+# Worker retry settings
+MAX_WORKER_RETRY = 2  # original + 1 retry
+WORKER_TIMEOUT_S = 60  # seconds to wait for worker response
+
 
 # ─── Head Protocol State ───────────────────────────────────────────────
 
@@ -340,7 +344,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         if is_head:
             # Head gets their configured tools + head protocol tools (builtin, otdel-only)
             agent_tools = list(agent.get("tools", []))
-            head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_decide", "kanban_task"]
+            head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_decide", "head_block", "kanban_task"]
             tool_names = agent_tools + head_protocol_tools
         else:
             tool_names = agent.get("tools", [])
@@ -538,8 +542,27 @@ async def _handle_otdel_send(user_id: str, msg: dict):
 
             processed_slugs.add(agent_slug_val)
             if not is_head:
-                responded_workers.add(agent_slug_val)
-                workers_responded += 1
+                # Check if worker response indicates failure
+                is_error = full_response.startswith("⚠️ Ошибка:") or not full_response.strip()
+                worker_attempts = head_state.worker_attempts if head_state else {}
+                current_attempt = worker_attempts.get(agent_slug_val, 0)
+                
+                if is_error and current_attempt < MAX_WORKER_RETRY:
+                    # Retry: increment attempt and re-queue worker
+                    worker_attempts[agent_slug_val] = current_attempt + 1
+                    retry_task = f"[RETRY #{current_attempt + 1}] {trigger_message}"
+                    agent_queue.append((agent, False, retry_task))
+                    logger.warning("Otdel %s worker %s failed, retrying (attempt %d/%d)", 
+                                 otdel_id, agent_slug_val, current_attempt + 1, MAX_WORKER_RETRY)
+                    # Don't add to responded_workers yet - will be added on final response
+                else:
+                    # Success or max retries exceeded
+                    if is_error and current_attempt >= MAX_WORKER_RETRY:
+                        logger.error("Otdel %s worker %s failed after %d retries, escalating to head", 
+                                   otdel_id, agent_slug_val, MAX_WORKER_RETRY)
+                        # Head will be notified in follow-up
+                    responded_workers.add(agent_slug_val)
+                    workers_responded += 1
 
         processed_count += 1
 
@@ -598,7 +621,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
 
         # Head gets head protocol tools in follow-up too
         head_agent_tools = list(head_agent.get("tools", []))
-        head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_decide", "kanban_task"]
+        head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_decide", "head_block", "kanban_task"]
         tool_names = head_agent_tools + head_protocol_tools
 
         # Stream follow-up response

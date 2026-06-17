@@ -768,6 +768,32 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
             },
         },
     },
+    "head_block": {
+        "type": "function",
+        "function": {
+            "name": "head_block",
+            "description": "Сообщить голове о блокере. Используй когда застрял и нужна помощь.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "description": "Причина блокера (что мешает выполнить задачу)",
+                    },
+                    "severity": {
+                        "type": "string",
+                        "enum": ["low", "medium", "high", "critical"],
+                        "description": "Серьёзность: low=мелочь, medium=нужна помощь, high=критично, critical=срочно",
+                    },
+                    "context": {
+                        "type": "string",
+                        "description": "Дополнительный контекст (что уже попробовал, что не получилось)",
+                    },
+                },
+                "required": ["reason"],
+            },
+        },
+    },
     "kanban_task": {
         "type": "function",
         "function": {
@@ -886,7 +912,7 @@ async def execute_tool(tool_name: str, params: dict, agent_slug: str | None = No
             params = {**params, "agent_id": agent_slug}
 
         # Inject otdel_id for head protocol tools
-        head_protocol_tools = ("head_delegate", "head_evaluate", "head_retry", "head_decide", "kanban_task")
+        head_protocol_tools = ("head_delegate", "head_evaluate", "head_retry", "head_decide", "head_block", "kanban_task")
         if otdel_id and tool_name in head_protocol_tools:
             params = {**params, "otdel_id": otdel_id}
 

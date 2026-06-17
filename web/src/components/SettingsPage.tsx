@@ -8,6 +8,8 @@ import { useDraggable } from '@dnd-kit/core'
 import { API_BASE } from '../config'
 import { useUndoWithProgress } from '../hooks/useUndoWithProgress'
 import { PageTransition } from './PageTransition'
+import { LoadingSpinner } from './LoadingSpinner'
+import { SettingsCard } from './SettingsCard'
 
 // Tabs that can be dragged to widget zones
 const DRAGGABLE_TABS = new Set(['departments', 'kanban'])
@@ -73,6 +75,8 @@ export function SettingsPage({ onAgentsChange, onDepartmentsChange }: SettingsPa
   const [addingProvider, setAddingProvider] = useState<ProviderInfo | null>(null)
   const [editingProvider, setEditingProvider] = useState<ApiProvider | null>(null)
   const providersRef = useRef<{ refresh: () => void }>(null)
+  const [visible, setVisible] = useState(false)
+  useEffect(() => { requestAnimationFrame(() => setVisible(true)) }, [])
 
   const handleTabChange = (tab: Tab) => {
     setActiveTab(tab)
@@ -135,7 +139,7 @@ export function SettingsPage({ onAgentsChange, onDepartmentsChange }: SettingsPa
         )
       })()}
 
-      <div className="settings-page">
+      <div className={`settings-page ${visible ? "visible" : ""}`}>
         {/* Header */}
         <div className="settings-top-bar">
           <div className="settings-section-header">
@@ -513,14 +517,13 @@ function GeneralSection() {
   }, [tweakcnUrl, settings, updateUI])
 
   if (!settings) {
-    return <div className="settings-loading">Загрузка...</div>
+    return <LoadingSpinner text="Загрузка..." />
   }
 
   return (
     <div className="general-settings">
       {/* ─── Обзор системы ─── */}
-      <section className="settings-card">
-        <h2 className="settings-card-title">Обзор системы</h2>
+      <SettingsCard title="Обзор системы">
         <div className="stats-summary">
           <div className="stats-card">
             <span className="stats-card-value">{overview?.agents ?? '—'}</span>
@@ -545,11 +548,9 @@ function GeneralSection() {
             <span className="stats-card-detail">с момента запуска</span>
           </div>
         </div>
-      </section>
+      </SettingsCard>
 
-      {/* ─── Сервер ─── */}
-      <section className="settings-card settings-card-disabled">
-        <h2 className="settings-card-title">Сервер <span className="settings-card-badge">требует перезапуск</span></h2>
+      <SettingsCard title="Сервер" badge="требует перезапуск" disabled>
         <div className="settings-row-2">
           <div className="settings-field">
             <label>Хост</label>
@@ -588,12 +589,11 @@ function GeneralSection() {
             enabled: v,
             requests_per_minute: settings.server.rate_limit?.requests_per_minute ?? 60,
           })} />
-      </section>
+      </SettingsCard>
 
       <div className="settings-row-2">
         {/* ─── 🎨 Интерфейс ─── */}
-        <section className="settings-card">
-          <h2 className="settings-card-title">Интерфейс</h2>
+        <SettingsCard title="Интерфейс">
         <div className="settings-row-2">
           <div className="settings-field">
             <label>Тема</label>
@@ -679,12 +679,11 @@ function GeneralSection() {
           </div>
         )}
 
-        </section>
+        </SettingsCard>
 
         {/* ─── 🤖 Настройка моделей ─── */}
-        <section className="settings-card settings-card-disabled">
-          <h2 className="settings-card-title">Настройка моделей <span className="settings-card-badge">скоро</span></h2>
-          <p className="settings-card-desc">Модели для специализированных задач</p>
+        <SettingsCard title="Настройка моделей" badge="скоро" disabled
+          description="Модели для специализированных задач">
           <div className="settings-field">
             <label>Визион (анализ изображений)</label>
             <CustomDropdown
@@ -740,12 +739,11 @@ function GeneralSection() {
               ]}
             />
           </div>
-        </section>
+        </SettingsCard>
       </div>
 
       {/* ─── Лента активности ─── */}
-      <section className="settings-card settings-card-disabled">
-        <h2 className="settings-card-title">Лента активности <span className="settings-card-badge">скоро</span></h2>
+      <SettingsCard title="Лента активности" badge="скоро" disabled>
         <div className="settings-row-2">
           <div className="settings-field">
             <label>Макс. записей</label>
@@ -816,7 +814,7 @@ function GeneralSection() {
             />
           </div>
         </div>
-      </section>
+      </SettingsCard>
     </div>
   )
 }
@@ -1456,7 +1454,9 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
       <div className="roles-depts-divider" />
 
       {/* External Agents section */}
-      {externalDetected && externalAgents.length > 0 && (
+      {!externalDetected ? (
+        <LoadingSpinner text="Обнаружение внешних агентов..." minHeight={80} />
+      ) : externalAgents.length > 0 ? (
         <section className="agents-role-section">
           <h2 className="agents-role-title">
             <span className="agents-role-dot" style={{ background: '#6b7280' }} />
@@ -1561,7 +1561,7 @@ function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
             ))}
           </div>
         </section>
-      )}
+      ) : null}
 
       {/* Agents grouped by role */}
       {(() => {
@@ -1854,10 +1854,7 @@ const ProvidersSection = forwardRef<{ refresh: () => void }, { onAddProvider: (t
 
       {/* Connected providers */}
       {loading ? (
-        <div className="providers-loading">
-          <div className="spinner" />
-          <span>Загрузка провайдеров...</span>
-        </div>
+        <LoadingSpinner text="Загрузка провайдеров..." />
       ) : connected.length > 0 ? (
         <section className="providers-section">
           <div className="providers-section-header">
@@ -2750,15 +2747,14 @@ function AddChannelModal({ onClose }: { onClose: () => void }) {
 function SkillsSection() {
   return (
     <div className="settings-sections">
-      <section className="settings-card">
-        <h2 className="settings-card-title">Скиллы системы</h2>
+      <SettingsCard title="Скиллы системы">
         <p style={{ color: 'var(--gray-500)', fontSize: '14px', lineHeight: '1.6' }}>
           База скиллов — подходы, шаблоны и процедуры, которые система использует для решения задач.
         </p>
         <div style={{ marginTop: '16px', padding: '12px', background: 'var(--gray-900)', borderRadius: '8px', border: '1px solid var(--gray-800)' }}>
           <span style={{ color: 'var(--gray-400)', fontSize: '13px' }}>🚧 В разработке — здесь будет список скиллов с возможностью добавления, редактирования и привязки к агентам</span>
         </div>
-      </section>
+      </SettingsCard>
     </div>
   )
 }
@@ -2778,8 +2774,7 @@ function KanbanSection() {
   return (
     <div className="settings-sections">
       {/* Stats Overview */}
-      <section className="settings-card">
-        <h2 className="settings-card-title">Глобальный Канбан</h2>
+      <SettingsCard title="Глобальный Канбан">
         <p style={{ color: 'var(--gray-500)', fontSize: '14px', lineHeight: '1.6', marginBottom: '16px' }}>
           Глобальная доска задач для управления работой всех отделов и агентов.
         </p>
@@ -2803,15 +2798,14 @@ function KanbanSection() {
             </div>
           </div>
         )}
-      </section>
+      </SettingsCard>
 
       <KanbanColumnsConfig />
       <KanbanLabelsConfig />
       <KanbanWidgetConfig />
 
       {/* Board Settings */}
-      <section className="settings-card">
-        <h2 className="settings-card-title">Настройки доски</h2>
+      <SettingsCard title="Настройки доски">
         <div className="settings-row-2">
           <div className="settings-field">
             <label>Максимум активных задач</label>
@@ -2831,25 +2825,23 @@ function KanbanSection() {
           </div>
         </div>
         <Toggle label="Уведомления о задачах" defaultChecked={true} onChange={() => {}} />
-      </section>
+      </SettingsCard>
 
       {/* Automation */}
-      <section className="settings-card">
-        <h2 className="settings-card-title">Автоматизация</h2>
+      <SettingsCard title="Автоматизация">
         <Toggle label="Авто назначение главы" defaultChecked={true} onChange={() => {}} />
         <Toggle label="Summon при завершении — автоматически передавать задачу следующему отделу" defaultChecked={false} onChange={() => {}} />
         <Toggle label="Эскалация при простое — эскалировать при превышении дедлайна" defaultChecked={false} onChange={() => {}} />
         <Toggle label="Запрос человека при блоке — уведомление при эскалации" defaultChecked={false} onChange={() => {}} />
-      </section>
+      </SettingsCard>
 
       {/* Coming Soon */}
-      <section className="settings-card" style={{ opacity: 0.5, pointerEvents: 'none' }}>
-        <h2 className="settings-card-title">Скоро</h2>
+      <SettingsCard title="Скоро" style={{ opacity: 0.5, pointerEvents: 'none' }}>
         <Toggle label="Drag & Drop — перетаскивание тасков между колонками" defaultChecked={false} onChange={() => {}} />
         <Toggle label="Интеграция с Forum — обсуждения задач в форуме агентов" defaultChecked={false} onChange={() => {}} />
         <Toggle label="Canvas связей — визуализация потока задач между отделами" defaultChecked={false} onChange={() => {}} />
         <Toggle label="Skills привязка — автоматический подбор агентов по навыкам" defaultChecked={false} onChange={() => {}} />
-      </section>
+      </SettingsCard>
     </div>
   )
 }
@@ -3116,8 +3108,7 @@ function KanbanColumnsConfig() {
   }
 
   return (
-    <section className="settings-card">
-      <h2 className="settings-card-title">Конфигурация колонок</h2>
+    <SettingsCard title="Конфигурация колонок">
       <p className="settings-hint">Настройте колонки доски: цвета, порядок, видимость</p>
       <div className="settings-divider-thin" />
       {columns.map((col, i) => (
@@ -3285,7 +3276,7 @@ function KanbanColumnsConfig() {
           />
         </div>
       )}
-    </section>
+    </SettingsCard>
   )
 }
 
@@ -3440,8 +3431,7 @@ function KanbanLabelsConfig() {
   // and the static-progress bug is fixed in one place).
 
   return (
-    <section className="settings-card">
-      <h2 className="settings-card-title">Конфигурация меток</h2>
+    <SettingsCard title="Конфигурация меток">
       <p className="settings-hint">Настройте метки (теги) для задач: цвет фона и текста</p>
       <div className="settings-divider-thin" />
       {labels.map((label, i) => (
@@ -3516,7 +3506,7 @@ function KanbanLabelsConfig() {
           />
         </div>
       )}
-    </section>
+    </SettingsCard>
   )
 }
 
@@ -3621,8 +3611,7 @@ function KanbanWidgetConfig() {
   }
 
   return (
-    <section className={`settings-card${saving ? ' saving' : ''}`}>
-      <h2 className="settings-card-title">Конфигурация виджета</h2>
+    <SettingsCard title="Конфигурация виджета" className={saving ? 'saving' : undefined}>
       <p className="settings-hint">Настройте виджет канбан-доски на главной странице</p>
       <div className="settings-divider-thin" />
       <div className="settings-row-2">
@@ -3705,6 +3694,6 @@ function KanbanWidgetConfig() {
         checked={config.compact}
         onChange={v => updateConfig({ compact: v })}
       />
-    </section>
+    </SettingsCard>
   )
 }

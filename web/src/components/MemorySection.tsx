@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react'
 // ─── Memory Section ──────────────────────────────────────────
 
 import { API_BASE as API } from '../config'
+import { LoadingSpinner } from './LoadingSpinner'
+import { SettingsCard } from './SettingsCard'
 import { DropdownMenu, type DropdownOption } from './DropdownMenu'
 
 // Re-use the global portal-based DropdownMenu. See DropdownMenu.tsx — the
@@ -152,8 +154,7 @@ export function MemorySection() {
   return (
     <div className="memory-section">
       {/* Block 1: User Profile (Global, Read-Only) */}
-      <section className="settings-card">
-        <h2 className="settings-card-title">Профиль пользователя</h2>
+      <SettingsCard title="Профиль пользователя">
         <p className="memory-card-desc">Общая информация о пользователе. Доступна всем агентам. Заполняется автоматически при общении.</p>
 
         <div className="memory-header">
@@ -168,7 +169,7 @@ export function MemorySection() {
         {/* Entry list (read-only, deduplicated by key) */}
         <div className="memory-entries">
           {loading ? (
-            <div className="memory-loading">Загрузка...</div>
+            <LoadingSpinner text="Загрузка..." />
           ) : userData?.entries && userData.entries.length > 0 ? (
             (() => {
               /* Keep only the last entry per unique key (most complete wins) */
@@ -217,13 +218,12 @@ export function MemorySection() {
             <div className="memory-empty">Агенты ещё ничего не записали о пользователе</div>
           )}
         </div>
-      </section>
+      </SettingsCard>
 
       {/* Compaction + Sessions side by side */}
       <div className="memory-settings-row">
         {/* Block 2: Compaction */}
-        <section className="settings-card memory-settings-half">
-          <h2 className="settings-card-title">Компакция</h2>
+        <SettingsCard title="Компакция" className="memory-settings-half">
           <p className="memory-card-desc">Автоматическое сжатие истории сообщений когда контекст заполняется. Не даёт диалогу «упасть» из-за переполнения.</p>
 
           <div className="memory-config-form">
@@ -296,11 +296,10 @@ export function MemorySection() {
               />
             </div>
           </div>
-        </section>
+        </SettingsCard>
 
         {/* Block 3: Memory Provider */}
-        <section className="settings-card memory-settings-half">
-          <h2 className="settings-card-title">Memory Provider</h2>
+        <SettingsCard title="Memory Provider" className="memory-settings-half">
           <p className="memory-card-desc">Где агенты хранят долгосрочную память. Built-in использует MEMORY.md / USER.md файлы.</p>
 
           <div className="memory-config-form">
@@ -363,11 +362,10 @@ export function MemorySection() {
               </>
             )}
           </div>
-        </section>
+        </SettingsCard>
 
         {/* Block 4: Memory Settings */}
-        <section className="settings-card memory-settings-half">
-          <h2 className="settings-card-title">Настройка памяти</h2>
+        <SettingsCard title="Настройка памяти" className="memory-settings-half">
           <p className="memory-card-desc">Параметры работы долгосрочной памяти агентов.</p>
 
           <div className="memory-config-form">
@@ -434,13 +432,12 @@ export function MemorySection() {
               <span className="settings-field-hint-inline">Автоматически объединять дублирующие записи (скоро)</span>
             </div>
           </div>
-        </section>
+        </SettingsCard>
       </div>
 
       <div className="memory-settings-row">
         {/* Block 4: Otdel Compaction */}
-        <section className="settings-card memory-settings-half">
-          <h2 className="settings-card-title">Отделы</h2>
+        <SettingsCard title="Отделы" className="memory-settings-half">
           <p className="memory-card-desc">Настройки компакции чатов отделов. Глобальные правила для всех отделов.</p>
 
           <div className="memory-config-form">
@@ -477,7 +474,7 @@ export function MemorySection() {
               <span className="settings-field-hint-inline">При превышении — старые сообщения заменяются summary</span>
             </div>
           </div>
-        </section>
+        </SettingsCard>
       </div>
     </div>
   )

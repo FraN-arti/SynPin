@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { API_BASE } from '../config'
+import { LoadingSpinner } from './LoadingSpinner'
 
 interface WidgetConfig {
   mode: string
@@ -202,7 +203,7 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
   if (loading) {
     return (
       <div className="kanban-widget">
-        <div className="widget-empty">Загрузка...</div>
+        <LoadingSpinner text="Загрузка..." />
       </div>
     )
   }

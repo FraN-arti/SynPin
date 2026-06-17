@@ -4,6 +4,7 @@ import { DndContext, pointerWithin, useDraggable, useDroppable, DragEndEvent, Dr
 import { SortableContext, useSortable, arrayMove, horizontalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { PickerMenu } from './PickerMenu'
+import { LoadingSpinner } from './LoadingSpinner'
 
 interface Task {
   id: string
@@ -614,7 +615,7 @@ export function KanbanBoard({ wsOn }: KanbanBoardProps) {
 
       {/* Board */}
       {loading ? (
-        <div className="kanban-loading">Загрузка доски...</div>
+        <LoadingSpinner text="Загрузка доски..." />
       ) : (
         <DndContext collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <SortableContext

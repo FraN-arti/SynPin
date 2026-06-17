@@ -71,3 +71,6 @@ core/synpin/agents/*/agent.yaml
 core/synpin/data/departments/*/department.yaml
 core/synpin/data/otdels/*/otdel.yaml
 core/synpin/data/tasks/*.yaml
+
+# Debug logs
+stream_debug.log

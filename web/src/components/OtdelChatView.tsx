@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { EmojiPicker } from './EmojiPicker'
 import { MarkdownRenderer } from './MarkdownRenderer'
+import { useChatScroll } from '../hooks/useChatScroll'
 
 import { API_BASE } from '../config'
 
@@ -75,7 +76,7 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
   const [compacting, setCompacting] = useState<{ before: number; after: number } | null>(null)
   const [workerStatuses, setWorkerStatuses] = useState<Map<string, 'idle' | 'thinking' | 'done'>>(new Map())
   const [delegations, setDelegations] = useState<Array<{id: string; worker: string; workerName: string; task: string; status: 'pending' | 'done'}>>([])
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const { sentinelRef: messagesEndRef } = useChatScroll(messages)
 
   // Load agents and departments for color mapping
   useEffect(() => {
@@ -386,10 +387,6 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
     }
   }, [wsOn, otdel.otdelid])
 
-  // Auto-scroll
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
 
   const handleSend = async () => {
     if (!input.trim()) return

@@ -27,6 +27,7 @@ import {
 } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useWebSocket } from './hooks/useWebSocket'
+import { useChatScroll } from './hooks/useChatScroll'
 
 import { API_BASE } from './config'
 
@@ -83,77 +84,30 @@ interface ToolTimelineProps {
   toolNames: Record<string, string>
 }
 
-function ToolTimeline({ tools, isLive, toolNames }: ToolTimelineProps) {
-  const [expanded, setExpanded] = useState(isLive)
-
-  // Auto-expand when live (tools running), auto-collapse when done
-  useEffect(() => {
-    if (isLive) setExpanded(true)
-  }, [isLive])
-
-  const doneCount = tools.filter(t => t.status === 'completed').length
-  const errorCount = tools.filter(t => t.status === 'error').length
-  const runningCount = tools.filter(t => t.status === 'running').length
-  const total = tools.length
-
-  // Summary line for collapsed state
-  const summary = errorCount > 0
-    ? `${errorCount} ошибка${errorCount > 1 ? 'и' : ''}`
-    : runningCount > 0
-      ? `${doneCount}/${total} действий...`
-      : `${total} действий ✓`
-
-  // Render chips for collapsed state
-  const renderChips = () => (
-    <div className="tool-chips">
-      {tools.map((tc) => (
-        <span key={tc.id} className={`tool-chip ${tc.status}`}>
-          {tc.status === 'running' && <span className="tool-spinner" />}
-          {tc.status === 'completed' && <span className="tool-check">✓</span>}
-          {tc.status === 'error' && <span className="tool-error">✕</span>}
-          <span>{toolNames[tc.name] || tc.name}</span>
-        </span>
-      ))}
-    </div>
-  )
+function ToolTimeline({ tools, toolNames }: ToolTimelineProps) {
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   return (
-    <div className={`tool-timeline ${expanded ? 'expanded' : 'collapsed'}`}>
-      {/* Header — always visible */}
-      <button
-        className="tool-timeline-header"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <span className="tool-timeline-icon">
-          {runningCount > 0 ? '⚡' : errorCount > 0 ? '⚠' : '✓'}
-        </span>
-        <span className="tool-timeline-summary">{summary}</span>
-        <span className={`tool-timeline-chevron ${expanded ? 'open' : ''}`}>▾</span>
-      </button>
-
-      {/* Collapsed: horizontal chips */}
-      {!expanded && renderChips()}
-
-      {/* Expanded: vertical list */}
-      {expanded && (
-        <div className="tool-timeline-body open">
-          {tools.map((tc) => (
-            <div key={tc.id} className={`tool-timeline-row ${tc.status}`}>
-              <span className="tool-timeline-status">
-                {tc.status === 'running' && <span className="tool-spinner" />}
-                {tc.status === 'completed' && <span className="tool-check">✓</span>}
-                {tc.status === 'error' && <span className="tool-error">✕</span>}
-              </span>
-              <span className="tool-timeline-name">
-                {toolNames[tc.name] || tc.name}
-              </span>
-              {tc.status === 'error' && tc.error && (
-                <span className="tool-timeline-error">{tc.error}</span>
-              )}
-            </div>
-          ))}
+    <div className="tool-timeline">
+      {tools.map((tc) => (
+        <div
+          key={tc.id}
+          className={`tool-chip ${tc.status} ${expandedId === tc.id ? 'expanded' : ''}`}
+          onClick={() => setExpandedId(expandedId === tc.id ? null : tc.id)}
+        >
+          <span className="tool-chip-icon">
+            {tc.status === 'running' && <span className="tool-spinner" />}
+            {tc.status === 'completed' && <span className="tool-check">✓</span>}
+            {tc.status === 'error' && <span className="tool-error-icon">✕</span>}
+          </span>
+          <span className="tool-chip-name">{toolNames[tc.name] || tc.name}</span>
+          <div className="tool-chip-detail">
+            {tc.status === 'running' && 'Выполняется...'}
+            {tc.status === 'completed' && 'Готово'}
+            {tc.status === 'error' && (tc.error || 'Ошибка')}
+          </div>
         </div>
-      )}
+      ))}
     </div>
   )
 }
@@ -195,6 +149,8 @@ function App() {
 
   // Widget layout (left/right zones on main page)
   const { layout, removeWidget, handleDragEnd } = useWidgetLayout()
+  // Chat auto-scroll — unified sentinel pattern
+  const { sentinelRef: chatEndRef } = useChatScroll(messages)
 
   // DndContext sensors
   const sensors = useSensors(
@@ -254,7 +210,7 @@ function App() {
     refreshDepartments()
   }, [refreshDepartments])
 
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const activeAgentRef = useRef<AgentConfig | null>(null)
   const messagesRef = useRef<Message[] | null>(null)
@@ -528,18 +484,7 @@ function App() {
     return () => clearInterval(pollInterval)
   }, [activeAgent, view])
 
-  // Scroll to bottom on any messages change (initial restore, new send,
-  // streaming chunk, return from settings, agent switch). This is the
-  // single source of truth — scroll fires only after messages is real.
-  useEffect(() => {
-    if (view.type !== 'chat' || !activeAgent || !messages) return
-    // Double rAF: first waits for React render, second waits for DOM paint
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
-      })
-    })
-  }, [messages, view, activeAgent])
+  // Auto-scroll handled by useChatScroll hook (sentinel pattern)
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value)
@@ -1069,7 +1014,7 @@ function App() {
             body = (
               <>
                 <div className="messages-area">
-                  <div className="messages-container">
+                  <div className="messages-container" ref={messagesContainerRef}>
                     {messages.map((msg) => {
                       const isLastAssistant = msg.role === 'assistant' && msg.id === messages[messages.length - 1]?.id && isTyping
                       return (
@@ -1098,7 +1043,7 @@ function App() {
                         </div>
                       )
                     })}
-                    <div ref={messagesEndRef} />
+                    <div ref={chatEndRef} />
                   </div>
                 </div>
 

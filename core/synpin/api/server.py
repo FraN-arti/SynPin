@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from synpin import __version__
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from ..cli.console import console
 import logging
 import os
 import yaml
@@ -78,13 +79,13 @@ for candidate in _config_candidates:
     if candidate.exists():
         _loaded_registry = ProviderRegistry.from_config(candidate)
         _loaded_config_path = candidate
-        print(f"  [chat] Loaded providers from: {candidate}")
+        console.print(f"  [chat] Loaded providers from: {candidate}")
         break
 
 if _loaded_registry is None:
     _loaded_registry = ProviderRegistry()
     _loaded_config_path = None
-    print("  [chat] No providers.yaml found — chat disabled")
+    console.print("  [chat] No providers.yaml found — chat disabled")
 
 # Inject registry into the router module
 chat_router.registry = _loaded_registry
@@ -192,10 +193,9 @@ async def _start_update_checker():
     """
     from .version_router import _update_check_loop
     asyncio.create_task(_update_check_loop())
-    print(
+    console.print(
         f"  [update-check] GitHub update-checker running (every 6h, "
-        f"repo=FraN-arti/SynPin)",
-        flush=True,
+        f"repo=FraN-arti/SynPin)"
     )
 
 
@@ -220,11 +220,11 @@ def _start_auto_delete():
         svc = KanbanService()
         task = schedule_auto_delete(svc)
         if task:
-            print("  [auto-delete] worker running (default 1h, override via AUTO_DELETE_INTERVAL_S)", flush=True)
+            console.print("  [auto-delete] worker running (default 1h, override via AUTO_DELETE_INTERVAL_S)")
         else:
-            print("  [auto-delete] no event loop yet, worker will start on next request", flush=True)
+            console.print("  [auto-delete] no event loop yet, worker will start on next request")
     except Exception as e:
-        print(f"  [auto-delete] failed to start: {e}", flush=True)
+        console.print(f"  [auto-delete] failed to start: {e}")
 
 
 @app.post("/api/admin/reload")
@@ -281,14 +281,14 @@ def _on_providers_changed(path: Path, mtime: float) -> None:
     """Reload providers when providers.yaml changes on disk."""
     if _loaded_registry:
         _loaded_registry.reload()
-        print(f"  [config] providers.yaml reloaded (mtime={mtime:.0f})")
+        console.print(f"  [config] providers.yaml reloaded (mtime={mtime:.0f})")
         _broadcast_config_event("providers:updated", {"mtime": mtime})
 
 
 def _on_yaml_changed(label: str) -> "callable":
     """Return a callback that logs + broadcasts when a YAML changes."""
     def _cb(path: Path, mtime: float) -> None:
-        print(f"  [config] {label} reloaded from disk (mtime={mtime:.0f})")
+        console.print(f"  [config] {label} reloaded from disk (mtime={mtime:.0f})")
         _broadcast_config_event(f"{label}:updated", {"mtime": mtime})
     return _cb
 
@@ -333,7 +333,7 @@ for yaml_name in ("columns.yaml", "labels.yaml", "settings.yaml", "widget.yaml")
 
 _config_watcher.start()
 watched = sum(1 for p, _ in _config_watcher._watches)
-print(f"  [config] ConfigWatcher active: {watched} files, polling every 5s")
+console.print(f"  [config] ConfigWatcher active: {watched} files, polling every 5s")
 
 
 # Serve React SPA (built static files) — ONLY in production

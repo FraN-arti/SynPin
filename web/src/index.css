@@ -710,22 +710,12 @@ body {
 }
 
 .tool-block.running {
-  border-color: transparent;
-  background:
-    linear-gradient(var(--gray-800), var(--gray-800)) padding-box,
-    conic-gradient(
-      from var(--border-angle),
-      transparent 60%,
-      #f59e0b 75%,
-      #f59e0b 85%,
-      transparent 100%
-    ) border-box;
-  animation: toolBorderFlow 1.5s linear infinite;
+  border: 1px solid rgba(249, 115, 22, 0.4);
+  box-shadow:
+    0 0 8px rgba(249, 115, 22, 0.2),
+    0 0 20px rgba(249, 115, 22, 0.08);
+  animation: glowPulse 2s ease-in-out infinite;
   color: var(--white);
-}
-
-@keyframes toolBorderFlow {
-  to { --border-angle: 360deg; }
 }
 
 .tool-block.done {
@@ -759,86 +749,115 @@ body {
   to { transform: rotate(360deg); }
 }
 
-/* === Tool Timeline (collapsible action flow) === */
+/* === Tool Timeline (horizontal chips, animated) === */
 
 .tool-timeline {
-  max-width: 80%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-bottom: 8px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius);
-  background: var(--glass-bg-heavy);
-  overflow: hidden;
   animation: fadeIn 0.2s ease;
 }
 
-/* Horizontal mode (collapsed) - single line with chips */
-.tool-timeline.collapsed .tool-timeline-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 6px 10px;
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.tool-timeline.collapsed .tool-timeline-header:hover {
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.tool-timeline.collapsed .tool-timeline-body {
-  display: none;
-}
-
-/* Chips container in collapsed state */
-.tool-timeline.collapsed .tool-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 0 10px 6px;
-}
-
-.tool-chip {
+/* Individual tool chip */
+.tool-timeline .tool-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 12px;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: var(--radius);
   font-size: 11px;
   font-weight: 500;
   white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  animation: chipEnter 0.3s ease backwards;
+  width: fit-content;
+  overflow: hidden;
+  position: relative;
 }
 
-.tool-chip.running {
-  background: rgba(245, 158, 11, 0.15);
-  color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.3);
+/* Staggered animation for each chip */
+.tool-timeline .tool-chip:nth-child(1) { animation-delay: 0ms; }
+.tool-timeline .tool-chip:nth-child(2) { animation-delay: 60ms; }
+.tool-timeline .tool-chip:nth-child(3) { animation-delay: 120ms; }
+.tool-timeline .tool-chip:nth-child(4) { animation-delay: 180ms; }
+.tool-timeline .tool-chip:nth-child(5) { animation-delay: 240ms; }
+
+@keyframes chipEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.85) translateY(4px);
+  }
 }
 
-.tool-chip.completed {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+.tool-timeline .tool-chip.running {
+  background: rgba(249, 115, 22, 0.12);
+  color: #f97316;
+  border: 1px solid rgba(249, 115, 22, 0.35);
+  box-shadow: 0 0 8px rgba(249, 115, 22, 0.15), 0 0 20px rgba(249, 115, 22, 0.06);
+  animation: chipEnter 0.3s ease backwards, glowPulse 2s ease-in-out infinite;
 }
 
-.tool-chip.error {
-  background: rgba(239, 68, 68, 0.15);
+.tool-timeline .tool-chip.completed {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  opacity: 0.7;
+}
+
+.tool-timeline .tool-chip.error {
+  background: rgba(239, 68, 68, 0.1);
   color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid rgba(239, 68, 68, 0.25);
 }
 
-.tool-chip .tool-spinner {
+/* Expanded state — show detail text */
+.tool-timeline .tool-chip.expanded {
+  width: auto;
+  max-width: 360px;
+  flex-wrap: wrap;
+  padding: 6px 12px;
+  border-radius: var(--radius);
+}
+
+.tool-chip-detail {
+  width: 100%;
+  font-size: 10px;
+  color: var(--text-dim);
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease, opacity 0.3s ease;
+  opacity: 0;
+  line-height: 1.4;
+  padding-left: 15px;
+}
+
+.tool-timeline .tool-chip.expanded .tool-chip-detail {
+  max-height: 60px;
+  opacity: 1;
+}
+
+.tool-timeline .tool-chip .tool-spinner {
   width: 10px;
   height: 10px;
-  border: 2px solid var(--gray-600);
-  border-top-color: #f59e0b;
+  border: 2px solid rgba(249, 115, 22, 0.3);
+  border-top-color: #f97316;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+.tool-timeline .tool-chip .tool-check {
+  color: #22c55e;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.tool-timeline .tool-chip .tool-error-icon {
+  color: #ef4444;
+  font-size: 10px;
+  flex-shrink: 0;
 }
 
 /* Expanded mode (vertical list) */
@@ -1008,11 +1027,7 @@ body {
 }
 
 /* === Animated border flow — @property Houdini === */
-@property --border-angle {
-  inherits: false;
-  initial-value: 0deg;
-  syntax: '<angle>';
-}
+
 
 /* Message wrapper — base (no border by default) */
 .message-wrapper {
@@ -1021,24 +1036,47 @@ body {
   border-radius: var(--radius);
 }
 
-/* Streaming: add gradient border + animate the angle */
+/* Streaming: soft pulsing glow (no flicker on glass backgrounds) */
 .message-wrapper.streaming {
-  border: 2px solid transparent;
-  background:
-    linear-gradient(var(--gray-800), var(--gray-800)) padding-box,
-    conic-gradient(
-      from var(--border-angle),
-      transparent 70%,
-      #f97316 80%,
-      #fb923c 85%,
-      #fdba74 90%,
-      transparent 100%
-    ) border-box;
-  animation: borderFlow 2s linear infinite;
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  box-shadow:
+    0 0 8px rgba(249, 115, 22, 0.15),
+    0 0 20px rgba(249, 115, 22, 0.05);
+  animation: glowPulse 2.5s ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+  0% {
+    border-color: rgba(249, 115, 22, 0.4);
+    box-shadow: 0 0 8px rgba(249, 115, 22, 0.2), 0 0 20px rgba(249, 115, 22, 0.06);
+  }
+  33% {
+    border-color: rgba(245, 158, 11, 0.45);
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.25), 0 0 25px rgba(245, 158, 11, 0.08);
+  }
+  66% {
+    border-color: rgba(168, 85, 247, 0.4);
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.2), 0 0 25px rgba(168, 85, 247, 0.08);
+  }
+  100% {
+    border-color: rgba(249, 115, 22, 0.4);
+    box-shadow: 0 0 8px rgba(249, 115, 22, 0.2), 0 0 20px rgba(249, 115, 22, 0.06);
+  }
 }
 
 @keyframes borderFlow {
-  to { --border-angle: 360deg; }
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Reusable animated glow — apply to any "active" element */
+.animated-border {
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  box-shadow:
+    0 0 8px rgba(249, 115, 22, 0.15),
+    0 0 20px rgba(249, 115, 22, 0.05);
+  animation: glowPulse 2.5s ease-in-out infinite;
 }
 
 /* Message bubble — appears after avatar */
@@ -2930,24 +2968,7 @@ body {
 }
 
 /* Loading & Empty states */
-.providers-loading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 20px;
-  color: var(--text-dim);
-  font-size: 14px;
-  justify-content: center;
-}
 
-.spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--gray-700);
-  border-top-color: var(--orange);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
 
 .connected-providers-empty {
   display: flex;
@@ -3225,18 +3246,6 @@ body {
 }
 
 /* Model chips loading */
-.model-chips-loading {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 0;
-  font-size: 12px;
-  color: var(--text-dim);
-}
-
-.model-chips-loading .spinner {
-  animation: spin 1s linear infinite;
-}
 
 /* Search bar */
 .providers-search-bar {
@@ -4003,7 +4012,6 @@ body {
   cursor: not-allowed;
 }
 
-.memory-loading,
 .memory-empty {
   padding: 32px;
   text-align: center;
@@ -4324,12 +4332,6 @@ body {
 }
 
 /* Settings loading */
-.settings-loading {
-  padding: 40px;
-  text-align: center;
-  color: var(--text-dim);
-  font-size: 13px;
-}
 
 /* Divider between cards */
 .settings-divider {
@@ -4804,7 +4806,7 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 6px;
-  overflow: hidden;
+  overflow: clip;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
@@ -4900,6 +4902,10 @@ body {
 .widget-departments-list {
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+  max-height: 280px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--gray-700, #374151) transparent;
 }
 
 .widget-empty {
@@ -5775,20 +5781,13 @@ body {
   }
 }
 
-/* Animated gradient border on bubble */
+/* Animated glow on bubble (soft, no flicker) */
 .otdel-msg-row.streaming .otdel-msg-bubble {
-  border: 2px solid transparent;
-  background:
-    linear-gradient(var(--gray-800), var(--gray-800)) padding-box,
-    conic-gradient(
-      from var(--border-angle),
-      transparent 70%,
-      #f97316 80%,
-      #fb923c 85%,
-      #fdba74 90%,
-      transparent 100%
-    ) border-box;
-  animation: borderFlow 2s linear infinite;
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  box-shadow:
+    0 0 8px rgba(249, 115, 22, 0.15),
+    0 0 20px rgba(249, 115, 22, 0.05);
+  animation: glowPulse 2.5s ease-in-out infinite;
 }
 
 /* Streaming dots */
@@ -5972,14 +5971,6 @@ body {
 }
 .kanban-create-btn:hover { opacity: 0.9; }
 
-.kanban-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 200px;
-  color: var(--text-muted);
-  font-size: 14px;
-}
 
 .kanban-columns {
   display: flex;
@@ -6952,6 +6943,22 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow-y: auto;
+  max-height: 280px;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--gray-600, #4b5563) transparent;
+}
+
+.kanban-widget::-webkit-scrollbar {
+  width: 5px;
+}
+.kanban-widget::-webkit-scrollbar-track {
+  background: transparent;
+}
+.kanban-widget::-webkit-scrollbar-thumb {
+  background: var(--gray-600, #4b5563);
+  border-radius: 3px;
 }
 
 .kanban-widget-task {
@@ -7305,6 +7312,15 @@ input[type="number"] {
   width: 100%;
 }
 
+/* Inside the skeleton, center the loading spinner vertically in the
+   available messages-area space rather than letting it sit near the top. */
+.chat-skeleton .messages-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
 /* === Picker Menu (portal-based search/select) === */
 /* Used by NewTaskModal: dept picker, tag picker. Replaces the
    inline-positioned .kanban-dept-dropdown and .tag-picker-popup
@@ -7462,4 +7478,90 @@ input[type="number"] {
   text-align: center;
   color: var(--text-dim);
   font-size: 13px;
+}
+
+/* ─── Loading Spinner (Neural Pulse) ─────────────────────── */
+/* Reusable centered spinner for any loading state. */
+.loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 40px 20px;
+  min-height: 120px;
+}
+
+.loading-ring {
+  position: relative;
+  width: 44px;
+  height: 44px;
+}
+
+.loading-ring::before,
+.loading-ring::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+/* Outer ring — rotates */
+.loading-ring::before {
+  border: 2px solid transparent;
+  border-top-color: var(--accent, #f97316);
+  border-right-color: color-mix(in srgb, var(--accent, #f97316) 40%, transparent);
+  animation: spinner-rotate 1.2s linear infinite;
+}
+
+/* Inner glow — pulses */
+.loading-ring::after {
+  border: 2px solid transparent;
+  border-bottom-color: var(--accent, #f97316);
+  border-left-color: color-mix(in srgb, var(--accent, #f97316) 40%, transparent);
+  animation: spinner-rotate 1.2s linear infinite reverse;
+  filter: blur(1px);
+}
+
+/* Soft ambient glow behind the ring */
+.loading-ring-glow {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent, #f97316) 15%, transparent) 0%, transparent 70%);
+  animation: spinner-pulse 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.loading-text {
+  font-size: 13px;
+  color: var(--text-muted, rgba(255,255,255,0.4));
+  letter-spacing: 0.02em;
+  animation: spinner-text-pulse 2s ease-in-out infinite;
+}
+
+@keyframes spinner-rotate {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spinner-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+@keyframes spinner-text-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+/* ─── Widget scroll + loading ─────────────────────────────── */
+.widget-card-body {
+  padding: 4px 0;
+}
+.widget-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  min-height: 80px;
 }

@@ -41,6 +41,8 @@ def _parse_iso(dt_str: str | None) -> datetime | None:
     if not dt_str:
         return None
     if isinstance(dt_str, datetime):
+        if dt_str.tzinfo is None:
+            return dt_str.replace(tzinfo=timezone.utc)
         return dt_str
     s = str(dt_str).strip()
     # Strip trailing Z so fromisoformat can handle UTC

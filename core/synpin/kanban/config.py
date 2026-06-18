@@ -79,6 +79,8 @@ class BoardSettings(BaseModel):
     # Column ID to move tasks to when head_block is called.
     # If empty, blocked tasks stay in their current column with blocked status.
     blocked_column: str | None = None
+    # Custom colors for deadline categories on the deadlines page
+    deadline_colors: dict[str, str] | None = None
 
 
 # ── Defaults ─────────────────────────────────────────────────────────────────

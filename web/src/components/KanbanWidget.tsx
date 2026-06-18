@@ -90,7 +90,8 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
     try {
       const res = await fetch(`${API_BASE}/api/otdels`)
       if (res.ok) {
-        const otdels = await res.json()
+        const data = await res.json()
+        const otdels = Array.isArray(data) ? data : (data.otdels || [])
         const map: Record<string, string> = {}
         for (const o of otdels) {
           const id = o.otdelid || o.id || o.departmentsid || ''

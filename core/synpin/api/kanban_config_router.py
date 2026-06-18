@@ -93,6 +93,7 @@ class BoardSettingsRequest(BaseRequest):
     auto_delete_from_columns: list[str] | None = None
     archive_column: str | None = None
     blocked_column: str | None = None
+    deadline_colors: dict[str, str] | None = None
 
 
 # ── Columns ──────────────────────────────────────────────────────────────────
@@ -426,5 +427,7 @@ def set_settings(req: BoardSettingsRequest) -> dict:
             if req.blocked_column not in valid_ids:
                 raise HTTPException(400, f"Unknown column id: {req.blocked_column}")
             settings.blocked_column = req.blocked_column
+    if req.deadline_colors is not None:
+        settings.deadline_colors = req.deadline_colors if req.deadline_colors else None
     save_settings(settings)
     return {"status": "ok"}

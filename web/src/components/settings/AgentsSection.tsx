@@ -26,6 +26,8 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
   const [newDept, setNewDept] = useState({ name: '', description: '', color: '#3b82f6' })
   const [externalAgents, setExternalAgents] = useState<ExternalAgentData[]>([])
   const [externalDetected, setExternalDetected] = useState(false)
+  const [detecting, setDetecting] = useState(false)
+  const [showSetup, setShowSetup] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [createForm, setCreateForm] = useState({
     name: '', role: '', department: '', model: '',
@@ -56,6 +58,8 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
 
   const roleMap: Record<string, { name: string; color: string }> = {}
   for (const r of roles) roleMap[r.rolesid] = { name: r.name, color: r.color }
+  // Fallback for default role IDs not in roles.yaml
+  if (!roleMap['worker']) roleMap['worker'] = { name: 'Сотрудник', color: '#6b7280' }
   const deptMap: Record<string, { name: string; color: string }> = {}
   for (const d of departments) deptMap[d.departmentsid] = { name: d.name, color: d.color }
 
@@ -88,10 +92,12 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
   }, [])
 
   const detectExternalAgents = useCallback(async () => {
+    setDetecting(true)
     try {
       const res = await fetch(`${API_BASE}/api/external-agents/detect`)
       if (res.ok) { const data = await res.json(); setExternalAgents(data.agents || []); setExternalDetected(true) }
     } catch (e) { console.error('[external-agents] detect error:', e); setExternalDetected(true) }
+    finally { setDetecting(false) }
   }, [])
 
   const fetchTools = useCallback(async () => {
@@ -469,15 +475,46 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
         </div>
       </div>
 
-      {/* External Agents section */}
+      {/* Внешние агенты section */}
       {!externalDetected ? (
         <LoadingSpinner text="Обнаружение внешних агентов..." minHeight={80} />
       ) : externalAgents.length > 0 ? (
         <section className="agents-role-section">
           <h2 className="agents-role-title">
             <span className="agents-role-dot" style={{ background: '#6b7280' }} />
-            External Agents
+            Внешние агенты
           </h2>
+          {/* Gateway warning when agents exist but unavailable */}
+          {externalAgents.some(a => !a.available) && (
+            <div className="external-gateway-warning">
+              <span>⚠️ Гатевей не запущен — агенты не могут получать задачи.</span>
+              <button className="settings-link-btn" onClick={() => setShowSetup(v => !v)}>
+                {showSetup ? 'Скрыть инструкцию' : 'Инструкция по настройке'}
+              </button>
+            </div>
+          )}
+          <div className={`external-agents-setup compact${showSetup ? ' open' : ''}`}>
+            <div className="setup-steps">
+              <div className="setup-step">
+                <span className="setup-step-num">1</span>
+                <div>
+                  <strong style={{ color: 'var(--orange)' }}>Включите API сервер в Hermes</strong>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    Добавьте в <code>~/.hermes/.env</code>: <code>API_SERVER_ENABLED=true</code>
+                  </div>
+                </div>
+              </div>
+              <div className="setup-step">
+                <span className="setup-step-num">2</span>
+                <div>
+                  <strong style={{ color: 'var(--orange)' }}>Запустите шлюз</strong>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    <code>hermes gateway</code> — API на <code>http://127.0.0.1:8642</code>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           <div className="settings-grid">
             {externalAgents.map(agent => (
               <div key={agent.slug} className="agent-card-wrapper"
@@ -562,7 +599,7 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
         <section className="agents-role-section">
           <h2 className="agents-role-title">
             <span className="agents-role-dot" style={{ background: '#6b7280' }} />
-            External Agents
+            Внешние агенты
           </h2>
           <div className="external-agents-setup">
             <div className="setup-icon">
@@ -570,7 +607,7 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
                 <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
               </svg>
             </div>
-            <h3 className="setup-title">Подключение внешних агентов</h3>
+            <h3 className="setup-title" style={{ color: 'var(--orange)' }}>Подключение внешних агентов</h3>
             <p className="setup-desc">
               Внешние агенты — это самостоятельные AI-агенты, работающие отдельно от SynPin.
               Они подключаются через ACP (Agent Communication Protocol) и получают задачи из отделов.
@@ -579,7 +616,7 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
               <div className="setup-step">
                 <span className="setup-step-num">1</span>
                 <div>
-                  <strong>Включите API сервер в Hermes</strong>
+                  <strong style={{ color: 'var(--orange)' }}>Включите API сервер в Hermes</strong>
                   Добавьте в <code>~/.hermes/.env</code>:<br/>
                   <code>API_SERVER_ENABLED=true</code><br/>
                   <code>API_SERVER_KEY=ваш-ключ</code>
@@ -588,21 +625,21 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
               <div className="setup-step">
                 <span className="setup-step-num">2</span>
                 <div>
-                  <strong>Запустите шлюз</strong>
+                  <strong style={{ color: 'var(--orange)' }}>Запустите шлюз</strong>
                   <code>hermes gateway</code> — API сервер поднимется на <code>http://127.0.0.1:8642</code>
                 </div>
               </div>
               <div className="setup-step">
                 <span className="setup-step-num">3</span>
                 <div>
-                  <strong>Обнаружение автоматическое</strong>
+                  <strong style={{ color: 'var(--orange)' }}>Обнаружение автоматическое</strong>
                   SynPin проверяет <code>localhost:8642</code> при загрузке страницы.
                   Когда шлюз запущен — Hermes появится здесь с кнопкой «Активировать».
                 </div>
               </div>
             </div>
-            <button className="settings-btn-primary" onClick={detectExternalAgents} style={{ marginTop: '12px' }}>
-              Проверить снова
+            <button className="settings-btn-primary" onClick={detectExternalAgents} disabled={detecting} style={{ marginTop: '12px' }}>
+              {detecting ? 'Проверяю...' : 'Проверить снова'}
             </button>
           </div>
         </section>

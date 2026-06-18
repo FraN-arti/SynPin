@@ -33,6 +33,8 @@ def _parse_iso(dt_str: str | datetime | None) -> datetime | None:
     if not dt_str:
         return None
     if isinstance(dt_str, datetime):
+        if dt_str.tzinfo is None:
+            return dt_str.replace(tzinfo=timezone.utc)
         return dt_str
     s = str(dt_str).strip()
     if s.endswith("Z"):
@@ -75,9 +77,12 @@ async def _run_deadline_check(svc: Any) -> tuple[list[dict], list[dict]]:
         if deadline is None:
             continue
 
-        # Normalize: ensure timezone-aware
-        if deadline.tzinfo is None:
-            deadline = deadline.replace(tzinfo=timezone.utc)
+        # Normalize: ensure timezone-aware (some tasks store naive datetimes)
+        try:
+            if deadline.tzinfo is None:
+                deadline = deadline.replace(tzinfo=timezone.utc)
+        except Exception:
+            continue
 
         task_id = task.id
         status = getattr(task, "status", "")

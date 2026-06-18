@@ -171,19 +171,29 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
             <div className="modal-body">
               <div className="settings-field">
                 <label>Откуда</label>
-                <select className="settings-input" value={form.from} onChange={e => setForm(f => ({ ...f, from: e.target.value }))}
-                  disabled={!!editing}>
-                  <option value="">— выбрать отдел —</option>
-                  {otdels.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-                </select>
+                <CustomDropdown
+                  value={form.from}
+                  onChange={v => setForm(f => ({ ...f, from: v }))}
+                  options={[
+                    { value: '', label: '— выбрать отдел —' },
+                    ...otdels.map(o => ({ value: o.id, label: o.name })),
+                  ]}
+                  width="100%"
+                  disabled={!!editing}
+                />
               </div>
               <div className="settings-field">
                 <label>Куда</label>
-                <select className="settings-input" value={form.to} onChange={e => setForm(f => ({ ...f, to: e.target.value }))}
-                  disabled={!!editing}>
-                  <option value="">— выбрать отдел —</option>
-                  {otdels.filter(o => o.id !== form.from).map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-                </select>
+                <CustomDropdown
+                  value={form.to}
+                  onChange={v => setForm(f => ({ ...f, to: v }))}
+                  options={[
+                    { value: '', label: '— выбрать отдел —' },
+                    ...otdels.filter(o => o.id !== form.from).map(o => ({ value: o.id, label: o.name })),
+                  ]}
+                  width="100%"
+                  disabled={!!editing}
+                />
               </div>
               <div className="settings-field">
                 <label>Тип связи</label>

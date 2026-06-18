@@ -31,7 +31,11 @@ class OpenAIProvider(BaseProvider):
         """Build the request body for OpenAI-compatible API."""
         api_messages = []
         for m in messages:
-            msg: dict = {"role": m.role, "content": m.content}
+            # Some providers reject null or empty content
+            content = m.content or ""
+            if not content and m.role == "assistant" and m.tool_calls:
+                content = " "  # Space as minimal non-empty content for tool_call messages
+            msg: dict = {"role": m.role, "content": content}
 
             # For tool results, add tool_call_id
             if m.role == "tool" and m.tool_call_id:
@@ -40,9 +44,6 @@ class OpenAIProvider(BaseProvider):
             # For assistant messages with tool_calls
             if m.role == "assistant" and m.tool_calls:
                 msg["tool_calls"] = m.tool_calls
-                # When tool_calls present, content can be null
-                if not m.content:
-                    msg["content"] = None
 
             api_messages.append(msg)
 
@@ -91,6 +92,71 @@ class OpenAIProvider(BaseProvider):
                             import asyncio
                             await asyncio.sleep(1.0 * (attempt + 1))
                             continue
+                        # 400 with tools → retry without tools (provider may not support function calling)
+                        if resp.status_code == 400 and body.get("tools") and attempt == 0:
+                            import logging
+                            error_body = resp.text[:500]
+                            logging.getLogger("synpin.chat").warning("[provider] 400 with tools, retrying without tools. model=%s, response=%s", model, error_body)
+                            body.pop("tools", None)
+                            # Clean up tool-related messages for the retry
+                            clean_msgs = []
+                            for msg in body.get("messages", []):
+                                if msg.get("role") == "tool":
+                                    continue  # Remove tool result messages
+                                if msg.get("tool_calls"):
+                                    msg = {k: v for k, v in msg.items() if k != "tool_calls"}
+                                clean_msgs.append(msg)
+                            body["messages"] = clean_msgs
+                            continue
+                        if resp.status_code == 400:
+                            import logging
+                            _log = logging.getLogger("synpin.chat")
+                            _log.error("[provider] 400 Bad Request. model=%s", model)
+                            # Dump the problematic message
+                            try:
+                                error_msg = resp.json()
+                                err_text = error_msg.get("error", {}).get("message", "")
+                                # Extract message index from "messages.N.content"
+                                import re
+                                idx_match = re.search(r'messages\.(\d+)\.content', err_text)
+                                if idx_match:
+                                    bad_idx = int(idx_match.group(1))
+                                    if bad_idx < len(body.get("messages", [])):
+                                        bad_msg = body["messages"][bad_idx]
+                                        _log.error("[provider] BAD message[%d]: role=%s, content=%s, keys=%s",
+                                                   bad_idx, bad_msg.get("role"), repr(bad_msg.get("content"))[:200],
+                                                   list(bad_msg.keys()))
+                            except Exception as e:
+                                _log.error("[provider] Could not parse error: %s", e)
+                            _log.error("[provider] 400 response: %s", resp.text[:1000])
+                            # Also write to file for debugging
+                            try:
+                                import os
+                                debug_path = os.path.join(os.environ.get("APPDATA", "."), "synpin", "debug_400.log")
+                                os.makedirs(os.path.dirname(debug_path), exist_ok=True)
+                                with open(debug_path, "a", encoding="utf-8") as f:
+                                    f.write(f"\n{'='*60}\n")
+                                    f.write(f"400 Bad Request at {__import__('datetime').datetime.now().isoformat()}\n")
+                                    f.write(f"Model: {model}\n")
+                                    # Try to extract bad message index
+                                    try:
+                                        err_data = resp.json()
+                                        err_inner = json.loads(err_data.get("error", {}).get("message", "{}"))
+                                        err_text = err_inner.get("error", {}).get("message", "")
+                                        f.write(f"Error: {err_text}\n")
+                                        import re
+                                        idx_match = re.search(r'messages\.(\d+)\.content', err_text)
+                                        if idx_match:
+                                            bad_idx = int(idx_match.group(1))
+                                            msgs = body.get("messages", [])
+                                            if bad_idx < len(msgs):
+                                                bad = msgs[bad_idx]
+                                                f.write(f"BAD message[{bad_idx}]: role={bad.get('role')}, content={repr(bad.get('content'))[:300]}, keys={list(bad.keys())}\n")
+                                    except Exception:
+                                        f.write(f"Response: {resp.text[:2000]}\n")
+                                    f.write(f"Total messages: {len(body.get('messages', []))}\n")
+                            except Exception:
+                                pass
                         resp.raise_for_status()
                         data = resp.json()
                         break
@@ -135,6 +201,26 @@ class OpenAIProvider(BaseProvider):
                 headers=headers,
                 json=body,
             ) as response:
+                # 400 with tools → retry without tools
+                if response.status_code == 400 and body.get("tools"):
+                    body.pop("tools", None)
+                    async with client.stream("POST", f"{self.base_url}/chat/completions", headers=headers, json=body) as resp2:
+                        resp2.raise_for_status()
+                        async for line in resp2.aiter_lines():
+                            if not line.startswith("data: "): continue
+                            data_str = line[6:]
+                            if data_str == "[DONE]": break
+                            try: chunk = json.loads(data_str)
+                            except json.JSONDecodeError: continue
+                            for choice in chunk.get("choices", []):
+                                delta = choice.get("delta", {})
+                                content = delta.get("content")
+                                if content: yield content
+                                fr = choice.get("finish_reason")
+                                if fr: finish_reason = fr
+                            if chunk.get("usage"): yield f"__USAGE__:{json.dumps(chunk['usage'])}"
+                    return
+
                 response.raise_for_status()
 
                 async for line in response.aiter_lines():

@@ -34,6 +34,10 @@
   --glow-orange: 0 0 20px rgba(249, 115, 22, 0.15), 0 0 40px rgba(249, 115, 22, 0.05);
   --glow-orange-strong: 0 0 15px rgba(249, 115, 22, 0.25), 0 0 45px rgba(249, 115, 22, 0.1);
   --glow-border: rgba(249, 115, 22, 0.2);
+  /* Semantic */
+  --green: #22c55e;
+  --yellow: #f59e0b;
+  --red: #ef4444;
 }
 
 /* Light Theme */

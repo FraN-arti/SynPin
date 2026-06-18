@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { API_BASE } from '../../config'
+import { DropdownMenu } from '../DropdownMenu'
 
 interface Otdel {
   otdelid: string
@@ -133,11 +134,15 @@ export function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChang
           </div>
           <div className="settings-field">
             <label>Ментор (роль)</label>
-            <select className="settings-input" value={form.mentor_role}
-              onChange={e => setForm(f => ({ ...f, mentor_role: e.target.value }))}>
-              <option value="">Не назначен</option>
-              {roles.map(r => <option key={r.rolesid} value={r.rolesid}>{r.name}</option>)}
-            </select>
+            <DropdownMenu
+              value={form.mentor_role}
+              onChange={v => setForm(f => ({ ...f, mentor_role: v }))}
+              options={[
+                { value: '', label: 'Не назначен' },
+                ...roles.map(r => ({ value: r.rolesid, label: r.name })),
+              ]}
+              width="100%"
+            />
           </div>
           <div className="settings-field">
             <label>Эскалация</label>

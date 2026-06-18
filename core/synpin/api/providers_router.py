@@ -219,6 +219,7 @@ async def test_provider(name: str):
         is_ollama = "ollama.com" in base_url or "ollama.ai" in base_url
         if is_ollama and not api_key:
             return {"status": "error", "message": "Ollama Cloud требует API ключ"}
+        # First: check /models endpoint is reachable
         test_url = f"{base_url}/tags" if is_ollama else f"{base_url}/models"
         try:
             headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
@@ -238,6 +239,22 @@ async def test_provider(name: str):
                     else:
                         model_list = data.get("data", [])
                         model_ids = [m.get("id", m) if isinstance(m, dict) else m for m in model_list[:10]]
+                    # Second: verify API key with a minimal chat completion
+                    if api_key and model_ids:
+                        try:
+                            verify_resp = await client.post(
+                                f"{base_url}/chat/completions",
+                                headers={**headers, "Content-Type": "application/json"},
+                                json={"model": model_ids[0], "messages": [{"role": "user", "content": "ping"}], "max_tokens": 1},
+                                timeout=15.0,
+                            )
+                            if verify_resp.status_code in (401, 403):
+                                return {"status": "error", "message": "Неверный API ключ (модели доступны, но ключ не работает)"}
+                            if verify_resp.status_code == 400:
+                                # 400 might be model-specific, try next model
+                                pass
+                        except Exception:
+                            pass  # chat test is supplementary, don't fail on it
                     return {"status": "ok", "message": f"Connected — {len(model_list)} models available", "models": model_ids}
                 else:
                     return {"status": "error", "message": human_error(resp.status_code, resp.text[:200], test_url)}

@@ -209,7 +209,7 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
   }
 
   return (
-    <div className="kanban-widget">
+    <div className={`kanban-widget${config.compact ? ' compact' : ''}`}>
       {tasks.length === 0 && (
         <div className="widget-empty">Нет задач</div>
       )}

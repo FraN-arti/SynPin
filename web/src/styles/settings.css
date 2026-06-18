@@ -2193,12 +2193,19 @@
 }
 
 .btn-action-delete {
-  /* Delete (×) button */
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: var(--radius, 8px);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
 }
 
 .btn-action-delete:hover {
-  border-color: #ef4444;
-  color: #ef4444;
+  border-color: var(--red, #ef4444);
+  color: var(--red, #ef4444);
   background: rgba(239, 68, 68, 0.08);
 }
 

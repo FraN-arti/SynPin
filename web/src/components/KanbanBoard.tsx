@@ -5,6 +5,7 @@ import { SortableContext, useSortable, arrayMove, horizontalListSortingStrategy 
 import { CSS } from '@dnd-kit/utilities'
 import { PickerMenu } from './PickerMenu'
 import { LoadingSpinner } from './LoadingSpinner'
+import { KanbanStats } from './KanbanStats'
 
 interface Task {
   id: string
@@ -93,7 +94,19 @@ function sortByPriority(tasks: Task[]): Task[] {
 const formatDate = (s: string) => {
   if (!s) return ''
   const d = new Date(s)
-  return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })
+  return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+const formatDateTime = (s: string) => {
+  if (!s) return ''
+  const d = new Date(s)
+  return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+    ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+}
+
+const isDeadlineOverdue = (s: string) => {
+  if (!s) return false
+  return new Date(s) < new Date()
 }
 
 const formatTime = (s: string) => {
@@ -428,6 +441,12 @@ export function KanbanBoard({ wsOn }: KanbanBoardProps) {
     const unsub5 = wsOn('kanban:widget_updated', () => {
       loadWidgetConfig()
     })
+    const unsubDel1 = wsOn('kanban:task_deleted', () => {
+      loadBoard()
+    })
+    const unsubDel2 = wsOn('kanban:tasks_deleted', () => {
+      loadBoard()
+    })
     // Deadline notifications
     const unsub6 = wsOn('kanban:deadline_warning', (data: { task_id: string; title: string; minutes_left: number }) => {
       console.warn(`[kanban] ⏰ Deadline approaching: "${data.title}" — ${data.minutes_left} min left`)
@@ -445,6 +464,8 @@ export function KanbanBoard({ wsOn }: KanbanBoardProps) {
       unsub5()
       unsub6()
       unsub7()
+      unsubDel1()
+      unsubDel2()
     }
   }, [wsOn, loadBoard, loadColumns, loadLabels, loadWidgetConfig])
 
@@ -635,7 +656,9 @@ export function KanbanBoard({ wsOn }: KanbanBoardProps) {
 
       {/* Board */}
       {loading ? (
-        <LoadingSpinner text="Загрузка доски..." />
+        <div className="kanban-loading-wrapper">
+          <LoadingSpinner text="Загрузка доски..." />
+        </div>
       ) : (
         <DndContext collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <SortableContext
@@ -681,13 +704,17 @@ export function KanbanBoard({ wsOn }: KanbanBoardProps) {
         </DndContext>
       )}
 
-      {/* Bottom area — stats and more will go here */}
-      <div className="kanban-bottom">
-        <div className="kanban-bottom-placeholder">
-          <span className="kanban-bottom-icon">📊</span>
-          <span>Статистика и аналитика — скоро</span>
-        </div>
-      </div>
+      {/* Scroll indicator */}
+      <button
+        className="kanban-scroll-indicator"
+        onClick={() => document.getElementById('kanban-stats')?.scrollIntoView({ behavior: 'smooth' })}
+      >
+        <span className="kanban-scroll-arrow">▼</span>
+        <span>Статистика</span>
+      </button>
+
+      {/* Stats section */}
+      <KanbanStats wsOn={wsOn} />
 
       {/* Task Detail Modal — Task 2: cleaned up */}
       {selectedTask && (
@@ -724,7 +751,16 @@ export function KanbanBoard({ wsOn }: KanbanBoardProps) {
                   }}
                 >{selectedDeptName}</span>
               )}
-              {selectedTask.deadline && <span>⏰ {formatDate(selectedTask.deadline)}</span>}
+              {selectedTask.created_at && (
+                <span className="kanban-date-badge created">
+                  📅 {formatDateTime(selectedTask.created_at)}
+                </span>
+              )}
+              {selectedTask.deadline && (
+                <span className={`kanban-date-badge deadline${isDeadlineOverdue(selectedTask.deadline) ? ' overdue' : ''}`}>
+                  ⏰ {formatDate(selectedTask.deadline)}
+                </span>
+              )}
             </div>
 
             {/* Workers */}

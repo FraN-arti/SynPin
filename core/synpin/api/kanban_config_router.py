@@ -91,6 +91,8 @@ class BoardSettingsRequest(BaseRequest):
     auto_escalate_overdue: bool | None = None
     notify_human_on_block: bool | None = None
     auto_delete_from_columns: list[str] | None = None
+    archive_column: str | None = None
+    blocked_column: str | None = None
 
 
 # ── Columns ──────────────────────────────────────────────────────────────────
@@ -405,5 +407,24 @@ def set_settings(req: BoardSettingsRequest) -> dict:
         settings.auto_delete_from_columns = filtered
     if req.notify_human_on_block is not None:
         settings.notify_human_on_block = req.notify_human_on_block
+    if req.archive_column is not None:
+        # Validate: must be a real column id or empty string to clear
+        if req.archive_column == "":
+            settings.archive_column = None
+        else:
+            cols = load_columns()
+            valid_ids = {c.id for c in cols}
+            if req.archive_column not in valid_ids:
+                raise HTTPException(400, f"Unknown column id: {req.archive_column}")
+            settings.archive_column = req.archive_column
+    if req.blocked_column is not None:
+        if req.blocked_column == "":
+            settings.blocked_column = None
+        else:
+            cols = load_columns()
+            valid_ids = {c.id for c in cols}
+            if req.blocked_column not in valid_ids:
+                raise HTTPException(400, f"Unknown column id: {req.blocked_column}")
+            settings.blocked_column = req.blocked_column
     save_settings(settings)
     return {"status": "ok"}

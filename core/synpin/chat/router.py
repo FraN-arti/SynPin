@@ -901,14 +901,66 @@ def build_openai_tools(tool_names: list[str]) -> list[dict] | None:
     return tools if tools else None
 
 
+def build_tool_descriptions(tool_names: list[str]) -> str:
+    """Build text-based tool descriptions for system prompt fallback.
+
+    When native function calling is not available, this provides the model
+    with tool names, descriptions, and parameter schemas so it can generate
+    tool calls as JSON in its text output.
+    """
+    all_names = list(BUILTINS) + [n for n in (tool_names or []) if n not in BUILTINS]
+    if not all_names:
+        return ""
+
+    lines = ["\n## Инструменты\n",
+             "Для работы с задачами используй инструменты. Формат вызова:",
+             '```tool_call',
+             '{"name": "имя_инструмента", "params": {"параметр": "значение"}}',
+             '```',
+             "Можно вызвать несколько инструментов подряд. Результат вернётся автоматически.\n"]
+
+    for name in all_names:
+        tool_def = _NATIVE_TOOL_DEFS.get(name)
+        if not tool_def:
+            continue
+        fn = tool_def.get("function", {})
+        desc = fn.get("description", "")
+        params = fn.get("parameters", {})
+        required = params.get("required", [])
+        props = params.get("properties", {})
+
+        lines.append(f"### {name}")
+        lines.append(f"{desc}")
+        if name == "kanban_task":
+            lines.append("")
+            lines.append("Пример вызова:")
+            lines.append('```tool_call')
+            lines.append('{"name": "kanban_task", "params": {"command": "list"}}')
+            lines.append('```')
+        if props:
+            param_parts = []
+            for pname, pdef in props.items():
+                ptype = pdef.get("type", "string")
+                pdesc = pdef.get("description", "")
+                req = " (required)" if pname in required else ""
+                param_parts.append(f"  - `{pname}` ({ptype}){req}: {pdesc}")
+            lines.append("Parameters:")
+            lines.extend(param_parts)
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 async def execute_tool(tool_name: str, params: dict, agent_slug: str | None = None, otdel_id: str | None = None) -> dict:
     """Execute a tool via the tool registry. Returns result dict."""
     try:
         from ..tools import get_tool_registry
+        import logging
 
         handlers = get_tool_registry()
         handler = handlers.get(tool_name)
         if not handler:
+            logging.getLogger("synpin.chat").warning("[tool] Tool '%s' not found in registry", tool_name)
             return {"success": False, "output": "", "error": f"Tool '{tool_name}' not found in registry"}
 
         # Inject agent_id for memory tools
@@ -920,9 +972,25 @@ async def execute_tool(tool_name: str, params: dict, agent_slug: str | None = No
         if otdel_id and tool_name in head_protocol_tools:
             params = {**params, "otdel_id": otdel_id}
 
+        logging.getLogger("synpin.chat").info("[tool] Executing %s with params=%s", tool_name, {k: str(v)[:100] for k, v in params.items()})
+        try:
+            import os
+            _dbg = os.path.join(os.environ.get("APPDATA", "."), "synpin", "chat_debug.log")
+            with open(_dbg, "a", encoding="utf-8") as f:
+                f.write(f"[tool] Executing {tool_name} with params={dict(params)}\n")
+        except Exception:
+            pass
         result = await handler(params)
+        logging.getLogger("synpin.chat").info("[tool] %s result: success=%s, output=%s",
+                                              tool_name, result.get("success"), str(result.get("output", ""))[:200])
+        try:
+            with open(_dbg, "a", encoding="utf-8") as f:
+                f.write(f"[tool] {tool_name} result: success={result.get('success')}, output={str(result.get('output', ''))[:500]}\n")
+        except Exception:
+            pass
         return result
     except Exception as e:
+        logging.getLogger("synpin.chat").error("[tool] %s error: %s", tool_name, e)
         return {"success": False, "output": "", "error": f"Tool execution error: {e}"}
 
 
@@ -1067,13 +1135,21 @@ async def stream_response(
     # Build initial message list
     chat_messages = list(messages)
 
-    # Prepend system prompt if provided
-    if system_prompt:
-        chat_messages = [ChatMessage(role="system", content=system_prompt)] + chat_messages
-
     # Build native OpenAI tools
     tool_names = tool_names or []
     native_tools = build_openai_tools(tool_names)
+
+    # Always append tool descriptions to system prompt (text-based fallback)
+    # This ensures models know about tools even when native function calling
+    # is not supported by the provider.
+    tool_descriptions = build_tool_descriptions(tool_names)
+
+    # Prepend system prompt if provided (with tool descriptions appended)
+    if system_prompt:
+        full_system = system_prompt + tool_descriptions if tool_descriptions else system_prompt
+        chat_messages = [ChatMessage(role="system", content=full_system)] + chat_messages
+    elif tool_descriptions:
+        chat_messages = [ChatMessage(role="system", content=tool_descriptions)] + chat_messages
 
     usage = None
     model_name = model
@@ -1084,6 +1160,22 @@ async def stream_response(
     _log = logging.getLogger("synpin.chat")
     _tool_names_sent = [t.get("function", {}).get("name", "?") for t in (native_tools or [])]
     _log.info("CHAT tools=%s model=%s provider=%s", _tool_names_sent, model, provider_name if provider else "NONE")
+    # Debug: write to file since uvicorn filters INFO
+    try:
+        import os
+        _dbg = os.path.join(os.environ.get("APPDATA", "."), "synpin", "chat_debug.log")
+        os.makedirs(os.path.dirname(_dbg), exist_ok=True)
+        with open(_dbg, "a", encoding="utf-8") as f:
+            f.write(f"\n{'='*40}\n")
+            f.write(f"stream_response called: model={model}, provider={provider_name}\n")
+            f.write(f"tools={_tool_names_sent}\n")
+            f.write(f"native_tools count={len(native_tools) if native_tools else 0}\n")
+    except Exception:
+        pass
+    if native_tools:
+        _log.info("CHAT sending %d native tools to provider", len(native_tools))
+    else:
+        _log.warning("CHAT NO native tools to send!")
     if native_tools:
         for iteration in range(MAX_TOOL_ITERATIONS):
             # Call LLM non-streaming with tools
@@ -1118,6 +1210,16 @@ async def stream_response(
             _log.info("LLM response: text=%d chars, tool_calls=%d, finish_reason=%s",
                       len(full_text), len(model_tool_calls),
                       "unknown" if not model_tool_calls else "has_calls")
+            if full_text:
+                _log.info("LLM text preview: %s", full_text[:500])
+                try:
+                    import os
+                    _dbg = os.path.join(os.environ.get("APPDATA", "."), "synpin", "chat_debug.log")
+                    with open(_dbg, "a", encoding="utf-8") as f:
+                        f.write(f"LLM response: text={len(full_text)} chars, tool_calls={len(model_tool_calls)}\n")
+                        f.write(f"LLM text: {full_text[:1000]}\n")
+                except Exception:
+                    pass
             # Determine
             is_text_fallback = False
             if not model_tool_calls:
@@ -1125,9 +1227,12 @@ async def stream_response(
                 if text_tool_calls:
                     model_tool_calls = text_tool_calls
                     is_text_fallback = True
+                    _log.info("[text-tools] Parsed %d tool calls from text: %s",
+                              len(text_tool_calls),
+                              [tc.get("function", {}).get("name", "?") for tc in text_tool_calls])
                 else:
-                    # No tool calls at all → yield Phase 1 result directly, skip Phase 2
-                    # (Mistral requires last message to be user/tool, not assistant)
+                    _log.info("[text-tools] No tool calls found in text. Model just responded with text.")
+                    # No tool calls at all → yield result directly
                     if full_text:
                         yield f"data: {json.dumps({'type': 'chunk', 'content': full_text})}\n\n"
                     if usage:

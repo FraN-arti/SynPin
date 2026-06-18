@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 
 import { API_BASE } from '../config'
+import { DropdownMenu } from './DropdownMenu'
 
 interface OtdelData {
   otdelid: string
@@ -175,16 +176,15 @@ export function OtdelSettingsPanel({ otdel, open, onClose, onSaved }: OtdelSetti
                 Нет агентов с ролью «{fullOtdel.mentor_role}»
               </span>
             ) : (
-              <select
-                className="settings-input"
+              <DropdownMenu
                 value={head}
-                onChange={e => setHead(e.target.value)}
-              >
-                <option value="">Не назначен</option>
-                {roleAgents.map(a => (
-                  <option key={a.slug} value={a.slug}>{a.name}</option>
-                ))}
-              </select>
+                onChange={v => setHead(v)}
+                options={[
+                  { value: '', label: 'Не назначен' },
+                  ...roleAgents.map(a => ({ value: a.slug, label: a.name })),
+                ]}
+                width="100%"
+              />
             )}
           </div>
 

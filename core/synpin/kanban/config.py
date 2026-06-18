@@ -73,6 +73,12 @@ class BoardSettings(BaseModel):
     # means no auto-deletion. The default is the standard 'done'
     # column; the user can configure any column(s).
     auto_delete_from_columns: list[str] = Field(default_factory=list)
+    # Column ID to move tasks to when archiving (instead of file move).
+    # If empty, archive moves the YAML file to tasks/archive/.
+    archive_column: str | None = None
+    # Column ID to move tasks to when head_block is called.
+    # If empty, blocked tasks stay in their current column with blocked status.
+    blocked_column: str | None = None
 
 
 # ── Defaults ─────────────────────────────────────────────────────────────────

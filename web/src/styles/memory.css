@@ -1419,7 +1419,49 @@
   -webkit-backdrop-filter: blur(var(--glass-blur));
   overflow-x: auto;
   flex-shrink: 0;
-  animation: fadeIn 0.2s ease;
+  max-height: 200px;
+  opacity: 1;
+  transition: max-height 0.3s ease, opacity 0.2s ease, padding 0.3s ease;
+}
+.otdel-worker-status-bar.collapsed {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+  border-bottom-color: transparent;
+}
+
+.otdel-workers-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: -12px auto 0;
+  padding: 3px 14px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 8px);
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+.otdel-workers-toggle:hover {
+  color: var(--orange);
+  border-color: var(--orange);
+  background: var(--orange-muted);
+}
+.otdel-workers-toggle .toggle-arrow {
+  display: inline-block;
+  transition: transform 0.2s ease;
+  font-size: 10px;
+}
+.otdel-workers-toggle .toggle-arrow.open {
+  transform: rotate(180deg);
 }
 
 .otdel-worker-chip {
@@ -1427,7 +1469,7 @@
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  border-radius: 20px;
+  border-radius: var(--radius, 8px);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--glass-border);
   font-size: 12px;
@@ -1438,14 +1480,14 @@
 
 .otdel-worker-chip.thinking {
   border-color: var(--orange);
-  background: rgba(249, 115, 22, 0.08);
+  background: var(--orange-muted);
   color: var(--white);
 }
 
 .otdel-worker-chip.done {
-  border-color: #22c55e;
+  border-color: var(--green, #22c55e);
   background: rgba(34, 197, 94, 0.06);
-  color: #22c55e;
+  color: var(--green, #22c55e);
 }
 
 .otdel-worker-dot {
@@ -1462,7 +1504,7 @@
 }
 
 .otdel-worker-dot.done {
-  background: #22c55e;
+  background: var(--green, #22c55e);
 }
 
 .otdel-worker-name {
@@ -2285,7 +2327,14 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.kanban-page::-webkit-scrollbar {
+  display: none;
 }
 
 .kanban-header {
@@ -2368,8 +2417,8 @@
   gap: 12px;
   padding: 16px;
   overflow-x: auto;
-  height: 40vh;
-  min-height: 300px;
+  height: calc(80vh - 120px);
+  min-height: 400px;
   flex-shrink: 0;
   align-items: stretch;
 }
@@ -3418,6 +3467,462 @@
   color: var(--text-muted);
   flex-shrink: 0;
   font-family: monospace;
+}
+
+/* ── Column Status Badge ───────────────────────────────────────────────────── */
+
+.status-reference-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 16px;
+}
+.status-ref-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+.status-ref-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 90px;
+  justify-content: center;
+}
+.status-ref-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.col-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Widget Compact Mode ───────────────────────────────────────────────────── */
+
+.kanban-widget.compact .kanban-widget-task {
+  padding: 3px 6px;
+  gap: 6px;
+}
+.kanban-widget.compact .kanban-widget-task-title {
+  font-size: 11px;
+}
+.kanban-widget.compact .kanban-widget-task-dept,
+.kanban-widget.compact .kanban-widget-task-deadline {
+  font-size: 9px;
+}
+.kanban-widget.compact .kanban-widget-status-dot {
+  width: 5px;
+  height: 5px;
+}
+.kanban-widget.compact {
+  gap: 1px;
+}
+
+/* ── Settings Section Label ────────────────────────────────────────────────── */
+
+.settings-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+.settings-section-label:first-child {
+  margin-top: 0;
+}
+
+/* ── Settings Link Button ──────────────────────────────────────────────────── */
+
+.settings-link-btn {
+  background: none;
+  border: none;
+  color: var(--orange, #f97316);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+.settings-link-btn:hover {
+  background: rgba(249, 115, 22, 0.1);
+}
+
+/* ── Widget Column Chip ────────────────────────────────────────────────────── */
+
+.kanban-widget-col-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--glass-border);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+.kanban-widget-col-chip:hover {
+  border-color: var(--orange, #f97316);
+}
+.kanban-widget-col-chip input[type="checkbox"] {
+  width: 12px;
+  height: 12px;
+  accent-color: var(--orange, #f97316);
+}
+
+/* ── Bulk Cleanup ──────────────────────────────────────────────────────────── */
+
+.bulk-task-list {
+  max-height: 240px;
+  overflow-y: auto;
+  margin-top: 8px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 8px);
+  background: var(--glass-bg, rgba(15,15,28,0.55));
+  scrollbar-width: thin;
+  scrollbar-color: var(--gray-600, #4b5563) transparent;
+}
+.bulk-task-list::-webkit-scrollbar {
+  width: 5px;
+}
+.bulk-task-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.bulk-task-list::-webkit-scrollbar-thumb {
+  background: var(--gray-600, #4b5563);
+  border-radius: 3px;
+}
+
+.bulk-task-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-bottom: 1px solid var(--glass-border);
+  font-size: 12px;
+}
+.bulk-task-row:last-child {
+  border-bottom: none;
+}
+.bulk-task-row:hover {
+  background: rgba(255,255,255,0.03);
+}
+.bulk-task-row.selected {
+  background: rgba(249, 115, 22, 0.08);
+}
+.bulk-task-row input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--orange, #f97316);
+  flex-shrink: 0;
+}
+.bulk-task-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.bulk-task-status {
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.05);
+}
+
+/* ── Settings Row (side by side) ───────────────────────────────────────────── */
+
+.kanban-settings-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .kanban-settings-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Settings Stepper (number input) ───────────────────────────────────────── */
+
+.settings-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+  overflow: hidden;
+  width: fit-content;
+}
+.settings-stepper-btn {
+  background: var(--bg-elevated);
+  border: none;
+  color: var(--text);
+  font-size: 16px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.settings-stepper-btn:hover {
+  background: var(--orange-muted);
+  color: var(--orange);
+}
+.settings-stepper-value {
+  width: 44px;
+  height: 32px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--glass-bg);
+  border: none;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  -moz-appearance: textfield;
+  outline: none;
+}
+.settings-stepper-value:focus {
+  background: var(--bg-elevated);
+}
+.settings-stepper-value::-webkit-outer-spin-button,
+.settings-stepper-value::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* ── Column Toggle Buttons (Все/Нет) ──────────────────────────────────────── */
+
+.kanban-col-toggle-btn {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.kanban-col-toggle-btn:hover {
+  background: var(--orange-muted);
+  border-color: var(--orange);
+  color: var(--orange);
+}
+
+/* ── Theme-aware Checkboxes ────────────────────────────────────────────────── */
+
+input[type="checkbox"] {
+  accent-color: var(--orange);
+}
+
+/* ── Label Hash Prefix ────────────────────────────────────────────────────── */
+
+.label-name-input {
+  /* Input for label name — no special border radius needed */
+}
+
+/* ── Bulk Cleanup Select (match site theme) ────────────────────────────────── */
+
+.kanban-date-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+}
+.kanban-date-badge.created {
+  color: var(--text-muted);
+}
+.kanban-date-badge.deadline {
+  color: var(--yellow, #f59e0b);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+.kanban-date-badge.deadline.overdue {
+  color: var(--red, #ef4444);
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.bulk-task-list .settings-input,
+.kanban-bulk-filter select {
+  background: var(--glass-bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius, 8px);
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+/* Theme-aware select options */
+select option {
+  background: var(--gray-950, #07070d);
+  color: var(--text);
+}
+
+/* ── Scroll Indicator ─────────────────────────────────────────────────────── */
+
+.kanban-scroll-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 20px 0;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.kanban-scroll-indicator:hover {
+  color: var(--orange);
+}
+.kanban-scroll-arrow {
+  font-size: 16px;
+  animation: bounceDown 1.5s ease-in-out infinite;
+}
+@keyframes bounceDown {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(4px); }
+}
+
+/* ── Kanban Loading ───────────────────────────────────────────────────────── */
+
+.kanban-loading-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: calc(80vh - 120px);
+}
+
+/* ── Kanban Stats ─────────────────────────────────────────────────────────── */
+
+.kanban-stats {
+  padding: 24px 16px 40px;
+  width: 100%;
+}
+.stats-metrics-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.stats-metric-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 8px);
+  padding: 16px;
+  text-align: center;
+}
+.stats-metric-card.accent .stats-metric-value { color: var(--orange); }
+.stats-metric-card.success .stats-metric-value { color: var(--green, #22c55e); }
+.stats-metric-card.danger .stats-metric-value { color: var(--red, #ef4444); }
+.stats-metric-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+.stats-metric-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.stats-charts-row {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+  grid-template-columns: 1fr 1fr;
+}
+.stats-charts-row:nth-child(2) {
+  grid-template-columns: 3fr 1fr;
+}
+.stats-chart-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 8px);
+  padding: 16px;
+}
+.stats-chart-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--orange);
+  margin: 0 0 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+@media (max-width: 768px) {
+  .stats-metrics-row { grid-template-columns: repeat(2, 1fr); }
+  .stats-charts-row:nth-child(2),
+  .stats-charts-row:nth-child(3) { grid-template-columns: 1fr; }
+}
+
+/* ── Recharts hover fix ───────────────────────────────────────────────────── */
+
+.recharts-bar-rectangle .recharts-rectangle:hover {
+  filter: drop-shadow(0 0 6px rgba(249,115,22,0.3));
+}
+.recharts-active-bar .recharts-rectangle {
+  fill: var(--orange) !important;
+  filter: drop-shadow(0 0 8px rgba(249,115,22,0.4));
+}
+/* Kill white hover background on bar charts */
+.recharts-bar-rectangle > rect {
+  transition: none;
+}
+.recharts-bar-rectangle:hover > rect {
+  fill: inherit;
+}
+.recharts-tooltip-cursor {
+  fill: transparent !important;
+  stroke: none !important;
+}
+/* Remove any recharts active background rectangles */
+g.recharts-active-bar > rect:first-child {
+  fill: transparent !important;
+  stroke: none !important;
 }
 
 /* ── Column Drag Handle ──────────────────────────────────────────────────── */

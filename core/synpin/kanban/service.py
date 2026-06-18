@@ -325,7 +325,35 @@ class KanbanService:
     # ── Delete ────────────────────────────────────────────────────────
 
     def archive_task(self, task_id: str) -> bool:
-        """Move task to archive directory."""
+        """Archive a task.
+
+        If archive_column is configured in BoardSettings, moves the
+        task to that column's status (keeps it visible on the board).
+        Otherwise falls back to moving the YAML file to tasks/archive/.
+        """
+        from .config import load_settings, load_columns
+
+        task = self.get_task(task_id)
+        if task is None:
+            return False
+
+        settings = load_settings()
+
+        # Column-based archive
+        if settings.archive_column:
+            cols = load_columns()
+            target_col = next((c for c in cols if c.id == settings.archive_column), None)
+            if target_col and target_col.status:
+                try:
+                    new_status = TaskStatus(target_col.status)
+                except ValueError:
+                    new_status = None
+                if new_status:
+                    task.move_to(new_status, actor="system")
+                    self.save_task(task)
+                    return True
+
+        # Fallback: file-level archive
         filepath = self._data_dir / f"{task_id}.yaml"
         if not filepath.exists():
             return False

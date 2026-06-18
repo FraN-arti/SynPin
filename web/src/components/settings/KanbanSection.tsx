@@ -52,6 +52,7 @@ interface KanbanColumnForWidget {
 
 export function KanbanSection() {
   const [stats, setStats] = useState<Record<string, unknown> | null>(null)
+  const [boardSettingsKey, setBoardSettingsKey] = useState(0)
 
   useEffect(() => {
     fetch(`${API_BASE}/api/kanban/stats`)
@@ -74,62 +75,81 @@ export function KanbanSection() {
               <div style={{ fontSize: '11px', color: 'var(--gray-500)' }}>Всего задач</div>
             </div>
             <div style={{ padding: '12px', background: 'var(--gray-900)', borderRadius: '8px', textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', fontWeight: '700', color: '#f97316' }}>{(stats.by_status as Record<string, number>)?.in_progress || 0}</div>
+              <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--orange)' }}>{(stats.by_status as Record<string, number>)?.in_progress || 0}</div>
               <div style={{ fontSize: '11px', color: 'var(--gray-500)' }}>В работе</div>
             </div>
             <div style={{ padding: '12px', background: 'var(--gray-900)', borderRadius: '8px', textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', fontWeight: '700', color: '#f59e0b' }}>{(stats.by_status as Record<string, number>)?.review || 0}</div>
+              <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--yellow)' }}>{(stats.by_status as Record<string, number>)?.review || 0}</div>
               <div style={{ fontSize: '11px', color: 'var(--gray-500)' }}>На ревью</div>
             </div>
             <div style={{ padding: '12px', background: 'var(--gray-900)', borderRadius: '8px', textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', fontWeight: '700', color: '#22c55e' }}>{(stats.by_status as Record<string, number>)?.done || 0}</div>
+              <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--green)' }}>{(stats.by_status as Record<string, number>)?.done || 0}</div>
               <div style={{ fontSize: '11px', color: 'var(--gray-500)' }}>Выполнено</div>
             </div>
           </div>
         )}
       </SettingsCard>
 
-      <KanbanColumnsConfig />
-      <KanbanLabelsConfig />
-      <KanbanWidgetConfig />
+      <KanbanColumnsConfig onStatusChange={() => setBoardSettingsKey(k => k + 1)} />
 
-      {/* Board Settings */}
-      <SettingsCard title="Настройки доски">
-        <div className="settings-row-2">
-          <div className="settings-field">
-            <label>Максимум активных задач</label>
-            <input type="number" className="settings-input" defaultValue={50} />
-            <span className="settings-hint">Лимит одновременно открытых задач на доске</span>
+      {/* Status Reference */}
+      <SettingsCard title="Справочник статусов">
+        <p className="settings-hint">Какие статусы использует система и что они означают</p>
+        <div className="settings-divider-thin" />
+        <div className="status-reference-grid">
+          <div className="status-ref-item">
+            <span className="status-ref-badge" style={{ background: 'rgba(107,114,128,0.2)', color: '#9ca3af' }}>BACKLOG</span>
+            <span className="status-ref-desc">Создан, ожидает назначения</span>
           </div>
-          <div className="settings-field">
-            <label>Автоархивация закрытых</label>
-            <select className="settings-input" defaultValue="30d">
-              <option value="7d">7 дней</option>
-              <option value="14d">14 дней</option>
-              <option value="30d">30 дней</option>
-              <option value="90d">90 дней</option>
-              <option value="never">Никогда</option>
-            </select>
-            <span className="settings-hint">Перемещать завершённые задачи в архив через</span>
+          <div className="status-ref-item">
+            <span className="status-ref-badge" style={{ background: 'rgba(59,130,246,0.2)', color: '#60a5fa' }}>TODO</span>
+            <span className="status-ref-desc">Назначен, готов к выполнению</span>
+          </div>
+          <div className="status-ref-item">
+            <span className="status-ref-badge" style={{ background: 'rgba(168,85,247,0.2)', color: '#c084fc' }}>READY</span>
+            <span className="status-ref-desc">В очереди на выполнение</span>
+          </div>
+          <div className="status-ref-item">
+            <span className="status-ref-badge" style={{ background: 'rgba(249,115,22,0.2)', color: '#fb923c' }}>IN PROGRESS</span>
+            <span className="status-ref-desc">Агенты работают над задачей</span>
+          </div>
+          <div className="status-ref-item">
+            <span className="status-ref-badge" style={{ background: 'rgba(245,158,11,0.2)', color: '#fbbf24' }}>REVIEW</span>
+            <span className="status-ref-desc">Готово, глава проверяет</span>
+          </div>
+          <div className="status-ref-item">
+            <span className="status-ref-badge" style={{ background: 'rgba(236,72,153,0.2)', color: '#f472b6' }}>REVISION</span>
+            <span className="status-ref-desc">Отправлено на доработку</span>
+          </div>
+          <div className="status-ref-item">
+            <span className="status-ref-badge" style={{ background: 'rgba(239,68,68,0.2)', color: '#f87171' }}>BLOCKED</span>
+            <span className="status-ref-desc">Заблокировано, нужна помощь человека</span>
+          </div>
+          <div className="status-ref-item">
+            <span className="status-ref-badge" style={{ background: 'rgba(34,197,94,0.2)', color: '#4ade80' }}>DONE</span>
+            <span className="status-ref-desc">Выполнено и принято</span>
           </div>
         </div>
-        <Toggle label="Уведомления о задачах" defaultChecked={true} onChange={() => {}} />
       </SettingsCard>
 
-      {/* Automation */}
-      <SettingsCard title="Автоматизация">
+      {/* Board Settings — under columns */}
+      <BoardSettingsConfig refreshKey={boardSettingsKey} />
+
+      <KanbanLabelsConfig />
+
+      {/* Widget Config + Bulk Cleanup — side by side */}
+      <div className="kanban-settings-row">
+        <KanbanWidgetConfig />
+        <KanbanBulkCleanup />
+      </div>
+
+      {/* Automation — Coming Soon */}
+      <SettingsCard title="Автоматизация" style={{ opacity: 0.5, pointerEvents: 'none' }}>
+        <p className="settings-hint">Автоматическое назначение, эскалация и передача задач между отделами</p>
         <Toggle label="Авто назначение главы" defaultChecked={true} onChange={() => {}} />
-        <Toggle label="Summon при завершении — автоматически передавать задачу следующему отделу" defaultChecked={false} onChange={() => {}} />
-        <Toggle label="Эскалация при простое — эскалировать при превышении дедлайна" defaultChecked={false} onChange={() => {}} />
-        <Toggle label="Запрос человека при блоке — уведомление при эскалации" defaultChecked={false} onChange={() => {}} />
-      </SettingsCard>
-
-      {/* Coming Soon */}
-      <SettingsCard title="Скоро" style={{ opacity: 0.5, pointerEvents: 'none' }}>
-        <Toggle label="Drag & Drop — перетаскивание тасков между колонками" defaultChecked={false} onChange={() => {}} />
-        <Toggle label="Интеграция с Forum — обсуждения задач в форуме агентов" defaultChecked={false} onChange={() => {}} />
-        <Toggle label="Canvas связей — визуализация потока задач между отделами" defaultChecked={false} onChange={() => {}} />
-        <Toggle label="Skills привязка — автоматический подбор агентов по навыкам" defaultChecked={false} onChange={() => {}} />
+        <Toggle label="Summon при завершении" defaultChecked={false} onChange={() => {}} />
+        <Toggle label="Эскалация при простое" defaultChecked={false} onChange={() => {}} />
+        <Toggle label="Запрос человека при блоке" defaultChecked={false} onChange={() => {}} />
       </SettingsCard>
     </div>
   )
@@ -137,7 +157,7 @@ export function KanbanSection() {
 
 // ── KanbanColumnsConfig ────────────────────────────────────────────
 
-function KanbanColumnsConfig() {
+function KanbanColumnsConfig({ onStatusChange }: { onStatusChange?: () => void }) {
   const DEFAULT_COLUMN_AUTO = '__auto__'
   const [columns, setColumns] = useState<KanbanColumnItem[]>([])
   const [defaultColumn, setDefaultColumn] = useState<string>(DEFAULT_COLUMN_AUTO)
@@ -162,8 +182,6 @@ function KanbanColumnsConfig() {
         })
       },
     })
-
-  const [widgetSaving, setWidgetSaving] = useState(false)
 
   useEffect(() => {
     fetch(`${API_BASE}/api/kanban/config/columns`)
@@ -249,6 +267,43 @@ function KanbanColumnsConfig() {
     }, 500)
   }
 
+  const updateStatus = (index: number, status: string) => {
+    const col = columns[index]
+    if (!col) return
+    const newStatus = status === '' ? undefined : status
+    setColumns(prev => prev.map((c, i) => i === index ? { ...c, status: newStatus } : c))
+    patchColumn(col.id, { status: status === '' ? null : status } as any)
+
+    // Auto-link: if status is "blocked", set as blocked_column
+    if (status === 'blocked') {
+      fetch(`${API_BASE}/api/kanban/config/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ blocked_column: col.id }),
+      }).catch(() => {})
+      onStatusChange?.()
+    }
+  }
+
+  const STATUS_COLORS: Record<string, string> = {
+    backlog: '#9ca3af',
+    todo: '#60a5fa',
+    ready: '#c084fc',
+    in_progress: '#fb923c',
+    review: '#fbbf24',
+    revision: '#f472b6',
+    blocked: '#f87171',
+    done: '#4ade80',
+  }
+
+  const STATUS_OPTIONS = [
+    { value: '', label: 'Не назначен' },
+    ...Object.entries(STATUS_COLORS).map(([val, color]) => ({
+      value: val,
+      label: <span style={{ color, fontWeight: 600 }}>{val.replace('_', ' ').toUpperCase()}</span>,
+    })),
+  ]
+
   const addColumn = async () => {
     setSaving(true)
     try {
@@ -310,7 +365,6 @@ function KanbanColumnsConfig() {
   }
 
   const saveDefaultColumn = useCallback(async (value: string | null) => {
-    setWidgetSaving(true)
     try {
       await fetch(`${API_BASE}/api/kanban/config/widget`, {
         method: 'PUT',
@@ -319,13 +373,10 @@ function KanbanColumnsConfig() {
       })
     } catch (e) {
       console.error('[kanban] save default column error:', e)
-    } finally {
-      setWidgetSaving(false)
     }
   }, [])
 
   const saveAutoArchive = useCallback(async (days: number, cols: string[]) => {
-    setWidgetSaving(true)
     try {
       await fetch(`${API_BASE}/api/kanban/config/settings`, {
         method: 'PUT',
@@ -337,8 +388,6 @@ function KanbanColumnsConfig() {
       })
     } catch (e) {
       console.error('[kanban] save auto-archive error:', e)
-    } finally {
-      setWidgetSaving(false)
     }
   }, [])
 
@@ -385,6 +434,12 @@ function KanbanColumnsConfig() {
             placeholder="Описание (для промпта агентов)"
             style={{ flex: 1, minWidth: 120, fontSize: '12px', opacity: 0.7 }}
           />
+          <CustomDropdown
+            value={col.status || ''}
+            onChange={v => updateStatus(i, v)}
+            options={STATUS_OPTIONS}
+            width="120px"
+          />
           <label className="settings-toggle" style={{ margin: 0, fontSize: '12px' }}>
             <input
               type="checkbox"
@@ -409,7 +464,7 @@ function KanbanColumnsConfig() {
             disabled={i === columns.length - 1}
             title="Переместить вниз"
           >↓</button>
-          {saving && savedId === col.id && <span style={{ color: '#22c55e', fontSize: '12px' }}>✓</span>}
+
         </div>
       ))}
       <div style={{ display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -439,9 +494,9 @@ function KanbanColumnsConfig() {
 
           <div
             style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-            title="Задачи из выбранных колонок старше N дней будут удаляться автоматически каждый час"
+            title="Задачи из выбранных колонок старше N дней будут перемещаться в архив автоматически"
           >
-            <label style={{ color: 'var(--text-secondary)', fontSize: '13px', whiteSpace: 'nowrap' }}>Удалить через</label>
+            <label style={{ color: 'var(--text-secondary)', fontSize: '13px', whiteSpace: 'nowrap' }}>Переместить через</label>
             <input
               type="number"
               min={0}
@@ -474,6 +529,7 @@ function KanbanColumnsConfig() {
               width="160px"
               placeholder="Выберите колонки"
             />
+            <label style={{ color: 'var(--text-secondary)', fontSize: '13px', whiteSpace: 'nowrap' }}>в архив</label>
           </div>
 
           <div style={{
@@ -483,7 +539,7 @@ function KanbanColumnsConfig() {
           }} />
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <label style={{ color: 'var(--text-secondary)', fontSize: '13px', whiteSpace: 'nowrap' }}>Стандартно в</label>
+            <label style={{ color: 'var(--text-secondary)', fontSize: '13px', whiteSpace: 'nowrap' }}>Новые таски в</label>
             <CustomDropdown
               value={defaultColumnValue}
               options={defaultColumnOptions}
@@ -494,7 +550,6 @@ function KanbanColumnsConfig() {
           </div>
         </div>
 
-        {widgetSaving && <span style={{ color: '#22c55e', fontSize: '12px' }}>✓</span>}
       </div>
       {/* Undo Toast */}
       {pendingDelete && (
@@ -578,9 +633,11 @@ function KanbanLabelsConfig() {
     patchLabel(label.id, { [field]: value } as Partial<KanbanLabelItem>)
   }
 
-  const updateLabelName = (index: number, name: string) => {
+  const updateLabelName = (index: number, rawName: string) => {
     const label = labels[index]
     if (!label) return
+    // Auto-prepend "#" if user didn't type it
+    const name = rawName.startsWith('#') ? rawName : '#' + rawName
     setLabels(prev => prev.map((l, i) => i === index ? { ...l, name } : l))
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
@@ -605,7 +662,7 @@ function KanbanLabelsConfig() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: 'Новая метка',
+          name: '#Новая метка',
           color: '#3b82f6',
           text_color: '#ffffff',
           description: '',
@@ -652,8 +709,8 @@ function KanbanLabelsConfig() {
               {label.name}
             </span>
             <input
-              className="settings-input"
-              value={label.name}
+              className="settings-input label-name-input"
+              value={label.name.replace(/^#/, '')}
               onChange={e => updateLabelName(i, e.target.value)}
               placeholder="Название метки"
               style={{ flex: 1, minWidth: 120 }}
@@ -683,7 +740,7 @@ function KanbanLabelsConfig() {
               onClick={() => removeLabel(i)}
               title="Удалить метку"
             >×</button>
-            {saving && savedId === label.id && <span style={{ color: '#22c55e', fontSize: '12px' }}>✓</span>}
+
           </div>
           <input
             className="settings-input"
@@ -731,7 +788,8 @@ function KanbanWidgetConfig() {
   })
   const [columns, setColumns] = useState<KanbanColumnForWidget[]>([])
   const [saving, setSaving] = useState(false)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const saveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     fetch(`${API_BASE}/api/kanban/config/widget`)
@@ -749,11 +807,6 @@ function KanbanWidgetConfig() {
       .catch(() => {})
   }, [])
 
-  useEffect(() => {
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
-  }, [])
-
-  const saveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveWidgetConfig = useCallback((newConfig: KanbanWidgetConfigData) => {
     if (saveRef.current) clearTimeout(saveRef.current)
     saveRef.current = setTimeout(async () => {
@@ -769,7 +822,7 @@ function KanbanWidgetConfig() {
       } finally {
         setSaving(false)
       }
-    }, 500)
+    }, 300)
   }, [])
 
   const updateConfig = useCallback((patch: Partial<KanbanWidgetConfigData>) => {
@@ -793,82 +846,114 @@ function KanbanWidgetConfig() {
     })
   }
 
+  const selectAllColumns = () => {
+    const allIds = columns.map(c => c.id)
+    updateConfig({ show_columns: allIds })
+  }
+
+  const selectNoneColumns = () => {
+    updateConfig({ show_columns: [] })
+  }
+
   return (
     <SettingsCard title="Конфигурация виджета" className={saving ? 'saving' : undefined}>
       <p className="settings-hint">Настройте виджет канбан-доски на главной странице</p>
-      <div className="settings-divider-thin" />
+
+      {/* ── Отображение ── */}
+      <div className="settings-section-label">Отображение</div>
       <div className="settings-row-2">
         <div className="settings-field">
-          <label>Режим отображения</label>
-          <select
-            className="settings-input"
+          <label>Режим</label>
+          <CustomDropdown
             value={config.mode}
-            onChange={e => updateConfig({ mode: e.target.value })}
-          >
-            <option value="active">Активные</option>
-            <option value="all">Все задачи</option>
-            <option value="my">Мои задачи</option>
-            <option value="blocked">Заблокированные</option>
-          </select>
-        </div>
-        <div className="settings-field">
-          <label>Максимум элементов: {config.max_items}</label>
-          <input
-            type="range"
-            min={1}
-            max={50}
-            value={config.max_items}
-            onChange={e => updateConfig({ max_items: parseInt(e.target.value) })}
-            style={{ width: '100%' }}
+            onChange={v => updateConfig({ mode: v })}
+            options={[
+              { value: 'active', label: 'Активные' },
+              { value: 'all', label: 'Все задачи' },
+              { value: 'my', label: 'Мои задачи' },
+              { value: 'blocked', label: 'Заблокированные' },
+            ]}
+            width="100%"
           />
         </div>
-      </div>
-      <div className="settings-divider-thin" />
-      <div className="settings-field">
-        <label>Показывать колонки</label>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
-          {columns.length === 0 && (
-            <span style={{ color: 'var(--text-dim)', fontSize: '12px' }}>
-              Загрузка колонок...
-            </span>
-          )}
-          {columns.map(col => (
-            <label
-              key={col.id}
-              className="settings-toggle"
-              style={{
-                margin: 0, fontSize: '12px', display: 'flex', gap: '6px',
-                alignItems: 'center',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                background: col.color ? col.color + '22' : 'transparent',
-                border: '1px solid ' + (col.color || 'var(--border)'),
+        <div className="settings-field">
+          <label>Лимит</label>
+          <div className="settings-stepper">
+            <button
+              className="settings-stepper-btn"
+              onClick={() => updateConfig({ max_items: Math.max(1, config.max_items - 1) })}
+            >−</button>
+            <input
+              type="number"
+              className="settings-stepper-value"
+              value={config.max_items}
+              min={1}
+              max={50}
+              onChange={e => {
+                const v = Math.max(1, Math.min(50, parseInt(e.target.value) || 1))
+                updateConfig({ max_items: v })
               }}
-            >
-              <input
-                type="checkbox"
-                checked={config.show_columns.includes(col.id)}
-                onChange={() => toggleShowColumn(col.id)}
-              />
-              <span
-                style={{
-                  display: 'inline-block', width: '8px', height: '8px',
-                  borderRadius: '50%', background: col.color || '#6b7280',
-                }}
-              />
-              <span>{col.label}</span>
-            </label>
-          ))}
+            />
+            <button
+              className="settings-stepper-btn"
+              onClick={() => updateConfig({ max_items: Math.min(50, config.max_items + 1) })}
+            >+</button>
+          </div>
         </div>
       </div>
+
       <div className="settings-divider-thin" />
+
+      {/* ── Колонки ── */}
+      <div className="settings-section-label">
+        Колонки
+        <span style={{ display: 'inline-flex', gap: '4px', marginLeft: 'auto' }}>
+          <button className="kanban-col-toggle-btn" onClick={selectAllColumns}>Все</button>
+          <button className="kanban-col-toggle-btn" onClick={selectNoneColumns}>Нет</button>
+        </span>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' }}>
+        {columns.length === 0 && (
+          <span style={{ color: 'var(--text-dim)', fontSize: '12px' }}>
+            Нет активных колонок
+          </span>
+        )}
+        {columns.map(col => (
+          <label
+            key={col.id}
+            className="kanban-widget-col-chip"
+            style={{
+              background: config.show_columns.includes(col.id) ? (col.color ? col.color + '33' : 'var(--glass-bg)') : 'transparent',
+              borderColor: config.show_columns.includes(col.id) ? (col.color || 'var(--orange)') : 'var(--glass-border)',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={config.show_columns.includes(col.id)}
+              onChange={() => toggleShowColumn(col.id)}
+            />
+            <span
+              style={{
+                display: 'inline-block', width: '7px', height: '7px',
+                borderRadius: '50%', background: col.color || '#6b7280',
+              }}
+            />
+            <span>{col.label}</span>
+          </label>
+        ))}
+      </div>
+
+      <div className="settings-divider-thin" />
+
+      {/* ── Информация ── */}
+      <div className="settings-section-label">Информация</div>
       <Toggle
-        label="Показывать дедлайн"
+        label="Дедлайн"
         checked={config.show_deadline}
         onChange={v => updateConfig({ show_deadline: v })}
       />
       <Toggle
-        label="Показывать отдел"
+        label="Отдел"
         checked={config.show_department}
         onChange={v => updateConfig({ show_department: v })}
       />
@@ -877,6 +962,337 @@ function KanbanWidgetConfig() {
         checked={config.compact}
         onChange={v => updateConfig({ compact: v })}
       />
+    </SettingsCard>
+  )
+}
+
+// ── BoardSettingsConfig ───────────────────────────────────────────
+
+function BoardSettingsConfig({ refreshKey }: { refreshKey?: number }) {
+  const [settings, setSettings] = useState({
+    max_active_tasks: 50,
+    auto_archive_days: 30,
+    notifications_enabled: true,
+    archive_column: '' as string,
+    blocked_column: '' as string,
+  })
+  const [columns, setColumns] = useState<{ id: string; label: string; enabled: boolean }[]>([])
+
+  const loadSettings = useCallback(() => {
+    fetch(`${API_BASE}/api/kanban/config/settings`)
+      .then(r => r.json())
+      .then(data => {
+        setSettings({
+          max_active_tasks: data.max_active_tasks ?? 50,
+          auto_archive_days: data.auto_archive_days ?? 30,
+          notifications_enabled: data.notifications_enabled ?? true,
+          archive_column: data.archive_column ?? '',
+          blocked_column: data.blocked_column ?? '',
+        })
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => { loadSettings() }, [loadSettings, refreshKey])
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/kanban/config/columns`)
+      .then(r => r.json())
+      .then((cols: { id: string; label: string; enabled: boolean }[]) => {
+        setColumns(cols.filter(c => c.enabled !== false))
+      })
+      .catch(() => {})
+  }, [])
+
+  const save = useCallback(async (patch: Record<string, unknown>) => {
+    try {
+      await fetch(`${API_BASE}/api/kanban/config/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      })
+    } catch (e) {
+      console.error('[kanban] save board settings error:', e)
+    }
+  }, [])
+
+  const update = (patch: Partial<typeof settings>) => {
+    setSettings(prev => ({ ...prev, ...patch }))
+    save(patch)
+  }
+
+  const archiveDaysOptions = [
+    { value: 7, label: '7 дней' },
+    { value: 14, label: '14 дней' },
+    { value: 30, label: '30 дней' },
+    { value: 90, label: '90 дней' },
+    { value: 0, label: 'Никогда' },
+  ]
+
+  return (
+    <SettingsCard title="Настройки доски">
+      <p className="settings-hint">Лимиты, архивация и уведомления глобальной доски задач</p>
+      <div className="settings-row-2">
+        <div className="settings-field">
+          <label>Максимум активных задач</label>
+          <div className="settings-stepper">
+            <button
+              className="settings-stepper-btn"
+              onClick={() => update({ max_active_tasks: Math.max(1, settings.max_active_tasks - 5) })}
+            >−</button>
+            <input
+              type="number"
+              className="settings-stepper-value"
+              value={settings.max_active_tasks}
+              min={1}
+              onChange={e => update({ max_active_tasks: Math.max(1, parseInt(e.target.value) || 1) })}
+            />
+            <button
+              className="settings-stepper-btn"
+              onClick={() => update({ max_active_tasks: settings.max_active_tasks + 5 })}
+            >+</button>
+          </div>
+          <span className="settings-hint">Лимит одновременно открытых задач</span>
+        </div>
+        <div className="settings-field">
+          <label>Автоудаление из колонок через</label>
+          <CustomDropdown
+            value={String(settings.auto_archive_days)}
+            onChange={v => update({ auto_archive_days: parseInt(v) })}
+            options={archiveDaysOptions.map(o => ({ value: String(o.value), label: o.label }))}
+            width="100%"
+          />
+          <span className="settings-hint">Задачи старше этого срока перемещаются в архив</span>
+        </div>
+      </div>
+      <div className="settings-divider-thin" />
+      <div className="settings-row-2">
+        <div className="settings-field">
+          <label>Колонка архива</label>
+          <CustomDropdown
+            value={settings.archive_column}
+            onChange={v => update({ archive_column: v })}
+            options={[
+              { value: '', label: 'Файловый архив (скрытый)' },
+              ...columns.map(col => ({ value: col.id, label: col.label })),
+            ]}
+            width="100%"
+          />
+          <span className="settings-hint">
+            {settings.archive_column
+              ? 'Архивированные задачи перемещаются в эту колонку'
+              : 'Архивированные задачи скрываются с доски (файловый архив)'}
+          </span>
+        </div>
+        <div className="settings-field">
+          <label>Колонка блокировок</label>
+          <CustomDropdown
+            value={settings.blocked_column}
+            onChange={v => update({ blocked_column: v })}
+            options={[
+              { value: '', label: 'Текущая колонка (по умолчанию)' },
+              ...columns.map(col => ({ value: col.id, label: col.label })),
+            ]}
+            width="100%"
+          />
+          <span className="settings-hint">
+            {settings.blocked_column
+              ? 'Заблокированные задачи перемещаются в эту колонку'
+              : 'Заблокированные задачи остаются в текущей колонке'}
+          </span>
+        </div>
+      </div>
+      <div className="settings-divider-thin" />
+      <div className="settings-field">
+        <label>Уведомления <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>🚧 скоро</span></label>
+        <div style={{ opacity: 0.5, pointerEvents: 'none' }}>
+          <Toggle
+            label="Уведомления о задачах"
+            checked={settings.notifications_enabled}
+            onChange={() => {}}
+          />
+        </div>
+        <span className="settings-hint">Создание, смена статуса, эскалация и дедлайны задач</span>
+      </div>
+    </SettingsCard>
+  )
+}
+
+// ── KanbanBulkCleanup ─────────────────────────────────────────────
+
+function KanbanBulkCleanup() {
+  const [tasks, setTasks] = useState<{ id: string; title: string; status: string; department: string }[]>([])
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<{ action: string; processed: number } | null>(null)
+  const [confirmAction, setConfirmAction] = useState<string | null>(null)
+
+  const loadTasks = useCallback(async () => {
+    setLoading(true)
+    try {
+      const url = filterStatus === 'all'
+        ? `${API_BASE}/api/kanban/tasks`
+        : `${API_BASE}/api/kanban/tasks?status=${filterStatus}`
+      const res = await fetch(url)
+      if (res.ok) {
+        const data = await res.json()
+        setTasks(data.map((t: Record<string, unknown>) => ({
+          id: t.id as string,
+          title: t.title as string,
+          status: (t.status as string) || '',
+          department: (t.department as string) || '',
+        })))
+      }
+    } catch (e) {
+      console.error('[kanban] load tasks for cleanup error:', e)
+    } finally {
+      setLoading(false)
+    }
+  }, [filterStatus])
+
+  useEffect(() => { loadTasks() }, [loadTasks])
+
+  const toggleTask = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const selectAll = () => setSelected(new Set(tasks.map(t => t.id)))
+  const selectNone = () => setSelected(new Set())
+
+  const executeBulk = async (action: 'delete' | 'archive') => {
+    if (selected.size === 0) return
+    setConfirmAction(null)
+    setLoading(true)
+    setResult(null)
+    try {
+      const res = await fetch(`${API_BASE}/api/kanban/tasks/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_ids: [...selected], action }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setResult({ action, processed: data.processed })
+        setSelected(new Set())
+        loadTasks()
+      }
+    } catch (e) {
+      console.error('[kanban] bulk action error:', e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const statusLabels: Record<string, string> = {
+    backlog: 'Бэклог', todo: 'К выполнению', in_progress: 'В работе',
+    review: 'Ревью', revision: 'Ревизия', blocked: 'Заблокировано', done: 'Выполнено',
+  }
+
+  return (
+    <SettingsCard title="Массовая чистка">
+      <p className="settings-hint">Выберите задачи для удаления или архивации</p>
+
+      {/* Фильтр + управление */}
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '8px', flexWrap: 'wrap' }}>
+        <CustomDropdown
+          value={filterStatus}
+          onChange={v => { setFilterStatus(v); setSelected(new Set()) }}
+          options={[
+            { value: 'all', label: 'Все статусы' },
+            ...Object.entries(statusLabels).map(([val, label]) => ({ value: val, label })),
+          ]}
+          width="160px"
+        />
+
+        <button className="settings-link-btn" onClick={selectAll}>Выбрать все</button>
+        <button className="settings-link-btn" onClick={selectNone}>Снять</button>
+
+        <span style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--text-muted)' }}>
+          {selected.size} из {tasks.length}
+        </span>
+      </div>
+
+      {/* Список задач */}
+      <div className="bulk-task-list">
+        {loading && tasks.length === 0 && (
+          <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+            Загрузка...
+          </div>
+        )}
+        {!loading && tasks.length === 0 && (
+          <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+            Нет задач
+          </div>
+        )}
+        {tasks.map(task => (
+          <label
+            key={task.id}
+            className={`bulk-task-row${selected.has(task.id) ? ' selected' : ''}`}
+          >
+            <input
+              type="checkbox"
+              checked={selected.has(task.id)}
+              onChange={() => toggleTask(task.id)}
+            />
+            <span className="bulk-task-title">{task.title}</span>
+            <span className="bulk-task-status">{statusLabels[task.status] || task.status}</span>
+          </label>
+        ))}
+      </div>
+
+      {/* Действия */}
+      {selected.size > 0 && (
+        <div style={{ display: 'flex', gap: '8px', marginTop: '10px', alignItems: 'center' }}>
+          {confirmAction ? (
+            <>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                {confirmAction === 'delete'
+                  ? `Удалить ${selected.size} задач? Безвозвратно.`
+                  : `Архивировать ${selected.size} задач?`}
+              </span>
+              <button
+                className="btn-action-delete"
+                onClick={() => executeBulk(confirmAction as 'delete' | 'archive')}
+              >
+                Да
+              </button>
+              <button className="settings-link-btn" onClick={() => setConfirmAction(null)}>
+                Отмена
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className="kanban-create-btn"
+                style={{ padding: '6px 14px', fontSize: '12px' }}
+                onClick={() => setConfirmAction('archive')}
+              >
+                Архивировать ({selected.size})
+              </button>
+              <button
+                className="btn-action-delete"
+                style={{ padding: '6px 14px', fontSize: '12px' }}
+                onClick={() => setConfirmAction('delete')}
+              >
+                Удалить ({selected.size})
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Результат */}
+      {result && (
+        <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--green)' }}>
+          {result.action === 'delete' ? 'Удалено' : 'Архивировано'}: {result.processed} задач
+        </div>
+      )}
     </SettingsCard>
   )
 }

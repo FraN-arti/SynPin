@@ -252,23 +252,19 @@ export function GeneralSection() {
                 { value: 'ru', label: 'Русский' }, { value: 'en', label: 'English' },
               ]} disabled />
             </div>
-          </div>
-          {settings.ui.theme !== 'tweakcn' && (
-            <>
-              <div className="settings-divider-thin" />
-              <div className="settings-field">
-                <label>Скругление углов: <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{settings.ui.border_radius ?? 8}px</span></label>
-                <div className="radius-slider-row">
-                  <span className="radius-label">1px</span>
-                  <input type="range" min={1} max={20} value={settings.ui.border_radius ?? 8}
-                    onChange={e => { const val = parseInt(e.target.value); updateUI('border_radius', val); document.documentElement.style.setProperty('--radius', `${val}px`) }}
-                    className="radius-slider" />
-                  <span className="radius-label">20px</span>
-                </div>
-              </div>
-            </>
-          )}
-          {settings.ui.theme === 'tweakcn' && (
+            </div>
+            <div className="settings-divider-thin" />
+            <div className="settings-field">
+            <label>Скругление углов: <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{settings.ui.border_radius ?? 8}px</span></label>
+            <div className="radius-slider-row">
+              <span className="radius-label">1px</span>
+              <input type="range" min={1} max={20} value={settings.ui.border_radius ?? 8}
+                onChange={e => { const val = parseInt(e.target.value); updateUI('border_radius', val); document.documentElement.style.setProperty('--radius', `${val}px`) }}
+                className="radius-slider" />
+              <span className="radius-label">20px</span>
+            </div>
+            </div>
+            {settings.ui.theme === 'tweakcn' && (
             <div className="tweakcn-section">
               <div className="settings-divider-thin" />
               <h3 className="settings-subsection-title">TweakCN Theme</h3>

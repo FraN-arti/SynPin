@@ -294,7 +294,7 @@ def _build_head_context(history: list[dict], agent_slug: str, exclude_last: bool
     source = history[:-1] if exclude_last else history
     for m in source:
         sender = m.get("sender", "")
-        content = m.get("content", "")
+        content = m.get("content") or ""
 
         if sender == "user":
             context.append({"role": "user", "content": content})
@@ -320,7 +320,7 @@ def _build_worker_context(history: list[dict], agent_slug: str, head_slug: str, 
     context = []
     for m in history[:-1]:  # Exclude current trigger
         sender = m.get("sender", "")
-        content = m.get("content", "")
+        content = m.get("content") or ""
 
         if sender == "user":
             context.append({"role": "user", "content": content})

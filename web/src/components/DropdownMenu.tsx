@@ -19,7 +19,7 @@ import { createPortal } from 'react-dom'
 
 export interface DropdownOption {
   value: string
-  label: string
+  label: ReactNode
   disabled?: boolean
   badge?: ReactNode
 }

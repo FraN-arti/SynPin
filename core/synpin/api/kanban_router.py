@@ -61,6 +61,12 @@ class ActionRequest(BaseRequest):
     detail: str = ""
 
 
+class BulkActionRequest(BaseRequest):
+    """Bulk delete or archive tasks by IDs."""
+    task_ids: list[str]
+    action: str = "delete"  # "delete" or "archive"
+
+
 class SummonRequest(BaseRequest):
     target_department: str
     reason: str
@@ -153,12 +159,28 @@ def create_task(req: CreateTaskRequest) -> dict:
     except ValueError:
         pass
 
+    # Use configured default column if no status specified
     initial_status = TaskStatus.BACKLOG
     if req.status:
         try:
             initial_status = TaskStatus(req.status)
         except ValueError:
             raise HTTPException(400, f"Invalid status: {req.status}")
+    else:
+        # Check widget config for default_column
+        try:
+            from ..kanban.config import load_widget, load_columns
+            widget = load_widget()
+            if widget.default_column:
+                cols = load_columns()
+                target_col = next((c for c in cols if c.id == widget.default_column), None)
+                if target_col and target_col.status:
+                    try:
+                        initial_status = TaskStatus(target_col.status)
+                    except ValueError:
+                        pass  # fallback to BACKLOG
+        except Exception:
+            pass  # fallback to BACKLOG
 
     task = svc.create_task(
         title=req.title,
@@ -470,4 +492,139 @@ def kanban_stats() -> dict:
         "by_status": by_status,
         "by_department": by_department,
         "by_priority": by_priority,
+    }
+
+
+@router.get("/stats/extended")
+def kanban_stats_extended() -> dict:
+    """Extended statistics for charts and analytics."""
+    from datetime import datetime, timedelta, timezone
+    svc = _get_service()
+    all_tasks = svc.list_tasks()
+
+    # ── Basic counts ──
+    by_status: dict[str, int] = {}
+    by_department: dict[str, int] = {}
+    by_priority: dict[str, int] = {}
+    for t in all_tasks:
+        by_status[t.status.value] = by_status.get(t.status.value, 0) + 1
+        if t.department:
+            by_department[t.department] = by_department.get(t.department, 0) + 1
+        by_priority[t.priority.value] = by_priority.get(t.priority.value, 0) + 1
+
+    # ── Overdue tasks ──
+    now = datetime.now(timezone.utc)
+    overdue = 0
+    for t in all_tasks:
+        if t.deadline and t.status.value not in ("done", "blocked"):
+            dl = t.deadline if t.deadline.tzinfo else t.deadline.replace(tzinfo=timezone.utc)
+            if dl < now:
+                overdue += 1
+
+    # ── Daily completions (last 30 days) ──
+    daily_completed: dict[str, int] = {}
+    daily_created: dict[str, int] = {}
+    for t in all_tasks:
+        if t.completed_at:
+            day = t.completed_at.strftime("%Y-%m-%d")
+            daily_completed[day] = daily_completed.get(day, 0) + 1
+        if t.created_at:
+            day = t.created_at.strftime("%Y-%m-%d")
+            daily_created[day] = daily_created.get(day, 0) + 1
+
+    # Fill missing days (last 30)
+    timeline = []
+    for i in range(30, -1, -1):
+        day = (now - timedelta(days=i)).strftime("%Y-%m-%d")
+        timeline.append({
+            "date": day,
+            "completed": daily_completed.get(day, 0),
+            "created": daily_created.get(day, 0),
+        })
+
+    # ── Average completion time (hours) ──
+    completion_times = []
+    for t in all_tasks:
+        if t.completed_at and t.created_at:
+            delta = t.completed_at - t.created_at
+            completion_times.append(delta.total_seconds() / 3600)
+    avg_completion_hours = round(sum(completion_times) / len(completion_times), 1) if completion_times else 0
+
+    # ── Department names mapping (tasks use otdel IDs) ──
+    try:
+        from ..agents.manager import load_otdels
+        otdels_raw = load_otdels()
+        otdels_list = otdels_raw if isinstance(otdels_raw, list) else otdels_raw.get("otdels", [])
+        dept_map = {}
+        for o in otdels_list:
+            oid = o.get("otdelid", "")
+            name = o.get("name", "")
+            if oid and name:
+                dept_map[oid] = name
+    except Exception:
+        dept_map = {}
+
+    by_department_named = {}
+    for dept_id, count in by_department.items():
+        # Handle both ID and name (some tasks store name directly)
+        name = dept_map.get(dept_id, dept_id)
+        # Deduplicate: if name already exists, merge counts
+        if name in by_department_named:
+            by_department_named[name] += count
+        else:
+            by_department_named[name] = count
+
+    return {
+        "total": len(all_tasks),
+        "by_status": by_status,
+        "by_department": by_department_named,
+        "by_priority": by_priority,
+        "overdue": overdue,
+        "avg_completion_hours": avg_completion_hours,
+        "timeline": timeline,
+        "active": by_status.get("in_progress", 0) + by_status.get("review", 0),
+        "done": by_status.get("done", 0),
+    }
+
+
+# ── Bulk Actions ──────────────────────────────────────────────────────────────
+
+@router.post("/tasks/bulk")
+def bulk_action(req: BulkActionRequest) -> dict:
+    """Bulk delete or archive tasks by IDs.
+
+    Returns count of successfully processed tasks.
+    """
+    svc = _get_service()
+    processed = 0
+    errors = []
+
+    for task_id in req.task_ids:
+        try:
+            if req.action == "archive":
+                ok = svc.archive_task(task_id)
+            elif req.action == "delete":
+                ok = svc.delete_task(task_id)
+            else:
+                raise HTTPException(400, f"Unknown action: {req.action}. Use 'delete' or 'archive'.")
+            if ok:
+                processed += 1
+            else:
+                errors.append(f"{task_id}: not found")
+        except Exception as e:
+            errors.append(f"{task_id}: {e}")
+
+    # Broadcast board refresh
+    try:
+        from ..kanban.service import _broadcast
+        _broadcast({"type": "kanban:task_updated", "bulk": True, "action": req.action, "count": processed})
+    except Exception:
+        pass
+
+    return {
+        "status": "ok",
+        "action": req.action,
+        "processed": processed,
+        "total_requested": len(req.task_ids),
+        "errors": errors,
     }

@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { API_BASE } from '../../config'
 import { LoadingSpinner } from '../LoadingSpinner'
+import { DropdownMenu } from '../DropdownMenu'
 import type { AgentData, ExternalAgentData } from './types'
 
 interface RoleInfo { rolesid: string; name: string; description: string; color: string }
@@ -344,25 +345,40 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div className="settings-field">
                   <label>Роль</label>
-                  <select className="settings-input" style={{ cursor: 'pointer' }} value={createForm.role} onChange={e => setCreateForm({ ...createForm, role: e.target.value })}>
-                    <option value="">— не указана —</option>
-                    {roles.map(r => <option key={r.rolesid} value={r.rolesid}>{r.name}</option>)}
-                  </select>
+                  <DropdownMenu
+                    value={createForm.role}
+                    onChange={v => setCreateForm({ ...createForm, role: v })}
+                    options={[
+                      { value: '', label: '— не указана —' },
+                      ...roles.map(r => ({ value: r.rolesid, label: r.name })),
+                    ]}
+                    width="100%"
+                  />
                 </div>
                 <div className="settings-field">
-                  <label>Отдел</label>
-                  <select className="settings-input" style={{ cursor: 'pointer' }} value={createForm.department} onChange={e => setCreateForm({ ...createForm, department: e.target.value })}>
-                    <option value="">— не указан —</option>
-                    {departments.map(d => <option key={d.departmentsid} value={d.departmentsid}>{d.name}</option>)}
-                  </select>
+                  <label>Департамент</label>
+                  <DropdownMenu
+                    value={createForm.department}
+                    onChange={v => setCreateForm({ ...createForm, department: v })}
+                    options={[
+                      { value: '', label: '— не указан —' },
+                      ...departments.map(d => ({ value: d.departmentsid, label: d.name })),
+                    ]}
+                    width="100%"
+                  />
                 </div>
               </div>
               <div className="settings-field">
                 <label>Модель</label>
-                <select className="settings-input" style={{ cursor: 'pointer' }} value={createForm.model} onChange={e => setCreateForm({ ...createForm, model: e.target.value })}>
-                  <option value="">— выбрать позже —</option>
-                  {modelOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
+                <DropdownMenu
+                  value={createForm.model}
+                  onChange={v => setCreateForm({ ...createForm, model: v })}
+                  options={[
+                    { value: '', label: '— выбрать позже —' },
+                    ...modelOptions.map(opt => ({ value: opt, label: opt })),
+                  ]}
+                  width="100%"
+                />
               </div>
               <div className="settings-field">
                 <label>Описание</label>
@@ -502,22 +518,32 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
                       <div className="agent-expanded-body">
                         <div className="expanded-field">
                           <label>Роль</label>
-                          <select className="settings-input" value={agent.role} onChange={e => handleExternalRoleChange(agent, e.target.value)} style={{ cursor: 'pointer' }}>
-                            {roles.map(r => <option key={r.rolesid} value={r.rolesid}>{r.name}</option>)}
-                          </select>
+                          <DropdownMenu
+                            value={agent.role}
+                            onChange={v => handleExternalRoleChange(agent, v)}
+                            options={roles.map(r => ({ value: r.rolesid, label: r.name }))}
+                            width="100%"
+                          />
                         </div>
                         <div className="expanded-field">
-                          <label>Отдел</label>
-                          <select className="settings-input" value={agent.department} onChange={e => handleExternalDeptChange(agent, e.target.value)} style={{ cursor: 'pointer' }}>
-                            {departments.map(d => <option key={d.departmentsid} value={d.departmentsid}>{d.name}</option>)}
-                          </select>
+                          <label>Департамент</label>
+                          <DropdownMenu
+                            value={agent.department}
+                            onChange={v => handleExternalDeptChange(agent, v)}
+                            options={departments.map(d => ({ value: d.departmentsid, label: d.name }))}
+                            width="100%"
+                          />
                         </div>
                         {agent.models.length > 0 && (
                           <div className="expanded-field">
                             <label>Модель</label>
-                            <select className="settings-input" style={{ cursor: 'pointer' }}>
-                              {agent.models.map(model => <option key={model} value={model}>{model}</option>)}
-                            </select>
+                            <DropdownMenu
+                              value={agent.models[0] || ''}
+                              onChange={() => {}}
+                              options={agent.models.map(m => ({ value: m, label: m }))}
+                              width="100%"
+                              disabled
+                            />
                           </div>
                         )}
                         <div className="expanded-toggle-row">
@@ -642,22 +668,33 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
                           <div className="expanded-field"><label>Agent ID</label><span className="agentid-display">{agent.agentid}</span></div>
                           <div className="expanded-field">
                             <label>Роль</label>
-                            <select className="settings-input" value={agent.role} onChange={e => handleAgentRoleChange(agent, e.target.value)} style={{ cursor: 'pointer' }}>
-                              {roles.map(r => <option key={r.rolesid} value={r.rolesid}>{r.name}</option>)}
-                            </select>
+                            <DropdownMenu
+                              value={agent.role}
+                              onChange={v => handleAgentRoleChange(agent, v)}
+                              options={roles.map(r => ({ value: r.rolesid, label: r.name }))}
+                              width="100%"
+                            />
                           </div>
                           <div className="expanded-field">
-                            <label>Отдел</label>
-                            <select className="settings-input" value={agent.department} onChange={e => handleAgentDeptChange(agent, e.target.value)} style={{ cursor: 'pointer' }}>
-                              {departments.map(d => <option key={d.departmentsid} value={d.departmentsid}>{d.name}</option>)}
-                            </select>
+                            <label>Департамент</label>
+                            <DropdownMenu
+                              value={agent.department}
+                              onChange={v => handleAgentDeptChange(agent, v)}
+                              options={departments.map(d => ({ value: d.departmentsid, label: d.name }))}
+                              width="100%"
+                            />
                           </div>
                           <div className="expanded-field">
                             <label>Модель</label>
-                            <select className="settings-input" value={agent.model} onChange={e => handleModelChange(agent, e.target.value)} style={{ cursor: 'pointer' }}>
-                              <option value="">— выбрать —</option>
-                              {modelOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                            </select>
+                            <DropdownMenu
+                              value={agent.model || ''}
+                              onChange={v => handleModelChange(agent, v)}
+                              options={[
+                                { value: '', label: '— выбрать —' },
+                                ...modelOptions.map(opt => ({ value: opt, label: opt })),
+                              ]}
+                              width="100%"
+                            />
                           </div>
                           {agent.provider && <div className="expanded-field"><label>Провайдер</label><span>{agent.provider}</span></div>}
                           <div className="expanded-field">
@@ -689,7 +726,7 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
                                         const isImplemented = tool.implemented !== false
                                         return (
                                           <button key={name} className={`tool-chip ${isEnabled ? 'active' : ''} ${!isImplemented ? 'dimmed' : ''}`}
-                                            onClick={() => isImplemented && handleToolToggle(agent.agentid, name, agent.tools || [])}
+                                            onClick={() => isImplemented && handleToolToggle(agent.slug, name, agent.tools || [])}
                                             title={tool.description + (!isImplemented ? ' (будет доступно позже)' : '')}>
                                             <span className="tool-chip-name">{tool.display}</span>
                                           </button>

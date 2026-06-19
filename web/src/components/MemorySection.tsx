@@ -259,8 +259,8 @@ export function MemorySection() {
                 onBlur={() => saveConfig({ compaction: compactionForm })}
               />
             </div>
-            <div className="settings-field">
-              <label>Объем суммаризации: <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{compactionForm.summary_volume}</span></label>
+            <div className="settings-field" style={{ gridTemplateColumns: '1fr' }}>
+              <label style={{ display: 'block', marginBottom: '10px' }}>Объем суммаризации: <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{compactionForm.summary_volume}</span></label>
               <div className="radius-slider-row">
                 <span className="radius-label">5%</span>
                 <input

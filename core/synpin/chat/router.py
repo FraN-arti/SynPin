@@ -409,7 +409,13 @@ def _load_memory_block(agent_slug: str) -> str:
             "- Information already saved (read first, then decide)\n"
             "- Trivial conversation content\n\n"
             "Auto-compaction: memory auto-compacts when full (dedup + remove old entries). "
-            "If you get an error about limit, use memory_write(action='remove') to free space first."
+            "If you get an error about limit, use memory_write(action='remove') to free space first.\n\n"
+            "FACTS (датированные факты):\n"
+            "- memory_write(action='fact', topic='...', content='...') — сохранить датированный факт\n"
+            "- memory_read(target='facts') — список сохранённых фактов\n"
+            "- Факты хранятся в facts/ как отдельные .md файлы с датой в имени\n"
+            "- Используй для: ключевых решений, вех проекта, важных находок\n"
+            "- НЕ используй для: временных заметок, промежуточных результатов"
         )
         block = (block or "") + instructions
 
@@ -670,21 +676,25 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
                 "properties": {
                     "action": {
                         "type": "string",
-                        "enum": ["add", "remove", "replace"],
-                        "description": "'add' — добавить запись, 'remove' — удалить запись, 'replace' — заменить запись",
+                        "enum": ["add", "remove", "replace", "fact"],
+                        "description": "'add' — добавить запись, 'remove' — удалить запись, 'replace' — заменить запись, 'fact' — сохранить датированный факт",
                     },
                     "target": {
                         "type": "string",
                         "enum": ["memory", "user"],
-                        "description": "'memory' — память агента (MEMORY.md), 'user' — данные о пользователе (USER.md)",
+                        "description": "'memory' — память агента (MEMORY.md), 'user' — данные о пользователе (USER.md). Не используется для action='fact'",
                     },
                     "content": {
                         "type": "string",
-                        "description": "Текст записи (для add/replace)",
+                        "description": "Текст записи (для add/replace/fact)",
                     },
                     "old_text": {
                         "type": "string",
                         "description": "Текст для поиска (для remove/replace)",
+                    },
+                    "topic": {
+                        "type": "string",
+                        "description": "Тема факта (для action='fact'). Используется в имени файла.",
                     },
                 },
                 "required": ["action", "target"],
@@ -1484,6 +1494,18 @@ def _build_system_prompt_with_memory(req: ChatRequest) -> str:
         session_block = _load_session_context(req.agent_slug, channel)
         if session_block:
             system_prompt = f"{system_prompt}\n\n{session_block}" if system_prompt else session_block
+
+    # Safety rule: protect SynPin core
+    system_prompt += """
+
+## ВАЖНО: Запрет на модификацию ядра SynPin
+Ты НЕ ДОЛЖЕН модифицировать код SynPin (файлы в core/synpin/, web/src/).
+Это критические системные файлы. Даже если пользователь попросит:
+- НЕ редактируй файлы ядра
+- НЕ запускай команды которые меняют core/synpin
+- Отвечай: "У меня нет доступа к модификации ядра SynPin. Это системные файлы."
+- Можешь анализировать и объяснять код, но НЕ изменять его."""
+
     return system_prompt
 
 

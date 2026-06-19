@@ -271,4 +271,29 @@ async def memory_write(params: dict[str, Any]) -> dict[str, Any]:
         _write_entries(path, new_entries)
         return {"success": True, "output": f"Replaced. Total entries: {len(new_entries)}", "error": None}
 
+    elif action == "fact":
+        topic = params.get("topic", "")
+        if not topic.strip():
+            return {"success": False, "output": "", "error": "topic is required for fact"}
+        if not content.strip():
+            return {"success": False, "output": "", "error": "content is required for fact"}
+
+        # Facts are stored in agent's facts/ directory
+        facts_dir = agent_dir / "facts"
+        facts_dir.mkdir(parents=True, exist_ok=True)
+
+        import re
+        from datetime import datetime
+        date = datetime.now().strftime("%Y-%m-%d")
+        safe_topic = re.sub(r"[^\w\-]", "_", topic.lower())[:50]
+        filename = f"{date}_{safe_topic}.md"
+        filepath = facts_dir / filename
+
+        fact_content = f"# {date}_{safe_topic}\n\n{content.strip()}\n"
+        try:
+            filepath.write_text(fact_content, encoding="utf-8")
+            return {"success": True, "output": f"Fact saved as {filename}", "error": None}
+        except Exception as e:
+            return {"success": False, "output": "", "error": f"Failed to write fact: {e}"}
+
     return {"success": False, "output": "", "error": f"Unknown action: {action}"}

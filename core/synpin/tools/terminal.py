@@ -1,11 +1,11 @@
-"""Terminal tool — execute shell commands via asyncio subprocess.
+"""Terminal tool — execute shell commands via subprocess.
 
-Runs commands through bash with a 30-second timeout.
+Runs commands through bash (Git Bash on Windows) or cmd with a 30-second timeout.
 Default working directory: first allowed directory (configurable).
 """
 from __future__ import annotations
 
-import asyncio
+import subprocess
 import os
 from pathlib import Path
 
@@ -15,7 +15,7 @@ from .security import get_allowed_roots
 # Default working directory for command execution
 def _get_work_root() -> Path:
     roots = get_allowed_roots()
-    return roots[0] if roots else Path(r"D:\synpin")
+    return roots[0] if roots else Path.home() / ".synpin"
 
 # Maximum execution time in seconds
 _TIMEOUT = 30
@@ -26,7 +26,6 @@ async def terminal(params: dict) -> ToolResult:
 
     Params:
         command (str): The shell command to execute.
-
     Returns:
         ToolResult with combined stdout+stderr output.
     """
@@ -35,21 +34,31 @@ async def terminal(params: dict) -> ToolResult:
         return make_error("Missing required parameter: command")
 
     try:
-        # Use bash (Git Bash on Windows) for POSIX-compatible shell
-        proc = await asyncio.create_subprocess_shell(
-            command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=str(_get_work_root()),
+        # Determine shell: prefer bash (Git Bash on Windows), fallback to cmd
+        import shutil
+        shell_cmd = shutil.which("bash") or shutil.which("sh")
+        if shell_cmd:
+            # Use bash with -c flag
+            cmd_list = [shell_cmd, "-c", command]
+        else:
+            # Windows fallback: use cmd.exe
+            cmd_list = ["cmd", "/c", command]
+
+        cwd = str(_get_work_root())
+
+        proc = subprocess.Popen(
+            cmd_list,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=cwd,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
 
         try:
-            stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                proc.communicate(), timeout=_TIMEOUT
-            )
-        except asyncio.TimeoutError:
+            stdout_bytes, stderr_bytes = proc.communicate(timeout=_TIMEOUT)
+        except subprocess.TimeoutExpired:
             proc.kill()
-            await proc.wait()
+            proc.communicate()
             return make_error(
                 f"Command timed out after {_TIMEOUT}s and was killed.\n"
                 f"Command was: {command}"
@@ -75,4 +84,6 @@ async def terminal(params: dict) -> ToolResult:
         return make_success(output)
 
     except Exception as e:
-        return make_error(f"Failed to execute command: {e}")
+        import logging
+        logging.getLogger("synpin.tools").error("[terminal] %s: %s", type(e).__name__, e)
+        return make_error(f"Failed to execute command: {type(e).__name__}: {e}")

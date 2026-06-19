@@ -218,6 +218,7 @@ class SettingsUpdate(BaseRequest):
     """Partial update for settings.yaml."""
     server: Optional[Dict[str, Any]] = None
     ui: Optional[Dict[str, Any]] = None
+    models: Optional[Dict[str, Any]] = None
     feed: Optional[Dict[str, Any]] = None
     kanban: Optional[Dict[str, Any]] = None
 
@@ -295,6 +296,8 @@ async def update_settings(req: SettingsUpdate):
             full["server"] = _deep_merge(full.get("server", {}), req.server)
         if req.ui is not None:
             full["ui"] = _deep_merge(full.get("ui", {}), req.ui)
+        if req.models is not None:
+            full["models"] = _deep_merge(full.get("models", {}), req.models)
         if req.feed is not None:
             full["feed"] = _deep_merge(full.get("feed", {}), req.feed)
         if req.kanban is not None:

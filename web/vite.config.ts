@@ -23,10 +23,16 @@ export default defineConfig({
       '/api': {
         target: `http://localhost:${backendPort}`,
         changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('error', () => {}) // Suppress errors during backend restart
+        },
       },
       '/ws': {
         target: `ws://localhost:${backendPort}`,
         ws: true,
+        configure: (proxy) => {
+          proxy.on('error', () => {}) // Suppress ECONNABORTED during backend restart
+        },
       },
     },
   },

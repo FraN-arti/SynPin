@@ -108,16 +108,16 @@ def _get_agent_compaction_config(agent_slug: str) -> dict:
             "context_window": full.get("context_window", {}).get("default", 128000),
             "compaction_enabled": full.get("compaction", {}).get("enabled", True),
             "trigger_percent": full.get("compaction", {}).get("trigger_percent", 80),
-            "keep_recent": full.get("compaction", {}).get("keep_recent", 10),
-            "strategy": full.get("compaction", {}).get("strategy", "truncate"),
+            "summary_volume": full.get("compaction", {}).get("summary_volume", 0.2),
+            "strategy": full.get("compaction", {}).get("strategy", "summarize"),
         }
     except Exception:
         global_cfg = {
             "context_window": 128000,
             "compaction_enabled": True,
             "trigger_percent": 80,
-            "keep_recent": 10,
-            "strategy": "truncate",
+            "summary_volume": 0.2,
+            "strategy": "summarize",
         }
 
     # 2. Override with per-agent settings if present
@@ -130,8 +130,8 @@ def _get_agent_compaction_config(agent_slug: str) -> dict:
                 global_cfg["compaction_enabled"] = memory["compaction_enabled"]
             if "compaction_trigger_percent" in memory:
                 global_cfg["trigger_percent"] = memory["compaction_trigger_percent"]
-            if "compaction_keep_recent" in memory:
-                global_cfg["keep_recent"] = memory["compaction_keep_recent"]
+            if "compaction_summary_volume" in memory:
+                global_cfg["summary_volume"] = memory["compaction_summary_volume"]
             if "compaction_strategy" in memory:
                 global_cfg["strategy"] = memory["compaction_strategy"]
             if agent.get("context_window"):
@@ -142,7 +142,7 @@ def _get_agent_compaction_config(agent_slug: str) -> dict:
     return global_cfg
 
 
-def compact_messages(
+async def compact_messages(
     messages: list,
     system_prompt: str = "",
     agent_slug: str = "",
@@ -161,7 +161,8 @@ def compact_messages(
 
     ctx_limit = cfg.get("context_window", 128000)
     trigger_pct = cfg.get("trigger_percent", 80)
-    keep_recent = cfg.get("keep_recent", 10)
+    summary_volume = cfg.get("summary_volume", 0.2)
+    strategy = cfg.get("strategy", "summarize")
 
     # Estimate total tokens
     sys_tokens = _estimate_tokens(system_prompt)
@@ -174,19 +175,72 @@ def compact_messages(
     if total <= threshold:
         return messages, ""
 
-    # Need compaction — trim old messages, keep last N
-    if len(messages) <= keep_recent:
+    # Need compaction
+    if len(messages) <= 2:
         return messages, ""
 
-    # Split: keep system + first message (context) + last N messages
-    trimmed = messages[:1] + messages[-keep_recent:]
-    new_total = sys_tokens + sum(_estimate_tokens(m.get("content", "") or "") for m in trimmed)
-    removed = len(messages) - len(trimmed)
+    # Calculate target sizes
+    target_summary_tokens = int(ctx_limit * summary_volume)
+    available_for_recent = threshold - target_summary_tokens - sys_tokens
 
-    notice = (
-        f"[Компакция: удалено {removed} старых сообщений "
-        f"(~{total:,} → ~{new_total:,} токенов, лимит {ctx_limit:,})]"
-    )
+    # Estimate how many recent messages fit
+    recent_count = 0
+    recent_tokens = 0
+    for i in range(len(messages) - 1, 0, -1):
+        msg_tokens_i = _estimate_tokens(messages[i].get("content", "") or "")
+        if recent_tokens + msg_tokens_i > available_for_recent:
+            break
+        recent_tokens += msg_tokens_i
+        recent_count += 1
+
+    recent_count = max(recent_count, 1)  # Always keep at least 1 recent message
+
+    # Split messages
+    context_msg = messages[:1]
+    old_messages = messages[1:-recent_count] if recent_count < len(messages) - 1 else []
+    recent_messages = messages[-recent_count:]
+
+    if strategy == "summarize" and old_messages:
+        # Try to summarize old messages
+        summary_text = ""
+        try:
+            from .tools.summarize import summarize_for_compaction
+            summary_text = await summarize_for_compaction(old_messages)
+        except Exception as e:
+            logger.warning("[compaction] Summarization failed, using truncate: %s", e)
+
+        if summary_text and not summary_text.startswith("[Суммаризация недоступна"):
+            # Summarization succeeded
+            summary_msg = {
+                "role": "user",
+                "content": f"[Суммаризация предыдущего диалога]\n{summary_text}",
+                "compaction": True,
+            }
+            trimmed = context_msg + [summary_msg] + recent_messages
+            removed = len(messages) - len(trimmed)
+            new_total = sys_tokens + sum(_estimate_tokens(m.get("content", "") or "") for m in trimmed)
+            notice = (
+                f"[Компакция: суммаризовано {removed} сообщений "
+                f"(~{total:,} → ~{new_total:,} токенов)]"
+            )
+        else:
+            # Summarization failed — truncate
+            trimmed = context_msg + recent_messages
+            removed = len(messages) - len(trimmed)
+            new_total = sys_tokens + sum(_estimate_tokens(m.get("content", "") or "") for m in trimmed)
+            notice = (
+                f"[Компакция: удалено {removed} сообщений "
+                f"(~{total:,} → ~{new_total:,} токенов)]"
+            )
+    else:
+        # Truncate strategy
+        trimmed = context_msg + recent_messages
+        removed = len(messages) - len(trimmed)
+        new_total = sys_tokens + sum(_estimate_tokens(m.get("content", "") or "") for m in trimmed)
+        notice = (
+            f"[Компакция: удалено {removed} сообщений "
+            f"(~{total:,} → ~{new_total:,} токенов)]"
+        )
 
     logger.info(
         "Compacted %s: %d → %d messages (~%d → ~%d tokens)",
@@ -875,10 +929,64 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
             },
         },
     },
+    "image_analyze": {
+        "type": "function",
+        "function": {
+            "name": "image_analyze",
+            "description": "Анализ изображения через vision-модель. Используй когда пользователь отправил картинку и нужно описать или проанализировать её содержимое.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "image_url": {
+                        "type": "string",
+                        "description": "Base64 data URL или HTTP URL изображения",
+                    },
+                    "prompt": {
+                        "type": "string",
+                        "description": "Что анализировать (по умолчанию: 'Опиши что изображено на картинке')",
+                    },
+                },
+                "required": ["image_url"],
+            },
+        },
+    },
+    "summarize": {
+        "type": "function",
+        "function": {
+            "name": "summarize",
+            "description": "Суммаризация текста. Используй когда нужно кратко описать длинный текст, диалог или документ.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": "Текст для суммаризации",
+                    },
+                    "max_length": {
+                        "type": "string",
+                        "enum": ["short", "medium", "detailed"],
+                        "description": "Длина суммаризации (по умолчанию: medium)",
+                    },
+                },
+                "required": ["text"],
+            },
+        },
+    },
 }
 
 
-BUILTINS = {"memory_read", "memory_write"}
+BUILTINS = {"memory_read", "memory_write", "image_analyze", "summarize"}
+
+# Head-only tools — not available to regular workers
+HEAD_TOOLS = {"head_delegate", "head_evaluate", "head_retry", "head_decide", "head_block", "kanban_task"}
+
+
+def get_all_tool_names(include_head: bool = False) -> list[str]:
+    """Get all available tool names. All agents get all tools by default."""
+    tools = [n for n in _NATIVE_TOOL_DEFS if n not in HEAD_TOOLS]
+    if include_head:
+        tools.extend(HEAD_TOOLS)
+    return tools
 
 
 def build_openai_tools(tool_names: list[str]) -> list[dict] | None:
@@ -1421,7 +1529,7 @@ async def chat_stream(req: ChatRequest):
     # Compaction: trim old messages if context exceeds limit
     if req.agent_slug:
         msg_dicts = [{"role": m.role, "content": m.content or ""} for m in messages]
-        compacted, notice = compact_messages(msg_dicts, system_prompt, req.agent_slug)
+        compacted, notice = await compact_messages(msg_dicts, system_prompt, req.agent_slug)
         if notice:
             messages = [ChatMessage(role=m["role"], content=m["content"]) for m in compacted]
             system_prompt = f"{system_prompt}\n\n{notice}" if system_prompt else notice
@@ -1573,7 +1681,7 @@ async def chat_complete(req: ChatRequest):
     # Compaction: trim old messages if context exceeds limit
     if req.agent_slug:
         msg_dicts = [{"role": m.role, "content": m.content or ""} for m in messages]
-        compacted, notice = compact_messages(msg_dicts, system_prompt, req.agent_slug)
+        compacted, notice = await compact_messages(msg_dicts, system_prompt, req.agent_slug)
         if notice:
             messages = [ChatMessage(role=m["role"], content=m["content"]) for m in compacted]
             system_prompt = f"{system_prompt}\n\n{notice}" if system_prompt else notice

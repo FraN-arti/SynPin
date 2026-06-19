@@ -336,6 +336,9 @@
   opacity: 1;
   transform: translateY(0);
 }
+.custom-dropdown-menu.open.has-search {
+  max-height: 280px;
+}
 
 /* Portal variant — menu is detached from trigger (rendered in document.body).
    Needs full border (no longer visually fused with the trigger) and
@@ -406,6 +409,42 @@
 
 .dropdown-check {
   color: var(--orange);
+}
+
+/* Dropdown search */
+.custom-dropdown-search-wrap {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-card, #1a1a2e);
+  border-bottom: 1px solid var(--border, rgba(255,255,255,0.08));
+  z-index: 1;
+}
+.custom-dropdown-search-icon {
+  color: var(--text-dim, rgba(255,255,255,0.4));
+  flex-shrink: 0;
+}
+.custom-dropdown-search {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text, #fff);
+  font-size: 13px;
+  font-family: inherit;
+  min-width: 0;
+}
+.custom-dropdown-search::placeholder {
+  color: var(--text-dim, rgba(255,255,255,0.4));
+}
+.custom-dropdown-empty {
+  padding: 10px 12px;
+  color: var(--text-dim, rgba(255,255,255,0.4));
+  font-size: 13px;
+  text-align: center;
 }
 
 /* Toggle */

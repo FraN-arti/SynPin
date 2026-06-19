@@ -7,6 +7,7 @@
 @import "./styles/base.css";        /* Base, themes, CSS variables */
 @import "./styles/layout.css";      /* Logo, sidebar, main area, input */
 @import "./styles/chat.css";        /* Messages, tools, timeline, animations */
+@import "./styles/attachments.css"; /* Image attachments, drag-drop, attach btn */
 @import "./styles/markdown.css";    /* Markdown rendered content */
 @import "./styles/settings.css";    /* Settings page, providers, modals */
 @import "./styles/memory.css";      /* Memory section */

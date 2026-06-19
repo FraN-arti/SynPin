@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { EmojiPicker } from './EmojiPicker'
 import { MarkdownRenderer } from './MarkdownRenderer'
 import { useChatScroll } from '../hooks/useChatScroll'
+import { ImageAttachment, fileToAttachment, extractImagesFromPaste, type ImageAttachment as ImageAttachmentType } from './ImageAttachment'
 
 import { API_BASE } from '../config'
 
@@ -32,6 +33,7 @@ interface ChatMessage {
   provider?: string
   prompt_tokens?: number
   completion_tokens?: number
+  images?: string[]  // base64 data URLs of attached images
 }
 
 interface ToolCall {
@@ -69,6 +71,7 @@ interface OtdelChatViewProps {
 export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChatViewProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
+  const [attachments, setAttachments] = useState<ImageAttachmentType[]>([])
   const [agents, setAgents] = useState<Agent[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [sending, setSending] = useState(false)
@@ -77,6 +80,16 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
   const [workerStatuses, setWorkerStatuses] = useState<Map<string, 'idle' | 'thinking' | 'done'>>(new Map())
   const [showWorkers, setShowWorkers] = useState(false)
   const { sentinelRef: messagesEndRef } = useChatScroll(messages)
+  const attachRef = useRef<{ openPicker: () => void }>(null)
+
+  // ── Stuck state protection ──────────────────────────────────────
+  const clearStuckState = useCallback(() => {
+    setSending(false)
+    setThinkingAgents(new Map())
+    setWorkerStatuses(new Map())
+    // Remove empty assistant placeholders
+    setMessages(prev => prev.filter(m => !(m.role === 'assistant' && !m.content && !m.streaming)))
+  }, [])
 
   // Load agents and departments for color mapping
   useEffect(() => {
@@ -137,7 +150,7 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
     const interval = setInterval(() => {
       if (!sending) return // Only refresh when idle
       loadHistory()
-    }, 5000) // Check every 5 seconds when sending
+    }, 10000) // Check every 10 seconds when sending (fallback for missed WS)
     return () => clearInterval(interval)
   }, [loadHistory, sending])
 
@@ -378,9 +391,17 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
 
 
   const handleSend = async () => {
-    if (!input.trim()) return
+    if (!input.trim() && attachments.length === 0) return
+
+    // If stuck, clear it first
+    if (sending) {
+      clearStuckState()
+    }
+
     const text = input.trim()
+    const userImages = attachments.map(a => a.dataUrl)
     setInput('')
+    setAttachments([])
     setSending(true)
     // Reset worker statuses for new round
     setWorkerStatuses(new Map())
@@ -391,7 +412,8 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
     // Send via WebSocket — backend will push the message back with its own id
     wsSend('otdel:send', {
       otdel_id: otdel.otdelid,
-      message: text,
+      message: text || (userImages.length > 0 ? `[Изображение${userImages.length > 1 ? ` (${userImages.length})` : ''}]` : ''),
+      images: userImages.length > 0 ? userImages : undefined,
     })
   }
 
@@ -413,13 +435,74 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
     setInput(prev => prev + emoji)
   }
 
+  // ── Image attachments ─────────────────────────────────────────
+  const handleAddImages = useCallback(async (files: File[]) => {
+    const newAttachments = await Promise.all(files.map(fileToAttachment))
+    setAttachments(prev => [...prev, ...newAttachments])
+  }, [])
+
+  const handleRemoveImage = useCallback((id: string) => {
+    setAttachments(prev => prev.filter(a => a.id !== id))
+  }, [])
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const images = extractImagesFromPaste(e)
+    if (images.length > 0) {
+      e.preventDefault()
+      handleAddImages(images)
+    }
+  }, [handleAddImages])
+
+  // Drag-n-drop state
+  const [dragOver, setDragOver] = useState(false)
+  const dragCounterRef = useRef(0)
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    dragCounterRef.current++
+    const types = Array.from(e.dataTransfer.types)
+    if (types.includes('Files') || types.includes('text/plain')) setDragOver(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    dragCounterRef.current--
+    if (dragCounterRef.current === 0) setDragOver(false)
+  }, [])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    dragCounterRef.current = 0
+    setDragOver(false)
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))
+    if (files.length > 0) handleAddImages(files)
+  }, [handleAddImages])
+
 
   const isLeftSide = (msg: ChatMessage) => {
     return msg.role === 'user' || msg.sender === 'user' || msg.is_head === true
   }
 
   return (
-    <div className="otdel-chat-view">
+    <div
+      className="otdel-chat-view"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      style={{ position: 'relative' }}
+    >
+      <div className={`chat-drop-overlay ${dragOver ? 'active' : ''}`}>
+        <div className="chat-drop-overlay-inner">
+          <div className="chat-drop-overlay-icon">↓</div>
+          <div className="chat-drop-overlay-text">Перетащите изображение</div>
+          <div className="chat-drop-overlay-hint">PNG, JPEG, WebP, GIF — до 10 МБ</div>
+        </div>
+      </div>
       {/* Header */}
       <div className="otdel-chat-header">
         <div className="otdel-header-info">
@@ -523,6 +606,13 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
                         background: workerColor + '12',
                       } : undefined}
                     >
+                      {msg.images && msg.images.length > 0 && (
+                        <div className="message-images">
+                          {msg.images.map((src, i) => (
+                            <img key={i} src={src} alt={`Изображение ${i + 1}`} className="message-image" />
+                          ))}
+                        </div>
+                      )}
                       <MarkdownRenderer content={msg.content} isStreaming={isStreaming} />
                       </div>
                       {/* Message meta info — time · agent · model */}
@@ -617,18 +707,45 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
 
       {/* Input */}
       <div className="otdel-bottom-input">
+        <ImageAttachment
+          ref={attachRef}
+          images={attachments}
+          onAdd={handleAddImages}
+          onRemove={handleRemoveImage}
+          disabled={sending}
+        />
         <div className="input-bar">
+          <button
+            type="button"
+            className="attach-btn"
+            onClick={() => attachRef.current?.openPicker()}
+            disabled={sending}
+            title="Прикрепить изображение"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+            </svg>
+          </button>
           <EmojiPicker onSelect={handleEmojiSelect} />
           <textarea
             className="chat-textarea"
-            placeholder={compacting ? 'Компакция истории...' : sending ? 'Агенты работают... (Enter — отправить ещё)' : 'Спроси что-нибудь...'}
+            placeholder={compacting ? 'Компакция истории...' : sending ? 'Агенты работают... (Enter — отправить ещё)' : attachments.length > 0 ? 'Опиши что на картинке...' : 'Спроси что-нибудь...'}
             value={input}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             rows={1}
           />
-          <button className="send-btn" onClick={handleSend} disabled={!input.trim() || !!compacting}>
-            →
+          <button className={`send-btn ${sending ? 'stop-mode' : ''}`}
+            onClick={handleSend}
+            disabled={!sending && !input.trim() && attachments.length === 0}
+            title={sending ? 'Остановить' : 'Отправить'}
+          >
+            {sending ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="6" width="12" height="12" rx="2" />
+              </svg>
+            ) : '→'}
           </button>
         </div>
       </div>

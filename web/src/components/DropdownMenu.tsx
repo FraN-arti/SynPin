@@ -33,18 +33,22 @@ export interface DropdownMenuProps {
   disabled?: boolean
   /** Алиас для контроля ширины меню. По умолчанию совпадает с шириной триггера. */
   menuMinWidth?: number
+  /** Показать поле поиска внутри меню (фильтрация по label). */
+  searchable?: boolean
 }
 
 const MENU_GAP = 4 // px between trigger and menu
 const VIEWPORT_PADDING = 8 // keep menu inside viewport
 
-export function DropdownMenu({ value, options, onChange, width, disabled, menuMinWidth }: DropdownMenuProps) {
+export function DropdownMenu({ value, options, onChange, width, disabled, menuMinWidth, searchable }: DropdownMenuProps) {
   const [open, setOpen] = useState(false)
   const [highlighted, setHighlighted] = useState(-1)
   const [position, setPosition] = useState<{ top: number; left: number; width: number; placement: 'bottom' | 'top' } | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const triggerRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const selected = options.find(o => o.value === value)
 
@@ -117,7 +121,30 @@ export function DropdownMenu({ value, options, onChange, width, disabled, menuMi
     onChange(option.value)
     setOpen(false)
     setHighlighted(-1)
+    setSearchQuery('')
   }
+
+  // Filter options by search query (case-insensitive, matches against string labels)
+  const filteredOptions = searchable && searchQuery.trim()
+    ? options.filter(o => {
+        const label = typeof o.label === 'string' ? o.label : String(o.value)
+        return label.toLowerCase().includes(searchQuery.toLowerCase())
+      })
+    : options
+
+  // Auto-focus search input when opened
+  useEffect(() => {
+    if (open && searchable && searchInputRef.current) {
+      // Small delay so the portal DOM is mounted
+      const t = setTimeout(() => searchInputRef.current?.focus(), 0)
+      return () => clearTimeout(t)
+    }
+  }, [open, searchable])
+
+  // Reset search on close
+  useEffect(() => {
+    if (!open) setSearchQuery('')
+  }, [open])
 
   // Render menu into document.body via portal. This is the global fix:
   // it escapes any clipping/stacking-context ancestor, regardless of where
@@ -125,7 +152,7 @@ export function DropdownMenu({ value, options, onChange, width, disabled, menuMi
   const menuNode = open && position ? (
     <div
       ref={menuRef}
-      className={`custom-dropdown-menu open portal`}
+      className={`custom-dropdown-menu open portal ${searchable ? 'has-search' : ''}`}
       role="listbox"
       style={{
         position: 'fixed',
@@ -137,7 +164,31 @@ export function DropdownMenu({ value, options, onChange, width, disabled, menuMi
       }}
       data-placement={position.placement}
     >
-      {options.map((option, i) => (
+      {searchable && (
+        <div className="custom-dropdown-search-wrap">
+          <svg className="custom-dropdown-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" r="8" /><path d="m21 21-4.3-4.3" />
+          </svg>
+          <input
+            ref={searchInputRef}
+            type="text"
+            className="custom-dropdown-search"
+            placeholder="Поиск..."
+            value={searchQuery}
+            onChange={e => { setSearchQuery(e.target.value); setHighlighted(-1) }}
+            onKeyDown={e => {
+              if (e.key === 'ArrowDown') { e.preventDefault(); setHighlighted(h => Math.min(h + 1, filteredOptions.length - 1)) }
+              else if (e.key === 'ArrowUp') { e.preventDefault(); setHighlighted(h => Math.max(h - 1, 0)) }
+              else if (e.key === 'Enter' && highlighted >= 0 && highlighted < filteredOptions.length) { e.preventDefault(); handleSelect(filteredOptions[highlighted]) }
+            }}
+            onMouseDown={e => e.stopPropagation()}
+          />
+        </div>
+      )}
+      {filteredOptions.length === 0 && (
+        <div className="custom-dropdown-empty">Ничего не найдено</div>
+      )}
+      {filteredOptions.map((option, i) => (
         <button
           key={option.value}
           type="button"

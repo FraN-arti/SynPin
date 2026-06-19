@@ -8,6 +8,7 @@ Multiplexed protocol:
 import asyncio
 import re
 import json
+from .router import get_all_tool_names
 import logging
 import uuid
 from dataclasses import dataclass, field
@@ -112,6 +113,43 @@ async def websocket_endpoint(ws: WebSocket):
         ws_manager.disconnect(user_id)
 
 
+async def _auto_analyze_images(images: list[str]) -> str:
+    """Analyze images via image_analyze tool and return text for system prompt."""
+    try:
+        from ..tools.image_analyze import image_analyze
+    except ImportError:
+        return ""
+
+    async def _analyze_one(idx: int, img_url: str) -> str:
+        try:
+            result = await image_analyze({
+                "image_url": img_url,
+                "prompt": "Подробно опиши что изображено на картинке. Цвета, объекты, текст, стиль.",
+            })
+            if result.get("success"):
+                return f"[Изображение {idx+1}]: {result['output']}"
+            else:
+                return f"[Изображение {idx+1}]: не удалось — {result.get('error', 'unknown')}"
+        except Exception as e:
+            logger.warning("[auto_analyze] Failed to analyze image %d: %s", idx, e)
+            return f"[Изображение {idx+1}]: ошибка — {e}"
+
+    try:
+        results = await asyncio.gather(*[_analyze_one(i, url) for i, url in enumerate((images or [])[:3])])
+    except Exception as e:
+        logger.warning("[auto_analyze] Error: %s", e)
+        return ""
+
+    if not results:
+        return ""
+
+    return (
+        "\n\n[АНАЛИЗ ИЗОБРАЖЕНИЙ — выполнено автоматически]\n"
+        + "\n\n".join(results)
+        + "\n\n[Конец анализа изображений. Используй эти описания для ответа пользователю.]"
+    )
+
+
 async def _handle_chat_send(user_id: str, msg: dict):
     """Handle private chat message — stream LLM response via WS."""
     from .router import registry, _build_system_prompt_with_memory, _load_chat_history, _save_chat_history
@@ -127,6 +165,7 @@ async def _handle_chat_send(user_id: str, msg: dict):
     message = msg.get("message", "")
     channel_id = msg.get("channel_id", "web")
     system_prompt = msg.get("system_prompt", "")
+    images = msg.get("images")  # list[str] of base64 data URLs
 
     if not agent_slug or not message:
         await ws_manager.send(user_id, {"type": "error", "message": "Missing agent_slug or message"})
@@ -137,22 +176,48 @@ async def _handle_chat_send(user_id: str, msg: dict):
     req = SimpleNamespace(agent_slug=agent_slug, system_prompt=system_prompt, channel_id=channel_id)
     full_system_prompt = _build_system_prompt_with_memory(req)
 
-    # Load history + add user message
+    # Load history + add user message (with images)
     history = _load_chat_history(agent_slug, channel_id)
-    history.append({"role": "user", "content": message, "timestamp": datetime.now().isoformat()})
+    user_entry = {"role": "user", "content": message, "timestamp": datetime.now().isoformat()}
+    if images:
+        user_entry["images"] = images
+    history.append(user_entry)
     _save_chat_history(agent_slug, channel_id, history)
+
+    # Auto-analyze images BEFORE sending to agent
+    if images:
+        full_system_prompt += await _auto_analyze_images(images)
 
     # Compaction: trim old messages if context exceeds limit (internal agents only)
     from .router import compact_messages
-    compacted_history, compaction_notice = compact_messages(
+    compacted_history, compaction_notice = await compact_messages(
         history,
         system_prompt=full_system_prompt,
         agent_slug=agent_slug,
     )
     if compaction_notice:
         logger.info("WS chat compaction for %s: %s", agent_slug, compaction_notice)
+        # Notify client about compaction
+        await ws_manager.send(user_id, {
+            "type": "chat:compacting",
+            "agent_slug": agent_slug,
+            "notice": compaction_notice,
+            "before": len(history),
+            "after": len(compacted_history),
+        })
 
-    messages = [ChatMessage(role=m["role"], content=m["content"]) for m in compacted_history]
+    # Build messages — only pass images from the LAST user message
+    # (old images are already analyzed by auto_analyze, no need to send raw base64)
+    last_user_idx = None
+    for i in range(len(compacted_history) - 1, -1, -1):
+        if compacted_history[i].get("role") == "user":
+            last_user_idx = i
+            break
+
+    messages = []
+    for i, m in enumerate(compacted_history):
+        msg_images = m.get("images") if i == last_user_idx else None
+        messages.append(ChatMessage(role=m["role"], content=m["content"], images=msg_images))
 
     # Get provider/model
     from ..agents.manager import get_agent
@@ -161,7 +226,7 @@ async def _handle_chat_send(user_id: str, msg: dict):
     model = agent_data.get("model", "default") if agent_data else "default"
     temperature = agent_data.get("temperature", 0.7) if agent_data else 0.7
     max_tokens = agent_data.get("max_tokens", 4096) if agent_data else 4096
-    tool_names = agent_data.get("tools", []) if agent_data else []
+    tool_names = get_all_tool_names()
 
     if provider_name and model.startswith(f"{provider_name}/"):
         model = model[len(provider_name) + 1:]
@@ -240,6 +305,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
 
     otdel_id = msg.get("otdel_id", "")
     message = msg.get("message", "")
+    images = msg.get("images")  # list[str] of base64 data URLs
 
     if not otdel_id or not message:
         await ws_manager.send(user_id, {"type": "error", "message": "Missing otdel_id or message"})
@@ -261,6 +327,8 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         "content": message,
         "timestamp": datetime.now().isoformat(),
     }
+    if images:
+        user_msg["images"] = images
     history.append(user_msg)
     save_stats = _save_history(otdel_id, history)
     if save_stats.get("was_compacted"):
@@ -326,13 +394,17 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         system_prompt = _build_otdel_system_prompt(otdel, agent, is_head)
         history = _load_history(otdel_id)
 
+        # Auto-analyze images from the current user message
+        if images:
+            system_prompt += await _auto_analyze_images(images)
+
         if is_head:
             context_messages = _build_head_context(history, agent_slug_val)
             head_processed = True
         else:
             context_messages = _build_worker_context(history, agent_slug_val, head_slug, head_name)
 
-        messages = [ChatMessage(role=m["role"], content=m["content"]) for m in context_messages]
+        messages = [ChatMessage(role=m["role"], content=m["content"], images=m.get("images")) for m in context_messages]
         messages.append(ChatMessage(role="user", content=trigger_message))
 
         model = agent.get("model", "default")
@@ -342,12 +414,10 @@ async def _handle_otdel_send(user_id: str, msg: dict):
 
         # Determine tools for this agent
         if is_head:
-            # Head gets their configured tools + head protocol tools (builtin, otdel-only)
-            agent_tools = list(agent.get("tools", []))
-            head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_decide", "head_block", "kanban_task"]
-            tool_names = agent_tools + head_protocol_tools
+            # Head gets all tools including head protocol tools
+            tool_names = get_all_tool_names(include_head=True)
         else:
-            tool_names = agent.get("tools", [])
+            tool_names = get_all_tool_names()
 
         # Stream LLM response via WebSocket chunks
         agent_msg_id = f"a-{uuid.uuid4().hex[:8]}"
@@ -608,7 +678,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         else:
             acknowledge_trigger = "Работники отдела ответили. Посмотри их ответы и прокомментируй, если нужно."
 
-        messages = [ChatMessage(role=m["role"], content=m["content"]) for m in context_messages]
+        messages = [ChatMessage(role=m["role"], content=m["content"], images=m.get("images")) for m in context_messages]
         messages.append(ChatMessage(role="user", content=acknowledge_trigger))
 
         system_prompt = _build_otdel_system_prompt(otdel, head_agent, True)
@@ -617,10 +687,8 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         if provider_name and model.startswith(f"{provider_name}/"):
             model = model[len(provider_name) + 1:]
 
-        # Head gets head protocol tools in follow-up too
-        head_agent_tools = list(head_agent.get("tools", []))
-        head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_decide", "head_block", "kanban_task"]
-        tool_names = head_agent_tools + head_protocol_tools
+        # Head gets all tools including head protocol
+        tool_names = get_all_tool_names(include_head=True)
 
         # Stream follow-up response
         followup_msg_id = f"a-{uuid.uuid4().hex[:8]}"
@@ -737,12 +805,16 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         system_prompt = _build_otdel_system_prompt(otdel, agent, is_head)
         history = _load_history(otdel_id)
 
+        # Auto-analyze images from the current user message
+        if images:
+            system_prompt += await _auto_analyze_images(images)
+
         if is_head:
             context_messages = _build_head_context(history, agent_slug_val)
         else:
             context_messages = _build_worker_context(history, agent_slug_val, head_slug, head_name)
 
-        messages = [ChatMessage(role=m["role"], content=m["content"]) for m in context_messages]
+        messages = [ChatMessage(role=m["role"], content=m["content"], images=m.get("images")) for m in context_messages]
         messages.append(ChatMessage(role="user", content=trigger_message))
 
         model = agent.get("model", "default")
@@ -751,9 +823,9 @@ async def _handle_otdel_send(user_id: str, msg: dict):
             model = model[len(provider_name) + 1:]
 
         if is_head:
-            tool_names = list(agent.get("tools", [])) + ["head_delegate", "head_evaluate", "head_retry", "head_decide", "kanban_task"]
+            tool_names = get_all_tool_names(include_head=True)
         else:
-            tool_names = agent.get("tools", [])
+            tool_names = get_all_tool_names()
 
         agent_msg_id = f"a-{uuid.uuid4().hex[:8]}"
         full_response = ""

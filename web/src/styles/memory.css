@@ -1779,6 +1779,14 @@
   opacity: 0.85;
 }
 
+.otdel-bottom-input .send-btn.stop-mode {
+  background: #ef4444;
+  animation: stopPulse 1.5s ease infinite;
+}
+.otdel-bottom-input .send-btn.stop-mode:hover {
+  background: #dc2626;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    Otdel Settings Panel (slide-out from left)
    ═══════════════════════════════════════════════════════════════ */
@@ -2032,7 +2040,8 @@
 }
 
 /* ── Compaction Banner (in chat) ─────────────────────────────── */
-.otdel-compaction-banner {
+.otdel-compaction-banner,
+.compaction-banner {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4455,6 +4464,7 @@ g.recharts-active-bar > rect:first-child {
   display: flex;
   align-items: center;
   gap: 10px;
+  padding: 0 2px;
 }
 
 .radius-label {

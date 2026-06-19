@@ -127,6 +127,25 @@ def _auto_compact(entries: list[str], limit: int) -> list[str]:
     return entries
 
 
+async def _summarize_entries(entries: list[str], target_chars: int) -> list[str]:
+    """Summarize memory entries using LLM to fit within target char limit.
+
+    Uses the configured summarization model, or falls back to simple compaction.
+    """
+    try:
+        from .summarize import summarize_for_compaction
+        # Convert entries to a single text block
+        text = "\n".join(entries)
+        summary = await summarize_for_compaction([{"role": "user", "content": text}])
+        if summary and len(summary) <= target_chars:
+            return [summary]
+    except Exception as e:
+        logger.warning("[memory] LLM summarization failed: %s", e)
+
+    # Fallback to simple compaction
+    return _auto_compact(entries, target_chars)
+
+
 async def memory_write(params: dict[str, Any]) -> dict[str, Any]:
     """Write to agent memory.
 
@@ -171,9 +190,9 @@ async def memory_write(params: dict[str, Any]) -> dict[str, Any]:
         compacted = False
 
         if test_total > limit:
-            # Auto-compact existing entries first
+            # Auto-compact existing entries first (LLM summarize if available)
             before_count = len(entries)
-            entries = _auto_compact(entries, limit)
+            entries = await _summarize_entries(entries, limit)
             compacted = len(entries) < before_count
 
             # Check again after compaction

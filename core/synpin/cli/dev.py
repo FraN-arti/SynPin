@@ -281,6 +281,51 @@ def _wait_for_backend(port: int, core_proc: subprocess.Popen) -> bool:
     return False
 
 
+def _wait_for_file_change(timeout: int = 300) -> bool:
+    """Wait for a file change in the project. Returns True if change detected."""
+    try:
+        import watchdog.observers
+        import watchdog.events
+    except ImportError:
+        # Fallback: just wait and assume change
+        console.print("[dim]watchdog not installed — waiting 5s for change...[/dim]")
+        time.sleep(5)
+        return True
+
+    project_root = _project_root()
+
+    class ChangeHandler(watchdog.events.FileSystemEventHandler):
+        def __init__(self):
+            self.changed = False
+        def on_modified(self, event):
+            if not event.is_directory and event.src_path.endswith(('.py', '.tsx', '.ts', '.css')):
+                self.changed = True
+        def on_created(self, event):
+            if not event.is_directory and event.src_path.endswith(('.py', '.tsx', '.ts', '.css')):
+                self.changed = True
+
+    handler = ChangeHandler()
+    observer = watchdog.observers.Observer()
+    try:
+        observer.schedule(handler, str(project_root / "core"), recursive=True)
+    except Exception:
+        pass
+    try:
+        observer.schedule(handler, str(project_root / "web" / "src"), recursive=True)
+    except Exception:
+        pass
+    observer.start()
+    try:
+        for _ in range(timeout * 2):  # Check every 0.5s
+            if handler.changed:
+                return True
+            time.sleep(0.5)
+        return False
+    finally:
+        observer.stop()
+        observer.join()
+
+
 def _start_core(port: int) -> subprocess.Popen:
     """Start the FastAPI core server."""
     env = os.environ.copy()
@@ -486,42 +531,72 @@ def run_dev_server() -> None:
         while not printer_stop.is_set():
             for proc in processes:
                 if proc.poll() is not None:
-                    if proc is core_proc and not core_reloaded:
-                        # Core exited — might be a reload.
-                        if core_exit_time is None:
-                            core_exit_time = time.time()
-                        # Check if port is still being served (uvicorn reloaded)
-                        if _port_alive(core_port):
-                            console.print("[success]Core reloaded — watching port for further changes.[/success]")
-                            core_reloaded = True
-                            continue
-                        # Port is down — check grace period
-                        if time.time() - core_exit_time > CORE_RELOAD_GRACE_S:
-                            console.print(
-                                f"[error]❌  Core exited with code {proc.returncode} (port {core_port} down for >{CORE_RELOAD_GRACE_S}s)[/error]"
-                            )
-                            _shutdown()
-                        # else: still waiting for reload
+                    if proc is core_proc:
+                        exit_code = proc.returncode
+                        if exit_code == 0 and not core_reloaded:
+                            # Clean exit — might be uvicorn reload
+                            if core_exit_time is None:
+                                core_exit_time = time.time()
+                            if _port_alive(core_port):
+                                console.print("[success]Core reloaded — watching for changes.[/success]")
+                                core_reloaded = True
+                                continue
+                            if time.time() - core_exit_time > CORE_RELOAD_GRACE_S:
+                                console.print(f"[error]❌ Core exited cleanly but port down for >{CORE_RELOAD_GRACE_S}s[/error]")
+                                _shutdown()
+                        elif exit_code != 0:
+                            # Core crashed — bad code, skip reload
+                            console.print(f"[error]❌ Core crashed (exit {exit_code}) — skipping reload. Fix the error and save.[/error]")
+                            console.print("[dim]Waiting for file changes...[/dim]")
+                            # Restart core — if it fails again, we'll catch it
+                            try:
+                                core_proc = _start_core(core_port)
+                                processes[0] = core_proc
+                                threading.Thread(target=_stream_output, args=(core_proc, "CORE", output_queue), daemon=True).start()
+                                _wait_for_backend(core_port, core_proc)
+                                if core_proc.poll() is not None:
+                                    # Still crashing — wait for user to fix
+                                    console.print("[dim]Core still crashing. Waiting for file change to retry...[/dim]")
+                                    _wait_for_file_change()
+                                    core_proc = _start_core(core_port)
+                                    processes[0] = core_proc
+                                    threading.Thread(target=_stream_output, args=(core_proc, "CORE", output_queue), daemon=True).start()
+                                    _wait_for_backend(core_port, core_proc)
+                                    if core_proc.poll() is None:
+                                        console.print("[success]Core recovered after fix.[/success]")
+                                        core_reloaded = True
+                                    else:
+                                        console.print("[error]❌ Core still crashing after fix. Shutting down.[/error]")
+                                        _shutdown()
+                                else:
+                                    console.print("[success]Core restarted after crash.[/success]")
+                                    core_reloaded = True
+                                    core_exit_time = None
+                            except Exception as e:
+                                console.print(f"[error]Failed to restart core: {e}[/error]")
+                                _shutdown()
+                        # else: clean exit + already reloaded = ignore
                     elif proc is not core_proc:
-                        console.print(
-                            f"[error]❌  Web exited with code {proc.returncode}[/error]"
-                        )
-                        _shutdown()
-                    # If core_reloaded is True, skip poll — we monitor port instead
+                        # Web (Vite) exited
+                        if core_reloaded and _port_alive(core_port):
+                            console.print(f"[warning]⚠ Web exited (code {proc.returncode}), restarting...[/warning]")
+                            new_web = _start_web(web_port, core_port)
+                            processes[1] = new_web
+                            threading.Thread(target=_stream_output, args=(new_web, "WEB", output_queue), daemon=True).start()
+                        else:
+                            console.print(f"[error]❌ Web exited with code {proc.returncode}[/error]")
+                            _shutdown()
 
-            # After first reload, monitor the port for subsequent reloads/crashes
+            # After first reload, monitor port for subsequent crashes
             if core_reloaded and not _port_alive(core_port):
-                # Port went down — might be another reload cycle
-                # Wait grace period to see if it comes back
                 grace_start = time.time()
                 while time.time() - grace_start < CORE_RELOAD_GRACE_S:
                     if _port_alive(core_port):
-                        console.print("[success]Core reloaded again.[/success]")
+                        console.print("[success]Core reloaded.[/success]")
                         break
                     time.sleep(0.5)
                 else:
-                    # Grace period expired — port still down = real crash
-                    console.print(f"[error]❌  Core port {core_port} is down (real crash, not reload).[/error]")
+                    console.print(f"[error]❌ Core port {core_port} down (real crash).[/error]")
                     _shutdown()
 
             time.sleep(0.5)

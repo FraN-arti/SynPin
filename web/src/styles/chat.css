@@ -476,6 +476,25 @@
   border: 1px solid rgba(249, 115, 22, 0.15);
 }
 
+/* Message images */
+.message-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.message-image {
+  max-width: 300px;
+  max-height: 300px;
+  border-radius: var(--radius, 8px);
+  object-fit: contain;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.message-image:hover {
+  transform: scale(1.02);
+}
+
 /* === Typing Indicator === */
 .typing-dots {
   background: var(--glass-bg);

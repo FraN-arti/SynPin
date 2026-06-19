@@ -30,6 +30,7 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useChatScroll } from './hooks/useChatScroll'
+import { ImageAttachment, fileToAttachment, extractImagesFromPaste, type ImageAttachment as ImageAttachmentType } from './components/ImageAttachment'
 
 import { API_BASE } from './config'
 
@@ -76,6 +77,7 @@ interface Message {
   prompt_tokens?: number
   completion_tokens?: number
   tools?: ToolCall[]
+  images?: string[]  // base64 data URLs of attached images
 }
 
 // ─── Tool Timeline (collapsible action flow) ────────────────
@@ -131,6 +133,8 @@ function App() {
   // null = not loaded yet (show skeleton), [] = loaded but empty chat
   const [messages, setMessages] = useState<Message[] | null>(null)
   const [input, setInput] = useState('')
+  const [attachments, setAttachments] = useState<ImageAttachmentType[]>([])
+  const [compactionNotice, setCompactionNotice] = useState<string | null>(null)
   const [isTyping, setIsTyping] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     const saved = localStorage.getItem('synpin-sidebar')
@@ -164,6 +168,29 @@ function App() {
 
   // WebSocket — single connection for all real-time messaging
   const { send: wsSend, on: wsOn, connected: wsConnected } = useWebSocket()
+
+  // ── Stuck state protection ──────────────────────────────────────
+  const clearStuckState = useCallback(() => {
+    setIsTyping(false)
+    // Remove empty assistant placeholders (stuck from previous session)
+    setMessages(prev => {
+      if (!prev) return prev
+      const cleaned = prev.filter(m => !(m.role === 'assistant' && !m.content && !m.tools?.length))
+      return cleaned.length === prev.length ? prev : cleaned
+    })
+  }, [])
+
+  // Auto-clear stuck state when WS reconnects after server restart
+  const wasConnectedRef = useRef(false)
+  useEffect(() => {
+    if (wsConnected && !wasConnectedRef.current) {
+      // WS just reconnected — if we were typing, the old request is lost
+      if (isTyping) {
+        clearStuckState()
+      }
+    }
+    wasConnectedRef.current = wsConnected
+  }, [wsConnected, isTyping, clearStuckState])
 
   // Server version — single source of truth is the backend.
   // Strategy: fetch /api/version on mount (works even if WS isn't
@@ -216,6 +243,7 @@ function App() {
 
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const attachRef = useRef<{ openPicker: () => void }>(null)
   const activeAgentRef = useRef<AgentConfig | null>(null)
   const messagesRef = useRef<Message[] | null>(null)
 
@@ -483,7 +511,7 @@ function App() {
       } catch (e) {
         // Polling failed — silent
       }
-    }, 3000) // Poll every 3 seconds
+    }, 10000) // Poll every 10 seconds (fallback for WebSocket misses)
 
     return () => clearInterval(pollInterval)
   }, [activeAgent, view])
@@ -497,19 +525,38 @@ function App() {
     el.style.height = Math.min(el.scrollHeight, 150) + 'px'
   }
 
+  // ── Compaction indicator ─────────────────────────────────────────
+  useEffect(() => {
+    const unsubCompacting = wsOn('chat:compacting', (msg) => {
+      if (msg.agent_slug !== activeAgent?.slug) return
+      setCompactionNotice(msg.notice || 'Компакция истории...')
+      // Auto-clear after 5 seconds
+      setTimeout(() => setCompactionNotice(null), 5000)
+    })
+    return unsubCompacting
+  }, [wsOn, activeAgent])
+
     const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || isTyping) return
+    if (!input.trim() && attachments.length === 0) return
 
+    // If agent is "typing" but stuck (e.g. after server restart), clear it
+    if (isTyping) {
+      clearStuckState()
+    }
+
+    const userImages = attachments.map(a => a.dataUrl)
     const userMsg: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: input.trim(),
+      content: input.trim() || (attachments.length > 0 ? `[Изображение${attachments.length > 1 ? ` (${attachments.length})` : ''}]` : ''),
       timestamp: new Date(),
+      images: userImages.length > 0 ? userImages : undefined,
     }
 
     const userInput = input
     setInput('')
+    setAttachments([])
 
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
@@ -667,7 +714,22 @@ function App() {
 
     const onDone = wsOn('chat:done', (msg) => {
       if (msg.agent_slug !== activeAgent?.slug) return
-      setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, model: msg.model || 'assistant', agent_name: msg.agent_name } : m))
+      setMessages(prev => {
+        const updated = prev ?? []
+        return updated.map(m => {
+          if (m.id !== assistantId) return m
+          const content = m.content || ''
+          // Detect compaction markers in agent response
+          if (content.includes('[Компакция') || content.includes('[Суммаризация')) {
+            const match = content.match(/\[(Компакция[^\]]*|Суммаризация[^\]]*)\]/)
+            if (match) {
+              setCompactionNotice(match[0])
+              setTimeout(() => setCompactionNotice(null), 5000)
+            }
+          }
+          return { ...m, model: msg.model || 'assistant', agent_name: msg.agent_name }
+        })
+      })
       cleanup()
     })
 
@@ -689,8 +751,9 @@ function App() {
       message: userInput,
       system_prompt: systemPrompt,
       channel_id: 'web',
+      images: userImages.length > 0 ? userImages : undefined,
     })
-  }, [input, isTyping, activeAgent, wsSend, wsOn])
+  }, [input, attachments, isTyping, activeAgent, wsSend, wsOn])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -745,6 +808,56 @@ function App() {
     })
   }
 
+  // ── Image attachments ─────────────────────────────────────────
+  const handleAddImages = useCallback(async (files: File[]) => {
+    const newAttachments = await Promise.all(files.map(fileToAttachment))
+    setAttachments(prev => [...prev, ...newAttachments])
+  }, [])
+
+  const handleRemoveImage = useCallback((id: string) => {
+    setAttachments(prev => prev.filter(a => a.id !== id))
+  }, [])
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const images = extractImagesFromPaste(e)
+    if (images.length > 0) {
+      e.preventDefault()
+      handleAddImages(images)
+    }
+  }, [handleAddImages])
+
+  // Drag-n-drop state
+  const [dragOver, setDragOver] = useState(false)
+  const dragCounterRef = useRef(0)
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    dragCounterRef.current++
+    // Check for files — types may be DOMStringList in some browsers
+    const types = Array.from(e.dataTransfer.types)
+    if (types.includes('Files') || types.includes('text/plain')) {
+      setDragOver(true)
+    }
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    dragCounterRef.current--
+    if (dragCounterRef.current === 0) setDragOver(false)
+  }, [])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    dragCounterRef.current = 0
+    setDragOver(false)
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))
+    if (files.length > 0) handleAddImages(files)
+  }, [handleAddImages])
+
   // Refresh agents list (called after tool/agent changes in Settings)
   const refreshAgents = useCallback(async () => {
     try {
@@ -774,25 +887,51 @@ function App() {
 
   const renderInput = () => (
     <form onSubmit={handleSubmit} className="input-container">
+      <ImageAttachment
+        ref={attachRef}
+        images={attachments}
+        onAdd={handleAddImages}
+        onRemove={handleRemoveImage}
+        disabled={isTyping}
+      />
       <div className="input-form">
+        <button
+          type="button"
+          className="attach-btn"
+          onClick={() => attachRef.current?.openPicker()}
+          disabled={isTyping}
+          title="Прикрепить изображение"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+          </svg>
+        </button>
         <EmojiPicker onSelect={handleEmojiSelect} />
         <textarea
           ref={textareaRef}
           value={input}
           onChange={handleInput}
           onKeyDown={handleKeyDown}
-          placeholder="Спроси что-нибудь..."
+          onPaste={handlePaste}
+          placeholder={attachments.length > 0 ? 'Опиши что на картинке...' : 'Спроси что-нибудь...'}
           className="input-field"
           rows={1}
         />
         <button
           type="submit"
-          disabled={!input.trim() || isTyping}
-          className="input-submit"
+          disabled={!isTyping && !input.trim() && attachments.length === 0}
+          className={`input-submit ${isTyping ? 'stop-mode' : ''}`}
+          title={isTyping ? 'Остановить' : 'Отправить'}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M5 12h14M12 5l7 7-7 7" />
-          </svg>
+          {isTyping ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="6" width="12" height="12" rx="2" />
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          )}
         </button>
       </div>
     </form>
@@ -1029,7 +1168,21 @@ function App() {
             )
           } else {
             body = (
-              <>
+              <div
+                className="chat-view-wrapper"
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                style={{ position: 'relative', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
+              >
+                <div className={`chat-drop-overlay ${dragOver ? 'active' : ''}`}>
+                  <div className="chat-drop-overlay-inner">
+                    <div className="chat-drop-overlay-icon">↓</div>
+                    <div className="chat-drop-overlay-text">Перетащите изображение</div>
+                    <div className="chat-drop-overlay-hint">PNG, JPEG, WebP, GIF — до 10 МБ</div>
+                  </div>
+                </div>
                 <div className="messages-area">
                   <div className="messages-container" ref={messagesContainerRef}>
                     {messages.map((msg) => {
@@ -1051,6 +1204,13 @@ function App() {
                           )}
                           <div className={`message-wrapper ${isLastAssistant ? 'streaming' : ''}`}>
                             <div className="message-bubble">
+                              {msg.images && msg.images.length > 0 && (
+                                <div className="message-images">
+                                  {msg.images.map((src, i) => (
+                                    <img key={i} src={src} alt={`Изображение ${i + 1}`} className="message-image" />
+                                  ))}
+                                </div>
+                              )}
                               <MarkdownRenderer content={msg.content} isStreaming={isLastAssistant} />
                             </div>
                           </div>
@@ -1064,10 +1224,17 @@ function App() {
                   </div>
                 </div>
 
+                {compactionNotice && (
+                  <div className="compaction-banner">
+                    <span className="compaction-icon">🗜️</span>
+                    <span className="compaction-text">{compactionNotice}</span>
+                  </div>
+                )}
+
                 <div className="bottom-input">
                   {renderInput()}
                 </div>
-              </>
+              </div>
             )
           }
           return <PageTransition pageKey={pageKey}>{body}</PageTransition>

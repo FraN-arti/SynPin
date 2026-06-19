@@ -60,7 +60,7 @@ interface MemoryEntry {
 interface CompactionConfig {
   enabled: boolean
   trigger_percent: number
-  keep_recent: number
+  summary_volume: number
   strategy: string
 }
 
@@ -86,13 +86,13 @@ export function MemorySection() {
 
   // Config state (compaction & memory)
   const [compactionForm, setCompactionForm] = useState<CompactionConfig>({
-    enabled: true, trigger_percent: 80, keep_recent: 10, strategy: 'truncate',
+    enabled: true, trigger_percent: 80, summary_volume: 0.2, strategy: 'summarize',
   })
   const [providerForm, setProviderForm] = useState<MemoryProviderConfig>({
     provider: 'built-in', api_key: '', endpoint: '', max_chars: 10000, auto_refactor: false,
   })
   const [memorySettings, setMemorySettings] = useState<MemorySettingsConfig>({
-    enabled: true, max_chars: 10000, auto_refactor: false,
+    enabled: true, max_chars: 10000, auto_refactor: true,
   })
   const [otdelCompaction, setOtdelCompaction] = useState({
     enabled: true, compaction_limit: 100,
@@ -260,33 +260,35 @@ export function MemorySection() {
               />
             </div>
             <div className="settings-field">
-              <div className="settings-field-label">
-                <label>Оставить последних</label>
-                <span className="settings-field-hint">Последние N сообщений остаются без изменений — агент помнит недавний контекст</span>
+              <label>Объем суммаризации: <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{compactionForm.summary_volume}</span></label>
+              <div className="radius-slider-row">
+                <span className="radius-label">5%</span>
+                <input
+                  type="range"
+                  className="radius-slider"
+                  min={0.05}
+                  max={0.5}
+                  step={0.05}
+                  value={compactionForm.summary_volume}
+                  onChange={e => {
+                    const next = { ...compactionForm, summary_volume: parseFloat(e.target.value) }
+                    setCompactionForm(next)
+                  }}
+                  onMouseUp={() => saveConfig({ compaction: compactionForm })}
+                />
+                <span className="radius-label">50%</span>
               </div>
-              <input
-                type="number"
-                className="settings-input"
-                min={1}
-                max={50}
-                value={compactionForm.keep_recent}
-                onChange={e => {
-                  const next = { ...compactionForm, keep_recent: Math.min(50, Math.max(1, Number(e.target.value))) }
-                  setCompactionForm(next)
-                }}
-                onBlur={() => saveConfig({ compaction: compactionForm })}
-              />
             </div>
             <div className="settings-field">
               <div className="settings-field-label">
                 <label>Стратегия</label>
-                <span className="settings-field-hint">Truncate — обрезка, Summarize — саммари</span>
+                <span className="settings-field-hint">Summarize — саммари через LLM, Truncate — обрезка</span>
               </div>
               <SmallDropdown
                 value={compactionForm.strategy}
                 options={[
+                  { value: 'summarize', label: 'Summarize — саммари' },
                   { value: 'truncate', label: 'Truncate — обрезка' },
-                  { value: 'summarize', label: 'Summarize — через LLM', disabled: true, badge: 'скоро' },
                 ]}
                 onChange={v => {
                   const next = { ...compactionForm, strategy: v }
@@ -429,7 +431,7 @@ export function MemorySection() {
                 />
                 <span>Авто-рефакторинг</span>
               </label>
-              <span className="settings-field-hint-inline">Автоматически объединять дублирующие записи (скоро)</span>
+              <span className="settings-field-hint-inline">При превышении лимита символов — автоматически суммаризовать память, сохраняя важные факты</span>
             </div>
           </div>
         </SettingsCard>

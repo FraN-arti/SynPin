@@ -446,3 +446,18 @@
   color: var(--text-dim);
   cursor: not-allowed;
 }
+
+.input-submit.stop-mode {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+  animation: stopPulse 1.5s ease infinite;
+}
+.input-submit.stop-mode:hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  box-shadow: 0 2px 16px rgba(239, 68, 68, 0.4);
+  transform: scale(1.05);
+}
+@keyframes stopPulse {
+  0%, 100% { box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3); }
+  50% { box-shadow: 0 2px 16px rgba(239, 68, 68, 0.5); }
+}

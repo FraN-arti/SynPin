@@ -10,6 +10,7 @@ class ChatMessage:
     content: str
     tool_call_id: str | None = None  # For role="tool" messages
     tool_calls: list[dict] | None = None  # For assistant messages with tool calls
+    images: list[str] | None = None  # Base64 data URLs for multimodal content
 
 
 @dataclass

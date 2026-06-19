@@ -11,7 +11,6 @@ import type { AgentData, ExternalAgentData } from './types'
 
 interface RoleInfo { rolesid: string; name: string; description: string; color: string }
 interface DeptInfo { departmentsid: string; name: string; description: string; color: string }
-interface ToolInfo { display: string; description: string; category: string; implemented: boolean; builtin?: boolean }
 
 export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
   const [agents, setAgents] = useState<AgentData[]>([])
@@ -35,8 +34,6 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
   })
   const [creating, setCreating] = useState(false)
   const [formTouched, setFormTouched] = useState(false)
-  const [toolsRegistry, setToolsRegistry] = useState<Record<string, ToolInfo>>({})
-  const [toolsCategories, setToolsCategories] = useState<Record<string, { display: string }>>({})
 
   useEffect(() => {
     if (!hoveredAgent) return
@@ -100,16 +97,9 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
     finally { setDetecting(false) }
   }, [])
 
-  const fetchTools = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/tools`)
-      if (res.ok) { const data = await res.json(); setToolsRegistry(data.tools || {}); setToolsCategories(data.categories || {}) }
-    } catch (e) { console.error('[tools] fetch error:', e) }
-  }, [])
-
   useEffect(() => {
-    fetchAgents(); fetchProviders(); fetchRoles(); fetchDepartments(); detectExternalAgents(); fetchTools()
-  }, [fetchAgents, fetchProviders, fetchRoles, fetchDepartments, detectExternalAgents, fetchTools])
+    fetchAgents(); fetchProviders(); fetchRoles(); fetchDepartments(); detectExternalAgents()
+  }, [fetchAgents, fetchProviders, fetchRoles, fetchDepartments, detectExternalAgents])
 
   const handleAddRole = async () => {
     if (!newRole.name.trim()) return
@@ -299,19 +289,6 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
       })
       if (res.ok) detectExternalAgents()
     } catch (e) { console.error('[external-agents] dept change error:', e) }
-  }
-
-  const handleToolToggle = async (agentid: string, toolName: string, currentTools: string[]) => {
-    const newTools = currentTools.includes(toolName)
-      ? currentTools.filter(t => t !== toolName)
-      : [...currentTools, toolName]
-    try {
-      const res = await fetch(`${API_BASE}/api/tools/${agentid}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tools: newTools }),
-      })
-      if (res.ok) { fetchAgents(); onAgentsChange?.() }
-    } catch (e) { console.error('[tools] toggle error:', e) }
   }
 
   const modelOptions: string[] = []
@@ -739,7 +716,7 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
                             <input type="number" className="settings-input" value={agent.context_window || ''} placeholder="128000"
                               onBlur={e => { const val = Number(e.target.value); if (val > 0 && val !== agent.context_window) handleAgentFieldChange(agent, 'context_window', val) }} />
                           </div>
-                          {agent.skills.length > 0 && (
+                          {agent.skills && agent.skills.length > 0 && (
                             <div className="expanded-field">
                               <label>Скиллы</label>
                               <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -747,34 +724,6 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
                               </div>
                             </div>
                           )}
-                          {/* Tools */}
-                          <div className="expanded-field">
-                            <label>Инструменты</label>
-                            <div className="tools-grid">
-                              {Object.entries(toolsCategories).map(([catKey, cat]) => {
-                                const catTools = Object.entries(toolsRegistry).filter(([, t]) => t.category === catKey && !t.builtin)
-                                if (catTools.length === 0) return null
-                                return (
-                                  <div key={catKey} className="tools-category">
-                                    <span className="tools-category-label">{cat.display}</span>
-                                    <div className="tools-chips">
-                                      {catTools.map(([name, tool]) => {
-                                        const isEnabled = (agent.tools || []).includes(name)
-                                        const isImplemented = tool.implemented !== false
-                                        return (
-                                          <button key={name} className={`tool-chip ${isEnabled ? 'active' : ''} ${!isImplemented ? 'dimmed' : ''}`}
-                                            onClick={() => isImplemented && handleToolToggle(agent.slug, name, agent.tools || [])}
-                                            title={tool.description + (!isImplemented ? ' (будет доступно позже)' : '')}>
-                                            <span className="tool-chip-name">{tool.display}</span>
-                                          </button>
-                                        )
-                                      })}
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </div>
                           <div className="expanded-field">
                             <label>System Prompt</label>
                             <textarea className="settings-input expanded-textarea" rows={4} defaultValue={agent.system_prompt}

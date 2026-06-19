@@ -28,10 +28,9 @@ def get_allowed_roots() -> list[Path]:
 
     roots = config.get("allowed_directories", [])
     if not roots:
-        # Default: D:\synpin for backwards compatibility
-        roots = [r"D:\synpin"]
+        roots = [str(Path.home() / ".synpin")]
 
-    _allowed_roots = [Path(r).resolve() for r in roots]
+    _allowed_roots = list(dict.fromkeys(Path(r).resolve() for r in roots))  # deduplicate
     return _allowed_roots
 
 

@@ -41,6 +41,8 @@ from .head_decide import head_decide
 from .head_block import head_block
 from .head_escalate import head_escalate, head_escalation_status
 from .kanban_task import kanban_task
+from .image_analyze import image_analyze
+from .summarize import summarize
 
 # Registry dict mapping tool names to handler functions (loaded lazily)
 _tool_handlers: dict[str, ToolHandler] | None = None
@@ -72,6 +74,8 @@ def get_tool_registry() -> dict[str, ToolHandler]:
             "head_escalate": head_escalate,
             "head_escalation_status": head_escalation_status,
             "kanban_task": kanban_task,
+            "image_analyze": image_analyze,
+            "summarize": summarize,
         }
     return _tool_handlers
 
@@ -101,4 +105,6 @@ __all__ = [
     "head_escalate",
     "head_escalation_status",
     "kanban_task",
+    "image_analyze",
+    "summarize",
 ]

@@ -36,6 +36,28 @@ class AnthropicProvider(BaseProvider):
             elif m.role == "tool":
                 # Anthropic API doesn't support tool role messages; skip them
                 continue
+            elif m.images and m.role == "user":
+                # Multimodal content for Anthropic
+                content_parts = []
+                if m.content:
+                    content_parts.append({"type": "text", "text": m.content})
+                for img_data in m.images:
+                    # Parse data URL: "data:image/png;base64,..."
+                    media_type = "image/jpeg"
+                    raw_data = img_data
+                    if img_data.startswith("data:"):
+                        # "data:image/png;base64,iVBOR..."
+                        parts = img_data.split(",", 1)
+                        if len(parts) == 2:
+                            header = parts[0]  # "data:image/png;base64"
+                            raw_data = parts[1]
+                            if ";base64" in header:
+                                media_type = header.split(":")[1].split(";")[0]
+                    content_parts.append({
+                        "type": "image",
+                        "source": {"type": "base64", "media_type": media_type, "data": raw_data},
+                    })
+                chat_messages.append({"role": m.role, "content": content_parts})
             else:
                 chat_messages.append({"role": m.role, "content": m.content})
 

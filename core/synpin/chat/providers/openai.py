@@ -35,7 +35,20 @@ class OpenAIProvider(BaseProvider):
             content = m.content or ""
             if not content and m.role == "assistant" and m.tool_calls:
                 content = " "  # Space as minimal non-empty content for tool_call messages
-            msg: dict = {"role": m.role, "content": content}
+
+            # Build content — multimodal if images are present
+            if m.images and m.role == "user":
+                content_parts: list[dict] = []
+                if content:
+                    content_parts.append({"type": "text", "text": content})
+                for img_data in m.images:
+                    content_parts.append({
+                        "type": "image_url",
+                        "image_url": {"url": img_data},
+                    })
+                msg: dict = {"role": m.role, "content": content_parts}
+            else:
+                msg = {"role": m.role, "content": content}
 
             # For tool results, add tool_call_id
             if m.role == "tool" and m.tool_call_id:

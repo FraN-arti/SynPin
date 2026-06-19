@@ -284,30 +284,30 @@ export function GeneralSection() {
           )}
         </SettingsCard>
 
-        <SettingsCard title="Настройка моделей" badge="скоро" disabled description="Модели для специализированных задач">
+        <SettingsCard title="Настройка моделей" description="Модели для специализированных задач">
           <div className="settings-field">
             <label>Визион (анализ изображений)</label>
-            <CustomDropdown value={settings.models?.vision || ''} onChange={v => updateModels('vision', v)}
+            <CustomDropdown value={settings.models?.vision || ''} onChange={v => updateModels('vision', v)} searchable
               options={[{ value: '', label: 'Не настроено' }, ...availableModels.map(m => ({ value: `${m.provider}/${m.model}`, label: `${m.model} (${m.provider})` }))]} />
           </div>
           <div className="settings-field">
             <label>Генерация изображений</label>
-            <CustomDropdown value={settings.models?.image_gen || ''} onChange={v => updateModels('image_gen', v)}
+            <CustomDropdown value={settings.models?.image_gen || ''} onChange={v => updateModels('image_gen', v)} searchable
               options={[{ value: '', label: 'Не настроено' }, ...availableModels.map(m => ({ value: `${m.provider}/${m.model}`, label: `${m.model} (${m.provider})` }))]} />
           </div>
           <div className="settings-field">
             <label>Веб-поиск</label>
-            <CustomDropdown value={settings.models?.web_search || ''} onChange={v => updateModels('web_search', v)}
+            <CustomDropdown value={settings.models?.web_search || ''} onChange={v => updateModels('web_search', v)} searchable
               options={[{ value: '', label: 'Не настроено' }, ...availableModels.map(m => ({ value: `${m.provider}/${m.model}`, label: `${m.model} (${m.provider})` }))]} />
           </div>
           <div className="settings-field">
             <label>Веб-экстракт</label>
-            <CustomDropdown value={settings.models?.web_extract || ''} onChange={v => updateModels('web_extract', v)}
+            <CustomDropdown value={settings.models?.web_extract || ''} onChange={v => updateModels('web_extract', v)} searchable
               options={[{ value: '', label: 'Не настроено' }, ...availableModels.map(m => ({ value: `${m.provider}/${m.model}`, label: `${m.model} (${m.provider})` }))]} />
           </div>
           <div className="settings-field">
             <label>Суммаризация</label>
-            <CustomDropdown value={settings.models?.summarization || ''} onChange={v => updateModels('summarization', v)}
+            <CustomDropdown value={settings.models?.summarization || ''} onChange={v => updateModels('summarization', v)} searchable
               options={[{ value: '', label: 'Не настроено' }, ...availableModels.map(m => ({ value: `${m.provider}/${m.model}`, label: `${m.model} (${m.provider})` }))]} />
           </div>
         </SettingsCard>

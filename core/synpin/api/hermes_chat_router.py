@@ -221,8 +221,12 @@ async def hermes_chat_stream(req: HermesChatRequest):
     if req.system_prompt:
         messages.append({"role": "system", "content": req.system_prompt})
 
-    # History
-    for msg in history:
+    # History (exclude the last message if it's the current user message — avoids duplication)
+    history_to_use = history
+    if history and history[-1].get("role") == "user" and history[-1].get("content") == req.message:
+        history_to_use = history[:-1]
+
+    for msg in history_to_use:
         messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
 
     # Current message
@@ -255,20 +259,22 @@ async def hermes_chat_stream(req: HermesChatRequest):
 
             # Save assistant response after streaming completes
             if agent_slug and full_response:
-                updated_history = list(history)
-                updated_history.append({"role": "user", "content": req.message})
-                updated_history.append({"role": "assistant", "content": full_response})
-                _save_chat_history(agent_slug, channel_id, updated_history)
+                # Reload history to get the latest (including user message saved earlier)
+                current_history = _load_chat_history(agent_slug, channel_id)
+                # Avoid duplicating — only add assistant if last message isn't already it
+                if not current_history or current_history[-1].get("role") != "assistant":
+                    current_history.append({"role": "assistant", "content": full_response})
+                    _save_chat_history(agent_slug, channel_id, current_history)
 
         except Exception as e:
             # Save error message to history so polling won't loop forever
             logger.error("Hermes background task failed for %s: %s", agent_slug, e)
             if agent_slug:
-                error_msg = f"\u26a0\ufe0f \u041e\u0448\u0438\u0431\u043a\u0430: Hermes \u043d\u0435 \u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d ({e})"
-                updated_history = list(history)
-                updated_history.append({"role": "user", "content": req.message})
-                updated_history.append({"role": "assistant", "content": error_msg})
-                _save_chat_history(agent_slug, channel_id, updated_history)
+                error_msg = f"⚠️ Ошибка: Hermes недоступен ({e})"
+                current_history = _load_chat_history(agent_slug, channel_id)
+                if not current_history or current_history[-1].get("role") != "assistant":
+                    current_history.append({"role": "assistant", "content": error_msg})
+                    _save_chat_history(agent_slug, channel_id, current_history)
 
         # Signal completion (always, even on error)
         await hermes_task.queue.put(None)

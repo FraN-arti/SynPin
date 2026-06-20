@@ -1028,6 +1028,101 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
             },
         },
     },
+    "otdel_manage": {
+        "type": "function",
+        "function": {
+            "name": "otdel_manage",
+            "description": "Управление отделами: создание, редактирование, удаление, просмотр состава. Используй для управления структурой организации.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "type": "string",
+                        "enum": ["list", "get", "create", "update", "delete"],
+                        "description": "Команда: list=все отделы, get=получить отдел, create=создать, update=обновить, delete=удалить",
+                    },
+                    "dept_id": {
+                        "type": "string",
+                        "description": "ID отдела (для get/update/delete)",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Название отдела (для create/update)",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Описание отдела (для create/update)",
+                    },
+                    "color": {
+                        "type": "string",
+                        "description": "Цвет отдела в hex (для create/update), по умолчанию #f97316",
+                    },
+                },
+                "required": ["command"],
+            },
+        },
+    },
+    "project_manage": {
+        "type": "function",
+        "function": {
+            "name": "project_manage",
+            "description": "Управление проектами: создание, редактирование, удаление, управление отделами в проекте. Используй для создания проектов и связывания их с отделами.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "type": "string",
+                        "enum": ["list", "get", "create", "update", "delete", "add_department", "remove_department"],
+                        "description": "Команда: list=все проекты, get=проект, create=создать, update=обновить, delete=удалить, add_department=добавить отдел, remove_department=убрать отдел",
+                    },
+                    "project_id": {
+                        "type": "string",
+                        "description": "ID проекта (для get/update/delete/add_department/remove_department)",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Название проекта (для create/update)",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Описание проекта (для create/update)",
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": ["planning", "active", "on_hold", "completed", "archived"],
+                        "description": "Статус проекта (для update)",
+                    },
+                    "priority": {
+                        "type": "string",
+                        "enum": ["low", "medium", "high", "critical"],
+                        "description": "Приоритет (для update)",
+                    },
+                    "deadline": {
+                        "type": "string",
+                        "description": "Дедлайн в ISO формате (для create/update)",
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Теги (для create/update)",
+                    },
+                    "dept_id": {
+                        "type": "string",
+                        "description": "ID отдела (для add_department/remove_department)",
+                    },
+                    "role": {
+                        "type": "string",
+                        "description": "Роль отдела в проекте (для add_department)",
+                    },
+                    "is_main": {
+                        "type": "boolean",
+                        "description": "Основной отдел проекта (для add_department)",
+                    },
+                },
+                "required": ["command"],
+            },
+        },
+    },
 }
 
 
@@ -1036,12 +1131,17 @@ BUILTINS = {"memory_read", "memory_write", "image_analyze", "summarize"}
 # Head-only tools — not available to regular workers
 HEAD_TOOLS = {"head_delegate", "head_evaluate", "head_retry", "head_decide", "head_block", "kanban_task"}
 
+# Primary-only tools — only available to the main agent (is_primary=true)
+PRIMARY_TOOLS = {"otdel_manage", "project_manage"}
 
-def get_all_tool_names(include_head: bool = False) -> list[str]:
+
+def get_all_tool_names(include_head: bool = False, include_primary: bool = False) -> list[str]:
     """Get all available tool names. All agents get all tools by default."""
-    tools = [n for n in _NATIVE_TOOL_DEFS if n not in HEAD_TOOLS]
+    tools = [n for n in _NATIVE_TOOL_DEFS if n not in HEAD_TOOLS and n not in PRIMARY_TOOLS]
     if include_head:
         tools.extend(HEAD_TOOLS)
+    if include_primary:
+        tools.extend(PRIMARY_TOOLS)
     return tools
 
 
@@ -1280,6 +1380,42 @@ def _parse_text_tool_calls(text: str) -> list[dict]:
     return calls
 
 
+# ─── Thinking text for tool execution ─────────────────────────────
+
+# Tool name → thinking text mapping (shown to user before tool executes)
+_THINKING_TEXTS: dict[str, str] = {
+    "terminal": "Выполняю команду...",
+    "file_read": "Читаю файл...",
+    "file_write": "Записываю файл...",
+    "search_files": "Ищу файлы...",
+    "web_search": "Ищу в интернете...",
+    "code_exec": "Выполняю код...",
+    "memory_read": "Читаю память...",
+    "memory_write": "Сохраняю в память...",
+    "summarize": "Суммаризирую...",
+    "image_analyze": "Анализирую изображение...",
+    "kanban_task": "Работаю с задачей...",
+    "otdel_manage": "Управляю отделами...",
+    "project_manage": "Управляю проектами...",
+    "head_delegate": "Делегирую задачу...",
+    "head_await": "Ожидаю ответа...",
+    "head_evaluate": "Оцениваю результат...",
+    "head_retry": "Повторяю попытку...",
+    "head_decide": "Принимаю решение...",
+    "head_block": "Блокирую задачу...",
+    "head_escalate": "Эскалирую проблему...",
+}
+
+_DEFAULT_THINKING = "Обрабатываю..."
+
+
+def _get_thinking_text(tool_name: str) -> str:
+    """Get thinking text for a tool name."""
+    text = _THINKING_TEXTS.get(tool_name, _DEFAULT_THINKING)
+    # Add newline at the end so it appears as a separate line
+    return text + "\n"
+
+
 # ─── SSE streaming ──────────────────────────────────────────────────
 
 async def stream_response(
@@ -1443,6 +1579,10 @@ async def stream_response(
                 if t_name not in tool_names and t_name not in BUILTINS:
                     tool_result = {"success": False, "output": "", "error": f"Tool '{t_name}' not enabled"}
                 else:
+                    # yield thinking chunk before tool execution
+                    thinking_text = _get_thinking_text(t_name)
+                    yield f"data: {json.dumps({'type': 'chunk', 'content': thinking_text})}\n\n"
+
                     # yield tool_start
                     yield f"data: {json.dumps({'type': 'tool_start', 'tool': t_name, 'params': t_params, 'index': tool_count})}\n\n"
 
@@ -1552,6 +1692,20 @@ def _build_system_prompt_with_memory(req: ChatRequest) -> str:
         session_block = _load_session_context(req.agent_slug, channel)
         if session_block:
             system_prompt = f"{system_prompt}\n\n{session_block}" if system_prompt else session_block
+
+        # Main agent prompt injection — if this agent is primary
+        try:
+            from ..agents.manager import get_agent
+            from ..paths import get_config_dir
+            agent_data = get_agent(req.agent_slug)
+            if agent_data and agent_data.get("is_primary"):
+                prompt_path = get_config_dir() / "templates" / "main_agent_prompt.md"
+                if prompt_path.exists():
+                    main_prompt = prompt_path.read_text(encoding="utf-8").strip()
+                    if main_prompt:
+                        system_prompt = f"{system_prompt}\n\n{main_prompt}" if system_prompt else main_prompt
+        except Exception:
+            pass
 
     # Safety rule: protect SynPin core
     system_prompt += """

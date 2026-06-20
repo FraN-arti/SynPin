@@ -189,7 +189,7 @@ export function SettingsPage({ onAgentsChange, onDepartmentsChange, wsOn }: Sett
         {/* Tab content */}
         <PageTransition pageKey={activeTab}>
           {activeTab === 'general' && <GeneralSection />}
-          {activeTab === 'agents' && <AgentsSection onAgentsChange={onAgentsChange} />}
+          {activeTab === 'agents' && <AgentsSection onAgentsChange={onAgentsChange} wsOn={wsOn} />}
           {activeTab === 'providers' && (
             <ProvidersSection
               ref={providersRef}

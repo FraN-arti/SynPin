@@ -198,12 +198,41 @@ async def get_primary_agent():
 
 @router.put("/primary-agent")
 async def set_primary_agent(req: PrimaryAgentUpdate):
-    """Set the primary agent slug. Empty string clears it."""
+    """Set the primary agent slug. Empty string clears it.
+    
+    Also syncs is_primary field in agents.yaml and external_agents.yaml.
+    Broadcasts change via WebSocket.
+    """
     try:
         path = CONFIG_DIR / "settings.yaml"
         full = _load_yaml(path)
         full["primary_agent_slug"] = req.slug
         _save_yaml(path, full)
+        
+        # Sync is_primary in agents.yaml
+        agents_path = CONFIG_DIR / "agents.yaml"
+        agents_data = _load_yaml(agents_path)
+        for slug, cfg in agents_data.get("agents", {}).items():
+            cfg["is_primary"] = (slug == req.slug)
+        _save_yaml(agents_path, agents_data)
+        
+        # Sync is_primary in external_agents.yaml
+        ext_path = CONFIG_DIR / "external_agents.yaml"
+        ext_data = _load_yaml(ext_path)
+        for slug, cfg in ext_data.get("agents", {}).items():
+            cfg["is_primary"] = (slug == req.slug)
+        _save_yaml(ext_path, ext_data)
+        
+        # Broadcast via WebSocket
+        try:
+            from ..chat.ws_manager import ws_manager
+            await ws_manager.broadcast({
+                "type": "agent:primary_changed",
+                "slug": req.slug,
+            })
+        except Exception:
+            pass
+        
         logger.info("Primary agent set to: %s", req.slug or "(none)")
         return {"success": True, "slug": req.slug}
     except Exception as e:
@@ -383,3 +412,18 @@ async def update_web_search_config(req: WebSearchProviderUpdate):
     except Exception as e:
         logger.error("Failed to update web search config: %s", e)
         raise HTTPException(500, "Failed to update config")
+
+
+@router.get("/main-agent-prompt")
+async def get_main_agent_prompt():
+    """Return the main agent system prompt template."""
+    from ..paths import get_config_dir
+    prompt_path = get_config_dir() / "templates" / "main_agent_prompt.md"
+    if not prompt_path.exists():
+        return {"prompt": ""}
+    try:
+        prompt = prompt_path.read_text(encoding="utf-8").strip()
+        return {"prompt": prompt}
+    except Exception as e:
+        logger.error("Failed to read main agent prompt: %s", e)
+        return {"prompt": ""}

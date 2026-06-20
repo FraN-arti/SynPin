@@ -226,7 +226,8 @@ async def _handle_chat_send(user_id: str, msg: dict):
     model = agent_data.get("model", "") if agent_data else ""
     temperature = agent_data.get("temperature", 0.7) if agent_data else 0.7
     max_tokens = agent_data.get("max_tokens", 4096) if agent_data else 4096
-    tool_names = get_all_tool_names()
+    is_primary = agent_data.get("is_primary", False) if agent_data else False
+    tool_names = get_all_tool_names(include_primary=is_primary)
 
     # Resolve model with fallback to provider's default
     from .router import resolve_model
@@ -234,6 +235,7 @@ async def _handle_chat_send(user_id: str, msg: dict):
 
     # Stream response via WS
     full_response = ""
+    tool_calls = []  # Track tool calls for history
     try:
         from .router import stream_response
         async for chunk in stream_response(
@@ -260,8 +262,33 @@ async def _handle_chat_send(user_id: str, msg: dict):
                         "agent_slug": agent_slug,
                         "content": content,
                     })
-                elif msg_type in ("tool_start", "tool_end", "done", "error"):
-                    # Forward tool events and done/error as-is
+                elif msg_type == "tool_start":
+                    # Track tool call
+                    tool_calls.append({
+                        "name": payload.get("tool", ""),
+                        "params": payload.get("params", {}),
+                        "status": "running",
+                    })
+                    # Forward
+                    ws_type = f"chat:{msg_type}"
+                    ws_msg = {"type": ws_type, "agent_slug": agent_slug}
+                    ws_msg.update({k: v for k, v in payload.items() if k != "type"})
+                    await ws_manager.send(user_id, ws_msg)
+                elif msg_type == "tool_end":
+                    # Update tool call status
+                    tool_name = payload.get("tool", "")
+                    for tc in tool_calls:
+                        if tc["name"] == tool_name and tc["status"] == "running":
+                            tc["status"] = "completed" if payload.get("success") else "error"
+                            tc["result"] = payload.get("result", "")
+                            break
+                    # Forward
+                    ws_type = f"chat:{msg_type}"
+                    ws_msg = {"type": ws_type, "agent_slug": agent_slug}
+                    ws_msg.update({k: v for k, v in payload.items() if k != "type"})
+                    await ws_manager.send(user_id, ws_msg)
+                elif msg_type in ("done", "error"):
+                    # Forward
                     ws_type = f"chat:{msg_type}"
                     ws_msg = {"type": ws_type, "agent_slug": agent_slug}
                     ws_msg.update({k: v for k, v in payload.items() if k != "type"})
@@ -282,15 +309,28 @@ async def _handle_chat_send(user_id: str, msg: dict):
             assistant_entry["provider"] = provider_name
         if agent_data and agent_data.get("name"):
             assistant_entry["agent_name"] = agent_data["name"]
+        # Save token usage if available
+        if usage:
+            assistant_entry["prompt_tokens"] = usage.get("prompt_tokens", 0)
+            assistant_entry["completion_tokens"] = usage.get("completion_tokens", 0)
+        # Save tool calls for badge display after reload
+        if tool_calls:
+            assistant_entry["tools"] = tool_calls
         history.append(assistant_entry)
         _save_chat_history(agent_slug, channel_id, history)
 
-    # Signal done
-    await ws_manager.send(user_id, {
+    # Signal done (include usage for footer display)
+    done_msg = {
         "type": "chat:done",
         "agent_slug": agent_slug,
         "content": full_response,
-    })
+    }
+    if usage:
+        done_msg["usage"] = {
+            "prompt_tokens": usage.get("prompt_tokens", 0),
+            "completion_tokens": usage.get("completion_tokens", 0),
+        }
+    await ws_manager.send(user_id, done_msg)
 
 
 async def _handle_otdel_send(user_id: str, msg: dict):
@@ -425,6 +465,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         # Stream LLM response via WebSocket chunks
         agent_msg_id = f"a-{uuid.uuid4().hex[:8]}"
         full_response = ""
+        usage = None  # Track token usage
         # Track tool calls made during streaming
         tools_called = []  # Track tool calls made during streaming
 
@@ -475,8 +516,22 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                                 "model": model,
                                 "provider": provider_name,
                             })
-                    elif msg_type in ("tool_start", "tool_end"):
-                        # Forward tool events via WS
+                    elif msg_type == "tool_start":
+                        # Send thinking chunk before tool execution
+                        from .router import _get_thinking_text
+                        thinking_text = _get_thinking_text(payload.get("tool", ""))
+                        await ws_manager.send(user_id, {
+                            "type": "otdel:chunk",
+                            "otdel_id": otdel_id,
+                            "message_id": agent_msg_id,
+                            "content": thinking_text,
+                            "sender": agent_slug_val,
+                            "sender_name": agent_name_val,
+                            "is_head": is_head,
+                            "model": model,
+                            "provider": provider_name,
+                        })
+                        # Forward tool event via WS
                         await ws_manager.send(user_id, {
                             "type": f"otdel:{msg_type}",
                             "otdel_id": otdel_id,
@@ -489,12 +544,33 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                             "index": payload.get("index"),
                         })
                         # Track tool calls for placeholder generation
-                        if msg_type == "tool_start":
-                            tools_called.append({
-                                "name": payload.get("tool", ""),
-                                "params": payload.get("params", {}),
-                            })
+                        tools_called.append({
+                            "name": payload.get("tool", ""),
+                            "params": payload.get("params", {}),
+                            "status": "running",
+                        })
+                    elif msg_type == "tool_end":
+                        # Update tool call status
+                        tool_name = payload.get("tool", "")
+                        for tc in tools_called:
+                            if tc["name"] == tool_name and tc.get("status") == "running":
+                                tc["status"] = "completed" if payload.get("success") else "error"
+                                tc["result"] = payload.get("result", "")
+                                break
+                        # Forward tool event via WS
+                        await ws_manager.send(user_id, {
+                            "type": f"otdel:{msg_type}",
+                            "otdel_id": otdel_id,
+                            "message_id": agent_msg_id,
+                            "tool": payload.get("tool"),
+                            "params": payload.get("params"),
+                            "result": payload.get("result"),
+                            "success": payload.get("success"),
+                            "error": payload.get("error"),
+                            "index": payload.get("index"),
+                        })
                     elif msg_type == "done":
+                        usage = payload.get("usage")
                         streaming = False
                     elif msg_type == "error":
                         streaming = False
@@ -563,6 +639,13 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 "model": model,
                 "provider": provider_name,
             }
+            # Save tool calls for badge display after reload
+            if tools_called:
+                agent_msg["tools"] = tools_called
+            # Save token usage if available
+            if usage:
+                agent_msg["prompt_tokens"] = usage.get("prompt_tokens", 0)
+                agent_msg["completion_tokens"] = usage.get("completion_tokens", 0)
             history.append(agent_msg)
             save_stats = _save_history(otdel_id, history)
             if save_stats.get("was_compacted"):
@@ -573,13 +656,19 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                     "after": save_stats["after"],
                 })
 
-            # Send done event
-            await ws_manager.send(user_id, {
+            # Send done event (include usage for footer display)
+            done_msg = {
                 "type": "otdel:done",
                 "otdel_id": otdel_id,
                 "message_id": agent_msg_id,
                 "message": agent_msg,
-            })
+            }
+            if usage:
+                done_msg["usage"] = {
+                    "prompt_tokens": usage.get("prompt_tokens", 0),
+                    "completion_tokens": usage.get("completion_tokens", 0),
+                }
+            await ws_manager.send(user_id, done_msg)
 
             if is_head:
                 # Workers are triggered ONLY via head_delegate tool (HeadState),

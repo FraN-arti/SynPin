@@ -13,6 +13,7 @@ class ExternalAgentUpdate(BaseRequest):
     role: str | None = None
     department: str | None = None
     enabled: bool | None = None
+    is_primary: bool | None = None
 
 
 @router.get("/external-agents/detect")

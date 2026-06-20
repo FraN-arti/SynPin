@@ -218,6 +218,19 @@ function App() {
     return off
   }, [wsOn])
 
+  // Listen for primary agent changes
+  useEffect(() => {
+    const off = wsOn('agent:primary_changed', (msg: { slug: string }) => {
+      setPrimarySlug(msg.slug)
+      // Sync is_primary in agents list
+      setAvailableAgents(prev => prev.map(a => ({
+        ...a,
+        is_primary: a.slug === msg.slug,
+      })))
+    })
+    return off
+  }, [wsOn])
+
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
 
   const refreshDepartments = useCallback(async () => {
@@ -433,7 +446,7 @@ function App() {
         const hasPendingTask = lastMsg?.role === 'user'
 
         if (msgs.length > 0) {
-          let restored: Message[] = msgs.map((m: { role: string; content: string; model?: string; agent_name?: string; prompt_tokens?: number; completion_tokens?: number }, i: number) => ({
+          let restored: Message[] = msgs.map((m: { role: string; content: string; model?: string; agent_name?: string; prompt_tokens?: number; completion_tokens?: number; tools?: ToolCall[] }, i: number) => ({
             id: `restored-${i}`,
             role: m.role as 'user' | 'assistant',
             content: m.content,
@@ -442,6 +455,7 @@ function App() {
             agent_name: m.agent_name,
             prompt_tokens: m.prompt_tokens,
             completion_tokens: m.completion_tokens,
+            tools: m.tools,
           }))
 
           // Check if restored messages already end with empty assistant (from SSE)
@@ -478,7 +492,8 @@ function App() {
   }, [activeAgent, view])
 
   // ─── Polling: check for background task completion ──────────────────
-  // Load chat history when active agent changes OR when returning to chat view
+  // Smart polling: only active when WS is disconnected or when waiting for response
+  // When WS is connected, polling interval is longer (30s) since WS handles real-time updates
   useEffect(() => {
     if (!activeAgent || view.type !== 'chat') return  // skip if not in chat view
 
@@ -486,6 +501,15 @@ function App() {
       // Check for empty assistant placeholder using ref (always current)
       const hasEmptyPlaceholder = (messagesRef.current ?? []).some(m => m.role === 'assistant' && !m.content)
       if (!hasEmptyPlaceholder) return
+
+      // Smart interval: poll less frequently when WS is connected (it handles real-time)
+      // The interval itself doesn't change, but we can skip poll if WS is healthy
+      if (wsConnected) {
+        // WS is connected — trust it for real-time updates, only poll as safety net
+        // Skip this poll cycle if we recently received a WS message (check via ref)
+        const lastWsMessage = (window as any).__lastWsMessageTime || 0
+        if (Date.now() - lastWsMessage < 15000) return  // Last WS message < 15s ago — skip poll
+      }
 
       try {
         const res = await fetch(`${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web`)
@@ -508,7 +532,7 @@ function App() {
           if (placeholderId) {
             setIsTyping(false)
             return list.map(m => m.id === placeholderId
-              ? { ...m, content: lastServerMsg.content, model: lastServerMsg.model, agent_name: lastServerMsg.agent_name, prompt_tokens: lastServerMsg.prompt_tokens, completion_tokens: lastServerMsg.completion_tokens }
+              ? { ...m, content: lastServerMsg.content, model: lastServerMsg.model, agent_name: lastServerMsg.agent_name, prompt_tokens: lastServerMsg.prompt_tokens, completion_tokens: lastServerMsg.completion_tokens, tools: lastServerMsg.tools }
               : m
             )
           }
@@ -517,7 +541,7 @@ function App() {
       } catch (e) {
         // Polling failed — silent
       }
-    }, 10000) // Poll every 10 seconds (fallback for WebSocket misses)
+    }, 30000) // Poll every 30 seconds (fallback for WebSocket misses — WS is primary)
 
     return () => clearInterval(pollInterval)
   }, [activeAgent, view])
@@ -604,6 +628,17 @@ function App() {
         if (activeAgent.system_prompt) ctx.push(activeAgent.system_prompt)
         ctx.push(`Если тебя спрашивают где ты или что ты — ты внутри SynPin и можешь помогать с задачами организации.`)
         systemPrompt = ctx.join('\n')
+
+        // Main agent prompt injection for external agents
+        if (activeAgent.is_primary) {
+          try {
+            const promptRes = await fetch(`${API_BASE}/api/config/main-agent-prompt`)
+            if (promptRes.ok) {
+              const { prompt } = await promptRes.json()
+              if (prompt) systemPrompt = systemPrompt + '\n\n' + prompt
+            }
+          } catch { /* ignore — external agent works without main prompt */ }
+        }
       } else {
         const parts: string[] = []
         if (activeAgent.name) parts.push(`Имя: ${activeAgent.name}`)
@@ -636,7 +671,6 @@ function App() {
             channel_id: 'web',
             temperature: activeAgent?.temperature || 0.7,
             max_tokens: activeAgent?.max_tokens,
-            tools: activeAgent?.tools || [],
           }),
         })
         if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -693,6 +727,7 @@ function App() {
     const onChunk = wsOn('chat:chunk', (msg) => {
       if (msg.agent_slug !== activeAgent?.slug) return
       fullContent += msg.content
+      ;(window as any).__lastWsMessageTime = Date.now()  // Track WS activity for smart polling
       setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, content: fullContent } : m))
     })
 
@@ -733,7 +768,7 @@ function App() {
               setTimeout(() => setCompactionNotice(null), 5000)
             }
           }
-          return { ...m, model: msg.model || 'assistant', agent_name: msg.agent_name }
+          return { ...m, model: msg.model || 'assistant', agent_name: msg.agent_name, prompt_tokens: msg.usage?.prompt_tokens, completion_tokens: msg.usage?.completion_tokens }
         })
       })
       cleanup()
@@ -976,6 +1011,7 @@ function App() {
                   <div className="agent-list-info">
                     <span className="agent-list-name">
                       {primary.name}
+                      {primary.is_external && <span className="agent-badge extern">extern</span>}
                     </span>
                     <span className="agent-list-role">{primary.role_name || primary.type}</span>
                   </div>
@@ -1052,7 +1088,14 @@ function App() {
                           method: 'PUT',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ slug: newPrimary }),
-                        }).then(() => setPrimarySlug(newPrimary))
+                        }).then(() => {
+                          setPrimarySlug(newPrimary)
+                          // Sync is_primary in agents list
+                          setAvailableAgents(prev => prev.map(a => ({
+                            ...a,
+                            is_primary: a.slug === newPrimary,
+                          })))
+                        })
                       }}
                     >★</span>
                   </button>

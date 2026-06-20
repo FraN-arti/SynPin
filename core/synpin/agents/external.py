@@ -148,6 +148,7 @@ def load_external_agents() -> list[dict[str, Any]]:
             "type": cfg.get("type", "unknown"),
             "description": cfg.get("description", ""),
             "enabled": cfg.get("enabled", False),
+            "is_primary": cfg.get("is_primary", False),
             "role": role_id,
             "role_name": role_name,
             "department": dept_id,
@@ -172,13 +173,42 @@ def update_external_agent(slug: str, updates: dict[str, Any]) -> dict[str, Any] 
         return None
 
     # Only allow certain fields to be updated
-    allowed_fields = {"name", "role", "department", "enabled"}
+    allowed_fields = {"name", "role", "department", "enabled", "is_primary"}
     for key, value in updates.items():
         if key in allowed_fields:
+            # If setting is_primary=True, unset all others first
+            if key == "is_primary" and value:
+                for other_slug, other_cfg in agents.items():
+                    if other_slug != slug:
+                        other_cfg["is_primary"] = False
             agents[slug][key] = value
 
     config["agents"] = agents
     save_external_agents_config(config)
+
+    # Sync is_primary with settings.yaml and broadcast
+    if "is_primary" in updates:
+        settings_path = manager._get_config_dir() / "settings.yaml"
+        settings_data = manager._load_yaml(settings_path)
+        if updates["is_primary"]:
+            settings_data["primary_agent_slug"] = slug
+        elif settings_data.get("primary_agent_slug") == slug:
+            settings_data["primary_agent_slug"] = ""
+        manager._save_yaml(settings_path, settings_data)
+
+        # Broadcast change via WebSocket
+        try:
+            import asyncio
+            from ..chat.ws_manager import ws_manager
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(ws_manager.broadcast({
+                    "type": "agent:primary_changed",
+                    "slug": slug if updates["is_primary"] else "",
+                }))
+        except Exception:
+            pass
+
     return load_external_agent(slug)
 
 

@@ -534,6 +534,30 @@ def save_agent(slug: str, updates: dict[str, Any]) -> dict[str, Any]:
                         other_cfg["is_primary"] = False
             data["agents"][slug].update(operational)
             _save_yaml(config_path, data)
+            
+            # Sync is_primary with settings.yaml and broadcast
+            if "is_primary" in operational:
+                # Update primary_agent_slug in settings.yaml
+                settings_path = _get_config_dir() / "settings.yaml"
+                settings_data = _load_yaml(settings_path)
+                if operational["is_primary"]:
+                    settings_data["primary_agent_slug"] = slug
+                elif settings_data.get("primary_agent_slug") == slug:
+                    settings_data["primary_agent_slug"] = ""
+                _save_yaml(settings_path, settings_data)
+                
+                # Broadcast change via WebSocket
+                try:
+                    import asyncio
+                    from ..chat.ws_manager import ws_manager
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        loop.create_task(ws_manager.broadcast({
+                            "type": "agent:primary_changed",
+                            "slug": slug if operational["is_primary"] else "",
+                        }))
+                except Exception:
+                    pass
 
     # Update agent.yaml
     if personalization:

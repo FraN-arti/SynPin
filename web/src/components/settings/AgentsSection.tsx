@@ -12,7 +12,12 @@ import type { AgentData, ExternalAgentData } from './types'
 interface RoleInfo { rolesid: string; name: string; description: string; color: string }
 interface DeptInfo { departmentsid: string; name: string; description: string; color: string }
 
-export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void }) {
+interface AgentsSectionProps {
+  onAgentsChange?: () => void
+  wsOn?: (type: string, handler: (data: any) => void) => () => void
+}
+
+export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
   const [agents, setAgents] = useState<AgentData[]>([])
   const [providers, setProviders] = useState<{ name: string; models: string[] }[]>([])
   const [hoveredAgent, setHoveredAgent] = useState<string | null>(null)
@@ -100,6 +105,16 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
   useEffect(() => {
     fetchAgents(); fetchProviders(); fetchRoles(); fetchDepartments(); detectExternalAgents()
   }, [fetchAgents, fetchProviders, fetchRoles, fetchDepartments, detectExternalAgents])
+
+  // Listen for primary agent changes via WebSocket
+  useEffect(() => {
+    if (!wsOn) return
+    const off = wsOn('agent:primary_changed', () => {
+      fetchAgents()
+      detectExternalAgents()
+    })
+    return off
+  }, [wsOn, fetchAgents, detectExternalAgents])
 
   const handleAddRole = async () => {
     if (!newRole.name.trim()) return
@@ -289,6 +304,16 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
       })
       if (res.ok) detectExternalAgents()
     } catch (e) { console.error('[external-agents] dept change error:', e) }
+  }
+
+  const handleExternalFieldChange = async (agent: ExternalAgentData, field: string, value: unknown) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/external-agents/${agent.slug}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value }),
+      })
+      if (res.ok) detectExternalAgents()
+    } catch (e) { console.error('[external-agents] field change error:', e) }
   }
 
   const modelOptions: string[] = []
@@ -562,6 +587,14 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
                         )}
                         <div className="expanded-toggle-row">
                           <label className="settings-toggle"><input type="checkbox" checked={agent.enabled} onChange={() => handleExternalToggle(agent)} /><span>Активен</span></label>
+                          <label className="settings-toggle" style={{ marginLeft: 12 }}>
+                            <input
+                              type="checkbox"
+                              checked={agent.is_primary || false}
+                              onChange={() => handleExternalFieldChange(agent, 'is_primary', !agent.is_primary)}
+                            />
+                            <span>Главный агент ★</span>
+                          </label>
                         </div>
                         {!agent.available && <div className="external-unavailable">⚠️ Сервис недоступен. Убедитесь что Hermes Gateway запущен.</div>}
                       </div>
@@ -732,6 +765,14 @@ export function AgentsSection({ onAgentsChange }: { onAgentsChange?: () => void 
                           {agent.description && <div className="expanded-field"><label>Описание</label><span className="expanded-description">{agent.description}</span></div>}
                           <div className="expanded-toggle-row">
                             <label className="settings-toggle"><input type="checkbox" checked={agent.enabled} onChange={() => handleToggle(agent)} /><span>Активен</span></label>
+                            <label className="settings-toggle" style={{ marginLeft: 12 }}>
+                              <input
+                                type="checkbox"
+                                checked={agent.is_primary || false}
+                                onChange={() => handleAgentFieldChange(agent, 'is_primary', !agent.is_primary)}
+                              />
+                              <span>Главный агент ★</span>
+                            </label>
                             <button className="expanded-delete-btn" onClick={() => handleDeleteAgent(agent.slug)} title="Удалить агента">
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />

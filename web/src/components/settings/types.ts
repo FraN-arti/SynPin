@@ -116,6 +116,7 @@ export interface AgentData {
   skills: string[]
   tools: string[]
   enabled: boolean
+  is_primary?: boolean
   description: string
   tone: string
   style: string
@@ -136,6 +137,7 @@ export interface ExternalAgentData {
   type: string
   description: string
   enabled: boolean
+  is_primary?: boolean
   role: string
   role_name: string
   department: string

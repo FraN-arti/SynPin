@@ -412,9 +412,13 @@ function App() {
   // Load chat history when active agent changes OR when returning to chat view
   useEffect(() => {
     if (!activeAgent || view.type !== 'chat') return  // skip if not in chat view
+
+    // Reset messages to null to show loading skeleton
+    setMessages(null)
+
     const loadHistory = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web`)
+        const res = await fetch(`${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web&limit=20`)
         if (!res.ok) {
           // Backend failure (5xx, 4xx other than empty) — unblock UI
           // so the user doesn't see a permanent skeleton.
@@ -773,6 +777,7 @@ function App() {
       return <span className="message-time">{formatTime(msg.timestamp)}</span>
     }
     // Assistant: time — agent_name · model · tokens
+    const totalTokens = (msg.prompt_tokens || 0) + (msg.completion_tokens || 0)
     return (
       <>
         <span className="message-time">{formatTime(msg.timestamp)}</span>
@@ -786,10 +791,10 @@ function App() {
         {msg.model && msg.model !== msg.agent_name && (
           <span className="meta-badge">{msg.model}</span>
         )}
-        {msg.prompt_tokens && (
+        {totalTokens > 0 && (
           <>
             <span className="meta-dot"> · </span>
-            <span className="meta-badge dim">{msg.prompt_tokens} tok</span>
+            <span className="meta-badge dim">{totalTokens.toLocaleString('ru-RU')}т</span>
           </>
         )}
       </>

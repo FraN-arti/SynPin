@@ -223,13 +223,14 @@ async def _handle_chat_send(user_id: str, msg: dict):
     from ..agents.manager import get_agent
     agent_data = get_agent(agent_slug)
     provider_name = agent_data.get("provider") if agent_data else None
-    model = agent_data.get("model", "default") if agent_data else "default"
+    model = agent_data.get("model", "") if agent_data else ""
     temperature = agent_data.get("temperature", 0.7) if agent_data else 0.7
     max_tokens = agent_data.get("max_tokens", 4096) if agent_data else 4096
     tool_names = get_all_tool_names()
 
-    if provider_name and model.startswith(f"{provider_name}/"):
-        model = model[len(provider_name) + 1:]
+    # Resolve model with fallback to provider's default
+    from .router import resolve_model
+    provider_name, model = resolve_model(provider_name, model)
 
     # Stream response via WS
     full_response = ""
@@ -407,10 +408,12 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         messages = [ChatMessage(role=m["role"], content=m["content"], images=m.get("images")) for m in context_messages]
         messages.append(ChatMessage(role="user", content=trigger_message))
 
-        model = agent.get("model", "default")
+        model = agent.get("model", "")
         provider_name = agent.get("provider")
-        if provider_name and model.startswith(f"{provider_name}/"):
-            model = model[len(provider_name) + 1:]
+
+        # Resolve model with fallback to provider's default
+        from .router import resolve_model
+        provider_name, model = resolve_model(provider_name, model)
 
         # Determine tools for this agent
         if is_head:
@@ -682,10 +685,12 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         messages.append(ChatMessage(role="user", content=acknowledge_trigger))
 
         system_prompt = _build_otdel_system_prompt(otdel, head_agent, True)
-        model = head_agent.get("model", "default")
+        model = head_agent.get("model", "")
         provider_name = head_agent.get("provider")
-        if provider_name and model.startswith(f"{provider_name}/"):
-            model = model[len(provider_name) + 1:]
+
+        # Resolve model with fallback to provider's default
+        from .router import resolve_model
+        provider_name, model = resolve_model(provider_name, model)
 
         # Head gets all tools including head protocol
         tool_names = get_all_tool_names(include_head=True)
@@ -817,10 +822,12 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         messages = [ChatMessage(role=m["role"], content=m["content"], images=m.get("images")) for m in context_messages]
         messages.append(ChatMessage(role="user", content=trigger_message))
 
-        model = agent.get("model", "default")
+        model = agent.get("model", "")
         provider_name = agent.get("provider")
-        if provider_name and model.startswith(f"{provider_name}/"):
-            model = model[len(provider_name) + 1:]
+
+        # Resolve model with fallback to provider's default
+        from .router import resolve_model
+        provider_name, model = resolve_model(provider_name, model)
 
         if is_head:
             tool_names = get_all_tool_names(include_head=True)

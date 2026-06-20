@@ -1,7 +1,7 @@
-"""Web search tool — search the internet via DuckDuckGo.
+"""Web search tool — unified search via multiple providers.
 
-Uses httpx for async HTTP requests. Tries the DuckDuckGo instant answer API
-first, then falls back to a lite HTML scraping approach.
+Supports: DuckDuckGo (default), Tavily, Bing, SerpAPI, Google CSE.
+Provider is selected from settings.yaml → models.web_search.
 """
 from __future__ import annotations
 
@@ -16,34 +16,48 @@ from .base import ToolResult, make_success, make_error
 # Default number of results
 _DEFAULT_LIMIT = 10
 
-
 async def web_search(params: dict) -> ToolResult:
     """Search the web for information.
-
+    
     Params:
         query (str): The search query.
         limit (int, optional): Maximum number of results. Defaults to 10.
-
+        provider (str, optional): Override provider (duckduckgo, tavily, bing, etc.)
+    
     Returns:
         ToolResult with search results as formatted text.
     """
     query = params.get("query")
     if not query:
         return make_error("Missing required parameter: query")
-
     limit = params.get("limit", _DEFAULT_LIMIT)
+    provider_override = params.get("provider", "")
 
-    # Strategy 1: DuckDuckGo Instant Answer API
+    # Use unified provider system
+    try:
+        from .web_search_providers import web_search_unified
+        results, used_provider = await web_search_unified(query, provider=provider_override, limit=limit)
+        if results:
+            # Format results as text
+            output_lines = [f"[Провайдер: {used_provider}]"]
+            for i, r in enumerate(results, 1):
+                output_lines.append(f"**{i}. {r.get('title', 'No title')}**")
+                output_lines.append(f"URL: {r.get('url', '')}")
+                output_lines.append(f"Snippet: {r.get('snippet', '')}")
+                output_lines.append("")
+            return make_success("\n".join(output_lines))
+    except Exception as e:
+        pass  # Fall through to legacy DDG
+
+    # Fallback: legacy DuckDuckGo methods
     results = await _ddg_instant(query, limit)
     if results:
         return make_success(results)
 
-    # Strategy 2: DuckDuckGo lite HTML scraping
     results = await _ddg_lite(query, limit)
     if results:
         return make_success(results)
 
-    # Strategy 3: DuckDuckGo HTML API
     results = await _ddg_html(query, limit)
     if results:
         return make_success(results)

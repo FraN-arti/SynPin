@@ -27,6 +27,32 @@ registry: ProviderRegistry | None = None
 # Max tool call iterations per message
 MAX_TOOL_ITERATIONS = 5
 
+
+def resolve_model(provider_name: str | None, model: str | None) -> tuple[str | None, str]:
+    """Resolve model with fallback to provider's default.
+
+    Args:
+        provider_name: Provider name (e.g. "9router")
+        model: Agent's model setting (e.g. "9router/hermes-agent" or "" or None)
+
+    Returns:
+        (provider_name, model_name) — resolved tuple
+    """
+    # Extract provider from model string if present (e.g. "9router/hermes-agent")
+    if model and "/" in model:
+        provider_name, model = model.split("/", 1)
+
+    # If model is empty or "default", use provider's first model
+    if not model or model == "default":
+        if registry:
+            default_model = registry.get_default_model(provider_name)
+            if default_model:
+                return provider_name, default_model
+        # Final fallback: return what we have
+        return provider_name, model or "default"
+
+    return provider_name, model
+
 # Shared data dir for memory (resolved once)
 # Max messages to keep in history per channel
 MAX_HISTORY_MESSAGES = 100
@@ -252,8 +278,21 @@ async def compact_messages(
 
 # ── Session Auto-Reset ────────────────────────────────────────────────────
 
+def _get_global_session_settings() -> dict:
+    """Read global session settings from settings.yaml."""
+    try:
+        from ..config.manager import load_yaml
+        settings = load_yaml("settings.yaml")
+        return settings.get("sessions", {})
+    except Exception:
+        return {}
+
+
 def _check_session_auto_reset(agent_slug: str, channel_id: str) -> bool:
-    """Check if session needs auto-reset. Returns True if reset was performed."""
+    """Check if session needs auto-reset. Returns True if reset was performed.
+    
+    Priority: agent memory settings → global settings.yaml → defaults.
+    """
     if not agent_slug or not channel_id:
         return False
 
@@ -267,7 +306,12 @@ def _check_session_auto_reset(agent_slug: str, channel_id: str) -> bool:
             return False
 
         memory = agent.get("memory", {})
-        if not memory.get("session_auto_reset_enabled", False):
+        global_settings = _get_global_session_settings()
+        
+        # Merge: agent memory > global settings > defaults
+        auto_reset_enabled = memory.get("session_auto_reset_enabled", 
+                                         global_settings.get("auto_reset_enabled", False))
+        if not auto_reset_enabled:
             return False
 
         data_dir = _get_data_dir()
@@ -290,11 +334,13 @@ def _check_session_auto_reset(agent_slug: str, channel_id: str) -> bool:
             return False
 
         now = datetime.now()
-        mode = memory.get("session_auto_reset_mode", "daily")
+        mode = memory.get("session_auto_reset_mode", 
+                          global_settings.get("auto_reset_mode", "daily"))
         needs_reset = False
 
         if mode == "daily":
-            reset_time_str = memory.get("session_auto_reset_time", "00:00")
+            reset_time_str = memory.get("session_auto_reset_time",
+                                        global_settings.get("auto_reset_time", "00:00"))
             try:
                 h, m = map(int, reset_time_str.split(":"))
                 today_reset = now.replace(hour=h, minute=m, second=0, microsecond=0)
@@ -610,7 +656,7 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
         "type": "function",
         "function": {
             "name": "web_search",
-            "description": "Поиск информации в интернете через DuckDuckGo.",
+            "description": "Поиск информации в интернете. Поддерживает несколько поисковых систем (DuckDuckGo, Tavily, EXA, Perplexity, Bing, SerpAPI, Google). Провайдер выбирается автоматически из настроек.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -1089,6 +1135,18 @@ async def execute_tool(tool_name: str, params: dict, agent_slug: str | None = No
         head_protocol_tools = ("head_delegate", "head_evaluate", "head_retry", "head_decide", "head_block", "kanban_task")
         if otdel_id and tool_name in head_protocol_tools:
             params = {**params, "otdel_id": otdel_id}
+
+        # Inject agent model info for model-dependent tools (fallback to agent's own model)
+        model_tools = ("summarize", "image_analyze")
+        if agent_slug and tool_name in model_tools:
+            from ..agents.manager import get_agent
+            agent = get_agent(agent_slug)
+            if agent:
+                agent_model = agent.get("model", "")
+                agent_provider = agent.get("provider", "")
+                if agent_model and "/" in agent_model:
+                    agent_provider, agent_model = agent_model.split("/", 1)
+                params = {**params, "_agent_provider": agent_provider, "_agent_model": agent_model}
 
         logging.getLogger("synpin.chat").info("[tool] Executing %s with params=%s", tool_name, {k: str(v)[:100] for k, v in params.items()})
         try:
@@ -1757,10 +1815,17 @@ async def chat_complete(req: ChatRequest):
 
 
 @router.get("/history")
-async def get_chat_history(agent_slug: str, channel_id: str = "web"):
-    """Load persisted chat history for an agent+channel."""
+async def get_chat_history(agent_slug: str, channel_id: str = "web", limit: int = 0):
+    """Load persisted chat history for an agent+channel.
+
+    Args:
+        limit: Max messages to return (0 = all). Returns the LAST N messages.
+    """
     messages = _load_chat_history(agent_slug, channel_id)
-    return {"messages": messages, "count": len(messages)}
+    total = len(messages)
+    if limit > 0 and len(messages) > limit:
+        messages = messages[-limit:]  # Return only the most recent N
+    return {"messages": messages, "count": len(messages), "total": total}
 
 
 @router.delete("/history")

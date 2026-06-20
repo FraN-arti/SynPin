@@ -20,6 +20,10 @@ export function GeneralSection() {
   const [tweakcnLoading, setTweakcnLoading] = useState(false)
   const [tweakcnError, setTweakcnError] = useState('')
   const [tweakcnSuccess, setTweakcnSuccess] = useState('')
+  const [webSearchProviders, setWebSearchProviders] = useState<Record<string, { enabled: boolean; api_key: string; search_engine_id?: string }>>({})
+  const [editingProvider, setEditingProvider] = useState<string | null>(null)
+  const [providerApiKey, setProviderApiKey] = useState('')
+  const [providerCx, setProviderCx] = useState('')
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -42,6 +46,10 @@ export function GeneralSection() {
 
   useEffect(() => {
     fetch(`${API_BASE}/api/themes/tweakcn/list`).then(r => r.ok ? r.json() : null).then(data => { if (data?.themes) setCustomThemes(data.themes) }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/config/web-search`).then(r => r.ok ? r.json() : null).then(data => { if (data?.providers) setWebSearchProviders(data.providers) }).catch(() => {})
   }, [])
 
   const tweakcnVarsRef = useRef<Record<string, string> | null>(null)
@@ -154,6 +162,34 @@ export function GeneralSection() {
       saveSettings({ feed: { [key]: value } } as unknown as Partial<SettingsData>)
     }
   }, [saveSettings])
+
+  const updateSessions = useCallback((key: string, value: string | number | boolean) => {
+    setSettings(prev => {
+      if (!prev) return prev
+      const sessions = { ...(prev.sessions || {}), [key]: value }
+      return { ...prev, sessions }
+    })
+    saveSettings({ sessions: { [key]: value } } as unknown as Partial<SettingsData>)
+  }, [saveSettings])
+
+  const saveWebSearchProvider = useCallback(async (provider: string, data: { enabled?: boolean; api_key?: string; search_engine_id?: string }) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/config/web-search`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, ...data }),
+      })
+      if (res.ok) {
+        const result = await res.json()
+        setWebSearchProviders(prev => ({
+          ...prev,
+          [provider]: { ...prev[provider], ...data },
+        }))
+      }
+    } catch (e) {
+      console.error('[web-search] save error:', e)
+    }
+  }, [])
 
   const handleTweakcnImport = useCallback(async () => {
     if (!tweakcnUrl.trim()) return
@@ -290,26 +326,101 @@ export function GeneralSection() {
             <CustomDropdown value={settings.models?.vision || ''} onChange={v => updateModels('vision', v)} searchable
               options={[{ value: '', label: 'Не настроено' }, ...availableModels.map(m => ({ value: `${m.provider}/${m.model}`, label: `${m.model} (${m.provider})` }))]} />
           </div>
-          <div className="settings-field">
-            <label>Генерация изображений</label>
-            <CustomDropdown value={settings.models?.image_gen || ''} onChange={v => updateModels('image_gen', v)} searchable
-              options={[{ value: '', label: 'Не настроено' }, ...availableModels.map(m => ({ value: `${m.provider}/${m.model}`, label: `${m.model} (${m.provider})` }))]} />
+          <div className="settings-field" style={{ opacity: 0.5, pointerEvents: 'none' }}>
+            <label>Генерация изображений <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>Скоро</span></label>
+            <CustomDropdown value="" onChange={() => {}} searchable
+              options={[{ value: '', label: 'Не настроено' }]} disabled />
           </div>
           <div className="settings-field">
             <label>Веб-поиск</label>
-            <CustomDropdown value={settings.models?.web_search || ''} onChange={v => updateModels('web_search', v)} searchable
-              options={[{ value: '', label: 'Не настроено' }, ...availableModels.map(m => ({ value: `${m.provider}/${m.model}`, label: `${m.model} (${m.provider})` }))]} />
+            <CustomDropdown
+              value={settings.models?.web_search || ''}
+              onChange={v => updateModels('web_search', v)}
+              searchable
+              options={[
+                { value: '', label: 'DuckDuckGo (бесплатно)' },
+                ...Object.entries(webSearchProviders)
+                  .filter(([name, cfg]) => name !== 'duckduckgo' && cfg.enabled && cfg.api_key)
+                  .map(([name]) => ({ value: name, label: name.charAt(0).toUpperCase() + name.slice(1) })),
+              ]}
+            />
+            <span className="settings-field-hint" style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+              DuckDuckGo доступен всегда. Другие провайдеры — в блоке ниже.
+            </span>
           </div>
-          <div className="settings-field">
-            <label>Веб-экстракт</label>
-            <CustomDropdown value={settings.models?.web_extract || ''} onChange={v => updateModels('web_extract', v)} searchable
-              options={[{ value: '', label: 'Не настроено' }, ...availableModels.map(m => ({ value: `${m.provider}/${m.model}`, label: `${m.model} (${m.provider})` }))]} />
+          <div className="settings-field" style={{ opacity: 0.5, pointerEvents: 'none' }}>
+            <label>Веб-экстракт <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>Скоро</span></label>
+            <CustomDropdown value="" onChange={() => {}} searchable
+              options={[{ value: '', label: 'Не настроено' }]} disabled />
           </div>
           <div className="settings-field">
             <label>Суммаризация</label>
             <CustomDropdown value={settings.models?.summarization || ''} onChange={v => updateModels('summarization', v)} searchable
               options={[{ value: '', label: 'Не настроено' }, ...availableModels.map(m => ({ value: `${m.provider}/${m.model}`, label: `${m.model} (${m.provider})` }))]} />
           </div>
+        </SettingsCard>
+
+        <SettingsCard title="Провайдеры поиска">
+          {[
+            { name: 'tavily', label: 'Tavily', hint: '1000 запросов/мес бесплатно', needsKey: true },
+            { name: 'perplexity', label: 'Perplexity', hint: 'AI-поиск с цитатами', needsKey: true },
+            { name: 'exa', label: 'EXA', hint: '1000 запросов/мес, AI-оптимизированный', needsKey: true },
+            { name: 'bing', label: 'Bing Search', hint: '~1000 запросов/мес бесплатно', needsKey: true },
+            { name: 'serpapi', label: 'SerpAPI', hint: '250 запросов/мес бесплатно', needsKey: true },
+            { name: 'google', label: 'Google CSE', hint: '100 запросов/день', needsKey: true, hasCx: true },
+          ].map(p => (
+            <div key={p.name} className="settings-field-row" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 12, marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
+                <label className="settings-toggle">
+                  <input
+                    type="checkbox"
+                    checked={webSearchProviders[p.name]?.enabled || false}
+                    onChange={e => saveWebSearchProvider(p.name, { enabled: e.target.checked })}
+                  />
+                  <span>{p.label}</span>
+                </label>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{p.hint}</span>
+              </div>
+              {webSearchProviders[p.name]?.enabled && (
+                <div style={{ display: 'flex', gap: 8, marginTop: 8, width: '100%' }}>
+                  <input
+                    type="password"
+                    className="settings-input"
+                    placeholder={p.name === 'google' ? 'API Key' : 'API Key'}
+                    value={editingProvider === p.name ? providerApiKey : (webSearchProviders[p.name]?.api_key ? '••••••••' : '')}
+                    onFocus={() => { setEditingProvider(p.name); setProviderApiKey(''); setProviderCx(webSearchProviders[p.name]?.search_engine_id || '') }}
+                    onBlur={() => setTimeout(() => setEditingProvider(null), 200)}
+                    onChange={e => setProviderApiKey(e.target.value)}
+                    style={{ flex: 1 }}
+                  />
+                  {p.hasCx && editingProvider === p.name && (
+                    <input
+                      type="text"
+                      className="settings-input"
+                      placeholder="Search Engine ID (CX)"
+                      value={providerCx}
+                      onChange={e => setProviderCx(e.target.value)}
+                      style={{ flex: 1 }}
+                    />
+                  )}
+                  {editingProvider === p.name && providerApiKey && (
+                    <button
+                      className="settings-btn-primary"
+                      onClick={() => {
+                        saveWebSearchProvider(p.name, {
+                          api_key: providerApiKey,
+                          ...(p.hasCx ? { search_engine_id: providerCx } : {}),
+                        })
+                        setEditingProvider(null)
+                      }}
+                    >
+                      Сохранить
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
         </SettingsCard>
       </div>
 

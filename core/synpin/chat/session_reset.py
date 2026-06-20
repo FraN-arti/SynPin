@@ -44,12 +44,21 @@ def _load_yaml(path: Path) -> dict:
 
 
 def _get_sessions_config() -> dict:
-    """Read sessions config from memory.yaml."""
+    """Read sessions config from settings.yaml, fallback to memory.yaml."""
     config_dir = _get_config_dir()
     if not config_dir:
         return {}
+    
+    # Try settings.yaml first (global settings from UI)
+    settings_cfg = _load_yaml(config_dir / "settings.yaml")
+    sessions_from_settings = settings_cfg.get("sessions", {})
+    
+    # Fallback to memory.yaml for legacy settings
     mem_cfg = _load_yaml(config_dir / "memory.yaml")
-    return mem_cfg.get("sessions", {})
+    sessions_from_memory = mem_cfg.get("sessions", {})
+    
+    # Merge: settings.yaml > memory.yaml
+    return {**sessions_from_memory, **sessions_from_settings}
 
 
 def _should_reset(sessions_cfg: dict) -> bool:
@@ -124,6 +133,7 @@ def _reset_sessions():
     sessions_cfg = _get_sessions_config()
     archive_on_reset = sessions_cfg.get("archive_on_reset", True)
     max_history = sessions_cfg.get("max_history", 100)
+    archive_retention_days = sessions_cfg.get("archive_retention_days", 30)
 
     # Find all session files: data/agents/{slug}/sessions/{channel}.json
     agents_dir = data_dir / "agents"
@@ -131,12 +141,28 @@ def _reset_sessions():
         return
 
     reset_count = 0
+    archived_cleaned = 0
+
     for agent_dir in agents_dir.iterdir():
         if not agent_dir.is_dir():
             continue
         sessions_dir = agent_dir / "sessions"
         if not sessions_dir.exists():
             continue
+
+        # Clean old archives if retention is set
+        if archive_retention_days > 0:
+            archive_dir = sessions_dir / "archive"
+            if archive_dir.exists():
+                cutoff = datetime.now() - timedelta(days=archive_retention_days)
+                for archive_file in archive_dir.glob("*.json"):
+                    try:
+                        mtime = datetime.fromtimestamp(archive_file.stat().st_mtime)
+                        if mtime < cutoff:
+                            archive_file.unlink()
+                            archived_cleaned += 1
+                    except Exception:
+                        pass
 
         for session_file in sessions_dir.glob("*.json"):
             try:
@@ -174,8 +200,8 @@ def _reset_sessions():
             except Exception as e:
                 logger.warning("Error processing session %s: %s", session_file, e)
 
-    if reset_count > 0:
-        logger.info("Session auto-reset: archived %d sessions", reset_count)
+    if reset_count > 0 or archived_cleaned > 0:
+        logger.info("Session auto-reset: archived %d sessions, cleaned %d old archives", reset_count, archived_cleaned)
 
 
 def _session_reset_loop(interval: int = 60):

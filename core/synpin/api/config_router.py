@@ -220,6 +220,7 @@ class SettingsUpdate(BaseRequest):
     ui: Optional[Dict[str, Any]] = None
     models: Optional[Dict[str, Any]] = None
     feed: Optional[Dict[str, Any]] = None
+    sessions: Optional[Dict[str, Any]] = None
     kanban: Optional[Dict[str, Any]] = None
 
 
@@ -245,6 +246,13 @@ _SETTINGS_DEFAULTS: dict[str, Any] = {
         "web_search": "",
         "web_extract": "",
         "summarization": "",
+    },
+    "sessions": {
+        "auto_reset_enabled": True,
+        "auto_reset_mode": "daily",
+        "auto_reset_time": "00:00",
+        "max_history": 100,
+        "archive_on_reset": True,
     },
     "feed": {
         "enabled": True,
@@ -298,6 +306,8 @@ async def update_settings(req: SettingsUpdate):
             full["ui"] = _deep_merge(full.get("ui", {}), req.ui)
         if req.models is not None:
             full["models"] = _deep_merge(full.get("models", {}), req.models)
+        if req.sessions is not None:
+            full["sessions"] = _deep_merge(full.get("sessions", {}), req.sessions)
         if req.feed is not None:
             full["feed"] = _deep_merge(full.get("feed", {}), req.feed)
         if req.kanban is not None:
@@ -309,3 +319,67 @@ async def update_settings(req: SettingsUpdate):
     except Exception as e:
         logger.error("Failed to update settings: %s", e)
         raise HTTPException(500, "Failed to update settings")
+
+
+# ── Web Search Config ─────────────────────────────────────────────────────
+
+@router.get("/web-search")
+async def get_web_search_config():
+    """Get web search provider configuration."""
+    try:
+        config_path = CONFIG_DIR / "web_search.yaml"
+        if config_path.exists():
+            with open(config_path, encoding="utf-8") as f:
+                return yaml.safe_load(f) or {"providers": {}}
+        return {"providers": {}}
+    except Exception as e:
+        logger.error("Failed to read web search config: %s", e)
+        raise HTTPException(500, "Failed to read config")
+
+
+class WebSearchProviderUpdate(BaseRequest):
+    """Update a web search provider."""
+    provider: str
+    enabled: bool | None = None
+    api_key: str | None = None
+    search_engine_id: str | None = None  # For Google CSE
+
+
+@router.put("/web-search")
+async def update_web_search_config(req: WebSearchProviderUpdate):
+    """Update a web search provider configuration."""
+    try:
+        config_path = CONFIG_DIR / "web_search.yaml"
+        if config_path.exists():
+            with open(config_path, encoding="utf-8") as f:
+                config = yaml.safe_load(f) or {}
+        else:
+            config = {}
+
+        providers = config.get("providers", {})
+        provider = providers.get(req.provider, {})
+
+        if req.enabled is not None:
+            provider["enabled"] = req.enabled
+        if req.api_key is not None:
+            provider["api_key"] = req.api_key
+        if req.search_engine_id is not None:
+            provider["search_engine_id"] = req.search_engine_id
+
+        providers[req.provider] = provider
+        config["providers"] = providers
+
+        _save_yaml(config_path, config)
+        
+        # Reload provider config cache
+        try:
+            from ..tools.web_search_providers import reload_config
+            reload_config()
+        except Exception:
+            pass
+
+        logger.info("web_search.yaml updated: %s", req.provider)
+        return {"success": True, "provider": provider}
+    except Exception as e:
+        logger.error("Failed to update web search config: %s", e)
+        raise HTTPException(500, "Failed to update config")

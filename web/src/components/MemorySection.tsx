@@ -98,6 +98,13 @@ export function MemorySection() {
     enabled: true, compaction_limit: 100,
   })
   const [contextWindowDefault, setContextWindowDefault] = useState(128000)
+  const [sessionSettings, setSessionSettings] = useState({
+    auto_reset_enabled: true,
+    auto_reset_mode: 'daily' as 'daily' | 'weekly' | 'never',
+    auto_reset_time: '00:00',
+    archive_on_reset: true,
+    archive_retention_days: 30,
+  })
 
   // Load data on mount
   useEffect(() => {
@@ -127,6 +134,7 @@ export function MemorySection() {
         if (data.memory) setMemorySettings(data.memory)
         if (data.otdel_compaction) setOtdelCompaction(data.otdel_compaction)
         if (data.context_window?.default) setContextWindowDefault(data.context_window.default)
+        if (data.sessions) setSessionSettings(prev => ({ ...prev, ...data.sessions }))
       }
     } catch (e) {
       console.error('[memory] config load error:', e)
@@ -146,6 +154,19 @@ export function MemorySection() {
     } catch (e) {
       console.error('[memory] config save error:', e)
       return false
+    }
+  }
+
+  const saveSessionSettings = async (key: string, value: unknown) => {
+    setSessionSettings(prev => ({ ...prev, [key]: value }))
+    try {
+      await fetch(`${API}/api/config/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessions: { [key]: value } }),
+      })
+    } catch (e) {
+      console.error('[memory] session settings save error:', e)
     }
   }
 
@@ -475,6 +496,64 @@ export function MemorySection() {
               />
               <span className="settings-field-hint-inline">При превышении — старые сообщения заменяются summary</span>
             </div>
+          </div>
+        </SettingsCard>
+
+        {/* Block 5: Agent Sessions */}
+        <SettingsCard title="Сессии агентов" className="memory-settings-half">
+          <p className="memory-card-desc">Глобальные настройки сброса и архивации сессий.</p>
+
+          <div className="memory-config-form">
+            <div className="settings-field-row">
+              <label>Авто-сброс</label>
+              <SmallDropdown
+                value={sessionSettings.auto_reset_mode}
+                onChange={v => saveSessionSettings('auto_reset_mode', v)}
+                options={[
+                  { value: 'daily', label: 'Ежедневно' },
+                  { value: 'weekly', label: 'Еженедельно' },
+                  { value: 'never', label: 'Отключено' },
+                ]}
+              />
+            </div>
+
+            {sessionSettings.auto_reset_mode !== 'never' && (
+              <div className="settings-field-row">
+                <label>Время сброса</label>
+                <input
+                  type="time"
+                  className="settings-input"
+                  value={sessionSettings.auto_reset_time}
+                  onChange={e => saveSessionSettings('auto_reset_time', e.target.value)}
+                />
+              </div>
+            )}
+
+            <div className="settings-field-row">
+              <label className="settings-toggle">
+                <input
+                  type="checkbox"
+                  checked={sessionSettings.archive_on_reset}
+                  onChange={e => saveSessionSettings('archive_on_reset', e.target.checked)}
+                />
+                <span>Архивировать при сбросе</span>
+              </label>
+            </div>
+
+            {sessionSettings.archive_on_reset && (
+              <div className="settings-field-row">
+                <label>Хранить архив (дней)</label>
+                <input
+                  type="number"
+                  className="settings-input"
+                  value={sessionSettings.archive_retention_days}
+                  min={7}
+                  max={365}
+                  onChange={e => saveSessionSettings('archive_retention_days', parseInt(e.target.value) || 30)}
+                />
+                <span className="settings-field-hint-inline">Старые архивы удаляются автоматически</span>
+              </div>
+            )}
           </div>
         </SettingsCard>
       </div>

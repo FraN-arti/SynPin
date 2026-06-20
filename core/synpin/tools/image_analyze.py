@@ -33,12 +33,14 @@ async def image_analyze(params: dict) -> ToolResult:
     if not image_url:
         return make_error("Missing required parameter: image_url")
 
-    # Load vision model setting from settings.yaml
-    vision_config = _load_vision_config()
+    # Resolve model: settings → agent fallback
+    from .model_resolve import resolve_specialized_model
+    vision_config = resolve_specialized_model("vision", params)
     if not vision_config:
         return make_error(
             "Vision model not configured. "
-            "Set it in Settings → General → Настройка моделей → Визион."
+            "Set it in Settings → General → Настройка моделей → Визион, "
+            "or assign a model to the agent."
         )
 
     provider_name, model_name = vision_config

@@ -53,10 +53,17 @@ class OtdelChatSend(BaseModel):
 
 
 @router.get("/{otdel_id}/chat/history")
-async def get_otdel_chat_history(otdel_id: str):
-    """Get chat history for an otdel."""
+async def get_otdel_chat_history(otdel_id: str, limit: int = 0):
+    """Get chat history for an otdel.
+
+    Args:
+        limit: Max messages to return (0 = all). Returns the LAST N messages.
+    """
     messages = _load_history(otdel_id)
-    return {"messages": messages}
+    total = len(messages)
+    if limit > 0 and len(messages) > limit:
+        messages = messages[-limit:]
+    return {"messages": messages, "total": total}
 
 
 async def _notify_compaction(chat_task, save_result: dict):
@@ -210,13 +217,13 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
             messages.append(ChatMessage(role="user", content=trigger_message))
             
             # Get provider/model info
-            model = agent.get("model", "default")
+            model = agent.get("model", "")
             provider_name = agent.get("provider")
-            
-            # Strip provider prefix
-            if provider_name and model.startswith(f"{provider_name}/"):
-                model = model[len(provider_name) + 1:]
-            
+
+            # Resolve model with fallback to provider's default
+            from .router import resolve_model
+            provider_name, model = resolve_model(provider_name, model)
+
             # Determine tools for this agent
             if is_head:
                 head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_decide", "head_block", "kanban_task"]
@@ -385,11 +392,13 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
             messages.append(ChatMessage(role="user", content=acknowledge_trigger))
             
             system_prompt = _build_otdel_system_prompt(otdel, head_agent, True)
-            model = head_agent.get("model", "default")
+            model = head_agent.get("model", "")
             provider_name = head_agent.get("provider")
-            if provider_name and model.startswith(f"{provider_name}/"):
-                model = model[len(provider_name) + 1:]
-            
+
+            # Resolve model with fallback to provider's default
+            from .router import resolve_model
+            provider_name, model = resolve_model(provider_name, model)
+
             full_response = ""
             try:
                 from .router import stream_response as base_stream

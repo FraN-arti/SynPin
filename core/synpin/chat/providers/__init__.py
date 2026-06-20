@@ -10,9 +10,9 @@ from .anthropic import AnthropicProvider
 
 class ProviderRegistry:
     """Registry of configured LLM providers."""
-
     def __init__(self):
         self._providers: dict[str, BaseProvider] = {}
+        self._models: dict[str, list[str]] = {}  # provider_name → [model_names]
         self._default: str | None = None
         self._config_path: Path | None = None  # Stored for hot-reload
 
@@ -24,6 +24,12 @@ class ProviderRegistry:
     def get(self, name: str | None = None) -> Optional[BaseProvider]:
         name = name or self._default
         return self._providers.get(name)
+
+    def get_default_model(self, provider_name: str | None = None) -> str | None:
+        """Return the first model for a provider, or None."""
+        name = provider_name or self._default
+        models = self._models.get(name, [])
+        return models[0] if models else None
 
     def list_names(self) -> list[str]:
         return list(self._providers.keys())
@@ -57,6 +63,7 @@ class ProviderRegistry:
             config = yaml.safe_load(f) or {}
 
         new_providers: dict[str, BaseProvider] = {}
+        new_models: dict[str, list[str]] = {}
         new_default: str | None = None
 
         for name, cfg in config.get("providers", {}).items():
@@ -78,8 +85,10 @@ class ProviderRegistry:
                 continue
 
             new_providers[name] = provider
+            new_models[name] = cfg.get("models", [])
             if cfg.get("default", False) or new_default is None:
                 new_default = name
 
         self._providers = new_providers
+        self._models = new_models
         self._default = new_default

@@ -1046,41 +1046,46 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
                       {deptSearch ? 'Отделы не найдены' : 'Нет доступных отделов'}
                     </span>
                   ) : (
-                    filteredDepartments.map(dept => (
-                      <div key={dept.id} className={`projects-dept-item ${newProject.selected_departments.includes(dept.id) ? 'selected' : ''}`}>
-                        <label className="projects-dept-checkbox">
-                          <input
-                            type="checkbox"
-                            checked={newProject.selected_departments.includes(dept.id)}
-                            onChange={() => toggleDepartment(dept.id)}
-                          />
-                          <span className="projects-dept-name">{dept.name}</span>
-                          {newProject.main_department === dept.id && (
-                            <span className="projects-dept-main-badge">★</span>
-                          )}
-                        </label>
-                        {newProject.selected_departments.includes(dept.id) && (
-                          <div className="projects-dept-options">
-                            <label className="projects-dept-main">
-                              <input
-                                type="radio"
-                                name="main_department"
-                                checked={newProject.main_department === dept.id}
-                                onChange={() => setMainDepartment(dept.id)}
-                              />
-                              <span>Основной</span>
-                            </label>
-                            <input
-                              type="text"
-                              className="projects-dept-role"
-                              value={newProject.department_roles[dept.id] || ''}
-                              onChange={e => updateDepartmentRole(dept.id, e.target.value)}
-                              placeholder="Роль"
-                            />
+                    filteredDepartments.map(dept => {
+                      const isSelected = newProject.selected_departments.includes(dept.id)
+                      const isMain = newProject.main_department === dept.id
+                      return (
+                        <div
+                          key={dept.id}
+                          className={`dept-row ${isSelected ? 'selected' : ''}`}
+                          onClick={() => toggleDepartment(dept.id)}
+                        >
+                          {/* Checkbox */}
+                          <div className={`dept-check ${isSelected ? 'checked' : ''}`}>
+                            {isSelected && <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                           </div>
-                        )}
-                      </div>
-                    ))
+
+                          {/* Name + badge */}
+                          <span className="dept-name">{dept.name}</span>
+                          {isMain && <span className="dept-star">★</span>}
+
+                          {/* Radio + role (only when selected) */}
+                          {isSelected && (
+                            <div className="dept-options" onClick={e => e.stopPropagation()}>
+                              <label className="dept-radio-label">
+                                <div className={`dept-radio ${isMain ? 'checked' : ''}`} onClick={() => setMainDepartment(dept.id)}>
+                                  {isMain && <div className="dept-radio-dot" />}
+                                </div>
+                                <span>Основной</span>
+                              </label>
+                              <input
+                                type="text"
+                                className="dept-role-input"
+                                value={newProject.department_roles[dept.id] || ''}
+                                onChange={e => updateDepartmentRole(dept.id, e.target.value)}
+                                placeholder="Роль"
+                                onClick={e => e.stopPropagation()}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })
                   )}
                 </div>
                 {newProject.selected_departments.length > 0 && !newProject.main_department && (

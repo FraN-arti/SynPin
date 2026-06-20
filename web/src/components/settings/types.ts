@@ -96,6 +96,13 @@ export interface SettingsData {
     sort: string
     group_by: string
   }
+  sessions: {
+    auto_reset_enabled: boolean
+    auto_reset_mode: 'daily' | 'weekly' | 'never'
+    auto_reset_time: string
+    max_history: number
+    archive_on_reset: boolean
+  }
 }
 
 export interface AgentData {

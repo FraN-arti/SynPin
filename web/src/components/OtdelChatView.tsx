@@ -70,6 +70,7 @@ interface OtdelChatViewProps {
 
 export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChatViewProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [loading, setLoading] = useState(true)
   const [input, setInput] = useState('')
   const [attachments, setAttachments] = useState<ImageAttachmentType[]>([])
   const [agents, setAgents] = useState<Agent[]>([])
@@ -119,8 +120,9 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
 
   // Load chat history
   const loadHistory = useCallback(async () => {
+    setLoading(true)
     try {
-      const res = await fetch(`${API_BASE}/api/otdels/${otdel.otdelid}/chat/history`)
+      const res = await fetch(`${API_BASE}/api/otdels/${otdel.otdelid}/chat/history?limit=20`)
       if (res.ok) {
         const data = await res.json()
         const msgs = data.messages || []
@@ -139,6 +141,7 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
         setWorkerStatuses(restoredStatuses)
       }
     } catch {}
+    setLoading(false)
   }, [otdel.otdelid])
 
   useEffect(() => {
@@ -559,7 +562,12 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
 
       {/* Messages */}
       <div className="otdel-messages-area">
-        {messages.length === 0 ? (
+        {loading ? (
+          <div className="loading-spinner">
+            <div className="loading-ring" />
+            <span>Загрузка чата...</span>
+          </div>
+        ) : messages.length === 0 ? (
           <div className="otdel-empty-chat">
             <div className="otdel-empty-icon">🏢</div>
             <p>Чат отдела «{otdel.name}»</p>

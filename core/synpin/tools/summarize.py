@@ -32,12 +32,14 @@ async def summarize(params: dict) -> ToolResult:
     if not text:
         return make_error("Missing required parameter: text")
 
-    # Load summarization model config
-    model_config = _load_summarization_config()
+    # Resolve model: settings → agent fallback
+    from .model_resolve import resolve_specialized_model
+    model_config = resolve_specialized_model("summarization", params)
     if not model_config:
         return make_error(
             "Summarization model not configured. "
-            "Set it in Settings → General → Настройка моделей → Суммаризация."
+            "Set it in Settings → General → Настройка моделей → Суммаризация, "
+            "or assign a model to the agent."
         )
 
     provider_name, model_name = model_config

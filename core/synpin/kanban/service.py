@@ -125,6 +125,8 @@ class KanbanService:
         deadline: datetime | None = None,
         tags: list[str] | None = None,
         required_skills: list[str] | None = None,
+        project_id: str | None = None,
+        project_goal_id: str | None = None,
     ) -> Task:
         """Create a new task and save to disk."""
         with self._lock:
@@ -139,6 +141,8 @@ class KanbanService:
                 tags=tags,
                 required_skills=required_skills,
                 task_id=task_id,
+                project_id=project_id,
+                project_goal_id=project_goal_id,
             )
             save_task(task, self._data_dir)
             # Broadcast new task to all connected clients
@@ -162,6 +166,7 @@ class KanbanService:
         status: TaskStatus | None = None,
         department: str | None = None,
         assigned_head: str | None = None,
+        project_id: str | None = None,
     ) -> list[Task]:
         """List all tasks with optional filters."""
         tasks = load_all_tasks(self._data_dir)
@@ -172,6 +177,8 @@ class KanbanService:
             tasks = [t for t in tasks if t.department == department]
         if assigned_head:
             tasks = [t for t in tasks if t.assigned_head == assigned_head]
+        if project_id:
+            tasks = [t for t in tasks if t.project_id == project_id]
 
         return tasks
 

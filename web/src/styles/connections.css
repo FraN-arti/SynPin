@@ -144,6 +144,29 @@
   z-index: 10;
 }
 
+/* Project filter dropdown */
+.connections-project-filter {
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--glass-bg-heavy);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.connections-project-filter:focus {
+  border-color: var(--orange);
+  outline: none;
+}
+
+.connections-project-filter option {
+  background: var(--bg-card);
+  color: var(--text);
+}
+
 /* ── Properties Panel ───────────────────────────────────────────────────── */
 
 .connections-panel {

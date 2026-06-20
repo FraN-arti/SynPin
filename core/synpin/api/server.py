@@ -144,6 +144,10 @@ app.include_router(kanban_router)
 from .kanban_config_router import router as kanban_config_router
 app.include_router(kanban_config_router)
 
+# Projects API
+from ..projects.router import router as projects_router
+app.include_router(projects_router)
+
 # Version metadata endpoint
 from .version_router import router as version_router
 app.include_router(version_router)

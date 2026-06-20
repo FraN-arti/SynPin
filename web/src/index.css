@@ -12,4 +12,5 @@
 @import "./styles/settings.css";    /* Settings page, providers, modals */
 @import "./styles/memory.css";      /* Memory section */
 @import "./styles/connections.css"; /* Connections canvas */
+@import "./styles/projects.css";     /* Projects page, tooltips */
 @import "./styles/misc.css";        /* Number input, misc overrides */

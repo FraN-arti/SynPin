@@ -27,6 +27,7 @@ import { SkillsSection } from './settings/SkillsSection'
 import { ConnectionsSection } from './settings/ConnectionsSection'
 import { KanbanSection } from './settings/KanbanSection'
 import { DeadlinesSection } from './settings/DeadlinesSection'
+import { ProjectsSection } from './settings/ProjectsSection'
 
 // ── Re-exports for backward compatibility ──────────────────────────
 export type { DropdownOption }
@@ -172,6 +173,11 @@ export function SettingsPage({ onAgentsChange, onDepartmentsChange, wsOn }: Sett
             <span className="settings-nav-group-label">Разработка</span>
             <div className="settings-nav-group-items">
               <DraggableTab
+                tab={{ id: 'projects' as Tab, label: 'Проекты' }}
+                isActive={activeTab === 'projects'}
+                onClick={() => handleTabChange('projects')}
+              />
+              <DraggableTab
                 tab={{ id: 'deadlines' as Tab, label: 'Дедлайны' }}
                 isActive={activeTab === 'deadlines'}
                 onClick={() => handleTabChange('deadlines')}
@@ -198,6 +204,7 @@ export function SettingsPage({ onAgentsChange, onDepartmentsChange, wsOn }: Sett
           {activeTab === 'skills' && <SkillsSection />}
           {activeTab === 'connections' && <ConnectionsSection wsOn={wsOn} />}
           {activeTab === 'kanban' && <KanbanSection />}
+          {activeTab === 'projects' && <ProjectsSection />}
           {activeTab === 'deadlines' && <DeadlinesSection />}
         </PageTransition>
       </div>

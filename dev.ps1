@@ -122,6 +122,28 @@ switch -Regex ($args[0]) {
             Write-Host "[dev] using Python: $pythonExe" -ForegroundColor Gray
         }
 
+        # Version sync: compare installed synpin-core version vs pyproject.toml.
+        # If pyproject.toml is newer, reinstall to keep them in sync.
+        try {
+            $installed = & $pythonExe -c "from importlib.metadata import version; print(version('synpin-core'))" 2>$null
+            $tomlMatch = Select-String -Path "$ScriptDir\core\pyproject.toml" -Pattern 'version\s*=\s*"(.+)"'
+            if ($tomlMatch -and $installed) {
+                $target = $tomlMatch.Matches[0].Groups[1].Value
+                if ($installed -ne $target) {
+                    Write-Host "[dev] version mismatch: installed=$installed, target=$target" -ForegroundColor Yellow
+                    Write-Host "[dev] reinstalling synpin-core $target ..." -ForegroundColor Yellow
+                    & $pythonExe -m pip install -e "$ScriptDir\core" --quiet 2>$null
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-Host "[dev] synpin-core $target installed." -ForegroundColor Green
+                    } else {
+                        Write-Host "[dev] reinstall failed, continuing with $installed." -ForegroundColor DarkYellow
+                    }
+                }
+            }
+        } catch {
+            # Best-effort; don't block startup if version check fails
+        }
+
         # The cmd 'set' in dev.bat is local to that .bat process, so
         # $env:SYNPIN_DEV never reaches here. We set it explicitly
         # so 'synpin dev' knows to use the in-repo config layout

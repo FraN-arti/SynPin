@@ -9,6 +9,7 @@ import { OtdelSettingsPanel } from './components/OtdelSettingsPanel'
 import { KanbanBoard } from './components/KanbanBoard'
 import { ConnectionsCanvas } from './components/ConnectionsCanvas'
 import { DeadlinesPage } from './components/DeadlinesPage'
+import { ProjectsPage } from './components/ProjectsPage'
 import { ChatSkeleton } from './components/ChatSkeleton'
 import { PageTransition } from './components/PageTransition'
 import {
@@ -128,6 +129,7 @@ function App() {
     | { type: 'kanban' }
     | { type: 'connections' }
     | { type: 'deadlines' }
+    | { type: 'projects' }
   const [view, setView] = useState<View>({ type: 'chat' })
   const [otdelSettingsOpen, setOtdelSettingsOpen] = useState(false)
   // null = not loaded yet (show skeleton), [] = loaded but empty chat
@@ -1060,6 +1062,9 @@ function App() {
           </div>
 
           <div className="sidebar-footer">
+            <button className={`settings-btn ${view.type === 'projects' ? 'active' : ''}`} onClick={() => setView({ type: 'projects' })}>
+              <span>📁</span> Проекты
+            </button>
             <button className={`settings-btn ${view.type === 'deadlines' ? 'active' : ''}`} onClick={() => setView({ type: 'deadlines' })}>
               <span>⏰</span> Дедлайны
             </button>
@@ -1108,6 +1113,7 @@ function App() {
           if (view.type === 'kanban') pageKey = 'kanban'
           else if (view.type === 'connections') pageKey = 'connections'
           else if (view.type === 'deadlines') pageKey = 'deadlines'
+          else if (view.type === 'projects') pageKey = 'projects'
           else if (view.type === 'settings') pageKey = 'settings'
           else if (view.type === 'otdel') pageKey = `otdel-${view.id}`
           else if (!agentsLoaded || (activeAgent && messages === null)) pageKey = 'chat-loading'
@@ -1119,6 +1125,8 @@ function App() {
             body = <KanbanBoard wsOn={wsOn} />
           } else if (view.type === 'deadlines') {
             body = <DeadlinesPage wsOn={wsOn} />
+          } else if (view.type === 'projects') {
+            body = <ProjectsPage wsOn={wsOn} />
           } else if (view.type === 'connections') {
             body = <ConnectionsCanvas wsOn={wsOn} />
           } else if (view.type === 'settings') {

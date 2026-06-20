@@ -204,6 +204,51 @@ export const api = {
     },
     stats: () => get<unknown>('/api/kanban/stats'),
   },
+  // ── Projects ──────────────────────────────────────────
+  projects: {
+    list: () => get<{ projects: unknown[] }>('/api/projects'),
+    get: (id: string) => get<unknown>(`/api/projects/${id}`),
+    create: (data: Record<string, unknown>) => post('/api/projects', data),
+    update: (id: string, data: Record<string, unknown>) =>
+      put(`/api/projects/${id}`, data),
+    delete: (id: string) => del(`/api/projects/${id}`),
+    departments: {
+      list: (projectId: string) => get<unknown>(`/api/projects/${projectId}/departments`),
+      add: (projectId: string, data: Record<string, unknown>) =>
+        post(`/api/projects/${projectId}/departments`, data),
+      remove: (projectId: string, deptId: string) =>
+        del(`/api/projects/${projectId}/departments/${deptId}`),
+      updateRole: (projectId: string, deptId: string, data: Record<string, unknown>) =>
+        put(`/api/projects/${projectId}/departments/${deptId}`, data),
+    },
+    setMainDepartment: (projectId: string, data: Record<string, unknown>) =>
+      put(`/api/projects/${projectId}/main-department`, data),
+    goals: {
+      list: (projectId: string) => get<unknown>(`/api/projects/${projectId}/goals`),
+      add: (projectId: string, data: Record<string, unknown>) =>
+        post(`/api/projects/${projectId}/goals`, data),
+      update: (projectId: string, goalId: string, data: Record<string, unknown>) =>
+        put(`/api/projects/${projectId}/goals/${goalId}`, data),
+      delete: (projectId: string, goalId: string) =>
+        del(`/api/projects/${projectId}/goals/${goalId}`),
+    },
+    archive: {
+      list: (projectId: string) => get<unknown>(`/api/projects/${projectId}/archive`),
+      archiveTask: (projectId: string, data: Record<string, unknown>) =>
+        post(`/api/projects/${projectId}/archive/task`, data),
+      archiveMilestone: (projectId: string, data: Record<string, unknown>) =>
+        post(`/api/projects/${projectId}/archive/milestone`, data),
+      delete: (projectId: string, entryId: string) =>
+        del(`/api/projects/${projectId}/archive/${entryId}`),
+    },
+    togle: {
+      get: (projectId: string) => get<{ content: string }>(`/api/projects/${projectId}/togle`),
+      update: (projectId: string, content: string) =>
+        put(`/api/projects/${projectId}/togle`, { content }),
+      append: (projectId: string, entry: string) =>
+        post(`/api/projects/${projectId}/togle/append`, { entry }),
+    },
+  },
 
   // ── Themes ───────────────────────────────────────────────────
   themes: {

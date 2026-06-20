@@ -153,6 +153,12 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
   const [loading, setLoading] = useState(true)
   const [connections, setConnections] = useState<Connection[]>([])
   const [otdelNames, setOtdelNames] = useState<Record<string, string>>({})
+  
+  // Project filtering
+  const [projects, setProjects] = useState<{id: string; name: string; departments: {id: string}[]}[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('')
+  const [allNodes, setAllNodes] = useState<Node[]>([])
+  const [allEdges, setAllEdges] = useState<Edge[]>([])
 
   // Load graph data
   const loadGraph = useCallback(async () => {
@@ -184,6 +190,8 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
       }))
 
       console.log('[connections] setting nodes:', flowNodes.length, 'edges:', flowEdges.length)
+      setAllNodes(flowNodes)
+      setAllEdges(flowEdges)
       setNodes(flowNodes)
       setEdges(flowEdges)
     } catch (e) {
@@ -192,6 +200,16 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
       setLoading(false)
     }
   }, [setNodes, setEdges])
+  
+  // Load projects for filtering
+  const loadProjects = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/projects`)
+      if (!res.ok) return
+      const data = await res.json()
+      setProjects(data.projects || [])
+    } catch {}
+  }, [])
 
   // Load connections list
   const loadConnections = useCallback(async () => {
@@ -224,7 +242,27 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
     loadGraph()
     loadConnections()
     loadOtdelNames()
-  }, [loadGraph, loadConnections, loadOtdelNames])
+    loadProjects()
+  }, [loadGraph, loadConnections, loadOtdelNames, loadProjects])
+  
+  // Filter by project
+  useEffect(() => {
+    if (!selectedProjectId) {
+      setNodes(allNodes)
+      setEdges(allEdges)
+      return
+    }
+    
+    const project = projects.find(p => p.id === selectedProjectId)
+    if (!project) return
+    
+    const deptIds = new Set(project.departments.map(d => d.id))
+    const filteredNodes = allNodes.filter(n => deptIds.has(n.id))
+    const filteredEdges = allEdges.filter(e => deptIds.has(e.source) && deptIds.has(e.target))
+    
+    setNodes(filteredNodes)
+    setEdges(filteredEdges)
+  }, [selectedProjectId, projects, allNodes, allEdges, setNodes, setEdges])
 
   // WebSocket live updates
   useEffect(() => {
@@ -323,6 +361,19 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
 
         {/* Toolbar */}
         <div className="connections-toolbar">
+          {/* Project filter */}
+          {projects.length > 0 && (
+            <select
+              className="connections-project-filter"
+              value={selectedProjectId}
+              onChange={e => setSelectedProjectId(e.target.value)}
+            >
+              <option value="">Все проекты</option>
+              {projects.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          )}
           <button className="connections-toolbar-btn" onClick={handleAutoLayout}>
             Сравнять
           </button>

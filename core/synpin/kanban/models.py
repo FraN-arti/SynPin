@@ -122,6 +122,10 @@ class Task(BaseModel):
     escalation_reason: str | None = None
     escalation_report: str | None = None
 
+    # Project binding
+    project_id: str | None = None                # Project ID (32 chars)
+    project_goal_id: str | None = None           # Goal ID within project
+    
     # Metadata
     tags: list[str] = Field(default_factory=list)
     required_skills: list[str] = Field(default_factory=list)
@@ -237,6 +241,8 @@ def create_task(
     tags: list[str] | None = None,
     required_skills: list[str] | None = None,
     task_id: str | None = None,
+    project_id: str | None = None,
+    project_goal_id: str | None = None,
 ) -> Task:
     """Create a new task with initial history entry."""
     task = Task(
@@ -250,6 +256,8 @@ def create_task(
         deadline=deadline,
         tags=tags or [],
         required_skills=required_skills or [],
+        project_id=project_id,
+        project_goal_id=project_goal_id,
     )
     task.add_history(
         actor="council",

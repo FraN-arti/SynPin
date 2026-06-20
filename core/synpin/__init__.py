@@ -60,7 +60,9 @@ def _read_version_from_pyproject() -> str | None:
 
 
 def _resolve_version() -> str:
-    for source in (_read_version_from_installed, _read_version_from_pyproject):
+    # Priority: pyproject.toml first (always current in dev), then installed metadata.
+    # This prevents stale installed versions from overriding the repo's pyproject.toml.
+    for source in (_read_version_from_pyproject, _read_version_from_installed):
         try:
             v = source()
         except Exception:

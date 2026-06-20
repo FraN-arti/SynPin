@@ -35,6 +35,8 @@ class CreateTaskRequest(BaseRequest):
     deadline: str | None = None
     tags: list[str] = Field(default_factory=list)
     required_skills: list[str] = Field(default_factory=list)
+    project_id: str | None = None
+    project_goal_id: str | None = None
 
 
 class UpdateTaskRequest(BaseRequest):
@@ -117,6 +119,7 @@ def _parse_deadline(deadline: str | None) -> datetime | None:
 def list_tasks(
     status: str | None = None,
     department: str | None = None,
+    project_id: str | None = None,
 ) -> list[dict]:
     """List all tasks with optional filters."""
     svc = _get_service()
@@ -127,7 +130,7 @@ def list_tasks(
         except ValueError:
             raise HTTPException(400, f"Invalid status: {status}")
 
-    tasks = svc.list_tasks(status=task_status, department=department)
+    tasks = svc.list_tasks(status=task_status, department=department, project_id=project_id)
     return [_task_to_dict(t) for t in tasks]
 
 
@@ -191,6 +194,8 @@ def create_task(req: CreateTaskRequest) -> dict:
         deadline=_parse_deadline(req.deadline),
         tags=req.tags,
         required_skills=req.required_skills,
+        project_id=req.project_id,
+        project_goal_id=req.project_goal_id,
     )
 
     # Parse #DepartmentID references from description

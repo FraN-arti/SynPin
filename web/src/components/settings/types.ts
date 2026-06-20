@@ -5,7 +5,7 @@
 
 // ── Tab definitions ────────────────────────────────────────────────
 
-export type Tab = 'general' | 'agents' | 'providers' | 'memory' | 'channels' | 'departments' | 'skills' | 'connections' | 'kanban' | 'deadlines'
+export type Tab = 'general' | 'agents' | 'providers' | 'memory' | 'channels' | 'departments' | 'skills' | 'connections' | 'kanban' | 'deadlines' | 'projects'
 
 export interface TabDef {
   id: Tab
@@ -26,7 +26,6 @@ export const SPACE_TABS: TabDef[] = [
   { id: 'connections', label: 'Связи' },
   { id: 'kanban', label: 'Канбан' },
 ]
-
 export const SECTION_INFO: Record<Tab, { title: string; description: string }> = {
   general: { title: 'Общие настройки', description: 'Тема, язык, сервер и статистика' },
   agents: { title: 'Агенты', description: 'Управление AI-агентами и их параметрами' },
@@ -37,6 +36,7 @@ export const SECTION_INFO: Record<Tab, { title: string; description: string }> =
   skills: { title: 'Скиллы', description: 'База знаний и процедур' },
   connections: { title: 'Связи', description: 'Структура и эскалации между отделами' },
   kanban: { title: 'Канбан', description: 'Настройки доски задач' },
+  projects: { title: 'Проекты', description: 'Управление проектами и их настройки' },
   deadlines: { title: 'Дедлайны', description: 'Настройки системы дедлайнов' },
 }
 

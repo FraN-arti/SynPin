@@ -905,6 +905,8 @@ function CreateTaskModal({
   const [tags, setTags] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [deptError, setDeptError] = useState(false)
+  const [projectId, setProjectId] = useState<string>('')
+  const [projectGoalId, setProjectGoalId] = useState<string>('')
 
   // Auto-expanding textarea
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -915,6 +917,9 @@ function CreateTaskModal({
   // Tag picker — state (selected tag names) is owned here; the picker
   // UI itself lives inside <PickerMenu multi>.
   const [availableLabels, setAvailableLabels] = useState<LabelConfig[]>([])
+  
+  // Projects for project selector
+  const [projects, setProjects] = useState<{id: string; name: string; goals: {id: string; title: string}[]}[]>([])
 
   // ── Fetch departments & labels ──
   useEffect(() => {
@@ -930,6 +935,14 @@ function CreateTaskModal({
     fetch(`${API_BASE}/api/kanban/config/labels`)
       .then(r => r.json())
       .then(data => setAvailableLabels(Array.isArray(data) ? data : data.labels || []))
+      .catch(() => {})
+  }, [])
+  
+  // Fetch projects
+  useEffect(() => {
+    fetch(`${API_BASE}/api/projects`)
+      .then(r => r.json())
+      .then(data => setProjects(data.projects || []))
       .catch(() => {})
   }, [])
 
@@ -966,6 +979,8 @@ function CreateTaskModal({
           priority,
           deadline: deadline || null,
           tags,
+          project_id: projectId || null,
+          project_goal_id: projectGoalId || null,
         }),
       })
       if (res.ok) onCreated()
@@ -1099,6 +1114,48 @@ function CreateTaskModal({
               }
             />
           </div>
+          
+          {/* Project selector */}
+          {projects.length > 0 && (
+            <div className="kanban-form-row">
+              <div className="kanban-form-group">
+                <label>Проект</label>
+                <select
+                  value={projectId}
+                  onChange={e => {
+                    setProjectId(e.target.value)
+                    setProjectGoalId('')
+                  }}
+                >
+                  <option value="">Без проекта</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* Goal selector (only if project selected) */}
+              {projectId && (() => {
+                const project = projects.find(p => p.id === projectId)
+                const goals = project?.goals || []
+                if (goals.length === 0) return null
+                return (
+                  <div className="kanban-form-group">
+                    <label>Цель проекта</label>
+                    <select
+                      value={projectGoalId}
+                      onChange={e => setProjectGoalId(e.target.value)}
+                    >
+                      <option value="">Без цели</option>
+                      {goals.map(g => (
+                        <option key={g.id} value={g.id}>{g.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                )
+              })()}
+            </div>
+          )}
 
           {/* Actions */}
           <div className="kanban-form-actions">

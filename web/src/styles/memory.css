@@ -3826,6 +3826,38 @@
   color: var(--orange);
 }
 
+/* ── Widget Library Card ──────────────────────────────────────────────────── */
+
+.widget-library-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--glass-bg, rgba(15,15,28,0.55));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 8px);
+  transition: opacity 0.2s, border-color 0.2s;
+}
+.widget-library-card:hover {
+  border-color: var(--orange);
+}
+.widget-library-icon {
+  font-size: 18px;
+}
+.widget-library-label {
+  font-size: 13px;
+  color: var(--text-primary, #fff);
+  font-weight: 500;
+}
+.widget-library-badge {
+  font-size: 10px;
+  color: var(--text-dim);
+  background: rgba(255,255,255,0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 4px;
+}
+
 /* ── Theme-aware Checkboxes ────────────────────────────────────────────────── */
 
 input[type="checkbox"] {

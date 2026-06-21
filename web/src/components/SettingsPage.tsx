@@ -28,6 +28,7 @@ import { ConnectionsSection } from './settings/ConnectionsSection'
 import { KanbanSection } from './settings/KanbanSection'
 import { DeadlinesSection } from './settings/DeadlinesSection'
 import { ProjectsSection } from './settings/ProjectsSection'
+import { WidgetsSection } from './settings/WidgetsSection'
 
 // ── Re-exports for backward compatibility ──────────────────────────
 export type { DropdownOption }
@@ -211,6 +212,7 @@ export function SettingsPage({ onAgentsChange, onDepartmentsChange, wsOn }: Sett
           {activeTab === 'kanban' && <KanbanSection />}
           {activeTab === 'projects' && <ProjectsSection />}
           {activeTab === 'deadlines' && <DeadlinesSection />}
+          {activeTab === 'widgets' && <WidgetsSection />}
         </PageTransition>
       </div>
     </>

@@ -5,7 +5,7 @@
 
 // ── Tab definitions ────────────────────────────────────────────────
 
-export type Tab = 'general' | 'agents' | 'providers' | 'memory' | 'channels' | 'departments' | 'skills' | 'connections' | 'kanban' | 'deadlines' | 'projects'
+export type Tab = 'general' | 'agents' | 'providers' | 'memory' | 'channels' | 'departments' | 'skills' | 'connections' | 'kanban' | 'deadlines' | 'projects' | 'widgets'
 
 export interface TabDef {
   id: Tab
@@ -24,6 +24,7 @@ export const SPACE_TABS: TabDef[] = [
   { id: 'skills', label: 'Скиллы' },
   { id: 'connections', label: 'Связи' },
   { id: 'departments', label: 'Отделы' },
+  { id: 'widgets', label: 'Виджеты' },
 ]
 export const SECTION_INFO: Record<Tab, { title: string; description: string }> = {
   general: { title: 'Общие настройки', description: 'Тема, язык, сервер и статистика' },
@@ -37,6 +38,7 @@ export const SECTION_INFO: Record<Tab, { title: string; description: string }> =
   kanban: { title: 'Канбан', description: 'Настройки доски задач' },
   projects: { title: 'Проекты', description: 'Управление проектами и их настройки' },
   deadlines: { title: 'Дедлайны', description: 'Настройки системы дедлайнов' },
+  widgets: { title: 'Виджеты', description: 'Управление виджетами на главной панели' },
 }
 
 // Tabs that can be dragged to widget zones

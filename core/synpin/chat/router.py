@@ -1384,42 +1384,6 @@ def _parse_text_tool_calls(text: str) -> list[dict]:
     return calls
 
 
-# ─── Thinking text for tool execution ─────────────────────────────
-
-# Tool name → thinking text mapping (shown to user before tool executes)
-_THINKING_TEXTS: dict[str, str] = {
-    "terminal": "Выполняю команду...",
-    "file_read": "Читаю файл...",
-    "file_write": "Записываю файл...",
-    "search_files": "Ищу файлы...",
-    "web_search": "Ищу в интернете...",
-    "code_exec": "Выполняю код...",
-    "memory_read": "Читаю память...",
-    "memory_write": "Сохраняю в память...",
-    "summarize": "Суммаризирую...",
-    "image_analyze": "Анализирую изображение...",
-    "kanban_task": "Работаю с задачей...",
-    "otdel_manage": "Управляю отделами...",
-    "project_manage": "Управляю проектами...",
-    "head_delegate": "Делегирую задачу...",
-    "head_await": "Ожидаю ответа...",
-    "head_evaluate": "Оцениваю результат...",
-    "head_retry": "Повторяю попытку...",
-    "head_decide": "Принимаю решение...",
-    "head_block": "Блокирую задачу...",
-    "head_escalate": "Эскалирую проблему...",
-}
-
-_DEFAULT_THINKING = "Обрабатываю..."
-
-
-def _get_thinking_text(tool_name: str) -> str:
-    """Get thinking text for a tool name."""
-    text = _THINKING_TEXTS.get(tool_name, _DEFAULT_THINKING)
-    # Add newline at the end so it appears as a separate line
-    return text + "\n"
-
-
 # ─── SSE streaming ──────────────────────────────────────────────────
 
 async def stream_response(
@@ -1583,10 +1547,6 @@ async def stream_response(
                 if t_name not in tool_names and t_name not in BUILTINS:
                     tool_result = {"success": False, "output": "", "error": f"Tool '{t_name}' not enabled"}
                 else:
-                    # yield thinking chunk before tool execution
-                    thinking_text = _get_thinking_text(t_name)
-                    yield f"data: {json.dumps({'type': 'chunk', 'content': thinking_text})}\n\n"
-
                     # yield tool_start
                     yield f"data: {json.dumps({'type': 'tool_start', 'tool': t_name, 'params': t_params, 'index': tool_count})}\n\n"
 

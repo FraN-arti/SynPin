@@ -521,20 +521,6 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                                 "provider": provider_name,
                             })
                     elif msg_type == "tool_start":
-                        # Send thinking chunk before tool execution
-                        from .router import _get_thinking_text
-                        thinking_text = _get_thinking_text(payload.get("tool", ""))
-                        await ws_manager.send(user_id, {
-                            "type": "otdel:chunk",
-                            "otdel_id": otdel_id,
-                            "message_id": agent_msg_id,
-                            "content": thinking_text,
-                            "sender": agent_slug_val,
-                            "sender_name": agent_name_val,
-                            "is_head": is_head,
-                            "model": model,
-                            "provider": provider_name,
-                        })
                         # Forward tool event via WS
                         await ws_manager.send(user_id, {
                             "type": f"otdel:{msg_type}",

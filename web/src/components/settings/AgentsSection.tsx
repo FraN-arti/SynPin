@@ -587,14 +587,6 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
                         )}
                         <div className="expanded-toggle-row">
                           <label className="settings-toggle"><input type="checkbox" checked={agent.enabled} onChange={() => handleExternalToggle(agent)} /><span>Активен</span></label>
-                          <label className="settings-toggle" style={{ marginLeft: 12 }}>
-                            <input
-                              type="checkbox"
-                              checked={agent.is_primary || false}
-                              onChange={() => handleExternalFieldChange(agent, 'is_primary', !agent.is_primary)}
-                            />
-                            <span>Главный агент ★</span>
-                          </label>
                         </div>
                         {!agent.available && <div className="external-unavailable">⚠️ Сервис недоступен. Убедитесь что Hermes Gateway запущен.</div>}
                       </div>

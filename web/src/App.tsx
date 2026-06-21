@@ -30,6 +30,7 @@ import {
 } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useWebSocket } from './hooks/useWebSocket'
+import { useGlobalTooltip } from './hooks/useGlobalTooltip'
 import { useChatScroll } from './hooks/useChatScroll'
 import { ImageAttachment, fileToAttachment, extractImagesFromPaste, type ImageAttachment as ImageAttachmentType } from './components/ImageAttachment'
 
@@ -172,6 +173,9 @@ function App() {
 
   // WebSocket — single connection for all real-time messaging
   const { send: wsSend, on: wsOn, connected: wsConnected } = useWebSocket()
+
+  // Global tooltip — intercepts all title attributes, shows mouse-following tooltip
+  const globalTooltip = useGlobalTooltip()
 
   // ── Stuck state protection ──────────────────────────────────────
   const clearStuckState = useCallback(() => {
@@ -731,7 +735,7 @@ function App() {
         if (activeAgent.name) parts.push(`Имя: ${activeAgent.name}`)
         if (activeAgent.description) parts.push(activeAgent.description)
         if (activeAgent.role_name) parts.push(`Роль: ${activeAgent.role_name}`)
-        if (activeAgent.department_name) parts.push(`Отдел: ${activeAgent.department_name}`)
+        if (activeAgent.department_name) parts.push(`Департамент: ${activeAgent.department_name}`)
         if (activeAgent.system_prompt) parts.push(activeAgent.system_prompt)
         if (activeAgent.tone) parts.push(`Тон общения: ${activeAgent.tone}`)
         if (activeAgent.style) parts.push(`Стиль ответов: ${activeAgent.style}`)
@@ -1071,6 +1075,7 @@ function App() {
 
   return (
     <div className="app-container">
+      {globalTooltip}
       {/* Fixed Logo — always visible, never moves */}
       <div
         className={`app-logo ${logoVisible ? 'visible' : ''}`}

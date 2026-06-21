@@ -812,3 +812,20 @@
 .emoji-item:hover {
   background: var(--gray-700);
 }
+
+/* ─── Global Mouse Tooltip (replaces native title) ──────────── */
+.global-mouse-tooltip {
+  background: rgba(10, 10, 20, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), 0 0 1px rgba(255, 255, 255, 0.06);
+  white-space: nowrap;
+  max-width: 320px;
+  z-index: 99999;
+}

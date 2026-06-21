@@ -291,26 +291,9 @@ _config_watcher = ConfigWatcher(interval=5)
 
 
 def _broadcast_config_event(event_type: str, payload: dict) -> None:
-    """Push a config:updated event to all connected WS clients.
-
-    We import ws_manager lazily because it's set up in an
-    on_event('startup') hook later in this file (and the import
-    itself is fine but the manager singleton might not be fully
-    initialised at module import time).
-    """
-    try:
-        from ..chat.ws_manager import ws_manager
-        import asyncio
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            asyncio.ensure_future(ws_manager.broadcast({
-                "type": event_type,
-                **payload,
-            }))
-    except Exception:
-        # If the loop isn't ready (e.g. we're in a unit test), skip
-        # the broadcast. The reload itself still happens.
-        pass
+    """Push a config:updated event to all connected WS clients."""
+    from ..ws_broadcast import broadcast
+    broadcast({"type": event_type, **payload})
 
 
 def _on_providers_changed(path: Path, mtime: float) -> None:

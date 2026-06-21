@@ -260,7 +260,7 @@ def _start_deadline_checker():
 
 
 @app.on_event("startup")
-def _start_auto_escalation():
+def _start_auto_approval():
     """Start the background auto-escalation worker.
 
     Every 5 minutes (or AUTO_ESCALATION_INTERVAL_S env var) checks
@@ -268,8 +268,8 @@ def _start_auto_escalation():
     to parent departments after timeout.
     """
     try:
-        from ..connections.auto_escalation import schedule_auto_escalation
-        task = schedule_auto_escalation()
+        from ..connections.auto_approval import schedule_auto_approval
+        task = schedule_auto_approval()
         if task:
             console.print("  [auto-escalation] worker running (default 5min, override via AUTO_ESCALATION_INTERVAL_S)")
         else:

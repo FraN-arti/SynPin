@@ -161,6 +161,10 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
   const [projects, setProjects] = useState<Project[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Department name lookup
+  const deptMap: Record<string, string> = {}
+  for (const d of departments) { deptMap[d.id] = d.name }
   const [filter, setFilter] = useState<StatusFilter>('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
@@ -642,7 +646,7 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
                   <div className="project-task-item">
                     <span className="project-task-id">{task.id}</span>
                     <span className="project-task-title">{task.title}</span>
-                    <span className="project-task-dept">{task.department}</span>
+                    <span className="project-task-dept">{deptMap[task.department] || task.department || 'Без отдела'}</span>
                     <span className="project-task-status" style={{ color: getTaskStatusColor(task.status) }}>
                       {task.status}
                     </span>

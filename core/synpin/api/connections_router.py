@@ -1,4 +1,4 @@
-"""REST API for connections — CRUD, graph, escalation, history."""
+"""REST API for connections — CRUD, graph, approval, history."""
 from __future__ import annotations
 
 import logging
@@ -33,7 +33,7 @@ class ConnectionUpdate(BaseRequest):
     auto_trigger: dict[str, Any] | None = None
 
 
-class EscalationCreate(BaseRequest):
+class ApprovalCreate(BaseRequest):
     task_id: str
     from_otdel: str
     to_otdel: str | None = None
@@ -41,7 +41,7 @@ class EscalationCreate(BaseRequest):
     report: str = ""
 
 
-class EscalationComplete(BaseRequest):
+class ApprovalComplete(BaseRequest):
     resolution: str = ""
 
 
@@ -93,14 +93,29 @@ async def get_history(
     to_otdel: str | None = None,
     status: str | None = None,
 ):
-    """Get escalation history with optional filters."""
+    """Get approval history with optional filters."""
     records = svc.list_history(task_id=task_id, from_otdel=from_otdel, to_otdel=to_otdel, status=status)
+
+    # Resolve otdel names for display
+    try:
+        from ..agents.manager import load_otdels as _load_otdels
+        otdels_list = _load_otdels()
+        otdel_names: dict[str, str] = {}
+        if isinstance(otdels_list, list):
+            otdel_names = {o.get("otdelid", ""): o.get("name", "") for o in otdels_list}
+        elif isinstance(otdels_list, dict):
+            otdel_names = {o.get("otdelid", ""): o.get("name", "") for o in otdels_list.get("otdels", [])}
+    except Exception:
+        otdel_names = {}
+
     return {"history": [
         {
             "id": r.id,
             "task_id": r.task_id,
             "from": r.from_otdel,
+            "from_name": otdel_names.get(r.from_otdel, r.from_otdel),
             "to": r.to_otdel,
+            "to_name": otdel_names.get(r.to_otdel, r.to_otdel),
             "connection_id": r.connection_id,
             "reason": r.reason,
             "report": r.report,
@@ -121,7 +136,7 @@ async def update_positions(req: PositionsUpdate):
 
 
 @router.post("/escalate")
-async def escalate(req: EscalationCreate):
+async def approve(req: ApprovalCreate):
     """Escalate a task to another department."""
     record = svc.escalate_task(
         task_id=req.task_id,
@@ -131,7 +146,7 @@ async def escalate(req: EscalationCreate):
         report=req.report,
     )
     if not record:
-        raise HTTPException(404, "No escalation connection found between these departments")
+        raise HTTPException(404, "No approval connection found between these departments")
     return {
         "id": record.id,
         "task_id": record.task_id,
@@ -160,10 +175,10 @@ async def delete_connection(conn_id: str):
     return {"ok": True}
 
 
-@router.put("/history/{escalation_id}/complete")
-async def complete_escalation(escalation_id: str, req: EscalationComplete):
-    """Mark an escalation as completed."""
-    ok = svc.complete_escalation(escalation_id, req.resolution)
+@router.put("/history/{approval_id}/complete")
+async def complete_approval(approval_id: str, req: ApprovalComplete):
+    """Mark an approval as completed."""
+    ok = svc.complete_approval(approval_id, req.resolution)
     if not ok:
-        raise HTTPException(404, f"Escalation not found: {escalation_id}")
+        raise HTTPException(404, f"Approval not found: {approval_id}")
     return {"ok": True}

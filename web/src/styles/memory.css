@@ -2304,14 +2304,31 @@
   color: var(--orange);
 }
 
-.otdel-tool-params {
+.otdel-tool-toggle {
+  margin-left: auto;
+  font-size: 10px;
   color: var(--text-dim);
-  font-style: italic;
+  transition: transform 0.15s ease;
 }
 
-.otdel-tool-result pre,
-.otdel-tool-error pre {
-  margin: 6px 0 0;
+/* Tool content — single container, animated */
+.otdel-tool-content {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height 0.25s ease, opacity 0.2s ease, padding 0.2s ease;
+  padding: 0;
+}
+
+.otdel-tool-call.expanded .otdel-tool-content {
+  max-height: 300px;
+  opacity: 1;
+  padding: 8px 0 0;
+  transition: max-height 0.3s ease, opacity 0.2s ease 0.1s, padding 0.2s ease;
+}
+
+.otdel-tool-content pre {
+  margin: 0;
   padding: 8px;
   background: var(--glass-bg-heavy);
   border-radius: 4px;
@@ -2322,12 +2339,70 @@
   word-wrap: break-word;
 }
 
-.otdel-tool-result pre {
+.otdel-tool-content pre.error {
+  color: #ef4444;
+}
+
+.otdel-tool-content pre:not(.error) {
   color: #22c55e;
 }
 
-.otdel-tool-error pre {
-  color: #ef4444;
+.otdel-tool-content span {
+  color: var(--text-dim);
+  font-style: italic;
+  font-size: 12px;
+}
+
+/* Tool result list (kanban_task list) */
+.tool-result-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tool-result-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.tool-result-item .task-id {
+  color: var(--orange);
+  font-family: monospace;
+  font-weight: 600;
+}
+
+.tool-result-item .task-title {
+  color: var(--text);
+  flex: 1;
+}
+
+.tool-result-item .task-status {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--glass-bg);
+}
+
+.tool-result-item .task-status.todo { color: #f59e0b; }
+.tool-result-item .task-status.in_progress { color: #3b82f6; }
+.tool-result-item .task-status.done { color: #22c55e; }
+.tool-result-item .task-status.blocked { color: #ef4444; }
+
+/* Terminal result */
+.tool-result-terminal {
+  font-family: monospace;
+}
+
+.tool-result-terminal .terminal-cmd {
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.tool-result-terminal pre {
+  margin: 0;
+  color: #22c55e;
 }
 
 /* ── Kanban Board ─────────────────────────────────────────────────────── */

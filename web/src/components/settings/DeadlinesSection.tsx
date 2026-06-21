@@ -52,7 +52,7 @@ export function DeadlinesSection() {
         <div className="settings-divider-thin" />
 
         <Toggle
-          label="Авто-эскалация при просрочке"
+          label="Авто-утверждение при просрочке"
           checked={settings.auto_escalate_overdue}
           onChange={v => { setSettings(s => ({ ...s, auto_escalate_overdue: v })); save({ auto_escalate_overdue: v }) }}
         />
@@ -67,7 +67,7 @@ export function DeadlinesSection() {
             onChange={() => {}}
           />
         </div>
-        <span className="settings-hint">🚧 Скоро — отправка уведомлений при эскалации в blocked</span>
+        <span className="settings-hint">🚧 Скоро — отправка уведомлений при утверждении в blocked</span>
 
         <div className="settings-divider-thin" />
 

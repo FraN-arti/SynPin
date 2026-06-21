@@ -80,6 +80,7 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
   const [compacting, setCompacting] = useState<{ before: number; after: number } | null>(null)
   const [workerStatuses, setWorkerStatuses] = useState<Map<string, 'idle' | 'thinking' | 'done'>>(new Map())
   const [showWorkers, setShowWorkers] = useState(false)
+  const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set())
   const { sentinelRef: messagesEndRef } = useChatScroll(messages)
   const attachRef = useRef<{ openPicker: () => void }>(null)
 
@@ -129,8 +130,9 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
         const msgs = (Array.isArray(data.messages) ? data.messages : []).map((m: any) => ({
           ...m,
           content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content ?? ''),
-          tools: Array.isArray(m.tools) ? m.tools.map((t: any) => ({
+          tools: Array.isArray(m.tools) ? m.tools.map((t: any, idx: number) => ({
             ...t,
+            id: t.id || `${m.id}-tool-${idx}`,
             result: typeof t.result === 'string' ? t.result : JSON.stringify(t.result ?? ''),
             error: typeof t.error === 'string' ? t.error : JSON.stringify(t.error ?? ''),
           })) : m.tools,
@@ -157,14 +159,9 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
     loadHistory()
   }, [loadHistory])
 
-  // Periodic history refresh — catch missed WS messages
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (!sending) return // Only refresh when idle
-      loadHistory()
-    }, 10000) // Check every 10 seconds when sending (fallback for missed WS)
-    return () => clearInterval(interval)
-  }, [loadHistory, sending])
+  // NOTE: Periodic refresh removed — WebSocket is the sole realtime mechanism.
+  // WS handles: otdel:message, otdel:chunk, otdel:done, otdel:thinking, otdel:tool_start/end.
+  // If WS disconnects, user sees stale state — no polling fallback.
 
   // WebSocket message handlers for this otdel
   useEffect(() => {
@@ -496,6 +493,80 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
   }, [handleAddImages])
 
 
+  const toggleToolExpand = useCallback((toolId: string) => {
+    setExpandedTools(prev => {
+      const next = new Set(prev)
+      if (next.has(toolId)) { next.delete(toolId) } else { next.add(toolId) }
+      return next
+    })
+  }, [])
+
+  const getToolSummary = useCallback((tc: ToolCall): string => {
+    if (tc.status === 'running') return 'Выполняется...'
+    if (tc.status === 'error') return tc.error || 'Ошибка'
+    const result = tc.result || ''
+    let parsed: any = null
+    try { parsed = JSON.parse(result) } catch {}
+    switch (tc.name) {
+      case 'kanban_task': {
+        const cmd = tc.params?.command || ''
+        if (cmd === 'list') return `📋 Задач: ${parsed?.count ?? parsed?.tasks?.length ?? '?'}`
+        if (cmd === 'create') { const t = tc.params?.title || ''; return `✅ Создана задача: "${t.slice(0,40)}${t.length>40?'...':''}"` }
+        if (cmd === 'complete') return `✅ Задача закрыта`
+        if (cmd === 'rework') return `🔄 Отправлено на доработку`
+        if (cmd === 'history') return `📝 Записана история`
+        return `📋 kanban_task: ${cmd}`
+      }
+      case 'head_delegate': {
+        const w = tc.params?.workers
+        if (Array.isArray(w) && w.length > 0) return `🤝 Делегировано: ${w.map((x:any)=>x.slug||x.name||'?').join(', ')}`
+        return `🤝 Делегировано: ${tc.params?.worker || tc.params?.target || '?'}`
+      }
+      case 'head_evaluate': return `📊 Оценка выполнения`
+      case 'head_retry': return `🔄 Повторная попытка`
+      case 'head_decide': return `🎯 Принято решение`
+      case 'head_block': return `⚠️ Блокировка: ${(tc.params?.reason||'').slice(0,50)}`
+      case 'terminal': return `💻 ${(tc.params?.command||'').slice(0,50)}`
+      default: return tc.name
+    }
+  }, [])
+
+  const getToolResultDisplay = useCallback((tc: ToolCall): React.ReactNode => {
+    if (tc.status === 'running') return <span>Выполняется...</span>
+    if (tc.status === 'error') return <span className="error">{tc.error || 'Ошибка'}</span>
+    const result = tc.result || ''
+    let parsed: any = null
+    try { parsed = JSON.parse(result) } catch {}
+    switch (tc.name) {
+      case 'kanban_task': {
+        const cmd = tc.params?.command || ''
+        if (cmd === 'list' && parsed?.tasks) {
+          return (<div className="tool-result-list">
+            {parsed.tasks.map((t: any, i: number) => (<div key={i} className="tool-result-item">
+              <span className="task-id">{t.id}</span>
+              <span className="task-title">{t.title}</span>
+              <span className={`task-status ${t.status}`}>{t.status}</span>
+            </div>))}
+          </div>)
+        }
+        if (cmd === 'create') return <span>Задача {parsed?.task_id||''} создана в колонке "{parsed?.status||'todo'}"</span>
+        if (cmd === 'complete') return <span>Задача закрыта</span>
+        if (cmd === 'rework') return <span>Отправлено на доработку</span>
+        if (cmd === 'history') return <span>Записана история (всего записей: {parsed?.history_count||'?'})</span>
+        break
+      }
+      case 'terminal': {
+        const cmd = tc.params?.command || ''
+        return (<div className="tool-result-terminal">
+          <div className="terminal-cmd">$ {cmd}</div>
+          {result && <pre>{result}</pre>}
+        </div>)
+      }
+    }
+    const display = typeof result === 'string' ? result : JSON.stringify(result, null, 2)
+    return <pre>{display}</pre>
+  }, [])
+
   const isLeftSide = (msg: ChatMessage) => {
     return msg.role === 'user' || msg.sender === 'user' || msg.is_head === true
   }
@@ -659,29 +730,24 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
                       )}
                       {msg.tools && msg.tools.length > 0 && (
                       <div className="otdel-msg-tools">
-                        {msg.tools.map(tc => (
-                          <div key={tc.id} className={`otdel-tool-call ${tc.status}`}>
-                            <div className="otdel-tool-header">
+                        {msg.tools.map(tc => {
+                          const isExpanded = expandedTools.has(tc.id)
+                          const summary = getToolSummary(tc)
+                          return (
+                          <div key={tc.id} className={`otdel-tool-call ${tc.status} ${isExpanded ? 'expanded' : 'collapsed'}`}>
+                            <div className="otdel-tool-header" onClick={() => toggleToolExpand(tc.id)} style={{cursor: 'pointer'}}>
                               <span className="otdel-tool-icon">
                                 {tc.status === 'running' ? '⏳' : tc.status === 'completed' ? '✅' : '❌'}
                               </span>
-                              <span className="otdel-tool-name">{tc.name}</span>
+                              <span className="otdel-tool-name">{summary}</span>
+                              <span className="otdel-tool-toggle">{isExpanded ? '▾' : '▸'}</span>
                             </div>
-                            {tc.status === 'running' && (
-                              <div className="otdel-tool-params">Выполняется...</div>
-                            )}
-                            {tc.status === 'completed' && tc.result && (
-                              <div className="otdel-tool-result">
-                                <pre>{typeof tc.result === 'string' ? tc.result : JSON.stringify(tc.result)}</pre>
-                              </div>
-                            )}
-                            {tc.status === 'error' && tc.error && (
-                              <div className="otdel-tool-error">
-                                <pre>{typeof tc.error === 'string' ? tc.error : JSON.stringify(tc.error)}</pre>
-                              </div>
-                            )}
+                            <div className="otdel-tool-content">
+                              {getToolResultDisplay(tc)}
+                            </div>
                           </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     )}
                     {isStreaming && (

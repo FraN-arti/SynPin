@@ -48,7 +48,7 @@ interface GraphEdge {
   label: string
   animated: boolean
   data: {
-    connection_type: string
+    connection_types: string[]
     color: string
     active_transfers: number
   }
@@ -160,6 +160,9 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
   const [allNodes, setAllNodes] = useState<Node[]>([])
   const [allEdges, setAllEdges] = useState<Edge[]>([])
 
+  // Activity toast — shows when approval starts/completes
+  const [activityToast, setActivityToast] = useState<{ message: string; type: 'start' | 'complete' } | null>(null)
+
   // Load graph data
   const loadGraph = useCallback(async () => {
     try {
@@ -187,6 +190,7 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
         labelStyle: { fill: '#fff', fontSize: 11, fontWeight: 600 },
         labelBgStyle: { fill: 'rgba(0,0,0,0.75)', stroke: e.data?.color || '#6b7280', strokeWidth: 1, borderRadius: 4 },
         labelBgPadding: [6, 4] as [number, number],
+        data: { connectionTypes: e.data?.connection_types || [], activeTransfers: e.data?.active_transfers || 0 },
       }))
 
       console.log('[connections] setting nodes:', flowNodes.length, 'edges:', flowEdges.length)
@@ -271,12 +275,22 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
       wsOn('connections:created', () => { loadGraph(); loadConnections() }),
       wsOn('connections:updated', () => { loadGraph(); loadConnections() }),
       wsOn('connections:deleted', () => { loadGraph(); loadConnections() }),
-      wsOn('connections:escalation_started', () => { loadGraph() }),
-      wsOn('connections:escalation_complete', () => { loadGraph() }),
+      wsOn('connections:approval_started', (data: any) => {
+        loadGraph()
+        const fromName = data?.approval?.from_name || data?.approval?.from || ''
+        const toName = data?.approval?.to_name || data?.approval?.to || ''
+        setActivityToast({ message: `Передача: ${fromName} → ${toName}`, type: 'start' })
+        setTimeout(() => setActivityToast(null), 4000)
+      }),
+      wsOn('connections:approval_complete', () => {
+        loadGraph()
+        setActivityToast({ message: 'Передача завершена', type: 'complete' })
+        setTimeout(() => setActivityToast(null), 3000)
+      }),
       wsOn('connections:positions_updated', () => { loadGraph() }),
     ]
     return () => { unsubs.forEach(u => u()) }
-  }, [wsOn, loadGraph, loadConnections])
+  }, [wsOn, loadGraph, loadConnections, otdelNames])
 
   // Сравнять with ELK
   const handleAutoLayout = useCallback(async () => {
@@ -359,6 +373,14 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
           <Controls />
         </ReactFlow>
 
+        {/* Activity toast — shows during active transfers */}
+        {activityToast && (
+          <div className={`connection-activity-toast ${activityToast.type}`}>
+            <span className="connection-activity-dot" />
+            {activityToast.message}
+          </div>
+        )}
+
         {/* Toolbar */}
         <div className="connections-toolbar">
           {/* Project filter */}
@@ -401,7 +423,7 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
               <div key={conn.id} className="connection-detail-card">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                   <span className="connection-type-badge" data-type={conn.type}>
-                    {conn.type === 'peer' ? 'Равноправная' : conn.type === 'escalation' ? 'Эскалация' : 'Делегирование'}
+                    {conn.type === 'peer' ? 'Равноправная' : conn.type === 'approval' ? 'Утверждение' : 'Делегирование'}
                   </span>
                   <span style={{ fontWeight: 600, color: 'var(--text)', fontSize: '13px' }}>
                     {conn.label || '—'}

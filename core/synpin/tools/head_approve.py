@@ -1,4 +1,4 @@
-"""Head Protocol: Escalate tasks to other departments via connections."""
+"""Head Protocol: Approve/transfer tasks to other departments via connections."""
 from __future__ import annotations
 
 from typing import Any
@@ -6,20 +6,20 @@ from typing import Any
 from .base import ToolResult, make_success, make_error
 
 
-async def head_escalate(params: dict[str, Any]) -> ToolResult:
+async def head_approve(params: dict[str, Any]) -> ToolResult:
     """
-    Escalate a task to another department through a connection.
+    Transfer a task to another department through a connection.
 
     Params:
         otdel_id: str (injected by execute_tool) — current department
         task_id: str (required) — kanban task ID (T-xxx)
         target_otdel: str (optional) — target department slug.
-                      If omitted, auto-detects escalation connection.
+                      If omitted, auto-detects approval connection.
         reason: str (required) — why escalating
         report: str (optional) — detailed report for target department
 
     Returns:
-        {escalation_id, from, to, task_id, status, message}
+        {approval_id, from, to, task_id, status, message}
     """
     otdel_id = params.get("otdel_id")
     if not otdel_id:
@@ -54,38 +54,38 @@ async def head_escalate(params: dict[str, Any]) -> ToolResult:
             connections = load_connections()
             available = [
                 c.to_otdel for c in connections
-                if c.from_otdel == otdel_id and c.type == ConnectionType.ESCALATION and c.active
+                if c.from_otdel == otdel_id and c.type == ConnectionType.APPROVAL and c.active
             ]
             if available:
                 return make_error(
-                    f"No escalation connection to '{target_otdel}'. "
+                    f"No approval connection to '{target_otdel}'. "
                     f"Available targets from {otdel_id}: {available}"
                 )
             else:
                 return make_error(
-                    f"No escalation connections from {otdel_id}. "
+                    f"No approval connections from {otdel_id}. "
                     f"Create a connection in Settings → Связи first."
                 )
 
         return make_success({
-            "escalation_id": record.id,
+            "approval_id": record.id,
             "from": record.from_otdel,
             "to": record.to_otdel,
             "task_id": record.task_id,
             "status": record.status.value,
             "message": (
-                f"Task {task_id} escalated from {record.from_otdel} to {record.to_otdel}. "
+                f"Task {task_id} transferred from {record.from_otdel} to {record.to_otdel}. "
                 f"Reason: {reason}"
             ),
         })
 
     except Exception as e:
-        return make_error(f"Escalation failed: {e}")
+        return make_error(f"Approval failed: {e}")
 
 
-async def head_escalation_status(params: dict[str, Any]) -> ToolResult:
+async def head_approval_status(params: dict[str, Any]) -> ToolResult:
     """
-    Check escalation status or list recent escalations.
+    Check approval status or list recent approvals.
 
     Params:
         otdel_id: str (injected by execute_tool)
@@ -93,7 +93,7 @@ async def head_escalation_status(params: dict[str, Any]) -> ToolResult:
         status: str (optional) — filter by status (pending/completed/rejected)
 
     Returns:
-        {escalations: [...]}
+        {approvals: [...]}
     """
     otdel_id = params.get("otdel_id")
     if not otdel_id:
@@ -111,7 +111,7 @@ async def head_escalation_status(params: dict[str, Any]) -> ToolResult:
             status=status,
         )
 
-        escalations = [
+        approvals = [
             {
                 "id": r.id,
                 "task_id": r.task_id,
@@ -126,10 +126,10 @@ async def head_escalation_status(params: dict[str, Any]) -> ToolResult:
             for r in records
         ]
 
-        return make_success({"escalations": escalations})
+        return make_success({"approvals": approvals})
 
     except Exception as e:
-        return make_error(f"Failed to get escalation status: {e}")
+        return make_error(f"Failed to get approval status: {e}")
 
 
-__all__ = ["head_escalate", "head_escalation_status"]
+__all__ = ["head_approve", "head_approval_status"]

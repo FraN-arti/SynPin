@@ -1,7 +1,7 @@
 """Connection models — Pydantic schemas for inter-department relationships.
 
 Each connection is stored in config/connections.yaml.
-Escalation history is stored in data/escalation_history.yaml.
+Approval history is stored in data/approval_history.yaml.
 Canvas positions are stored in data/canvas/positions.json.
 """
 from __future__ import annotations
@@ -18,21 +18,21 @@ from pydantic import BaseModel, Field
 class ConnectionType(str, Enum):
     """Types of connections between departments."""
     PEER = "peer"              # Equal-level, bidirectional cooperation
-    ESCALATION = "escalation"  # Upward — child reports to parent
+    APPROVAL = "approval"      # Upward — child reports to parent for approval
     DELEGATION = "delegation"  # Downward — parent assigns to child
 
 
-class EscalationStatus(str, Enum):
-    """Status of an escalation event."""
-    PENDING = "pending"        # Escalation in progress
-    COMPLETED = "completed"    # Resolved by target department
+class ApprovalStatus(str, Enum):
+    """Status of an approval event."""
+    PENDING = "pending"        # Pending approval
+    COMPLETED = "completed"    # Approved by target department
     REJECTED = "rejected"      # Rejected / sent back
 
 
 # ── Connection ───────────────────────────────────────────────────────────────
 
 class AutoTriggerConfig(BaseModel):
-    """Auto-escalation trigger configuration."""
+    """Auto-approval trigger configuration."""
     on_status: str = "blocked"     # Task status that triggers escalation
     timeout_s: int = 3600          # Seconds before auto-escalation
 
@@ -46,15 +46,15 @@ class Connection(BaseModel):
     label: str = ""                            # Display name
     description: str = ""                      # Details
     active: bool = True
-    auto_trigger: AutoTriggerConfig | None = None  # Only for escalation type
+    auto_trigger: AutoTriggerConfig | None = None  # Only for approval type
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
 
-# ── Escalation History ──────────────────────────────────────────────────────
+# ── Approval History ────────────────────────────────────────────────────────
 
-class EscalationRecord(BaseModel):
-    """A single escalation event in the history."""
+class ApprovalRecord(BaseModel):
+    """A single approval event in the history."""
     id: str                                    # esc-001, esc-002, etc.
     task_id: str                               # Kanban task ID (T-xxx)
     from_otdel: str                            # Source department slug
@@ -62,7 +62,7 @@ class EscalationRecord(BaseModel):
     connection_id: str                         # Connection used
     reason: str = ""                           # Why escalated
     report: str = ""                           # Detailed report
-    status: EscalationStatus = EscalationStatus.PENDING
+    status: ApprovalStatus = ApprovalStatus.PENDING
     timestamp: datetime = Field(default_factory=datetime.now)
     resolved_at: datetime | None = None
     resolution: str = ""                       # How it was resolved

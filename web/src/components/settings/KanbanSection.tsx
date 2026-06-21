@@ -145,10 +145,10 @@ export function KanbanSection() {
 
       {/* Automation — Coming Soon */}
       <SettingsCard title="Автоматизация" style={{ opacity: 0.5, pointerEvents: 'none' }}>
-        <p className="settings-hint">Автоматическое назначение, эскалация и передача задач между отделами</p>
+        <p className="settings-hint">Автоматическое назначение, утверждение и передача задач между отделами</p>
         <Toggle label="Авто назначение главы" defaultChecked={true} onChange={() => {}} />
         <Toggle label="Summon при завершении" defaultChecked={false} onChange={() => {}} />
-        <Toggle label="Эскалация при простое" defaultChecked={false} onChange={() => {}} />
+        <Toggle label="Утверждение при простое" defaultChecked={false} onChange={() => {}} />
         <Toggle label="Запрос человека при блоке" defaultChecked={false} onChange={() => {}} />
       </SettingsCard>
     </div>
@@ -1112,7 +1112,7 @@ function BoardSettingsConfig({ refreshKey }: { refreshKey?: number }) {
             onChange={() => {}}
           />
         </div>
-        <span className="settings-hint">Создание, смена статуса, эскалация и дедлайны задач</span>
+        <span className="settings-hint">Создание, смена статуса, утверждение и дедлайны задач</span>
       </div>
     </SettingsCard>
   )

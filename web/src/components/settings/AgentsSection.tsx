@@ -528,7 +528,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
                       <span className="agent-avatar external" style={{ background: agent.color }}>{agent.icon_letter}</span>
                       <div>
                         <span className="agent-name">{agent.name}<span className="agent-badge extern">extern</span></span>
-                        <span className="agent-role" style={{ color: roleMap[agent.role]?.color || '#6b7280' }}>{deptMap[agent.department]?.name || agent.department}</span>
+                        <span className="agent-role" style={{ color: roleMap[agent.role]?.color || '#6b7280' }}>{deptMap[agent.department]?.name || 'Без отдела'}</span>
                       </div>
                     </div>
                     <div className="agent-status-icon">
@@ -551,7 +551,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
                         <span className="agent-expanded-avatar external" style={{ background: agent.color }}>{agent.icon_letter}</span>
                         <div>
                           <span className="agent-expanded-name">{agent.name}<span className="agent-badge extern">extern</span></span>
-                          <span className="agent-expanded-role" style={{ color: roleMap[agent.role]?.color || '#6b7280' }}>{roleMap[agent.role]?.name || agent.role} · {deptMap[agent.department]?.name || agent.department}</span>
+                          <span className="agent-expanded-role" style={{ color: roleMap[agent.role]?.color || '#6b7280' }}>{roleMap[agent.role]?.name || agent.role} · {deptMap[agent.department]?.name || 'Без отдела'}</span>
                         </div>
                       </div>
                       <div className="agent-expanded-body">
@@ -674,7 +674,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
                         <span className="agent-avatar">{agent.name[0]}</span>
                         <div>
                           <span className="agent-name">{agent.name}</span>
-                          <span className="agent-role" style={{ color: roleMap[agent.role]?.color || '#6b7280' }}>{deptMap[agent.department]?.name || agent.department}</span>
+                          <span className="agent-role" style={{ color: roleMap[agent.role]?.color || '#6b7280' }}>{deptMap[agent.department]?.name || 'Без отдела'}</span>
                         </div>
                       </div>
                       <div className="agent-status-icon">
@@ -700,7 +700,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
                           <span className="agent-expanded-avatar">{agent.name[0]}</span>
                           <div>
                             <span className="agent-expanded-name">{agent.name}</span>
-                            <span className="agent-expanded-role" style={{ color: roleMap[agent.role]?.color || '#6b7280' }}>{roleMap[agent.role]?.name || agent.role} · {deptMap[agent.department]?.name || agent.department}</span>
+                            <span className="agent-expanded-role" style={{ color: roleMap[agent.role]?.color || '#6b7280' }}>{roleMap[agent.role]?.name || agent.role} · {deptMap[agent.department]?.name || 'Без отдела'}</span>
                           </div>
                         </div>
                         <div className="agent-expanded-body">

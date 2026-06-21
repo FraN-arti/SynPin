@@ -1,4 +1,4 @@
-"""Config loader — connections.yaml, escalation_history.yaml, canvas positions."""
+"""Config loader — connections.yaml, approval_history.yaml, canvas positions."""
 from __future__ import annotations
 
 import json
@@ -15,8 +15,8 @@ from .models import (
     CanvasData,
     Connection,
     ConnectionType,
-    EscalationRecord,
-    EscalationStatus,
+    ApprovalRecord,
+    ApprovalStatus,
     NodePosition,
 )
 
@@ -31,7 +31,7 @@ def _get_config_dir() -> Path:
 
 
 def _get_data_dir() -> Path:
-    """Data directory (escalation_history.yaml, canvas/)."""
+    """Data directory (approval_history.yaml, canvas/)."""
     from ..paths import get_data_dir
     return get_data_dir()
 
@@ -41,7 +41,7 @@ def _connections_path() -> Path:
 
 
 def _history_path() -> Path:
-    return _get_data_dir() / "escalation_history.yaml"
+    return _get_data_dir() / "approval_history.yaml"
 
 
 def _canvas_path() -> Path:
@@ -153,7 +153,7 @@ def create_connection(
         label=label,
         description=description,
     )
-    if auto_trigger and conn_type == "escalation":
+    if auto_trigger and conn_type == "approval":
         conn.auto_trigger = AutoTriggerConfig(**auto_trigger)
 
     connections = load_connections()
@@ -184,7 +184,7 @@ def update_connection(conn_id: str, updates: dict[str, Any]) -> Connection | Non
 
 
 def delete_connection(conn_id: str) -> bool:
-    """Delete a connection. Clean Delete — also removes related escalation history."""
+    """Delete a connection. Clean Delete — also removes related approval history."""
     connections = load_connections()
     original_len = len(connections)
     connections = [c for c in connections if c.id != conn_id]
@@ -193,7 +193,7 @@ def delete_connection(conn_id: str) -> bool:
 
     save_connections(connections)
 
-    # Clean Delete: remove escalation history for this connection
+    # Clean Delete: remove approval history for this connection
     _clean_history_for_connection(conn_id)
 
     # Clean Delete: remove canvas position if source/target has no other connections
@@ -203,16 +203,16 @@ def delete_connection(conn_id: str) -> bool:
     return True
 
 
-# ── Escalation History ───────────────────────────────────────────────────────
+# ── Approval History ────────────────────────────────────────────────────────
 
-def load_history() -> list[EscalationRecord]:
-    """Load escalation history."""
+def load_history() -> list[ApprovalRecord]:
+    """Load approval history."""
     data = _load_yaml(_history_path())
     raw_list = data.get("history", [])
     result = []
     for item in raw_list:
         try:
-            record = EscalationRecord(
+            record = ApprovalRecord(
                 id=item.get("id", ""),
                 task_id=item.get("task_id", ""),
                 from_otdel=item.get("from", ""),
@@ -231,8 +231,8 @@ def load_history() -> list[EscalationRecord]:
     return result
 
 
-def save_history(records: list[EscalationRecord]) -> None:
-    """Save escalation history."""
+def save_history(records: list[ApprovalRecord]) -> None:
+    """Save approval history."""
     raw_list = []
     for rec in records:
         raw_list.append({
@@ -258,9 +258,9 @@ def add_history_record(
     connection_id: str,
     reason: str = "",
     report: str = "",
-) -> EscalationRecord:
-    """Add a new escalation record."""
-    record = EscalationRecord(
+) -> ApprovalRecord:
+    """Add a new approval record."""
+    record = ApprovalRecord(
         id=_generate_id("esc"),
         task_id=task_id,
         from_otdel=from_otdel,

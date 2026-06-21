@@ -186,6 +186,17 @@ def update_external_agent(slug: str, updates: dict[str, Any]) -> dict[str, Any] 
     config["agents"] = agents
     save_external_agents_config(config)
 
+    # Broadcast agent list change if name/role/department changed (sidebar refresh)
+    if any(k in updates for k in ("name", "role", "department")):
+        try:
+            import asyncio
+            from ..chat.ws_manager import ws_manager
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(ws_manager.broadcast({"type": "agent:list_changed"}))
+        except Exception:
+            pass
+
     # Sync is_primary with settings.yaml and broadcast
     if "is_primary" in updates:
         settings_path = manager._get_config_dir() / "settings.yaml"

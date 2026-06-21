@@ -1,5 +1,5 @@
 /**
- * Connections settings section — CRUD connections + escalation history.
+ * Connections settings section — CRUD connections + approval history.
  * Supports create, edit, and delete with modal forms.
  */
 
@@ -22,7 +22,9 @@ interface EscalationRecord {
   id: string
   task_id: string
   from: string
+  from_name?: string
   to: string
+  to_name?: string
   reason: string
   status: string
   timestamp: string
@@ -36,7 +38,7 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
   const [otdels, setOtdels] = useState<{ id: string; name: string }[]>([])
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Connection | null>(null)
-  const [form, setForm] = useState({ from: '', to: '', type: 'escalation', label: '', description: '' })
+  const [form, setForm] = useState({ from: '', to: '', type: 'approval', label: '', description: '' })
   const [saving, setSaving] = useState(false)
 
   const loadConnections = useCallback(async () => {
@@ -73,8 +75,8 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
       wsOn('connections:created', () => loadConnections()),
       wsOn('connections:updated', () => loadConnections()),
       wsOn('connections:deleted', () => { loadConnections(); loadHistory() }),
-      wsOn('connections:escalation_started', () => loadHistory()),
-      wsOn('connections:escalation_complete', () => loadHistory()),
+      wsOn('connections:approval_started', () => loadHistory()),
+      wsOn('connections:approval_complete', () => loadHistory()),
     ]
     return () => { unsubs.forEach(u => u()) }
   }, [wsOn, loadConnections, loadHistory])
@@ -83,7 +85,7 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
 
   const openCreate = () => {
     setEditing(null)
-    setForm({ from: '', to: '', type: 'escalation', label: '', description: '' })
+    setForm({ from: '', to: '', type: 'approval', label: '', description: '' })
     setShowModal(true)
   }
 
@@ -126,13 +128,13 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
     try { await fetch(`${API_BASE}/api/connections/${id}`, { method: 'DELETE' }); loadConnections() } catch {}
   }
 
-  const typeLabels: Record<string, string> = { peer: 'Равноправная', escalation: 'Эскалация', delegation: 'Делегирование' }
+  const typeLabels: Record<string, string> = { peer: 'Равноправная', approval: 'Утверждение', delegation: 'Делегирование' }
   const statusLabels: Record<string, string> = { pending: 'В процессе', completed: 'Завершено', rejected: 'Отклонено' }
 
   return (
     <div className="settings-sections">
       <SettingsCard title="Связи между отделами">
-        <p className="settings-hint">Настройте структурные связи между отделами для эскалации и делегирования</p>
+        <p className="settings-hint">Настройте структурные связи между отделами для утверждения и делегирования</p>
         <div className="settings-divider-thin" />
 
         {connections.length === 0 ? (
@@ -199,7 +201,7 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
                 <label>Тип связи</label>
                 <CustomDropdown value={form.type} onChange={v => setForm(f => ({ ...f, type: v }))}
                   options={[
-                    { value: 'escalation', label: 'Эскалация (вверх)' },
+                    { value: 'approval', label: 'Утверждение (вверх)' },
                     { value: 'delegation', label: 'Делегирование (вниз)' },
                     { value: 'peer', label: 'Равноправная' },
                   ]} />
@@ -226,19 +228,19 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
       )}
 
       {/* Escalation history */}
-      <SettingsCard title="История эскалаций">
+      <SettingsCard title="История утверждений">
         {history.length === 0 ? (
-          <p className="settings-hint">Эскалаций пока не было</p>
+          <p className="settings-hint">Утверждений пока не было</p>
         ) : (
-          <div className="escalation-history">
+          <div className="approval-history">
             {history.slice(0, 20).map(rec => (
-              <div key={rec.id} className={`escalation-row status-${rec.status}`}>
-                <span className="escalation-task">{rec.task_id}</span>
-                <span className="escalation-from">{otdelName(rec.from)}</span>
-                <span className="escalation-arrow">→</span>
-                <span className="escalation-to">{otdelName(rec.to)}</span>
-                <span className="escalation-reason">{rec.reason}</span>
-                <span className={`escalation-status status-${rec.status}`}>{statusLabels[rec.status] || rec.status}</span>
+              <div key={rec.id} className={`approval-row status-${rec.status}`}>
+                <span className="approval-task">{rec.task_id}</span>
+                <span className="approval-from">{rec.from_name || otdelName(rec.from)}</span>
+                <span className="approval-arrow">→</span>
+                <span className="approval-to">{rec.to_name || otdelName(rec.to)}</span>
+                <span className="approval-reason">{rec.reason}</span>
+                <span className={`approval-status status-${rec.status}`}>{statusLabels[rec.status] || rec.status}</span>
               </div>
             ))}
           </div>

@@ -1,4 +1,4 @@
-"""Service — business logic for connections, escalation, and graph building."""
+"""Service — business logic for connections, approval, and graph building."""
 from __future__ import annotations
 
 import asyncio
@@ -9,8 +9,8 @@ from typing import Any
 from .models import (
     Connection,
     ConnectionType,
-    EscalationRecord,
-    EscalationStatus,
+    ApprovalRecord,
+    ApprovalStatus,
     Graph,
     GraphEdge,
     GraphNode,
@@ -109,7 +109,7 @@ def _conn_to_dict(conn: Connection) -> dict[str, Any]:
     }
 
 
-# ── Escalation ───────────────────────────────────────────────────────────────
+# ── Approval ────────────────────────────────────────────────────────────────
 
 def escalate_task(
     task_id: str,
@@ -117,20 +117,20 @@ def escalate_task(
     to_otdel: str | None = None,
     reason: str = "",
     report: str = "",
-) -> EscalationRecord | None:
+) -> ApprovalRecord | None:
     """Escalate a task from one department to another.
 
-    If to_otdel is None, finds the escalation connection automatically.
+    If to_otdel is None, finds the approval connection automatically.
     """
     # Find connection
-    connection = _find_escalation_connection(from_otdel, to_otdel)
+    connection = _find_approval_connection(from_otdel, to_otdel)
     if not connection:
-        logger.warning("No escalation connection found: %s → %s", from_otdel, to_otdel or "(auto)")
+        logger.warning("No approval connection found: %s → %s", from_otdel, to_otdel or "(auto)")
         return None
 
     target = connection.to_otdel
 
-    # Record escalation
+    # Record approval
     record = config.add_history_record(
         task_id=task_id,
         from_otdel=from_otdel,
@@ -144,13 +144,27 @@ def escalate_task(
     _move_task_to_otdel(task_id, target)
 
     # Broadcast
+    # Resolve otdel names for toast display
+    try:
+        from ..agents.manager import load_otdels as _load_otdels
+        otdels_list = _load_otdels()
+        _names: dict[str, str] = {}
+        if isinstance(otdels_list, list):
+            _names = {o.get("otdelid", ""): o.get("name", "") for o in otdels_list}
+        elif isinstance(otdels_list, dict):
+            _names = {o.get("otdelid", ""): o.get("name", "") for o in otdels_list.get("otdels", [])}
+    except Exception:
+        _names = {}
+
     _broadcast({
-        "type": "connections:escalation_started",
-        "escalation": {
+        "type": "connections:approval_started",
+        "approval": {
             "id": record.id,
             "task_id": task_id,
             "from": from_otdel,
+            "from_name": _names.get(from_otdel, from_otdel),
             "to": target,
+            "to_name": _names.get(target, target),
             "connection_id": connection.id,
             "reason": reason,
         },
@@ -160,32 +174,32 @@ def escalate_task(
     return record
 
 
-def complete_escalation(escalation_id: str, resolution: str = "") -> bool:
-    """Mark an escalation as completed."""
+def complete_approval(approval_id: str, resolution: str = "") -> bool:
+    """Mark an approval as completed."""
     records = config.load_history()
     for rec in records:
-        if rec.id == escalation_id:
-            rec.status = EscalationStatus.COMPLETED
+        if rec.id == approval_id:
+            rec.status = ApprovalStatus.COMPLETED
             rec.resolved_at = datetime.now(timezone.utc)
             rec.resolution = resolution
             config.save_history(records)
 
             _broadcast({
-                "type": "connections:escalation_complete",
-                "escalation_id": escalation_id,
+                "type": "connections:approval_complete",
+                "approval_id": approval_id,
                 "resolution": resolution,
             })
             return True
     return False
 
 
-def _find_escalation_connection(from_otdel: str, to_otdel: str | None = None) -> Connection | None:
-    """Find an escalation connection between departments."""
+def _find_approval_connection(from_otdel: str, to_otdel: str | None = None) -> Connection | None:
+    """Find an approval connection between departments."""
     connections = config.load_connections()
     for conn in connections:
         if not conn.active:
             continue
-        if conn.type != ConnectionType.ESCALATION:
+        if conn.type != ConnectionType.APPROVAL:
             continue
         if conn.from_otdel != from_otdel:
             continue
@@ -204,7 +218,7 @@ def _move_task_to_otdel(task_id: str, target_otdel: str) -> None:
         svc = KanbanService()
         task = svc.get_task(task_id)
         if not task:
-            logger.warning("Task %s not found for escalation", task_id)
+            logger.warning("Task %s not found for approval", task_id)
             return
 
         # Update department
@@ -216,7 +230,7 @@ def _move_task_to_otdel(task_id: str, target_otdel: str) -> None:
             task.summon_chain.append(target_otdel)
 
         # Move to TODO status in new department
-        task.move_to(TaskStatus.TODO, actor="escalation")
+        task.move_to(TaskStatus.TODO, actor="approval")
 
         svc.save_task(task)
     except Exception as e:
@@ -233,6 +247,15 @@ def build_graph() -> Graph:
     # Load otdel data for node info
     otdels = _load_otdels()
     agents = _load_agents()
+
+    # Clean dead connections (referencing non-existent otdels)
+    valid_otdel_ids = set(otdels.keys())
+    dead_connections = [c for c in connections if c.from_otdel not in valid_otdel_ids or c.to_otdel not in valid_otdel_ids]
+    if dead_connections:
+        logger.info("Cleaning %d dead connections (referencing deleted otdels)", len(dead_connections))
+        live_connections = [c for c in connections if c.from_otdel in valid_otdel_ids and c.to_otdel in valid_otdel_ids]
+        config.save_connections(live_connections)
+        connections = live_connections
 
     # Build nodes
     nodes: list[GraphNode] = []
@@ -270,7 +293,7 @@ def build_graph() -> Graph:
     # Build edges — merge multiple connections between same pair into one edge
     color_map = {
         ConnectionType.PEER: "#3b82f6",
-        ConnectionType.ESCALATION: "#f97316",
+        ConnectionType.APPROVAL: "#f97316",
         ConnectionType.DELEGATION: "#22c55e",
     }
 
@@ -291,12 +314,12 @@ def build_graph() -> Graph:
         merged_label = " · ".join(labels)
 
         # Use the "highest priority" color (escalation > delegation > peer)
-        priority = {ConnectionType.ESCALATION: 3, ConnectionType.DELEGATION: 2, ConnectionType.PEER: 1}
+        priority = {ConnectionType.APPROVAL: 3, ConnectionType.DELEGATION: 2, ConnectionType.PEER: 1}
         top_conn = max(conns, key=lambda c: priority.get(c.type, 0))
         color = color_map.get(top_conn.type, "#6b7280")
 
         # Check for active escalations
-        has_active = any(_has_active_escalation(c.id) for c in conns)
+        has_active = any(_has_active_approval(c.id) for c in conns)
 
         # Collect all connection IDs for the edge data
         conn_ids = [c.id for c in conns]
@@ -375,10 +398,10 @@ def _count_active_tasks(otdel_slug: str) -> int:
         return 0
 
 
-def _has_active_escalation(connection_id: str) -> bool:
-    """Check if there's an active (pending) escalation for this connection."""
+def _has_active_approval(connection_id: str) -> bool:
+    """Check if there's an active (pending) approval for this connection."""
     records = config.load_history()
-    return any(r.connection_id == connection_id and r.status == EscalationStatus.PENDING for r in records)
+    return any(r.connection_id == connection_id and r.status == ApprovalStatus.PENDING for r in records)
 
 
 # ── Canvas Positions ─────────────────────────────────────────────────────────
@@ -407,8 +430,8 @@ def list_history(
     from_otdel: str | None = None,
     to_otdel: str | None = None,
     status: str | None = None,
-) -> list[EscalationRecord]:
-    """List escalation history with optional filters."""
+) -> list[ApprovalRecord]:
+    """List approval history with optional filters."""
     records = config.load_history()
     if task_id:
         records = [r for r in records if r.task_id == task_id]
@@ -438,5 +461,5 @@ def clean_for_otdel(otdel_slug: str) -> None:
 
 
 def clean_for_task(task_id: str) -> None:
-    """Clean Delete: remove escalation history for a task."""
+    """Clean Delete: remove approval history for a task."""
     config.clean_history_for_task(task_id)

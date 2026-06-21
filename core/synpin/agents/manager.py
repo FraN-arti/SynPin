@@ -765,7 +765,7 @@ def update_department(dept_id: str, updates: dict[str, Any]) -> dict[str, Any] |
 
 
 def delete_department(dept_id: str) -> bool:
-    """Delete a department: remove from config."""
+    """Delete a department: remove from config + clean agent references."""
     config_path = _get_config_dir() / "departments.yaml"
     data = _load_yaml(config_path)
     departments = data.get("departments", [])
@@ -776,6 +776,34 @@ def delete_department(dept_id: str) -> bool:
 
     data["departments"] = new_departments
     _save_yaml(config_path, data)
+
+    # CLEAN DELETE: clear department field in agents referencing this department
+    # Internal agents (agents.yaml)
+    agents_path = _get_config_dir() / "agents.yaml"
+    agents_data = _load_yaml(agents_path)
+    agents_cfg = agents_data.get("agents", {})
+    cleaned = 0
+    for slug, cfg in agents_cfg.items():
+        if cfg.get("department") == dept_id:
+            cfg["department"] = ""
+            cleaned += 1
+    if cleaned:
+        _save_yaml(agents_path, agents_data)
+
+    # External agents (external_agents.yaml)
+    ext_path = _get_config_dir() / "external_agents.yaml"
+    ext_data = _load_yaml(ext_path)
+    ext_agents = ext_data.get("agents", {})
+    ext_cleaned = 0
+    for slug, cfg in ext_agents.items():
+        if cfg.get("department") == dept_id:
+            cfg["department"] = ""
+            ext_cleaned += 1
+    if ext_cleaned:
+        _save_yaml(ext_path, ext_data)
+
+    if cleaned or ext_cleaned:
+        logger.info("Cleaned department %s from %d internal + %d external agents", dept_id, cleaned, ext_cleaned)
 
     return True
 
@@ -898,35 +926,46 @@ def update_otdel(otdel_id: str, updates: dict[str, Any]) -> dict[str, Any] | Non
 
 
 def delete_otdel(otdel_id: str) -> bool:
-    """Delete an otdel: remove from config + delete directory recursively."""
-    import shutil
+    def delete_otdel(otdel_id: str) -> bool:
+        """Delete an otdel: remove from config + delete directory recursively.
 
-    config_path = _get_config_dir() / "otdels.yaml"
-    data = _load_yaml(config_path)
-    otdels = data.get("otdels", [])
+        CLEAN DELETE: also removes all connections involving this otdel.
+        """
+        import shutil
 
-    new_otdels = [o for o in otdels if o.get("otdelid") != otdel_id]
-    if len(new_otdels) == len(otdels):
-        return False  # Not found
+        config_path = _get_config_dir() / "otdels.yaml"
+        data = _load_yaml(config_path)
+        otdels = data.get("otdels", [])
+        new_otdels = [o for o in otdels if o.get("otdelid") != otdel_id]
+        if len(new_otdels) == len(otdels):
+            return False  # Not found
 
-    data["otdels"] = new_otdels
-    _save_yaml(config_path, data)
+        data["otdels"] = new_otdels
+        _save_yaml(config_path, data)
 
-    # Remove otdel directory (otdel.yaml, agents subdir, etc.)
-    otdels_dir = _get_otdels_dir()
-    otdel_dir = otdels_dir / otdel_id
-    if otdel_dir.exists():
-        shutil.rmtree(str(otdel_dir))
+        # Remove otdel directory (otdel.yaml, agents subdir, etc.)
+        otdels_dir = _get_otdels_dir()
+        otdel_dir = otdels_dir / otdel_id
+        if otdel_dir.exists():
+            shutil.rmtree(str(otdel_dir))
 
-    # Remove otdel chat history (data/otdels/<id>/chat.json)
-    from ..paths import get_data_dir
-    data_dir = get_data_dir()
-    if data_dir:
-        otdel_data_dir = data_dir / "otdels" / otdel_id
-        if otdel_data_dir.exists():
-            shutil.rmtree(str(otdel_data_dir))
+        # Remove otdel chat history (data/otdels/<id>/chat.json)
+        from ..paths import get_data_dir
+        data_dir = get_data_dir()
+        if data_dir:
+            otdel_data_dir = data_dir / "otdels" / otdel_id
+            if otdel_data_dir.exists():
+                shutil.rmtree(str(otdel_data_dir))
 
-    return True
+        # CLEAN DELETE: remove all connections + history for this otdel
+        try:
+            from ..connections.service import clean_for_otdel
+            clean_for_otdel(otdel_id)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("Failed to clean connections for otdel %s: %s", otdel_id, e)
+
+        return True
 
 
 # ─── Tools ───────────────────────────────────────────────────────

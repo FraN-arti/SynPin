@@ -173,7 +173,7 @@ export function DeadlinesPage({ wsOn }: DeadlinesPageProps) {
         <span className="deadline-task-title">{task.title}</span>
         <span className="deadline-task-sep" />
         <span className="deadline-task-dept" style={{ color: deptColor }}>
-          {deptMap[task.department] || task.department}
+          {deptMap[task.department] || task.department || 'Без отдела'}
         </span>
         <span className="deadline-task-sep" />
         <span className="deadline-task-status" style={{ color: STATUS_COLORS[task.status] || '#6b7280' }}>

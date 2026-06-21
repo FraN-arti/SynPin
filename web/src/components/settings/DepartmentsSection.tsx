@@ -145,7 +145,7 @@ export function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChang
             />
           </div>
           <div className="settings-field">
-            <label>Эскалация</label>
+            <label>Утверждение</label>
             <input className="settings-input" placeholder="Пока не реализовано"
               value={form.escalation} onChange={e => setForm(f => ({ ...f, escalation: e.target.value }))} disabled />
           </div>

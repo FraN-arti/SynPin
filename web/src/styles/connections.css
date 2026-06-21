@@ -119,7 +119,7 @@
   pointer-events: none;
 }
 
-/* Animated dash for active escalations */
+/* Animated dash for active approvals */
 @keyframes dash {
   to {
     stroke-dashoffset: -9;
@@ -230,7 +230,7 @@
   color: #3b82f6;
 }
 
-.connection-type-badge[data-type="escalation"] {
+.connection-type-badge[data-type="approval"] {
   background: rgba(249, 115, 22, 0.15);
   color: var(--orange);
 }
@@ -251,7 +251,7 @@
   font-size: 14px;
 }
 
-/* ── Pulse animation for active escalation nodes ────────────────────────── */
+/* ── Pulse animation for active approval nodes ─────────────────────────── */
 
 @keyframes nodePulse {
   0%, 100% { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); }
@@ -300,13 +300,13 @@
 
 /* ── Escalation History ────────────────────────────────────────────────── */
 
-.escalation-history {
+.approval-history {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.escalation-row {
+.approval-row {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -316,22 +316,22 @@
   font-size: 12px;
 }
 
-.escalation-task {
+.approval-task {
   font-weight: 600;
   color: var(--orange);
   min-width: 60px;
 }
 
-.escalation-from,
-.escalation-to {
+.approval-from,
+.approval-to {
   color: var(--text);
 }
 
-.escalation-arrow {
+.approval-arrow {
   color: var(--text-dim);
 }
 
-.escalation-reason {
+.approval-reason {
   color: var(--text-dim);
   flex: 1;
   overflow: hidden;
@@ -339,24 +339,24 @@
   white-space: nowrap;
 }
 
-.escalation-status {
+.approval-status {
   font-size: 10px;
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 10px;
 }
 
-.escalation-status.status-pending {
+.approval-status.status-pending {
   background: rgba(249, 115, 22, 0.15);
   color: #f97316;
 }
 
-.escalation-status.status-completed {
+.approval-status.status-completed {
   background: rgba(34, 197, 94, 0.15);
   color: #22c55e;
 }
 
-.escalation-status.status-rejected {
+.approval-status.status-rejected {
   background: rgba(239, 68, 68, 0.15);
   color: #ef4444;
 }
@@ -378,6 +378,75 @@
   font-family: inherit;
   font-size: 11px;
   font-weight: 600;
+}
+
+/* Animated edge — active approval/transfer in progress */
+.react-flow__edge.animated path {
+  stroke-dasharray: 8 4;
+  animation: edgeDash 1s linear infinite;
+  filter: drop-shadow(0 0 8px currentColor);
+}
+
+@keyframes edgeDash {
+  to { stroke-dashoffset: -12; }
+}
+
+/* Edge type base colors (set via inline style, this is fallback) */
+.react-flow__edge path {
+  transition: filter 0.3s ease;
+}
+
+.react-flow__edge.animated:hover path {
+  filter: drop-shadow(0 0 12px currentColor) brightness(1.2);
+}
+
+/* Activity toast — appears during active transfers */
+.connection-activity-toast {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  background: rgba(15, 15, 25, 0.9);
+  border: 1px solid rgba(249, 115, 22, 0.4);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 10;
+  animation: toastSlideIn 0.3s ease;
+  pointer-events: none;
+}
+
+.connection-activity-toast.complete {
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.connection-activity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f97316;
+  animation: toastPulse 1s ease infinite;
+}
+
+.connection-activity-toast.complete .connection-activity-dot {
+  background: #22c55e;
+  animation: none;
+}
+
+@keyframes toastSlideIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@keyframes toastPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 /* Connection detail card in properties panel */

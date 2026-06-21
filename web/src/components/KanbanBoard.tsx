@@ -6,6 +6,22 @@ import { CSS } from '@dnd-kit/utilities'
 import { PickerMenu } from './PickerMenu'
 import { LoadingSpinner } from './LoadingSpinner'
 import { KanbanStats } from './KanbanStats'
+import { useUndoWithProgress } from '../hooks/useUndoWithProgress'
+
+// Actor name resolver — maps internal slugs to human-readable labels
+const ACTOR_LABELS: Record<string, string> = {
+  council: 'Совет',
+  head: 'Глава',
+  system: 'Система',
+  'drag-drop': 'Перетаскивание',
+  approval: 'Утверждение',
+  user: 'Пользователь',
+}
+function resolveActorName(slug: string, agents: {slug: string; name: string}[]): string {
+  if (ACTOR_LABELS[slug]) return ACTOR_LABELS[slug]
+  const agent = agents.find(a => a.slug === slug)
+  return agent?.name || slug
+}
 
 interface Task {
   id: string
@@ -303,6 +319,7 @@ export function KanbanBoard({ wsOn }: KanbanBoardProps) {
   const [labels, setLabels] = useState<LabelConfig[]>([])
   const [defaultColumn, setDefaultColumn] = useState<string | null>(null)
   const [departments, setDepartments] = useState<DepartmentItem[]>([])
+  const [agents, setAgents] = useState<{ slug: string; name: string }[]>([])
 
   // Build label lookup map
   const labelMap: Record<string, LabelConfig> = {}
@@ -388,29 +405,39 @@ export function KanbanBoard({ wsOn }: KanbanBoardProps) {
     }
   }, [])
 
-  // ── Delete task ─────────────────────────────────────────────
-  // Manual deletion: invoked from the task-detail modal. We do a
-  // confirm() before the API call so an accidental click in the
-  // modal doesn't permanently lose work. After a successful
-  // delete we close the modal and refresh the board so the
-  // neighbouring columns don't show stale data.
-  const handleDeleteTask = async (taskId: string) => {
-    if (!window.confirm(`Удалить задачу? Это нельзя отменить.`)) return
+  const loadAgents = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/kanban/tasks/${taskId}`, {
-        method: 'DELETE',
-      })
+      const res = await fetch(`${API_BASE}/api/agents`)
       if (res.ok) {
-        setSelectedTask(null)
-        loadBoard()
-      } else {
-        const data = await res.json().catch(() => ({}))
-        alert(`Не удалось удалить: ${data.detail || res.statusText}`)
+        const data = await res.json()
+        setAgents((data.agents || []).filter((a: any) => a.enabled).map((a: any) => ({ slug: a.slug, name: a.name })))
       }
     } catch (e) {
-      console.error('[kanban] delete task error:', e)
-      alert('Ошибка сети при удалении')
+      console.error('[kanban] load agents error:', e)
     }
+  }, [])
+
+  // ── Delete task (with undo toast) ───────────────────────────
+  const { pendingDelete: pendingTaskDelete, undoProgress: taskUndoProgress, start: startTaskUndo, undo: undoTaskDelete } =
+    useUndoWithProgress<{ taskId: string }>({
+      onExpire: async (item) => {
+        try {
+          const res = await fetch(`${API_BASE}/api/kanban/tasks/${item.extras!.taskId}`, { method: 'DELETE' })
+          if (res.ok) {
+            setSelectedTask(null)
+            loadBoard()
+          }
+        } catch (e) {
+          console.error('[kanban] delete task error:', e)
+        }
+      },
+      onUndo: () => {},
+    })
+
+  const handleDeleteTask = (taskId: string) => {
+    const task = Object.values(board).flat().find((t: Task) => t.id === taskId)
+    const label = task ? task.title : taskId
+    startTaskUndo({ id: taskId, label: `«${label}»`, index: 0, extras: { taskId } })
   }
 
   useEffect(() => {
@@ -419,7 +446,8 @@ export function KanbanBoard({ wsOn }: KanbanBoardProps) {
     loadLabels()
     loadWidgetConfig()
     loadDepartments()
-  }, [loadBoard, loadColumns, loadLabels, loadWidgetConfig, loadDepartments])
+    loadAgents()
+  }, [loadBoard, loadColumns, loadLabels, loadWidgetConfig, loadDepartments, loadAgents])
 
   // WebSocket live updates
   useEffect(() => {
@@ -806,7 +834,7 @@ export function KanbanBoard({ wsOn }: KanbanBoardProps) {
                 {selectedTask.history.map((h, i) => (
                   <div key={i} className={`kanban-history-entry ${h.action}`}>
                     <span className="kanban-history-time">{formatTime(h.timestamp)}</span>
-                    <span className="kanban-history-actor">{h.actor}</span>
+                    <span className="kanban-history-actor">{resolveActorName(h.actor, agents)}</span>
                     <span className="kanban-history-action">{h.action}</span>
                     <span className="kanban-history-detail">{h.detail}</span>
                     {h.target_department && (
@@ -882,6 +910,20 @@ export function KanbanBoard({ wsOn }: KanbanBoardProps) {
           defaultStatus={defaultTaskStatus}
         />
       )}
+
+      {/* Undo toast for task deletion */}
+      <div className={`undo-toast ${pendingTaskDelete ? 'visible' : ''}`}>
+        <span className="undo-toast-text">
+          «{pendingTaskDelete?.label}» удалена
+        </span>
+        <button className="undo-toast-btn" onClick={undoTaskDelete}>
+          Отменить
+        </button>
+        <div
+          className="undo-toast-progress"
+          style={{ width: `${taskUndoProgress}%`, transition: 'width 100ms linear' }}
+        />
+      </div>
     </div>
   )
 }

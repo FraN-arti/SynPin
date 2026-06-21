@@ -39,7 +39,7 @@ from .head_evaluate import head_evaluate
 from .head_retry import head_retry
 from .head_decide import head_decide
 from .head_block import head_block
-from .head_escalate import head_escalate, head_escalation_status
+from .head_approve import head_approve, head_approval_status
 from .kanban_task import kanban_task
 from .image_analyze import image_analyze
 from .summarize import summarize
@@ -73,8 +73,8 @@ def get_tool_registry() -> dict[str, ToolHandler]:
             "head_retry": head_retry,
             "head_decide": head_decide,
             "head_block": head_block,
-            "head_escalate": head_escalate,
-            "head_escalation_status": head_escalation_status,
+            "head_approve": head_approve,
+            "head_approval_status": head_approval_status,
             "kanban_task": kanban_task,
             "image_analyze": image_analyze,
             "summarize": summarize,
@@ -106,8 +106,8 @@ __all__ = [
     "head_evaluate",
     "head_retry",
     "head_block",
-    "head_escalate",
-    "head_escalation_status",
+    "head_approve",
+    "head_approval_status",
     "kanban_task",
     "image_analyze",
     "summarize",

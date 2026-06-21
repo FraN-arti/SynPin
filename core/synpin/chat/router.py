@@ -1556,11 +1556,13 @@ async def stream_response(
                     # yield tool_end
                     yield f"data: {json.dumps({'type': 'tool_end', 'tool': t_name, 'result': tool_result.get('output', ''), 'success': tool_result.get('success', False), 'error': tool_result.get('error'), 'index': tool_count})}\n\n"
 
-                # Build tool result text
+                # Build tool result text — ensure it's always a string
                 if tool_result.get("success"):
-                    result_text = tool_result.get("output", "Выполнено.")
+                    output = tool_result.get("output", "Выполнено.")
+                    result_text = output if isinstance(output, str) else json.dumps(output, ensure_ascii=False)
                 else:
-                    result_text = f"Ошибка: {tool_result.get('error', 'Неизвестная ошибка')}"
+                    err = tool_result.get("error", "Неизвестная ошибка")
+                    result_text = err if isinstance(err, str) else json.dumps(err, ensure_ascii=False)
 
                 if is_text_fallback:
                     # Text fallback: collect results for user message

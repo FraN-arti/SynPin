@@ -290,6 +290,12 @@ async def delete_department(dept_id: str):
         ok = manager.delete_department(dept_id)
         if not ok:
             raise HTTPException(404, f"Department not found: {dept_id}")
+        # Broadcast: agents may have had their department cleaned
+        try:
+            from ..chat.ws_manager import ws_manager
+            await ws_manager.broadcast({"type": "agent:list_changed"})
+        except Exception:
+            pass
         return {"ok": True}
     except HTTPException:
         raise
@@ -393,6 +399,12 @@ async def delete_otdel(otdel_id: str):
         ok = manager.delete_otdel(otdel_id)
         if not ok:
             raise HTTPException(404, f"Otdel not found: {otdel_id}")
+        # Broadcast connection changes (otdel deletion cleans connections)
+        try:
+            from ..chat.ws_manager import ws_manager
+            await ws_manager.broadcast({"type": "connections:deleted"})
+        except Exception:
+            pass
         return {"ok": True}
     except HTTPException:
         raise

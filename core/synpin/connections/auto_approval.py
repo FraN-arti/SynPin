@@ -1,9 +1,9 @@
-"""Auto-escalation worker — escalates blocked tasks via connections.
+"""Auto-approval worker — approves blocked tasks via connections.
 
-Runs every 5 minutes (configurable via AUTO_ESCALATION_INTERVAL_S env var).
+Runs every 5 minutes (configurable via AUTO_APPROVAL_INTERVAL_S env var).
 On each tick:
   1. Loads all connections with auto_trigger configured.
-  2. For each escalation connection, finds tasks in the source department
+  2. For each approval connection, finds tasks in the source department
      that match the trigger status (e.g. 'blocked').
   3. If a task has been in that status longer than timeout_s, escalates it
      to the target department.
@@ -18,11 +18,11 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-logger = logging.getLogger("synpin.connections.auto_escalation")
+logger = logging.getLogger("synpin.connections.auto_approval")
 
 
-async def _run_escalation_pass() -> int:
-    """Single pass: check all connections for auto-escalation triggers."""
+async def _run_approval_pass() -> int:
+    """Single pass: check all connections for auto-approval triggers."""
     from .config import load_connections
     from .models import ConnectionType
     from .service import escalate_task
@@ -31,7 +31,7 @@ async def _run_escalation_pass() -> int:
     escalated = 0
 
     for conn in connections:
-        if not conn.active or conn.type != ConnectionType.ESCALATION:
+        if not conn.active or conn.type != ConnectionType.APPROVAL:
             continue
         if not conn.auto_trigger:
             continue
@@ -47,17 +47,17 @@ async def _run_escalation_pass() -> int:
                     task_id=task.id,
                     from_otdel=conn.from_otdel,
                     to_otdel=conn.to_otdel,
-                    reason=f"Auto-escalation: task in '{trigger_status}' for >{timeout_s}s",
-                    report=f"Automatically escalated via connection {conn.id}",
+                    reason=f"Auto-approval: task in '{trigger_status}' for >{timeout_s}s",
+                    report=f"Automatically approved via connection {conn.id}",
                 )
                 if record:
                     escalated += 1
                     logger.info(
-                        "[auto-escalation] %s: %s → %s via %s",
+                        "[auto-approval] %s: %s → %s via %s",
                         task.id, conn.from_otdel, conn.to_otdel, conn.id,
                     )
             except Exception as e:
-                logger.warning("[auto-escalation] failed for %s: %s", task.id, e)
+                logger.warning("[auto-approval] failed for %s: %s", task.id, e)
 
     return escalated
 
@@ -101,32 +101,32 @@ def _find_triggerable_tasks(otdel_slug: str, status: str, timeout_s: int) -> lis
         return []
 
 
-async def _auto_escalation_loop(interval_s: float) -> None:
-    """Background task: run escalation check every interval_s seconds."""
+async def _auto_approval_loop(interval_s: float) -> None:
+    """Background task: run approval check every interval_s seconds."""
     try:
         # First check 60s after startup
         await asyncio.sleep(60)
         while True:
             try:
-                n = await _run_escalation_pass()
+                n = await _run_approval_pass()
                 if n > 0:
-                    logger.info("[auto-escalation] this pass: %d task(s) escalated", n)
+                    logger.info("[auto-approval] this pass: %d task(s) approved", n)
             except Exception as e:
-                logger.warning("[auto-escalation] pass failed: %s", e)
+                logger.warning("[auto-approval] pass failed: %s", e)
             await asyncio.sleep(interval_s)
     except asyncio.CancelledError:
         return
 
 
-def schedule_auto_escalation(interval_s: float | None = None) -> "asyncio.Task | None":
-    """Start the background auto-escalation worker."""
+def schedule_auto_approval(interval_s: float | None = None) -> "asyncio.Task | None":
+    """Start the background auto-approval worker."""
     if interval_s is None:
         try:
-            interval_s = float(os.environ.get("AUTO_ESCALATION_INTERVAL_S", "300"))  # 5 min
+            interval_s = float(os.environ.get("AUTO_APPROVAL_INTERVAL_S", "300"))  # 5 min
         except ValueError:
             interval_s = 300.0
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
         return None
-    return loop.create_task(_auto_escalation_loop(interval_s))
+    return loop.create_task(_auto_approval_loop(interval_s))

@@ -188,14 +188,8 @@ def update_external_agent(slug: str, updates: dict[str, Any]) -> dict[str, Any] 
 
     # Broadcast agent list change if name/role/department changed (sidebar refresh)
     if any(k in updates for k in ("name", "role", "department")):
-        try:
-            import asyncio
-            from ..chat.ws_manager import ws_manager
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.create_task(ws_manager.broadcast({"type": "agent:list_changed"}))
-        except Exception:
-            pass
+        from ..ws_broadcast import broadcast
+        broadcast({"type": "agent:list_changed"})
 
     # Sync is_primary with settings.yaml and broadcast
     if "is_primary" in updates:
@@ -208,17 +202,8 @@ def update_external_agent(slug: str, updates: dict[str, Any]) -> dict[str, Any] 
         manager._save_yaml(settings_path, settings_data)
 
         # Broadcast change via WebSocket
-        try:
-            import asyncio
-            from ..chat.ws_manager import ws_manager
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.create_task(ws_manager.broadcast({
-                    "type": "agent:primary_changed",
-                    "slug": slug if updates["is_primary"] else "",
-                }))
-        except Exception:
-            pass
+        from ..ws_broadcast import broadcast
+        broadcast({"type": "agent:list_changed"})
 
     return load_external_agent(slug)
 

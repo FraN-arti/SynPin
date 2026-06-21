@@ -142,39 +142,10 @@ def _yaml_path(name: str) -> Path:
 
 # ── Broadcast helper ─────────────────────────────────────────────────────────
 
-_config_broadcast = None  # Set by server.py on startup
-_ws_loop = None  # Event loop for thread-safe broadcast
-
-
-def set_config_broadcast(fn) -> None:
-    """Set the broadcast function for config changes."""
-    global _config_broadcast
-    _config_broadcast = fn
-
-
-def set_config_ws_loop(loop) -> None:
-    """Set the event loop for thread-safe config broadcasts."""
-    global _ws_loop
-    _ws_loop = loop
-
-
 def _broadcast_config(event_type: str, data: dict) -> None:
-    """Broadcast config change to all connected clients (thread-safe)."""
-    if _ws_loop is None:
-        import logging
-        logging.getLogger(__name__).warning("Config broadcast: no event loop set")
-        return
-    try:
-        import asyncio
-        from ..chat.ws_manager import ws_manager
-
-        async def _do_broadcast():
-            await ws_manager.broadcast({"type": event_type, **data})
-
-        asyncio.run_coroutine_threadsafe(_do_broadcast(), _ws_loop)
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("Config broadcast failed: %s", e)
+    """Broadcast config change to all connected clients."""
+    from ..ws_broadcast import broadcast
+    broadcast({"type": event_type, **data})
 
 
 # ── File I/O ─────────────────────────────────────────────────────────────────

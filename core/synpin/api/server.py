@@ -156,33 +156,17 @@ app.include_router(version_router)
 from .widgets_router import router as widgets_router
 app.include_router(widgets_router)
 
-# Set up Kanban WS broadcast loop
+# Set up thread-safe WS broadcast (used by all modules)
 import asyncio
-from ..kanban.service import set_ws_loop
-from ..kanban.config import set_config_ws_loop
-from ..connections.service import set_ws_loop as set_connections_ws_loop
-# Hooks that wire up async-loop-dependent state. We attempt to do
-# this eagerly at import time (fast happy path) and fall back to
-# on_event('startup') if no loop is running yet. Both branches
-# must remain valid: some test harnesses import this module under
-# plain python -m unittest without uvicorn, others run it under
-# the production server. We register the startup hook ALWAYS, not
-# just inside except — that way the background update-checker (in
-# particular) fires whether or not a loop was available at import.
+from .. import ws_broadcast
+
 try:
     loop = asyncio.get_running_loop()
-    set_ws_loop(loop)
-    set_connections_ws_loop(loop)
-    set_config_ws_loop(loop)
+    ws_broadcast.init(loop)
 except RuntimeError:
-    # No loop at import time — register a startup hook to set one up
-    # when uvicorn starts the app.
     @app.on_event("startup")
-    def _setup_kanban_ws():
-        loop = asyncio.get_event_loop()
-        set_ws_loop(loop)
-        set_connections_ws_loop(loop)
-        set_config_ws_loop(loop)
+    def _setup_ws_broadcast():
+        ws_broadcast.init(asyncio.get_event_loop())
 
 
 # ---------------------------------------------------------------------------

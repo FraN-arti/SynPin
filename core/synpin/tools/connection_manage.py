@@ -116,14 +116,8 @@ async def connection_create(params: dict[str, Any]) -> ToolResult:
         to_name = names.get(to_otdel, to_otdel)
 
         # Broadcast
-        try:
-            from ..chat.ws_manager import ws_manager
-            import asyncio
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.create_task(ws_manager.broadcast({"type": "connections:created"}))
-        except Exception:
-            pass
+        from ..ws_broadcast import broadcast
+        broadcast({"type": "connections:created"})
 
         return make_success({
             "connection_id": new_conn.id,
@@ -170,14 +164,8 @@ async def connection_delete(params: dict[str, Any]) -> ToolResult:
         save_connections(remaining)
 
         # Broadcast
-        try:
-            from ..chat.ws_manager import ws_manager
-            import asyncio
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.create_task(ws_manager.broadcast({"type": "connections:deleted"}))
-        except Exception:
-            pass
+        from ..ws_broadcast import broadcast
+        broadcast({"type": "connections:deleted"})
 
         return make_success({
             "deleted": True,

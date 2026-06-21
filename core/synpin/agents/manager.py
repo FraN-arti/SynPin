@@ -555,17 +555,11 @@ def save_agent(slug: str, updates: dict[str, Any]) -> dict[str, Any]:
                 _save_yaml(settings_path, settings_data)
                 
                 # Broadcast change via WebSocket
-                try:
-                    import asyncio
-                    from ..chat.ws_manager import ws_manager
-                    loop = asyncio.get_event_loop()
-                    if loop.is_running():
-                        loop.create_task(ws_manager.broadcast({
-                            "type": "agent:primary_changed",
-                            "slug": slug if operational["is_primary"] else "",
-                        }))
-                except Exception:
-                    pass
+                from ..ws_broadcast import broadcast
+                broadcast({
+                    "type": "agent:primary_changed",
+                    "slug": slug if operational["is_primary"] else "",
+                })
 
     # Update agent.yaml
     if personalization:
@@ -860,16 +854,8 @@ def get_otdel(otdel_id: str) -> dict[str, Any] | None:
 
 def _broadcast_otdel_change() -> None:
     """Broadcast otdel list change via WebSocket."""
-    try:
-        import asyncio
-        from ..chat.ws_manager import ws_manager
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            loop.create_task(ws_manager.broadcast({
-                "type": "otdels:list_changed",
-            }))
-    except Exception:
-        pass
+    from ..ws_broadcast import broadcast
+    broadcast({"type": "otdels:list_changed"})
 
 
 def create_otdel(name: str, description: str = "", color: str = "#f97316",

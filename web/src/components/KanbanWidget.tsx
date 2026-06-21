@@ -181,8 +181,13 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
   // WebSocket live updates for config changes + task mutations
   useEffect(() => {
     if (!wsOn) return
-    const unsub1 = wsOn('kanban:widget_updated', () => {
-      loadConfig()
+    const unsub1 = wsOn('kanban:widget_updated', (msg: any) => {
+      // Use data from WS event directly — no extra fetch needed
+      if (msg.widget) {
+        setConfig(msg.widget)
+      } else {
+        loadConfig()
+      }
     })
     const unsub2 = wsOn('kanban:columns_updated', () => {
       loadColumns()

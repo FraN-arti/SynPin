@@ -7,6 +7,7 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { API_BASE } from '../config'
+import { LoadingSpinner } from './LoadingSpinner'
 import { MouseTooltip } from './MouseTooltip'
 
 interface ProjectGoal {
@@ -460,10 +461,7 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
   if (loading) {
     return (
       <div className="projects-page">
-        <div className="projects-loading">
-          <span className="tool-spinner" />
-          <span>Загрузка проектов...</span>
-        </div>
+        <LoadingSpinner text="Загрузка проектов..." />
       </div>
     )
   }

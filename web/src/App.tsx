@@ -351,7 +351,7 @@ function App() {
     return off
   }, [wsOn, refreshDepartments])
 
-  const messagesContainerRef
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const attachRef = useRef<{ openPicker: () => void }>(null)
   const activeAgentRef = useRef<AgentConfig | null>(null)

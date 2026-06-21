@@ -182,17 +182,55 @@ function App() {
     })
   }, [])
 
-  // Auto-clear stuck state when WS reconnects after server restart
+  // Handle WS connection state changes:
+  // - Disconnect: clear typing + remove empty placeholders (no polling fallback)
+  // - Reconnect: refetch history to recover messages from interrupted stream
   const wasConnectedRef = useRef(false)
   useEffect(() => {
-    if (wsConnected && !wasConnectedRef.current) {
-      // WS just reconnected — if we were typing, the old request is lost
-      if (isTyping) {
+    if (wasConnectedRef.current && !wsConnected) {
+      // WS just disconnected — clear typing and remove stuck placeholders
+      clearStuckState()
+    } else if (wsConnected && !wasConnectedRef.current) {
+      // WS just reconnected — refetch history to recover any messages saved during disconnect
+      const hasEmptyPlaceholder = (messages ?? []).some(m => m.role === 'assistant' && !m.content)
+      if (hasEmptyPlaceholder && activeAgent && view.type === 'chat') {
         clearStuckState()
+        fetch(`${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web&limit=20`)
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (!data?.messages) return
+            const msgs = data.messages
+            if (msgs.length === 0) return
+            const restored = msgs.map((m: { role: string; content: string; model?: string; agent_name?: string; prompt_tokens?: number; completion_tokens?: number; tools?: any[] }, i: number) => ({
+              id: `recovered-${Date.now()}-${i}`,
+              role: m.role as 'user' | 'assistant',
+              content: m.content,
+              timestamp: new Date(),
+              model: m.model,
+              agent_name: m.agent_name,
+              prompt_tokens: m.prompt_tokens,
+              completion_tokens: m.completion_tokens,
+              tools: m.tools,
+            }))
+            // If last message is user (backend still thinking), add placeholder and wait for WS
+            const lastMsg = msgs[msgs.length - 1]
+            if (lastMsg?.role === 'user') {
+              restored.push({
+                id: `placeholder-${Date.now()}`,
+                role: 'assistant',
+                content: '',
+                timestamp: new Date(),
+                tools: [],
+              })
+              setIsTyping(true)
+            }
+            setMessages(restored)
+          })
+          .catch(() => { /* silent — WS will handle updates */ })
       }
     }
     wasConnectedRef.current = wsConnected
-  }, [wsConnected, isTyping, clearStuckState])
+  }, [wsConnected, messages, clearStuckState, activeAgent, view])
 
   // Server version — single source of truth is the backend.
   // Strategy: fetch /api/version on mount (works even if WS isn't
@@ -428,13 +466,12 @@ function App() {
 
     // Reset messages to null to show loading skeleton
     setMessages(null)
+    let cancelled = false
 
     const loadHistory = async () => {
       try {
         const res = await fetch(`${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web&limit=20`)
         if (!res.ok) {
-          // Backend failure (5xx, 4xx other than empty) — unblock UI
-          // so the user doesn't see a permanent skeleton.
           setMessages([])
           return
         }
@@ -471,79 +508,51 @@ function App() {
               timestamp: new Date(),
               tools: [],
             })
-            setIsTyping(true) // Show spinner while polling
+            setIsTyping(true)
+
+            // Safety refetch: catch responses that arrived between history load and WS connect
+            // One-shot, 5s delay, no polling loop
+            setTimeout(async () => {
+              if (cancelled) return
+              try {
+                const retryRes = await fetch(`${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web&limit=20`)
+                if (!retryRes.ok) return
+                const retryData = await retryRes.json()
+                const retryMsgs = retryData.messages || []
+                const lastRetryMsg = retryMsgs[retryMsgs.length - 1]
+                if (lastRetryMsg?.role === 'assistant') {
+                  // Response arrived — fill the placeholder
+                  setMessages(prev => {
+                    const list = prev ?? []
+                    const placeholderId = list.map(m => m.id).reverse().find(id => {
+                      const msg = list.find(m => m.id === id)
+                      return msg?.role === 'assistant' && !msg.content
+                    })
+                    if (placeholderId) {
+                      setIsTyping(false)
+                      return list.map(m => m.id === placeholderId
+                        ? { ...m, content: lastRetryMsg.content, model: lastRetryMsg.model, agent_name: lastRetryMsg.agent_name, prompt_tokens: lastRetryMsg.prompt_tokens, completion_tokens: lastRetryMsg.completion_tokens, tools: lastRetryMsg.tools }
+                        : m
+                      )
+                    }
+                    return list
+                  })
+                }
+              } catch { /* silent */ }
+            }, 5000)
           }
 
           setMessages(restored)
-          // Scroll is handled by the [messages, view, activeAgent] effect
-          // below — no need to scroll here, that effect fires on setMessages.
         } else {
           setMessages([])
         }
       } catch (e) {
-        // Network error / fetch threw — unblock UI. Without this the
-        // skeleton would be permanent and the user would assume the
-        // app is broken.
         console.error('[history] load error:', e)
         setMessages([])
       }
     }
     loadHistory()
-  }, [activeAgent, view])
-
-  // ─── Polling: check for background task completion ──────────────────
-  // Smart polling: only active when WS is disconnected or when waiting for response
-  // When WS is connected, polling interval is longer (30s) since WS handles real-time updates
-  useEffect(() => {
-    if (!activeAgent || view.type !== 'chat') return  // skip if not in chat view
-
-    const pollInterval = setInterval(async () => {
-      // Check for empty assistant placeholder using ref (always current)
-      const hasEmptyPlaceholder = (messagesRef.current ?? []).some(m => m.role === 'assistant' && !m.content)
-      if (!hasEmptyPlaceholder) return
-
-      // Smart interval: poll less frequently when WS is connected (it handles real-time)
-      // The interval itself doesn't change, but we can skip poll if WS is healthy
-      if (wsConnected) {
-        // WS is connected — trust it for real-time updates, only poll as safety net
-        // Skip this poll cycle if we recently received a WS message (check via ref)
-        const lastWsMessage = (window as any).__lastWsMessageTime || 0
-        if (Date.now() - lastWsMessage < 15000) return  // Last WS message < 15s ago — skip poll
-      }
-
-      try {
-        const res = await fetch(`${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web`)
-        if (!res.ok) return
-        const data = await res.json()
-        const serverMsgs = data.messages || []
-
-        // ONLY fill placeholder when server's LAST message is an assistant response
-        // This means the LLM has completed and we can safely display the answer
-        const lastServerMsg = serverMsgs[serverMsgs.length - 1]
-        if (!lastServerMsg || lastServerMsg.role !== 'assistant') return
-
-        // Find the placeholder (empty assistant) and fill it
-        setMessages(prev => {
-          const list = prev ?? []
-          const placeholderId = list.map(m => m.id).reverse().find(id => {
-            const msg = list.find(m => m.id === id)
-            return msg?.role === 'assistant' && !msg.content
-          })
-          if (placeholderId) {
-            setIsTyping(false)
-            return list.map(m => m.id === placeholderId
-              ? { ...m, content: lastServerMsg.content, model: lastServerMsg.model, agent_name: lastServerMsg.agent_name, prompt_tokens: lastServerMsg.prompt_tokens, completion_tokens: lastServerMsg.completion_tokens, tools: lastServerMsg.tools }
-              : m
-            )
-          }
-          return list
-        })
-      } catch (e) {
-        // Polling failed — silent
-      }
-    }, 30000) // Poll every 30 seconds (fallback for WebSocket misses — WS is primary)
-
-    return () => clearInterval(pollInterval)
+    return () => { cancelled = true }
   }, [activeAgent, view])
 
   // Auto-scroll handled by useChatScroll hook (sentinel pattern)
@@ -727,7 +736,6 @@ function App() {
     const onChunk = wsOn('chat:chunk', (msg) => {
       if (msg.agent_slug !== activeAgent?.slug) return
       fullContent += msg.content
-      ;(window as any).__lastWsMessageTime = Date.now()  // Track WS activity for smart polling
       setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, content: fullContent } : m))
     })
 
@@ -1079,25 +1087,27 @@ function App() {
                       </span>
                       <span className="agent-list-role">{agent.role_name || agent.type}</span>
                     </div>
-                    <span
-                      className={`star-toggle ${primarySlug === agent.slug ? 'active' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        const newPrimary = primarySlug === agent.slug ? '' : agent.slug
-                        fetch(`${API_BASE}/api/config/primary-agent`, {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ slug: newPrimary }),
-                        }).then(() => {
-                          setPrimarySlug(newPrimary)
-                          // Sync is_primary in agents list
-                          setAvailableAgents(prev => prev.map(a => ({
-                            ...a,
-                            is_primary: a.slug === newPrimary,
-                          })))
-                        })
-                      }}
-                    >★</span>
+                    {!agent.is_external && (
+                      <span
+                        className={`star-toggle ${primarySlug === agent.slug ? 'active' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const newPrimary = primarySlug === agent.slug ? '' : agent.slug
+                          fetch(`${API_BASE}/api/config/primary-agent`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ slug: newPrimary }),
+                          }).then(() => {
+                            setPrimarySlug(newPrimary)
+                            // Sync is_primary in agents list
+                            setAvailableAgents(prev => prev.map(a => ({
+                              ...a,
+                              is_primary: a.slug === newPrimary,
+                            })))
+                          })
+                        }}
+                      >★</span>
+                    )}
                   </button>
                 ))}
                 {filteredAgents.length === 0 && agentSearch.trim() && (

@@ -38,8 +38,11 @@ def resolve_model(provider_name: str | None, model: str | None) -> tuple[str | N
     Returns:
         (provider_name, model_name) — resolved tuple
     """
-    # Extract provider from model string if present (e.g. "9router/hermes-agent")
-    if model and "/" in model:
+    # Extract provider from model string ONLY when provider is not already known.
+    # E.g. model="9router/hermes-agent" → provider="9router", model="hermes-agent".
+    # But when provider is already set (e.g. from agent config), don't re-split —
+    # model names themselves may contain "/" (e.g. "qd/gm51model").
+    if not provider_name and model and "/" in model:
         provider_name, model = model.split("/", 1)
 
     # If model is empty or "default", use provider's first model
@@ -1244,7 +1247,8 @@ async def execute_tool(tool_name: str, params: dict, agent_slug: str | None = No
             if agent:
                 agent_model = agent.get("model", "")
                 agent_provider = agent.get("provider", "")
-                if agent_model and "/" in agent_model:
+                # Split only when provider is not already known (model names may contain "/")
+                if not agent_provider and agent_model and "/" in agent_model:
                     agent_provider, agent_model = agent_model.split("/", 1)
                 params = {**params, "_agent_provider": agent_provider, "_agent_model": agent_model}
 

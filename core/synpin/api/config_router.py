@@ -209,18 +209,18 @@ async def set_primary_agent(req: PrimaryAgentUpdate):
         full["primary_agent_slug"] = req.slug
         _save_yaml(path, full)
         
-        # Sync is_primary in agents.yaml
+        # Sync is_primary in agents.yaml (only internal agents can be primary)
         agents_path = CONFIG_DIR / "agents.yaml"
         agents_data = _load_yaml(agents_path)
         for slug, cfg in agents_data.get("agents", {}).items():
             cfg["is_primary"] = (slug == req.slug)
         _save_yaml(agents_path, agents_data)
         
-        # Sync is_primary in external_agents.yaml
+        # Clear is_primary in external_agents.yaml (external agents cannot be primary)
         ext_path = CONFIG_DIR / "external_agents.yaml"
         ext_data = _load_yaml(ext_path)
         for slug, cfg in ext_data.get("agents", {}).items():
-            cfg["is_primary"] = (slug == req.slug)
+            cfg["is_primary"] = False
         _save_yaml(ext_path, ext_data)
         
         # Broadcast via WebSocket

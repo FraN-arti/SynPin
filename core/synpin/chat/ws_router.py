@@ -236,6 +236,7 @@ async def _handle_chat_send(user_id: str, msg: dict):
     # Stream response via WS
     full_response = ""
     tool_calls = []  # Track tool calls for history
+    usage = None  # Token usage from done message
     try:
         from .router import stream_response
         async for chunk in stream_response(
@@ -288,6 +289,9 @@ async def _handle_chat_send(user_id: str, msg: dict):
                     ws_msg.update({k: v for k, v in payload.items() if k != "type"})
                     await ws_manager.send(user_id, ws_msg)
                 elif msg_type in ("done", "error"):
+                    # Extract usage for history
+                    if msg_type == "done" and "usage" in payload:
+                        usage = payload["usage"]
                     # Forward
                     ws_type = f"chat:{msg_type}"
                     ws_msg = {"type": ws_type, "agent_slug": agent_slug}

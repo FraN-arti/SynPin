@@ -1132,10 +1132,12 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
 BUILTINS = {"memory_read", "memory_write", "image_analyze", "summarize"}
 
 # Head-only tools — not available to regular workers
-HEAD_TOOLS = {"head_delegate", "head_evaluate", "head_retry", "head_decide", "head_block", "kanban_task"}
+HEAD_TOOLS = {"head_delegate", "head_evaluate", "head_retry", "head_decide", "head_block", "kanban_task",
+              "head_approve", "head_reline", "head_approval_status"}
 
 # Primary-only tools — only available to the main agent (is_primary=true)
-PRIMARY_TOOLS = {"otdel_manage", "project_manage"}
+PRIMARY_TOOLS = {"otdel_manage", "project_manage",
+                 "connection_list", "connection_create", "connection_delete", "connection_history"}
 
 
 def get_all_tool_names(include_head: bool = False, include_primary: bool = False) -> list[str]:

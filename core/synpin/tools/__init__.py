@@ -41,6 +41,7 @@ from .head_decide import head_decide
 from .head_block import head_block
 from .head_approve import head_approve, head_approval_status
 from .head_reline import head_reline
+from .connection_manage import connection_list, connection_create, connection_delete, connection_history
 from .kanban_task import kanban_task
 from .image_analyze import image_analyze
 from .summarize import summarize
@@ -77,6 +78,10 @@ def get_tool_registry() -> dict[str, ToolHandler]:
             "head_approve": head_approve,
             "head_approval_status": head_approval_status,
             "head_reline": head_reline,
+            "connection_list": connection_list,
+            "connection_create": connection_create,
+            "connection_delete": connection_delete,
+            "connection_history": connection_history,
             "kanban_task": kanban_task,
             "image_analyze": image_analyze,
             "summarize": summarize,
@@ -111,6 +116,10 @@ __all__ = [
     "head_approve",
     "head_approval_status",
     "head_reline",
+    "connection_list",
+    "connection_create",
+    "connection_delete",
+    "connection_history",
     "kanban_task",
     "image_analyze",
     "summarize",

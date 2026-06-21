@@ -173,6 +173,11 @@ try:
     loop = asyncio.get_running_loop()
     set_ws_loop(loop)
     set_connections_ws_loop(loop)
+    # Wire up config broadcast
+    async def _broadcast(event: dict):
+        from ..chat.ws_manager import ws_manager
+        await ws_manager.broadcast(event)
+    set_config_broadcast(lambda e: asyncio.ensure_future(_broadcast(event=e)))
 except RuntimeError:
     # No loop at import time — register a startup hook to set one up
     # when uvicorn starts the app.

@@ -156,8 +156,12 @@ def _broadcast_config(event_type: str, data: dict) -> None:
     if _config_broadcast:
         try:
             _config_broadcast({"type": event_type, **data})
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("Config broadcast failed: %s", e)
+    else:
+        import logging
+        logging.getLogger(__name__).warning("Config broadcast not set! event=%s", event_type)
 
 
 # ── File I/O ─────────────────────────────────────────────────────────────────

@@ -493,6 +493,14 @@
   background: var(--white);
 }
 
+.settings-toggle-desc {
+  display: block;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin: -2px 0 6px 46px;
+  line-height: 1.4;
+}
+
 /* Buttons */
 .settings-btn-primary {
   padding: 8px 16px;

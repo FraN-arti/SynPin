@@ -5,11 +5,13 @@
 
 export function Toggle({
   label,
+  description,
   defaultChecked,
   checked,
   onChange,
 }: {
   label: string
+  description?: string
   defaultChecked?: boolean
   checked?: boolean
   onChange?: (v: boolean) => void
@@ -25,6 +27,9 @@ export function Toggle({
         />
         <span>{label}</span>
       </label>
+      {description && (
+        <span className="settings-toggle-desc">{description}</span>
+      )}
     </div>
   )
 }

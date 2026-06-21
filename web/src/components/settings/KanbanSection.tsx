@@ -949,16 +949,19 @@ function KanbanWidgetConfig() {
       <div className="settings-section-label">Информация</div>
       <Toggle
         label="Дедлайн"
+        description="Показывать срок выполнения на карточке задачи"
         checked={config.show_deadline}
         onChange={v => updateConfig({ show_deadline: v })}
       />
       <Toggle
         label="Отдел"
+        description="Показывать название отдела-владельца задачи"
         checked={config.show_department}
         onChange={v => updateConfig({ show_department: v })}
       />
       <Toggle
         label="Компактный режим"
+        description="Уменьшенные карточки для экономии места на доске"
         checked={config.compact}
         onChange={v => updateConfig({ compact: v })}
       />

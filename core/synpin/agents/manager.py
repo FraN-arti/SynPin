@@ -327,6 +327,14 @@ def delete_agent(slug: str) -> bool:
     if agent_dir.exists():
         shutil.rmtree(agent_dir)
 
+    # Remove chat history (data/agents/<slug>/sessions/)
+    from ..paths import get_data_dir
+    data_dir = get_data_dir()
+    if data_dir:
+        history_dir = data_dir / "agents" / slug
+        if history_dir.exists():
+            shutil.rmtree(history_dir)
+
     # Clean up agent from all departments and otdels
     _remove_agent_from_groups(slug)
 
@@ -909,6 +917,14 @@ def delete_otdel(otdel_id: str) -> bool:
     otdel_dir = otdels_dir / otdel_id
     if otdel_dir.exists():
         shutil.rmtree(str(otdel_dir))
+
+    # Remove otdel chat history (data/otdels/<id>/chat.json)
+    from ..paths import get_data_dir
+    data_dir = get_data_dir()
+    if data_dir:
+        otdel_data_dir = data_dir / "otdels" / otdel_id
+        if otdel_data_dir.exists():
+            shutil.rmtree(str(otdel_data_dir))
 
     return True
 

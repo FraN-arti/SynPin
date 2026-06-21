@@ -46,7 +46,7 @@ async def head_block(params: dict[str, Any]) -> ToolResult:
     # Store blocker
     if otdel_id not in _blockers:
         _blockers[otdel_id] = []
-    
+
     blocker = {
         "id": blocker_id,
         "reason": reason,
@@ -55,6 +55,26 @@ async def head_block(params: dict[str, Any]) -> ToolResult:
         "status": "open",  # open | resolved | escalated
     }
     _blockers[otdel_id].append(blocker)
+
+    # Record in task history if task_id provided
+    task_id = params.get("task_id", "")
+    if task_id:
+        try:
+            from ..kanban.service import KanbanService
+            from ..kanban.models import TaskStatus, ActionType
+            svc = KanbanService()
+            task = svc.get_task(task_id)
+            if task:
+                task.add_history(
+                    actor=otdel_id,
+                    action=ActionType.COMMENT,
+                    detail=f"BLOCK [{severity}]: {reason}",
+                )
+                if severity in ("high", "critical"):
+                    task.move_to(TaskStatus.BLOCKED, actor="head_block")
+                svc.save_task(task)
+        except Exception:
+            pass
     
     # Severity-based guidance
     severity_guidance = {

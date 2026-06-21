@@ -141,7 +141,7 @@ def escalate_task(
     )
 
     # Update kanban task
-    _move_task_to_otdel(task_id, target)
+    _move_task_to_otdel(task_id, target, reason=reason)
 
     # Broadcast
     # Resolve otdel names for toast display
@@ -209,17 +209,25 @@ def _find_approval_connection(from_otdel: str, to_otdel: str | None = None) -> C
     return None
 
 
-def _move_task_to_otdel(task_id: str, target_otdel: str) -> None:
+def _move_task_to_otdel(task_id: str, target_otdel: str, reason: str = "") -> None:
     """Move a kanban task to a target department."""
     try:
         from ..kanban.service import KanbanService
-        from ..kanban.models import TaskStatus
+        from ..kanban.models import TaskStatus, ActionType
 
         svc = KanbanService()
         task = svc.get_task(task_id)
         if not task:
             logger.warning("Task %s not found for approval", task_id)
             return
+
+        # Record transfer in task history (roadmap)
+        task.add_history(
+            actor="approval",
+            action=ActionType.SUMMONED,
+            detail=reason or f"Передан в отдел {target_otdel}",
+            target_department=target_otdel,
+        )
 
         # Update department
         task.current_department = target_otdel

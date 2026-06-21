@@ -287,8 +287,9 @@ def _build_otdel_system_prompt(otdel: dict, agent: dict, is_head: bool) -> str:
 Ты — контролёр. Получил задачу на утверждение:
 1. Проверь качество выполнения
 2. Если всё ок — закрой задачу (kanban_task complete)
-3. Если есть проблемы — верни на доработку (kanban_task rework) или делегируй обратно
-4. НЕ закрывай автоматически — только после проверки""")
+3. Если есть проблемы — РЕЛАЙН: head_reline(task_id, remarks="что исправить", severity="medium")
+4. Релайн = обратная передача с замечаниями. Задача уйдёт обратно с твоими требованиями
+5. НЕ закрывай автоматически — только после проверки""")
 
                 # Block 2: Approval OUT — tasks you send for review
                 if approval_out:
@@ -316,7 +317,8 @@ def _build_otdel_system_prompt(otdel: dict, agent: dict, is_head: bool) -> str:
 Другой отдел передаёт тебе задачи — выполни:
 1. Прими задачу к работе
 2. Выполни в своём отделе
-3. Отчитайся о результате""")
+3. Если задача не ясна или требует уточнений — РЕЛАЙН: head_reline(task_id, remarks="что уточнить")
+4. Отчитайся о результате""")
 
                 # Block 4: Delegation OUT — tasks you delegate to others
                 if delegation_out:

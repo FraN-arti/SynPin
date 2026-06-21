@@ -227,7 +227,7 @@ async def _handle_chat_send(user_id: str, msg: dict):
     temperature = agent_data.get("temperature", 0.7) if agent_data else 0.7
     max_tokens = agent_data.get("max_tokens", 4096) if agent_data else 4096
     is_primary = agent_data.get("is_primary", False) if agent_data else False
-    tool_names = get_all_tool_names(include_primary=is_primary)
+    tool_names = get_all_tool_names(include_head=is_primary, include_primary=is_primary)
 
     # Resolve model with fallback to provider's default
     from .router import resolve_model

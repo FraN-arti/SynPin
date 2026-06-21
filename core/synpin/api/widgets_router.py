@@ -49,15 +49,23 @@ def _save_layout(data: dict[str, Any]) -> None:
 def _broadcast_layout_change() -> None:
     try:
         import asyncio
+        from ..kanban.config import _ws_loop
         from ..chat.ws_manager import ws_manager
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            loop.create_task(ws_manager.broadcast({
+
+        async def _do_broadcast():
+            await ws_manager.broadcast({
                 "type": "widgets:layout_changed",
                 "layout": _load_layout(),
-            }))
-    except Exception:
-        pass
+            })
+
+        if _ws_loop is not None:
+            asyncio.run_coroutine_threadsafe(_do_broadcast(), _ws_loop)
+        else:
+            import logging
+            logging.getLogger(__name__).warning("Widget layout broadcast: no event loop")
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Widget layout broadcast failed: %s", e)
 
 
 @router.get("/layout")

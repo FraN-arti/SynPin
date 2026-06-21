@@ -72,8 +72,13 @@ export function WidgetsSection({ wsOn }: { wsOn?: (type: string, handler: (data:
 
   // WS sync — single source of truth for layout updates
   useEffect(() => {
-    if (!wsOn) return
+    if (!wsOn) {
+      console.log('[widgets-section] no wsOn provided')
+      return
+    }
+    console.log('[widgets-section] subscribing to widgets:layout_changed')
     const off = wsOn('widgets:layout_changed', (msg: any) => {
+      console.log('[widgets-section] WS received layout_changed', msg.layout)
       if (msg.layout) {
         setLayout(msg.layout)
       }

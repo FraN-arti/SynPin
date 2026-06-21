@@ -160,8 +160,6 @@ function App() {
   // Otdels for sidebar — loaded from /api/otdels
   const [sidebarDepartments, setSidebarDepartments] = useState<Department[]>([])
 
-  // Widget layout (left/right zones on main page)
-  const { layout, removeWidget, handleDragEnd } = useWidgetLayout(wsOn)
   // Chat auto-scroll — unified sentinel pattern
   const { sentinelRef: chatEndRef } = useChatScroll(messages)
 
@@ -173,6 +171,9 @@ function App() {
 
   // WebSocket — single connection for all real-time messaging
   const { send: wsSend, on: wsOn, connected: wsConnected } = useWebSocket()
+
+  // Widget layout (left/right zones on main page) — needs wsOn
+  const { layout, removeWidget, handleDragEnd } = useWidgetLayout(wsOn)
 
   // Global tooltip — intercepts all title attributes, shows mouse-following tooltip
   const globalTooltip = useGlobalTooltip()

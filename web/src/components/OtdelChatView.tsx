@@ -125,7 +125,11 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
       const res = await fetch(`${API_BASE}/api/otdels/${otdel.otdelid}/chat/history?limit=20`)
       if (res.ok) {
         const data = await res.json()
-        const msgs = data.messages || []
+        // Ensure messages is an array and content is always string
+        const msgs = (Array.isArray(data.messages) ? data.messages : []).map((m: any) => ({
+          ...m,
+          content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content ?? ''),
+        }))
         setMessages(msgs)
         // Rebuild worker statuses from chat history (survives F5 refresh)
         const respondedSlugs = new Set<string>()
@@ -161,7 +165,8 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
   useEffect(() => {
     const unsubMessage = wsOn('otdel:message', (msg) => {
       if (msg.otdel_id !== otdel.otdelid) return
-      const chatMsg = msg.message as ChatMessage
+      const raw = msg.message as any
+      const chatMsg = { ...raw, content: typeof raw.content === 'string' ? raw.content : JSON.stringify(raw.content ?? '') } as ChatMessage
       setMessages(prev => {
         if (prev.some(m => m.id === chatMsg.id)) return prev
         return [...prev, chatMsg]

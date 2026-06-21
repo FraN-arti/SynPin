@@ -28,33 +28,70 @@ export class ErrorBoundary extends React.Component<Props, State> {
     if (this.state.hasError) {
       return this.props.fallback || (
         <div style={{
-          padding: '20px',
-          margin: '10px',
-          borderRadius: '8px',
-          background: 'rgba(239, 68, 68, 0.1)',
-          border: '1px solid rgba(239, 68, 68, 0.3)',
-          color: '#ef4444',
-          fontFamily: 'monospace',
-          fontSize: '13px',
+          position: 'fixed',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--bg, #0a0a14)',
+          zIndex: 99999,
         }}>
-          <strong>⚠️ Component Error</strong>
-          <p style={{ margin: '8px 0 0', opacity: 0.8 }}>
-            {this.state.error?.message || 'Unknown error'}
-          </p>
-          <button
-            onClick={() => this.setState({ hasError: false, error: null })}
-            style={{
-              marginTop: '10px',
-              padding: '4px 12px',
-              background: 'rgba(239, 68, 68, 0.2)',
-              border: '1px solid rgba(239, 68, 68, 0.4)',
-              borderRadius: '4px',
+          <div style={{
+            maxWidth: 480,
+            width: '90%',
+            padding: '32px 28px',
+            borderRadius: 'var(--radius, 12px)',
+            background: 'var(--glass-bg, rgba(20, 20, 35, 0.9))',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            boxShadow: '0 16px 48px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.06)',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            textAlign: 'center',
+          }}>
+            <div style={{
+              fontSize: 40,
+              marginBottom: 16,
+            }}>⚠️</div>
+            <h2 style={{
+              margin: '0 0 12px',
+              fontSize: 18,
+              fontWeight: 600,
               color: '#ef4444',
-              cursor: 'pointer',
-            }}
-          >
-            Retry
-          </button>
+              letterSpacing: '-0.01em',
+            }}>Component Error</h2>
+            <p style={{
+              margin: '0 0 20px',
+              fontSize: 13,
+              lineHeight: 1.6,
+              color: 'var(--text-secondary, #9ca3af)',
+              wordBreak: 'break-word',
+            }}>
+              {this.state.error?.message || 'Unknown error'}
+            </p>
+            <button
+              onClick={() => this.setState({ hasError: false, error: null })}
+              style={{
+                padding: '10px 24px',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: 'var(--radius, 8px)',
+                color: '#ef4444',
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={e => {
+                (e.target as HTMLElement).style.background = 'rgba(239, 68, 68, 0.25)'
+              }}
+              onMouseLeave={e => {
+                (e.target as HTMLElement).style.background = 'rgba(239, 68, 68, 0.15)'
+              }}
+            >
+              Попробовать снова
+            </button>
+          </div>
         </div>
       )
     }

@@ -224,46 +224,138 @@ def _build_otdel_system_prompt(otdel: dict, agent: dict, is_head: bool) -> str:
 {separator}"""
     parts.append(otdel_block)
 
-    # Connections context — which departments this otdel interacts with
+    # Connections context — modular prompts per connection type
     otdel_id = otdel.get("otdelid", "")
     if otdel_id:
         try:
-            from ..connections.service import build_graph
             from ..connections.config import load_connections
             from ..agents.manager import load_otdels as _load_otdels
 
             conns = load_connections()
             otdels_list = _load_otdels()
-            otdel_names = {}
+            otdel_names: dict[str, str] = {}
             if isinstance(otdels_list, list):
                 otdel_names = {o.get("otdelid", ""): o.get("name", "") for o in otdels_list}
             elif isinstance(otdels_list, dict):
                 otdel_names = {o.get("otdelid", ""): o.get("name", "") for o in otdels_list.get("otdels", [])}
 
+            # Group by connection type + direction
+            # outgoing = where THIS department sends
+            # incoming = where THIS department receives from
             outgoing = [c for c in conns if c.from_otdel == otdel_id and c.active]
             incoming = [c for c in conns if c.to_otdel == otdel_id and c.active]
 
-            type_labels = {"approval": "Утверждение", "delegation": "Делегирование", "peer": "Кооперация"}
+            # Classify by type
+            approval_out = []    # THIS dept sends for approval TO others
+            approval_in = []     # OTHER depts send for approval TO THIS dept
+            delegation_out = []  # THIS dept delegates TO others
+            delegation_in = []   # OTHER depts delegate TO THIS dept
+            peer_connections = []  # Mutual cooperation
+
+            for c in outgoing:
+                t = c.type.value if hasattr(c.type, 'value') else c.type
+                if t == "approval":
+                    approval_out.append(c)
+                elif t == "delegation":
+                    delegation_out.append(c)
+                elif t == "peer":
+                    peer_connections.append(c)
+
+            for c in incoming:
+                t = c.type.value if hasattr(c.type, 'value') else c.type
+                if t == "approval":
+                    approval_in.append(c)
+                elif t == "delegation":
+                    delegation_in.append(c)
+                elif t == "peer":
+                    # Avoid duplicates — peer is bidirectional
+                    if not any(p.id == c.id for p in peer_connections):
+                        peer_connections.append(c)
 
             if outgoing or incoming:
-                conn_lines = []
-                for c in outgoing:
-                    target_name = otdel_names.get(c.to_otdel, c.to_otdel)
-                    label = type_labels.get(c.type.value if hasattr(c.type, 'value') else c.type, c.type.value if hasattr(c.type, 'value') else c.type)
-                    conn_lines.append(f"- → {target_name} ({label}{': ' + c.label if c.label else ''})")
-                for c in incoming:
-                    source_name = otdel_names.get(c.from_otdel, c.from_otdel)
-                    label = type_labels.get(c.type.value if hasattr(c.type, 'value') else c.type, c.type.value if hasattr(c.type, 'value') else c.type)
-                    conn_lines.append(f"- ← {source_name} ({label}{': ' + c.label if c.label else ''})")
+                conn_parts = []
 
-                conn_block = f"""
-## Связи с другими отделами
-{chr(10).join(conn_lines)}
-- Если задача не в твоей компетенции — передай по связи типа "Делегирование"
-- Если нужна совместная работа — обратись по связи типа "Кооперация"
-- Если нужно утверждение вышестоящего — передай по связи типа "Утверждение"
-- Для передачи используй инструмент head_approve"""
-                parts.append(conn_block)
+                # Block 1: Approval IN — tasks you receive for review
+                if approval_in:
+                    items = []
+                    for c in approval_in:
+                        name = otdel_names.get(c.from_otdel, c.from_otdel)
+                        label = f" — {c.label}" if c.label else ""
+                        items.append(f"- {name}{label}")
+                    conn_parts.append(f"""### Получаешь на утверждение от:
+{chr(10).join(items)}
+Ты — контролёр. Получил задачу на утверждение:
+1. Проверь качество выполнения
+2. Если всё ок — закрой задачу (kanban_task complete)
+3. Если есть проблемы — верни на доработку (kanban_task rework) или делегируй обратно
+4. НЕ закрывай автоматически — только после проверки""")
+
+                # Block 2: Approval OUT — tasks you send for review
+                if approval_out:
+                    items = []
+                    for c in approval_out:
+                        name = otdel_names.get(c.to_otdel, c.to_otdel)
+                        label = f" — {c.label}" if c.label else ""
+                        items.append(f"- {name}{label}")
+                    conn_parts.append(f"""### Отправляешь на утверждение в:
+{chr(10).join(items)}
+Перед важными решениями или закрытием — отправь на проверку:
+1. Заверши свою часть работы
+2. Отправь через head_approve(target_otdel="<id>", reason="опиши что сделано")
+3. Жди решения — задача вернётся с результатом""")
+
+                # Block 3: Delegation IN — tasks delegated to you
+                if delegation_in:
+                    items = []
+                    for c in delegation_in:
+                        name = otdel_names.get(c.from_otdel, c.from_otdel)
+                        label = f" — {c.label}" if c.label else ""
+                        items.append(f"- {name}{label}")
+                    conn_parts.append(f"""### Получаешь задачи по делегированию от:
+{chr(10).join(items)}
+Другой отдел передаёт тебе задачи — выполни:
+1. Прими задачу к работе
+2. Выполни в своём отделе
+3. Отчитайся о результате""")
+
+                # Block 4: Delegation OUT — tasks you delegate to others
+                if delegation_out:
+                    items = []
+                    for c in delegation_out:
+                        name = otdel_names.get(c.to_otdel, c.to_otdel)
+                        label = f" — {c.label}" if c.label else ""
+                        items.append(f"- {name}{label}")
+                    conn_parts.append(f"""### Можешь делегировать в:
+{chr(10).join(items)}
+Если задача не в компетенции твоего отдела — передай:
+1. Определи в какой отдел передать
+2. Отправь через head_approve(target_otdel="<id>", reason="почему передаёшь")
+3. Задача уйдёт в другой отдел на выполнение""")
+
+                # Block 5: Peer — cooperation
+                if peer_connections:
+                    items = []
+                    for c in peer_connections:
+                        # Get the "other" department
+                        other_id = c.to_otdel if c.from_otdel == otdel_id else c.from_otdel
+                        name = otdel_names.get(other_id, other_id)
+                        label = f" — {c.label}" if c.label else ""
+                        items.append(f"- {name}{label}")
+                    conn_parts.append(f"""### Кооперация с отделами:
+{chr(10).join(items)}
+Совместная работа — обсуждай и решай вместе:
+- Обращайся напрямую в чат отдела
+- Делитесь контекстом и результатами""")
+
+                # Block 6: Emergency — what to do if stuck
+                conn_parts.append("""### Если всё плохо:
+- Заблокируй задачу: head_block(reason="опиши проблему", severity="high")
+- Главный агент решит что делать дальше
+- НЕ ИГНОРИРУЙ проблемы — сообщи сразу""")
+
+                if conn_parts:
+                    conn_block = f"\n## Связи с другими отделами\n\n" + "\n\n".join(conn_parts)
+                    parts.append(conn_block)
         except Exception:
             pass  # Silently skip if connections module not available
 

@@ -1,7 +1,7 @@
 /**
  * WidgetsSection — library of available widgets.
  * Cards are draggable into left/right panel zones via @dnd-kit.
- * Syncs with backend via WebSocket.
+ * Syncs with backend via WebSocket only (no redundant fetch on DOM event).
  */
 import { useState, useEffect, useCallback } from 'react'
 import { useDraggable } from '@dnd-kit/core'
@@ -61,34 +61,25 @@ export function WidgetsSection({ wsOn }: { wsOn?: (type: string, handler: (data:
   const [layout, setLayout] = useState<WidgetLayout>({ left: [], right: [] })
   const [loading, setLoading] = useState(true)
 
-  const loadLayout = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/widgets/layout`)
-      if (res.ok) {
-        const data = await res.json()
-        setLayout({ left: data.left || [], right: data.right || [] })
-      }
-    } catch {}
-    setLoading(false)
+  // Initial load
+  useEffect(() => {
+    fetch(`${API_BASE}/api/widgets/layout`)
+      .then(r => r.ok ? r.json() : { left: [], right: [] })
+      .then(data => setLayout({ left: data.left || [], right: data.right || [] }))
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => { loadLayout() }, [loadLayout])
-
-  // WS sync — update when layout changes from other clients or main page
+  // WS sync — single source of truth for layout updates
   useEffect(() => {
     if (!wsOn) return
     const off = wsOn('widgets:layout_changed', (msg: any) => {
-      if (msg.layout) setLayout(msg.layout)
+      if (msg.layout) {
+        setLayout(msg.layout)
+      }
     })
     return off
   }, [wsOn])
-
-  // Also listen for the custom DOM event (when user drags on main page)
-  useEffect(() => {
-    const handler = () => loadLayout()
-    window.addEventListener('synpin-widgets-changed', handler)
-    return () => window.removeEventListener('synpin-widgets-changed', handler)
-  }, [loadLayout])
 
   if (loading) {
     return <div className="settings-hint">Загрузка...</div>

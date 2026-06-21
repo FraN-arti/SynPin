@@ -152,6 +152,10 @@ app.include_router(projects_router)
 from .version_router import router as version_router
 app.include_router(version_router)
 
+# Widget layout endpoint
+from .widgets_router import router as widgets_router
+app.include_router(widgets_router)
+
 # Set up Kanban WS broadcast loop
 import asyncio
 from ..kanban.service import set_ws_loop

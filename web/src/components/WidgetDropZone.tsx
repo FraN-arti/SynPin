@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   useDroppable,
 } from '@dnd-kit/core'
@@ -41,32 +41,63 @@ export const WIDGET_META: Record<WidgetType, { label: string; icon: string }> = 
 
 // ─── Layout persistence ──────────────────────────────────────────
 
+import { API_BASE } from '../config'
+
 const STORAGE_KEY = 'synpin_widget_layout'
 const EMPTY_LAYOUT: WidgetLayout = { left: [], right: [] }
 
-export function loadWidgetLayout(): WidgetLayout {
+/** Migrate old localStorage layout to backend, then clear localStorage. */
+async function migrateLocalStorageIfNeeded(): Promise<WidgetLayout | null> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      // Migrate old format (departments → otdels)
-      const migrate = (arr: string[]) =>
-        (arr || []).map((w: string) => w === 'departments' ? 'otdels' : w)
-          .filter((w: string) => ['otdels', 'kanban'].includes(w))
-      if (parsed.widgets && Array.isArray(parsed.widgets)) {
-        return { left: migrate(parsed.widgets), right: [] }
-      }
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    const migrate = (arr: string[]) =>
+      (arr || []).map((w: string) => w === 'departments' ? 'otdels' : w)
+        .filter((w: string) => ['otdels', 'kanban'].includes(w))
+    let layout: WidgetLayout
+    if (parsed.widgets && Array.isArray(parsed.widgets)) {
+      layout = { left: migrate(parsed.widgets), right: [] }
+    } else {
+      layout = { left: migrate(parsed.left), right: migrate(parsed.right) }
+    }
+    // Save to backend and clear localStorage
+    await saveWidgetLayout(layout)
+    localStorage.removeItem(STORAGE_KEY)
+    return layout
+  } catch {
+    return null
+  }
+}
+
+export async function loadWidgetLayout(): Promise<WidgetLayout> {
+  try {
+    // Try backend first
+    const res = await fetch(`${API_BASE}/api/widgets/layout`)
+    if (res.ok) {
+      const data = await res.json()
       return {
-        left: migrate(parsed.left),
-        right: migrate(parsed.right),
+        left: (data.left || []).filter((w: string) => ['otdels', 'kanban'].includes(w)),
+        right: (data.right || []).filter((w: string) => ['otdels', 'kanban'].includes(w)),
       }
     }
   } catch {}
+  // Fallback: migrate from localStorage
+  const migrated = await migrateLocalStorageIfNeeded()
+  if (migrated) return migrated
   return EMPTY_LAYOUT
 }
 
-export function saveWidgetLayout(layout: WidgetLayout) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(layout))
+export async function saveWidgetLayout(layout: WidgetLayout): Promise<void> {
+  try {
+    await fetch(`${API_BASE}/api/widgets/layout`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(layout),
+    })
+  } catch (e) {
+    console.error('[widgets] save layout error:', e)
+  }
 }
 
 // ─── Widget content renderers ────────────────────────────────────
@@ -195,8 +226,24 @@ export function WidgetDropZone({ side, widgets, departments, onRemove, isDraggin
 
 // ─── Layout Hook ─────────────────────────────────────────────────
 
-export function useWidgetLayout() {
-  const [layout, setLayout] = useState<WidgetLayout>(loadWidgetLayout)
+export function useWidgetLayout(wsOn?: (type: string, handler: (data: any) => void) => () => void) {
+  const [layout, setLayout] = useState<WidgetLayout>(EMPTY_LAYOUT)
+
+  // Load layout from backend on mount
+  useEffect(() => {
+    loadWidgetLayout().then(setLayout)
+  }, [])
+
+  // Listen for WS layout changes from other clients
+  useEffect(() => {
+    if (!wsOn) return
+    const off = wsOn('widgets:layout_changed', (msg: any) => {
+      if (msg.layout) {
+        setLayout(msg.layout)
+      }
+    })
+    return off
+  }, [wsOn])
 
   const syncLayout = useCallback((next: WidgetLayout) => {
     setLayout(next)

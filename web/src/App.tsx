@@ -161,7 +161,7 @@ function App() {
   const [sidebarDepartments, setSidebarDepartments] = useState<Department[]>([])
 
   // Widget layout (left/right zones on main page)
-  const { layout, removeWidget, handleDragEnd } = useWidgetLayout()
+  const { layout, removeWidget, handleDragEnd } = useWidgetLayout(wsOn)
   // Chat auto-scroll — unified sentinel pattern
   const { sentinelRef: chatEndRef } = useChatScroll(messages)
 

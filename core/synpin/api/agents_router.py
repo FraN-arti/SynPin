@@ -60,7 +60,7 @@ async def get_all_agents():
 async def create_agent(req: AgentCreate):
     """Create a new agent."""
     try:
-        return manager.create_agent(
+        result = manager.create_agent(
             name=req.name,
             role=req.role,
             department=req.department,
@@ -73,6 +73,13 @@ async def create_agent(req: AgentCreate):
             temperature=req.temperature,
             max_tokens=req.max_tokens,
         )
+        # Broadcast agent list change
+        try:
+            from ..chat.ws_manager import ws_manager
+            await ws_manager.broadcast({"type": "agent:list_changed"})
+        except Exception:
+            pass
+        return result
     except Exception as e:
         logger.error("Failed to create agent: %s", e)
         raise HTTPException(500, "Failed to create agent")
@@ -85,6 +92,12 @@ async def delete_agent(slug: str):
         ok = manager.delete_agent(slug)
         if not ok:
             raise HTTPException(404, f"Agent not found: {slug}")
+        # Broadcast agent list change
+        try:
+            from ..chat.ws_manager import ws_manager
+            await ws_manager.broadcast({"type": "agent:list_changed"})
+        except Exception:
+            pass
         return {"ok": True}
     except HTTPException:
         raise
@@ -121,6 +134,12 @@ async def update_agent(slug: str, req: AgentUpdate):
             return existing
 
         result = manager.save_agent(slug, updates)
+        # Broadcast agent list change (name, role, etc. may have changed)
+        try:
+            from ..chat.ws_manager import ws_manager
+            await ws_manager.broadcast({"type": "agent:list_changed"})
+        except Exception:
+            pass
         return result
     except HTTPException:
         raise

@@ -271,6 +271,49 @@ function App() {
     return off
   }, [wsOn])
 
+  // Listen for agent list changes (create/update/delete) — refresh sidebar
+  useEffect(() => {
+    const off = wsOn('agent:list_changed', () => {
+      fetch(`${API_BASE}/api/agents`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data?.agents) return
+          const allAgents = (Object.entries(data.agents) as [string, any][]).map(([slug, cfg]): AgentConfig => ({
+            slug,
+            agentid: cfg.agentid || slug,
+            name: cfg.name || slug,
+            role: cfg.role || '',
+            role_name: cfg.role_name || '',
+            department: cfg.department || '',
+            department_name: cfg.department_name || '',
+            model: cfg.model || '',
+            provider: cfg.provider || null,
+            system_prompt: cfg.system_prompt || '',
+            description: cfg.description || '',
+            tone: cfg.tone || '',
+            style: cfg.style || '',
+            traits: cfg.traits || [],
+            tools: cfg.tools || [],
+            temperature: cfg.temperature ?? 0.7,
+            max_tokens: cfg.max_tokens ?? 4096,
+            enabled: cfg.enabled ?? true,
+            is_primary: cfg.is_primary ?? false,
+            is_external: cfg.is_external ?? false,
+            type: cfg.type || '',
+          }))
+          setAvailableAgents(allAgents)
+          // Sync active agent if it was updated
+          const current = activeAgentRef.current
+          if (current) {
+            const fresh = allAgents.find(a => a.slug === current.slug)
+            if (fresh) setActiveAgent(fresh)
+          }
+        })
+        .catch(() => {})
+    })
+    return off
+  }, [wsOn])
+
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
 
   const refreshDepartments = useCallback(async () => {

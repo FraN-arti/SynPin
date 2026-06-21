@@ -1126,6 +1126,114 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
             },
         },
     },
+    # ── Connection & Approval Tools ──────────────────────────────────────
+    "head_approve": {
+        "type": "function",
+        "function": {
+            "name": "head_approve",
+            "description": "Передать задачу в другой отдел через связь (утверждение/делегирование). Используй когда задача требует проверки или выполнения другим отделом.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string", "description": "ID задачи (T-xxx)"},
+                    "target_otdel": {"type": "string", "description": "ID целевого отдела (опционально, авто-определение)"},
+                    "reason": {"type": "string", "description": "Причина передачи"},
+                    "report": {"type": "string", "description": "Детальный отчёт (опционально)"},
+                },
+                "required": ["task_id", "reason"],
+            },
+        },
+    },
+    "head_reline": {
+        "type": "function",
+        "function": {
+            "name": "head_reline",
+            "description": "Вернуть задачу предыдущему отделу с замечаниями (релайн). Используй когда задача выполнена некачественно или не соответствует требованиям.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string", "description": "ID задачи (T-xxx)"},
+                    "remarks": {"type": "string", "description": "Замечания — что нужно исправить"},
+                    "severity": {"type": "string", "enum": ["low", "medium", "high"], "description": "Серьёзность (по умолчанию medium)"},
+                },
+                "required": ["task_id", "remarks"],
+            },
+        },
+    },
+    "head_approval_status": {
+        "type": "function",
+        "function": {
+            "name": "head_approval_status",
+            "description": "Проверить статус утверждений или посмотреть последние передачи.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string", "description": "Фильтр по задаче (опционально)"},
+                    "status": {"type": "string", "enum": ["pending", "completed", "rejected"], "description": "Фильтр по статусу (опционально)"},
+                },
+                "required": [],
+            },
+        },
+    },
+    "connection_list": {
+        "type": "function",
+        "function": {
+            "name": "connection_list",
+            "description": "Показать все связи между отделами. Только для главного агента.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        },
+    },
+    "connection_create": {
+        "type": "function",
+        "function": {
+            "name": "connection_create",
+            "description": "Создать связь между отделами. Только для главного агента.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "from_otdel": {"type": "string", "description": "ID исходного отдела"},
+                    "to_otdel": {"type": "string", "description": "ID целевого отдела"},
+                    "type": {"type": "string", "enum": ["approval", "delegation", "peer"], "description": "Тип связи"},
+                    "label": {"type": "string", "description": "Название связи (опционально)"},
+                    "description": {"type": "string", "description": "Описание (опционально)"},
+                },
+                "required": ["from_otdel", "to_otdel", "type"],
+            },
+        },
+    },
+    "connection_delete": {
+        "type": "function",
+        "function": {
+            "name": "connection_delete",
+            "description": "Удалить связь по ID. Только для главного агента.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "connection_id": {"type": "string", "description": "ID связи (conn-xxx)"},
+                },
+                "required": ["connection_id"],
+            },
+        },
+    },
+    "connection_history": {
+        "type": "function",
+        "function": {
+            "name": "connection_history",
+            "description": "История передач/утверждений/релайнов. Только для главного агента.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "string", "description": "Фильтр по задаче (опционально)"},
+                    "limit": {"type": "integer", "description": "Максимум записей (по умолчанию 20)"},
+                },
+                "required": [],
+            },
+        },
+    },
 }
 
 

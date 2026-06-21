@@ -159,7 +159,7 @@ app.include_router(widgets_router)
 # Set up Kanban WS broadcast loop
 import asyncio
 from ..kanban.service import set_ws_loop
-from ..kanban.config import set_config_broadcast
+from ..kanban.config import set_config_ws_loop
 from ..connections.service import set_ws_loop as set_connections_ws_loop
 # Hooks that wire up async-loop-dependent state. We attempt to do
 # this eagerly at import time (fast happy path) and fall back to
@@ -173,11 +173,7 @@ try:
     loop = asyncio.get_running_loop()
     set_ws_loop(loop)
     set_connections_ws_loop(loop)
-    # Wire up config broadcast
-    async def _broadcast(event: dict):
-        from ..chat.ws_manager import ws_manager
-        await ws_manager.broadcast(event)
-    set_config_broadcast(lambda e: asyncio.ensure_future(_broadcast(event=e)))
+    set_config_ws_loop(loop)
 except RuntimeError:
     # No loop at import time — register a startup hook to set one up
     # when uvicorn starts the app.
@@ -186,11 +182,7 @@ except RuntimeError:
         loop = asyncio.get_event_loop()
         set_ws_loop(loop)
         set_connections_ws_loop(loop)
-        # Wire up config broadcast
-        async def _broadcast(event: dict):
-            from ..chat.ws_manager import ws_manager
-            await ws_manager.broadcast(event)
-        set_config_broadcast(lambda e: asyncio.ensure_future(_broadcast(event=e)))
+        set_config_ws_loop(loop)
 
 
 # ---------------------------------------------------------------------------

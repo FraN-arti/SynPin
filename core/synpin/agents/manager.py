@@ -858,6 +858,20 @@ def get_otdel(otdel_id: str) -> dict[str, Any] | None:
     return None
 
 
+def _broadcast_otdel_change() -> None:
+    """Broadcast otdel list change via WebSocket."""
+    try:
+        import asyncio
+        from ..chat.ws_manager import ws_manager
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(ws_manager.broadcast({
+                "type": "otdels:list_changed",
+            }))
+    except Exception:
+        pass
+
+
 def create_otdel(name: str, description: str = "", color: str = "#f97316",
                  mentor_role: str = "", escalation: str = "",
                  head: str = "", workers: list[str] | None = None) -> dict[str, Any]:
@@ -892,6 +906,8 @@ def create_otdel(name: str, description: str = "", color: str = "#f97316",
     data["otdels"] = otdels
     _save_yaml(config_path, data)
 
+    _broadcast_otdel_change()
+
     otdel_data["agent_count"] = 0
     return otdel_data
 
@@ -922,50 +938,53 @@ def update_otdel(otdel_id: str, updates: dict[str, Any]) -> dict[str, Any] | Non
         _save_yaml(otdel_dir / "otdel.yaml",
                    next(o for o in otdels if o["otdelid"] == otdel_id))
 
+    _broadcast_otdel_change()
+
     return get_otdel(otdel_id)
 
 
 def delete_otdel(otdel_id: str) -> bool:
-    def delete_otdel(otdel_id: str) -> bool:
-        """Delete an otdel: remove from config + delete directory recursively.
+    """Delete an otdel: remove from config + delete directory recursively.
 
-        CLEAN DELETE: also removes all connections involving this otdel.
-        """
-        import shutil
+    CLEAN DELETE: also removes all connections involving this otdel.
+    """
+    import shutil
 
-        config_path = _get_config_dir() / "otdels.yaml"
-        data = _load_yaml(config_path)
-        otdels = data.get("otdels", [])
-        new_otdels = [o for o in otdels if o.get("otdelid") != otdel_id]
-        if len(new_otdels) == len(otdels):
-            return False  # Not found
+    config_path = _get_config_dir() / "otdels.yaml"
+    data = _load_yaml(config_path)
+    otdels = data.get("otdels", [])
+    new_otdels = [o for o in otdels if o.get("otdelid") != otdel_id]
+    if len(new_otdels) == len(otdels):
+        return False  # Not found
 
-        data["otdels"] = new_otdels
-        _save_yaml(config_path, data)
+    data["otdels"] = new_otdels
+    _save_yaml(config_path, data)
 
-        # Remove otdel directory (otdel.yaml, agents subdir, etc.)
-        otdels_dir = _get_otdels_dir()
-        otdel_dir = otdels_dir / otdel_id
-        if otdel_dir.exists():
-            shutil.rmtree(str(otdel_dir))
+    # Remove otdel directory (otdel.yaml, agents subdir, etc.)
+    otdels_dir = _get_otdels_dir()
+    otdel_dir = otdels_dir / otdel_id
+    if otdel_dir.exists():
+        shutil.rmtree(str(otdel_dir))
 
-        # Remove otdel chat history (data/otdels/<id>/chat.json)
-        from ..paths import get_data_dir
-        data_dir = get_data_dir()
-        if data_dir:
-            otdel_data_dir = data_dir / "otdels" / otdel_id
-            if otdel_data_dir.exists():
-                shutil.rmtree(str(otdel_data_dir))
+    # Remove otdel chat history (data/otdels/<id>/chat.json)
+    from ..paths import get_data_dir
+    data_dir = get_data_dir()
+    if data_dir:
+        otdel_data_dir = data_dir / "otdels" / otdel_id
+        if otdel_data_dir.exists():
+            shutil.rmtree(str(otdel_data_dir))
 
-        # CLEAN DELETE: remove all connections + history for this otdel
-        try:
-            from ..connections.service import clean_for_otdel
-            clean_for_otdel(otdel_id)
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning("Failed to clean connections for otdel %s: %s", otdel_id, e)
+    # CLEAN DELETE: remove all connections + history for this otdel
+    try:
+        from ..connections.service import clean_for_otdel
+        clean_for_otdel(otdel_id)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Failed to clean connections for otdel %s: %s", otdel_id, e)
 
-        return True
+    _broadcast_otdel_change()
+
+    return True
 
 
 # ─── Tools ───────────────────────────────────────────────────────

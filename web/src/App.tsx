@@ -343,7 +343,15 @@ function App() {
     refreshDepartments()
   }, [refreshDepartments])
 
-  const messagesContainerRef = useRef<HTMLDivElement>(null)
+  // Listen for otdel list changes (create/update/delete) — refresh sidebar departments
+  useEffect(() => {
+    const off = wsOn('otdels:list_changed', () => {
+      refreshDepartments()
+    })
+    return off
+  }, [wsOn, refreshDepartments])
+
+  const messagesContainerRef
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const attachRef = useRef<{ openPicker: () => void }>(null)
   const activeAgentRef = useRef<AgentConfig | null>(null)

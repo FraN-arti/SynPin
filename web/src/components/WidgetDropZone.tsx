@@ -13,7 +13,7 @@ import { KanbanWidget } from './KanbanWidget'
 
 // ─── Types ───────────────────────────────────────────────────────
 
-export type WidgetType = 'departments' | 'kanban'
+export type WidgetType = 'otdels' | 'kanban'
 
 export interface WidgetLayout {
   left: WidgetType[]
@@ -35,7 +35,7 @@ export interface Department {
 // ─── Widget metadata ─────────────────────────────────────────────
 
 export const WIDGET_META: Record<WidgetType, { label: string; icon: string }> = {
-  departments: { label: 'Отделы', icon: '🏢' },
+  otdels: { label: 'Отделы', icon: '🏢' },
   kanban: { label: 'Канбан', icon: '📋' },
 }
 
@@ -49,14 +49,16 @@ export function loadWidgetLayout(): WidgetLayout {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      // Migrate old format
+      // Migrate old format (departments → otdels)
+      const migrate = (arr: string[]) =>
+        (arr || []).map((w: string) => w === 'departments' ? 'otdels' : w)
+          .filter((w: string) => ['otdels', 'kanban'].includes(w))
       if (parsed.widgets && Array.isArray(parsed.widgets)) {
-        return { left: parsed.widgets.filter((w: string) => ['departments', 'kanban'].includes(w)), right: [] }
+        return { left: migrate(parsed.widgets), right: [] }
       }
-      // Filter out removed widget types
       return {
-        left: (parsed.left || []).filter((w: string) => ['departments', 'kanban'].includes(w)),
-        right: (parsed.right || []).filter((w: string) => ['departments', 'kanban'].includes(w)),
+        left: migrate(parsed.left),
+        right: migrate(parsed.right),
       }
     }
   } catch {}
@@ -128,7 +130,7 @@ function SortableWidget({ id, departments, onRemove, onDepartmentClick, activeOt
         </button>
       </div>
       <div className="widget-card-body">
-        {id === 'departments' && <DepartmentsWidgetContent departments={departments} onDepartmentClick={onDepartmentClick} activeOtdelId={activeOtdelId} />}
+        {id === 'otdels' && <DepartmentsWidgetContent departments={departments} onDepartmentClick={onDepartmentClick} activeOtdelId={activeOtdelId} />}
         {id === 'kanban' && <KanbanWidget wsOn={wsOn} />}
       </div>
     </div>
@@ -219,9 +221,10 @@ export function useWidgetLayout() {
     const { active, over } = event
     const widgetId = String(active.id)
 
-    // New tab from settings — strip "tab-" prefix
-    const widgetType = widgetId.startsWith('tab-') ? widgetId.replace('tab-', '') : widgetId
-    if (!['departments', 'kanban'].includes(widgetType)) return
+    // New tab from settings — strip "tab-" prefix and map departments → otdels
+    const raw = widgetId.startsWith('tab-') ? widgetId.replace('tab-', '') : widgetId
+    const widgetType = raw === 'departments' ? 'otdels' : raw
+    if (!['otdels', 'kanban'].includes(widgetType)) return
 
     const overId = String(over.id)
 

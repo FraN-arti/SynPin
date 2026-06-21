@@ -203,7 +203,15 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
     const unsub5 = wsOn('kanban:task_created', () => {
       loadTasks()
     })
-    return () => { unsub1(); unsub2(); unsub3(); unsub4(); unsub5() }
+    // Task deleted — remove from state directly (no fetch needed)
+    const unsub6 = wsOn('kanban:task_deleted', (msg: any) => {
+      if (msg.task_id) {
+        setTasks(prev => prev.filter(t => t.id !== msg.task_id))
+      } else {
+        loadTasks()
+      }
+    })
+    return () => { unsub1(); unsub2(); unsub3(); unsub4(); unsub5(); unsub6() }
   }, [wsOn, loadConfig, loadColumns, loadTasks])
 
   if (loading) {

@@ -379,4 +379,8 @@ class KanbanService:
             return False
         with self._lock:
             filepath.unlink()
+        _broadcast({
+            "type": "kanban:task_deleted",
+            "task_id": task_id,
+        })
         return True

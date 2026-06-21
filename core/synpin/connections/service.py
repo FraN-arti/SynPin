@@ -22,32 +22,10 @@ logger = logging.getLogger("synpin.connections.service")
 
 # ── WebSocket broadcast ──────────────────────────────────────────────────────
 
-_ws_loop: asyncio.AbstractEventLoop | None = None
-
-
-def set_ws_loop(loop: asyncio.AbstractEventLoop) -> None:
-    """Set the event loop for broadcasting WS events from sync context."""
-    global _ws_loop
-    _ws_loop = loop
-
-
 def _broadcast(event: dict) -> None:
-    """Schedule a broadcast on the WS event loop (thread-safe)."""
-    if _ws_loop is None:
-        return
-    try:
-        asyncio.run_coroutine_threadsafe(_ws_broadcast(event), _ws_loop)
-    except Exception:
-        pass
-
-
-async def _ws_broadcast(event: dict) -> None:
-    """Actually broadcast via ws_manager."""
-    try:
-        from ..chat.ws_manager import ws_manager
-        await ws_manager.broadcast(event)
-    except Exception:
-        pass
+    """Thread-safe broadcast via centralized ws_broadcast module."""
+    from ..ws_broadcast import broadcast as _ws_broadcast
+    _ws_broadcast(event)
 
 
 # ── Connections CRUD ─────────────────────────────────────────────────────────

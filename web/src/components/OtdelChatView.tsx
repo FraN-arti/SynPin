@@ -129,6 +129,11 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
         const msgs = (Array.isArray(data.messages) ? data.messages : []).map((m: any) => ({
           ...m,
           content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content ?? ''),
+          tools: Array.isArray(m.tools) ? m.tools.map((t: any) => ({
+            ...t,
+            result: typeof t.result === 'string' ? t.result : JSON.stringify(t.result ?? ''),
+            error: typeof t.error === 'string' ? t.error : JSON.stringify(t.error ?? ''),
+          })) : m.tools,
         }))
         setMessages(msgs)
         // Rebuild worker statuses from chat history (survives F5 refresh)
@@ -667,12 +672,12 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
                             )}
                             {tc.status === 'completed' && tc.result && (
                               <div className="otdel-tool-result">
-                                <pre>{tc.result}</pre>
+                                <pre>{typeof tc.result === 'string' ? tc.result : JSON.stringify(tc.result)}</pre>
                               </div>
                             )}
                             {tc.status === 'error' && tc.error && (
                               <div className="otdel-tool-error">
-                                <pre>{tc.error}</pre>
+                                <pre>{typeof tc.error === 'string' ? tc.error : JSON.stringify(tc.error)}</pre>
                               </div>
                             )}
                           </div>

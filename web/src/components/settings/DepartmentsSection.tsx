@@ -181,7 +181,7 @@ export function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChang
               <span className="department-color-dot" style={{ background: otdel.color }} />
               <div>
                 <span className="department-name">{otdel.name}</span>
-                <span className="department-meta">{otdel.mentor_role ? `Ментор: ${otdel.mentor_role}` : 'Без ментора'} · {otdel.agent_count} агентов</span>
+                <span className="department-meta">{otdel.mentor_role ? `Ментор: ${roles.find(r => r.rolesid === otdel.mentor_role)?.name || otdel.mentor_role}` : 'Без ментора'} · {otdel.agent_count} агентов</span>
               </div>
             </div>
             <div className="department-actions">

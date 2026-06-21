@@ -212,7 +212,7 @@ export function SettingsPage({ onAgentsChange, onDepartmentsChange, wsOn }: Sett
           {activeTab === 'kanban' && <KanbanSection />}
           {activeTab === 'projects' && <ProjectsSection />}
           {activeTab === 'deadlines' && <DeadlinesSection />}
-          {activeTab === 'widgets' && <WidgetsSection />}
+          {activeTab === 'widgets' && <WidgetsSection wsOn={wsOn} />}
         </PageTransition>
       </div>
     </>

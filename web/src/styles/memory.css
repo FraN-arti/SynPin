@@ -3863,6 +3863,10 @@
   gap: 4px;
   margin-left: 8px;
 }
+.widget-library-card.dragging {
+  opacity: 0.5 !important;
+  box-shadow: 0 4px 20px rgba(249,115,22,0.3);
+}
 .widget-lib-btn {
   background: none;
   border: 1px solid var(--glass-border);

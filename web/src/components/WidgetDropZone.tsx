@@ -268,8 +268,9 @@ export function useWidgetLayout(wsOn?: (type: string, handler: (data: any) => vo
     const { active, over } = event
     const widgetId = String(active.id)
 
-    // New tab from settings — strip "tab-" prefix and map departments → otdels
-    const raw = widgetId.startsWith('tab-') ? widgetId.replace('tab-', '') : widgetId
+    // New tab from settings — strip "tab-" prefix, or "lib-" from library
+    const raw0 = widgetId.startsWith('tab-') ? widgetId.replace('tab-', '') : widgetId
+    const raw = raw0.startsWith('lib-') ? raw0.replace('lib-', '') : raw0
     const widgetType = raw === 'departments' ? 'otdels' : raw
     if (!['otdels', 'kanban'].includes(widgetType)) return
 

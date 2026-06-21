@@ -48,15 +48,17 @@ export function OtdelSettingsPanel({ otdel, open, onClose, onSaved }: OtdelSetti
   const [workers, setWorkers] = useState<Set<string>>(new Set())
   const [agents, setAgents] = useState<Agent[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
+  const [roles, setRoles] = useState<{ rolesid: string; name: string }[]>([])
   const [saving, setSaving] = useState(false)
 
-  // Load full otdel data + agents + departments when opened
+  // Load full otdel data + agents + departments + roles when opened
   const loadData = useCallback(async () => {
     try {
-      const [otdelRes, agentsRes, deptsRes] = await Promise.all([
+      const [otdelRes, agentsRes, deptsRes, rolesRes] = await Promise.all([
         fetch(`${API_BASE}/api/otdels/${otdel.otdelid}`),
         fetch(`${API_BASE}/api/agents`),
         fetch(`${API_BASE}/api/departments`),
+        fetch(`${API_BASE}/api/roles`),
       ])
 
       if (otdelRes.ok) {
@@ -74,6 +76,11 @@ export function OtdelSettingsPanel({ otdel, open, onClose, onSaved }: OtdelSetti
       if (deptsRes.ok) {
         const data = await deptsRes.json()
         setDepartments(data.departments || [])
+      }
+
+      if (rolesRes.ok) {
+        const data = await rolesRes.json()
+        setRoles(data.roles || [])
       }
     } catch {}
   }, [otdel.otdelid])
@@ -173,7 +180,7 @@ export function OtdelSettingsPanel({ otdel, open, onClose, onSaved }: OtdelSetti
               </span>
             ) : roleAgents.length === 0 ? (
               <span className="otdel-workers-hint" style={{ fontStyle: 'italic' }}>
-                Нет агентов с ролью «{fullOtdel.mentor_role}»
+                Нет агентов с ролью «{roles.find(r => r.rolesid === fullOtdel.mentor_role)?.name || fullOtdel.mentor_role}»
               </span>
             ) : (
               <DropdownMenu

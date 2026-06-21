@@ -182,6 +182,7 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
   useEffect(() => {
     if (!wsOn) return
     const unsub1 = wsOn('kanban:widget_updated', (msg: any) => {
+      console.log('[kanban-widget] WS received widget_updated', msg.widget)
       // Use data from WS event directly — no extra fetch needed
       if (msg.widget) {
         setConfig(msg.widget)

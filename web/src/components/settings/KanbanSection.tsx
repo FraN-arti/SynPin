@@ -812,11 +812,13 @@ function KanbanWidgetConfig() {
     saveRef.current = setTimeout(async () => {
       setSaving(true)
       try {
-        await fetch(`${API_BASE}/api/kanban/config/widget`, {
+        console.log('[kanban-settings] saving widget config', newConfig)
+        const res = await fetch(`${API_BASE}/api/kanban/config/widget`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newConfig),
         })
+        console.log('[kanban-settings] PUT response', res.status)
       } catch (e) {
         console.error('[kanban] save widget config error:', e)
       } finally {

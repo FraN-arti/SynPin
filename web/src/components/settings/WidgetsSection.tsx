@@ -20,12 +20,10 @@ function DraggableWidgetCard({
   id,
   isPlaced,
   zone,
-  onRemove,
 }: {
   id: WidgetType
   isPlaced: boolean
   zone: 'left' | 'right' | null
-  onRemove: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `lib-${id}`,
@@ -35,14 +33,15 @@ function DraggableWidgetCard({
   const meta = WIDGET_META[id]
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 0.5 : isPlaced ? 0.65 : 1,
+    opacity: isDragging ? 0.5 : isPlaced ? 0.4 : 1,
     zIndex: isDragging ? 100 : undefined,
+    pointerEvents: isDragging ? 'none' : 'auto',
   }
 
   return (
     <div
       ref={setNodeRef}
-      className={`widget-library-card ${isDragging ? 'dragging' : ''}`}
+      className={`widget-library-card ${isDragging ? 'dragging' : ''} ${isPlaced ? 'placed' : ''}`}
       style={style}
       {...listeners}
       {...attributes}
@@ -50,19 +49,9 @@ function DraggableWidgetCard({
       <span className="widget-library-icon">{meta.icon}</span>
       <span className="widget-library-label">{meta.label}</span>
       {isPlaced && (
-        <div className="widget-library-actions">
-          <span className="widget-library-badge">
-            {zone === 'left' ? 'Лево' : 'Право'}
-          </span>
-          <button
-            className="widget-lib-btn remove"
-            onClick={(e) => { e.stopPropagation(); onRemove() }}
-            onPointerDown={(e) => e.stopPropagation()}
-            title="Убрать с панели"
-          >
-            ×
-          </button>
-        </div>
+        <span className="widget-library-badge">
+          {zone === 'left' ? 'Левая панель' : 'Правая панель'}
+        </span>
       )}
     </div>
   )
@@ -101,19 +90,6 @@ export function WidgetsSection({ wsOn }: { wsOn?: (type: string, handler: (data:
     return () => window.removeEventListener('synpin-widgets-changed', handler)
   }, [loadLayout])
 
-  const removeFromZone = useCallback(async (id: WidgetType) => {
-    const next = {
-      left: layout.left.filter(w => w !== id),
-      right: layout.right.filter(w => w !== id),
-    }
-    setLayout(next)
-    await fetch(`${API_BASE}/api/widgets/layout`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(next),
-    })
-  }, [layout])
-
   if (loading) {
     return <div className="settings-hint">Загрузка...</div>
   }
@@ -135,7 +111,6 @@ export function WidgetsSection({ wsOn }: { wsOn?: (type: string, handler: (data:
               id={id}
               isPlaced={isPlaced}
               zone={zone}
-              onRemove={() => removeFromZone(id)}
             />
           )
         })}

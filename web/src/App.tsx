@@ -72,6 +72,7 @@ interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+  thinking?: string  // reasoning/thinking content (<think> tags or similar)
   timestamp: Date
   model?: string
   agent_name?: string
@@ -145,6 +146,7 @@ function App() {
   const [sidebarReady, setSidebarReady] = useState(false)
   const [logoVisible, setLogoVisible] = useState(false)
   const [revealedMeta, setRevealedMeta] = useState<Set<string>>(new Set())
+  const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set())
   const [activeAgent, setActiveAgent] = useState<AgentConfig | null>(null)
   const [availableAgents, setAvailableAgents] = useState<AgentConfig[]>([])
   // false until the initial /api/agents fetch resolves. Used to keep
@@ -616,6 +618,39 @@ function App() {
     const activeTools: ToolCall[] = []
     let toolIndex = 0
     let fullContent = ''
+    let fullThinking = ''
+    let inThinking = false
+
+    // Parse <think> tags from streaming chunks — universal for all models
+    const processChunk = (text: string): { thinking: string; content: string } => {
+      let thinking = ''
+      let content = ''
+      let remaining = text
+      while (remaining.length > 0) {
+        if (inThinking) {
+          const closeIdx = remaining.indexOf('</think>')
+          if (closeIdx === -1) {
+            thinking += remaining
+            remaining = ''
+          } else {
+            thinking += remaining.slice(0, closeIdx)
+            remaining = remaining.slice(closeIdx + 12)
+            inThinking = false
+          }
+        } else {
+          const openIdx = remaining.indexOf('<think>')
+          if (openIdx === -1) {
+            content += remaining
+            remaining = ''
+          } else {
+            content += remaining.slice(0, openIdx)
+            remaining = remaining.slice(openIdx + 7)
+            inThinking = true
+          }
+        }
+      }
+      return { thinking, content }
+    }
 
     // Build system prompt from agent config
     let systemPrompt: string | undefined
@@ -699,8 +734,10 @@ function App() {
             let parsed: Record<string, unknown>
             try { parsed = JSON.parse(line.slice(6)) } catch { continue }
             if (parsed.type === 'chunk' && typeof parsed.content === 'string') {
-              fullContent += parsed.content
-              setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, content: fullContent } : m))
+              const { thinking: t, content: c } = processChunk(parsed.content)
+              if (t) fullThinking += t
+              if (c) fullContent += c
+              setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, content: fullContent, thinking: fullThinking || undefined } : m))
             } else if (parsed.type === 'tool_start') {
               const toolName = String(parsed.tool || '')
               if (HIDDEN_TOOLS.has(toolName)) { toolIndex++; continue }
@@ -735,8 +772,10 @@ function App() {
 
     const onChunk = wsOn('chat:chunk', (msg) => {
       if (msg.agent_slug !== activeAgent?.slug) return
-      fullContent += msg.content
-      setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, content: fullContent } : m))
+      const { thinking: t, content: c } = processChunk(msg.content)
+      if (t) fullThinking += t
+      if (c) fullContent += c
+      setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, content: fullContent, thinking: fullThinking || undefined } : m))
     })
 
     const onToolStart = wsOn('chat:tool_start', (msg) => {
@@ -1275,6 +1314,26 @@ function App() {
                                   {msg.images.map((src, i) => (
                                     <img key={i} src={src} alt={`Изображение ${i + 1}`} className="message-image" />
                                   ))}
+                                </div>
+                              )}
+                              {msg.thinking && (
+                                <div className={`thinking-block ${expandedThinking.has(msg.id) || (isLastAssistant && isTyping) ? 'expanded' : ''}`}>
+                                  <button
+                                    className="thinking-toggle"
+                                    onClick={() => setExpandedThinking(prev => {
+                                      const next = new Set(prev)
+                                      if (next.has(msg.id)) next.delete(msg.id)
+                                      else next.add(msg.id)
+                                      return next
+                                    })}
+                                  >
+                                    <span className="thinking-icon">💭</span>
+                                    <span>Рассуждение</span>
+                                    <span className="thinking-chevron">›</span>
+                                  </button>
+                                  <div className="thinking-content">
+                                    <MarkdownRenderer content={msg.thinking} />
+                                  </div>
                                 </div>
                               )}
                               <MarkdownRenderer content={msg.content} isStreaming={isLastAssistant} />

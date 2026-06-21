@@ -468,6 +468,66 @@
   color: var(--white);
 }
 
+/* ─── Thinking Block (collapsible reasoning) ─────────────────── */
+.thinking-block {
+  margin-bottom: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.thinking-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: none;
+  color: var(--gray-400);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.thinking-toggle:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--gray-300);
+}
+
+.thinking-icon {
+  font-size: 14px;
+}
+
+.thinking-chevron {
+  margin-left: auto;
+  transition: transform 0.2s;
+  font-size: 14px;
+}
+
+.thinking-block.expanded .thinking-chevron {
+  transform: rotate(90deg);
+}
+
+.thinking-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.thinking-block.expanded .thinking-content {
+  max-height: 2000px;
+}
+
+.thinking-content > div {
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--gray-400);
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.02);
+}
+
 .message-row.user .message-bubble {
   background: rgba(249, 115, 22, 0.08);
   backdrop-filter: blur(8px);

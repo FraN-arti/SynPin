@@ -182,6 +182,11 @@ export function SettingsPage({ onAgentsChange, onDepartmentsChange, wsOn }: Sett
                 isActive={activeTab === 'deadlines'}
                 onClick={() => handleTabChange('deadlines')}
               />
+              <DraggableTab
+                tab={{ id: 'kanban' as Tab, label: 'Канбан' }}
+                isActive={activeTab === 'kanban'}
+                onClick={() => handleTabChange('kanban')}
+              />
             </div>
           </div>
         </nav>

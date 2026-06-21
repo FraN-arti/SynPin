@@ -21,10 +21,9 @@ export const SYSTEM_TABS: TabDef[] = [
 
 export const SPACE_TABS: TabDef[] = [
   { id: 'channels', label: 'Каналы' },
-  { id: 'departments', label: 'Отделы' },
   { id: 'skills', label: 'Скиллы' },
   { id: 'connections', label: 'Связи' },
-  { id: 'kanban', label: 'Канбан' },
+  { id: 'departments', label: 'Отделы' },
 ]
 export const SECTION_INFO: Record<Tab, { title: string; description: string }> = {
   general: { title: 'Общие настройки', description: 'Тема, язык, сервер и статистика' },

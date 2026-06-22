@@ -2178,6 +2178,12 @@
   background: rgba(249, 115, 22, 0.08);
 }
 
+.otdel-msg-bubble.main-agent {
+  border-color: var(--orange);
+  background: rgba(249, 115, 22, 0.08);
+  box-shadow: 0 4px 20px rgba(249, 115, 22, 0.2);
+}
+
 /* ── Typing Indicator (otdel) ──────────────────────────────────────────── */
 
 .otdel-typing-dots {
@@ -3866,6 +3872,9 @@
 .widget-library-card.dragging {
   opacity: 0.5 !important;
   box-shadow: 0 4px 20px rgba(249,115,22,0.3);
+}
+.widget-library-card.placed {
+  opacity: 0.4;
 }
 .widget-lib-btn {
   background: none;

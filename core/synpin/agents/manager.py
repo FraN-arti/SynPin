@@ -630,13 +630,53 @@ def load_roles() -> dict[str, Any]:
 
 
 def save_roles(roles: list[dict[str, Any]], is_default: str = None) -> list[dict[str, Any]]:
-    """Save roles list to config/roles.yaml."""
+    """Save roles list to config/roles.yaml.
+
+    Also cleans up agents whose roles were removed:
+    - Resets their role to default (or empty)
+    - Removes them from otdel head positions
+    """
     config_path = _get_config_dir() / "roles.yaml"
 
     # Preserve existing is_default if not provided
     if is_default is None:
         data = _load_yaml(config_path)
         is_default = data.get("is_default")
+
+    # Find removed roles
+    old_data = _load_yaml(config_path)
+    old_role_ids = {r.get("rolesid") for r in old_data.get("roles", [])}
+    new_role_ids = {r.get("rolesid") for r in roles}
+    removed_role_ids = old_role_ids - new_role_ids
+
+    # Clean up agents with removed roles
+    if removed_role_ids:
+        agents_config_path = _get_config_dir() / "agents.yaml"
+        agents_data = _load_yaml(agents_config_path)
+        agents = agents_data.get("agents", {})
+        changed = False
+
+        for slug, agent in agents.items():
+            agent_role = agent.get("role", "")
+            if agent_role in removed_role_ids:
+                # Reset role to default
+                agent["role"] = is_default or ""
+                changed = True
+
+                # Remove from otdel head if present
+                otdels = load_otdels()
+                if isinstance(otdels, dict):
+                    otdel_list = otdels.get("otdels", [])
+                else:
+                    otdel_list = otdels
+                for otdel in otdel_list:
+                    if otdel.get("head") == slug:
+                        otdel["head"] = ""
+                        changed = True
+
+        if changed:
+            _save_yaml(agents_config_path, agents_data)
+            _save_yaml(_get_config_dir() / "otdels.yaml", {"otdels": otdel_list})
 
     # Ensure each role has rolesid
     for role in roles:

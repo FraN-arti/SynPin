@@ -1035,7 +1035,7 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
         "type": "function",
         "function": {
             "name": "otdel_manage",
-            "description": "Управление отделами: создание, редактирование, удаление, просмотр состава. Используй для управления структурой организации.",
+            "description": "Управление отделами (otdels) — чат-комнаты для общения. Список, просмотр, создание, обновление, удаление. Узнай кто глава отдела и сколько агентов.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -1044,7 +1044,7 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
                         "enum": ["list", "get", "create", "update", "delete"],
                         "description": "Команда: list=все отделы, get=получить отдел, create=создать, update=обновить, delete=удалить",
                     },
-                    "dept_id": {
+                    "otdel_id": {
                         "type": "string",
                         "description": "ID отдела (для get/update/delete)",
                     },
@@ -1234,6 +1234,38 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
             },
         },
     },
+    "otdel_message": {
+        "type": "function",
+        "function": {
+            "name": "otdel_message",
+            "description": "Отправить сообщение в чат отдела от имени главного агента. Глава отдела получит уведомление и может ответить. Принимает otdel_id ИЛИ otdel_name. Только для главного агента.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "otdel_id": {"type": "string", "description": "ID отдела (можно узнать через otdel_manage(list))"},
+                    "otdel_name": {"type": "string", "description": "Название отдела (например 'Разработка', 'Дизайн')"},
+                    "message": {"type": "string", "description": "Текст сообщения"},
+                },
+                "required": ["message"],
+            },
+        },
+    },
+    "otdel_history": {
+        "type": "function",
+        "function": {
+            "name": "otdel_history",
+            "description": "Прочитать историю чата отдела. Позволяет проверить ответы главы отдела и обсуждения. Принимает otdel_id ИЛИ otdel_name. Только для главного агента.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "otdel_id": {"type": "string", "description": "ID отдела (можно узнать через otdel_manage(list))"},
+                    "otdel_name": {"type": "string", "description": "Название отдела (например 'Разработка', 'Дизайн')"},
+                    "limit": {"type": "integer", "description": "Максимум последних сообщений (по умолчанию 20)"},
+                },
+                "required": [],
+            },
+        },
+    },
 }
 
 
@@ -1245,7 +1277,8 @@ HEAD_TOOLS = {"head_delegate", "head_evaluate", "head_retry", "head_decide", "he
 
 # Primary-only tools — only available to the main agent (is_primary=true)
 PRIMARY_TOOLS = {"otdel_manage", "project_manage",
-                 "connection_list", "connection_create", "connection_delete", "connection_history"}
+                 "connection_list", "connection_create", "connection_delete", "connection_history",
+                 "otdel_message", "otdel_history"}
 
 
 def get_all_tool_names(include_head: bool = False, include_primary: bool = False) -> list[str]:

@@ -675,6 +675,7 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
               if (!hasValidSender && !hasContent) return null
               const left = isLeftSide(msg)
               const isHead = msg.is_head === true
+              const isMainAgent = msg.sender === 'main_agent'
               const isStreaming = msg.streaming === true
 
               const workerColor = !left && !isHead ? agentColorMap.get(msg.sender) : undefined
@@ -683,14 +684,18 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
                 <div key={msg.id} className={`otdel-msg-row ${left ? 'left' : 'right'} ${isStreaming ? 'streaming' : ''}`}>
                   <div
                     className={`otdel-msg-avatar ${left ? 'left' : 'right'}`}
-                    style={workerColor ? { background: workerColor + '20' } : undefined}
+                    style={isMainAgent ? { background: 'rgba(249,115,22,0.2)' } : workerColor ? { background: workerColor + '20' } : undefined}
                   >
-                    {left ? '👤' : '🏢'}
+                    {isMainAgent ? '🤖' : left ? '👤' : '🏢'}
                   </div>
                   <div className="otdel-msg-body">
                     <div
-                      className={`otdel-msg-bubble ${left ? 'left' : 'right'} ${isHead ? 'head' : ''}`}
-                      style={workerColor ? {
+                      className={`otdel-msg-bubble ${left ? 'left' : 'right'} ${isHead ? 'head' : ''} ${isMainAgent ? 'main-agent' : ''}`}
+                      style={isMainAgent ? {
+                        borderColor: 'var(--orange)',
+                        background: 'rgba(249,115,22,0.08)',
+                        boxShadow: '0 4px 20px rgba(249,115,22,0.2)',
+                      } : workerColor ? {
                         borderColor: workerColor,
                         background: workerColor + '12',
                       } : undefined}
@@ -705,6 +710,13 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
                       <MarkdownRenderer content={msg.content} isStreaming={isStreaming} />
                       </div>
                       {/* Message meta info — time · agent · model */}
+                      {isMainAgent && !isStreaming && (
+                        <div className="otdel-msg-meta">
+                          <span className="msg-meta-time">{new Date(msg.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span className="meta-sep"> — </span>
+                          <span className="meta-badge" style={{ color: 'var(--orange)' }}>🤖 Главный агент</span>
+                        </div>
+                      )}
                       {msg.role === 'assistant' && (msg.model || msg.sender_name) && !isStreaming && (
                         <div className="otdel-msg-meta">
                           <span className="msg-meta-time">{new Date(msg.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>

@@ -11,10 +11,10 @@ _API_BASE = os.environ.get("SYNPIN_API_BASE", "http://127.0.0.1:2088")
 
 async def otdel_manage(params: dict[str, Any]) -> ToolResult:
     """
-    Управление отделами.
+    Управление отделами (otdels) — чат-комнаты для общения.
 
     Commands:
-      list   — список всех отделов
+      list   — список всех отделов (с главой и количеством агентов)
       get    — получить отдел по ID
       create — создать отдел
       update — обновить отдел
@@ -42,49 +42,70 @@ async def otdel_manage(params: dict[str, Any]) -> ToolResult:
 
 
 async def _list(params: dict[str, Any]) -> ToolResult:
-    """Список всех отделов."""
+    """Список всех отделов (otdels) — чат-комнаты для общения."""
     import httpx
 
     async with httpx.AsyncClient(timeout=15.0) as client:
-        res = await client.get(f"{_API_BASE}/api/departments")
+        res = await client.get(f"{_API_BASE}/api/otdels")
         if res.status_code != 200:
-            return make_error(f"Failed to list departments: {res.text}")
+            return make_error(f"Failed to list otdels: {res.text}")
         data = res.json()
 
-    departments = data.get("departments", [])
+    otdels = data.get("otdels", [])
     result = []
-    for d in departments:
+    for o in otdels:
+        head = o.get("head", "")
+        head_name = ""
+        if head:
+            try:
+                from ..agents.manager import get_agent
+                agent = get_agent(head)
+                head_name = agent.get("name", head) if agent else head
+            except Exception:
+                head_name = head
         result.append({
-            "id": d.get("id", ""),
-            "name": d.get("name", ""),
-            "description": d.get("description", ""),
-            "agent_count": d.get("agent_count", 0),
+            "id": o.get("otdelid", ""),
+            "name": o.get("name", ""),
+            "description": o.get("description", ""),
+            "head": head_name or head,
+            "agent_count": o.get("agent_count", 0),
         })
 
-    return make_success({"departments": result, "count": len(result)})
+    return make_success({"otdels": result, "count": len(result)})
 
 
 async def _get(params: dict[str, Any]) -> ToolResult:
     """Получить отдел по ID."""
     import httpx
 
-    dept_id = params.get("dept_id", "") or params.get("id", "")
-    if not dept_id:
-        return make_error("dept_id required")
+    otdel_id = params.get("otdel_id", "") or params.get("dept_id", "") or params.get("id", "")
+    if not otdel_id:
+        return make_error("otdel_id required")
 
     async with httpx.AsyncClient(timeout=15.0) as client:
-        res = await client.get(f"{_API_BASE}/api/departments/{dept_id}")
+        res = await client.get(f"{_API_BASE}/api/otdels/{otdel_id}")
         if res.status_code != 200:
-            return make_error(f"Department not found: {dept_id}")
-        dept = res.json()
+            return make_error(f"Otdel not found: {otdel_id}")
+        otdel = res.json()
+
+    head = otdel.get("head", "")
+    head_name = ""
+    if head:
+        try:
+            from ..agents.manager import get_agent
+            agent = get_agent(head)
+            head_name = agent.get("name", head) if agent else head
+        except Exception:
+            head_name = head
 
     return make_success({
-        "id": dept.get("id", ""),
-        "name": dept.get("name", ""),
-        "description": dept.get("description", ""),
-        "color": dept.get("color", ""),
-        "agents": dept.get("agents", []),
-        "agent_count": dept.get("agent_count", 0),
+        "id": otdel.get("otdelid", ""),
+        "name": otdel.get("name", ""),
+        "description": otdel.get("description", ""),
+        "color": otdel.get("color", ""),
+        "head": head_name or head,
+        "workers": otdel.get("workers", []),
+        "agent_count": otdel.get("agent_count", 0),
     })
 
 
@@ -103,15 +124,15 @@ async def _create(params: dict[str, Any]) -> ToolResult:
     }
 
     async with httpx.AsyncClient(timeout=15.0) as client:
-        res = await client.post(f"{_API_BASE}/api/departments", json=payload)
+        res = await client.post(f"{_API_BASE}/api/otdels", json=payload)
         if res.status_code != 200:
-            return make_error(f"Failed to create department: {res.text}")
-        dept = res.json()
+            return make_error(f"Failed to create otdel: {res.text}")
+        otdel = res.json()
 
     return make_success({
-        "id": dept.get("id", ""),
-        "name": dept.get("name", ""),
-        "message": f"Department '{name}' created",
+        "id": otdel.get("otdelid", ""),
+        "name": otdel.get("name", ""),
+        "status": "created",
     })
 
 
@@ -119,45 +140,36 @@ async def _update(params: dict[str, Any]) -> ToolResult:
     """Обновить отдел."""
     import httpx
 
-    dept_id = params.get("dept_id", "") or params.get("id", "")
-    if not dept_id:
-        return make_error("dept_id required")
+    otdel_id = params.get("otdel_id", "") or params.get("id", "")
+    if not otdel_id:
+        return make_error("otdel_id required")
 
     payload = {}
-    for field in ("name", "description", "color"):
-        if field in params and params[field] is not None:
-            payload[field] = params[field]
-
+    for key in ("name", "description", "color"):
+        if key in params:
+            payload[key] = params[key]
     if not payload:
-        return make_error("Nothing to update — provide name, description, or color")
+        return make_error("Nothing to update")
 
     async with httpx.AsyncClient(timeout=15.0) as client:
-        res = await client.put(f"{_API_BASE}/api/departments/{dept_id}", json=payload)
+        res = await client.put(f"{_API_BASE}/api/otdels/{otdel_id}", json=payload)
         if res.status_code != 200:
-            return make_error(f"Failed to update department: {res.text}")
-        dept = res.json()
+            return make_error(f"Failed to update otdel: {res.text}")
 
-    return make_success({
-        "id": dept.get("id", ""),
-        "name": dept.get("name", ""),
-        "message": f"Department updated",
-    })
+    return make_success({"status": "updated", "otdel_id": otdel_id})
 
 
 async def _delete(params: dict[str, Any]) -> ToolResult:
     """Удалить отдел."""
     import httpx
 
-    dept_id = params.get("dept_id", "") or params.get("id", "")
-    if not dept_id:
-        return make_error("dept_id required")
+    otdel_id = params.get("otdel_id", "") or params.get("id", "")
+    if not otdel_id:
+        return make_error("otdel_id required")
 
     async with httpx.AsyncClient(timeout=15.0) as client:
-        res = await client.delete(f"{_API_BASE}/api/departments/{dept_id}")
+        res = await client.delete(f"{_API_BASE}/api/otdels/{otdel_id}")
         if res.status_code != 200:
-            return make_error(f"Failed to delete department: {res.text}")
+            return make_error(f"Failed to delete otdel: {res.text}")
 
-    return make_success({"message": f"Department {dept_id} deleted"})
-
-
-__all__ = ["otdel_manage"]
+    return make_success({"status": "deleted", "otdel_id": otdel_id})

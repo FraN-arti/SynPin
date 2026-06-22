@@ -3,7 +3,7 @@
  * Cards are draggable into left/right panel zones via @dnd-kit.
  * Syncs with backend via WebSocket only (no redundant fetch on DOM event).
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { API_BASE } from '../../config'
@@ -33,7 +33,6 @@ function DraggableWidgetCard({
   const meta = WIDGET_META[id]
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 0.5 : isPlaced ? 0.4 : 1,
     zIndex: isDragging ? 100 : undefined,
     pointerEvents: isDragging ? 'none' : 'auto',
   }
@@ -78,7 +77,6 @@ export function WidgetsSection({ wsOn }: { wsOn?: (type: string, handler: (data:
     }
     console.log('[widgets-section] subscribing to widgets:layout_changed')
     const off = wsOn('widgets:layout_changed', (msg: any) => {
-      console.log('[widgets-section] WS received layout_changed', msg.layout)
       if (msg.layout) {
         setLayout(msg.layout)
       }

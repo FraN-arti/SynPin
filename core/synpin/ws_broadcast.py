@@ -29,7 +29,9 @@ def broadcast(event: dict[str, Any]) -> None:
         _log.warning("broadcast: no event loop set, event=%s", event.get("type"))
         return
     try:
-        from ..chat.ws_manager import ws_manager
+        from .chat.ws_manager import ws_manager
+
+        _log.info("broadcast: %s (clients=%d)", event.get("type"), ws_manager.active_count)
 
         async def _send():
             await ws_manager.broadcast(event)

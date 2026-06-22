@@ -315,6 +315,11 @@ function App() {
           }
         })
         .catch(() => {})
+      // Re-fetch primary agent slug (may have changed after create/delete)
+      fetch(`${API_BASE}/api/config/primary-agent`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (data?.slug) setPrimarySlug(data.slug) })
+        .catch(() => {})
     })
     return off
   }, [wsOn])
@@ -1104,9 +1109,13 @@ function App() {
                 <button
                   className={`agent-list-item ${activeAgent?.slug === primary.slug ? 'active' : ''}`}
                   onClick={() => {
-                    setActiveAgent(primary)
-                    setMessages([])
-                    setView({ type: 'chat' })
+                    if (activeAgent?.slug !== primary.slug) {
+                      setActiveAgent(primary)
+                      setMessages([])
+                      setView({ type: 'chat' })
+                    } else if (view.type !== 'chat') {
+                      setView({ type: 'chat' })
+                    }
                   }}
                 >
                   <span className="agent-list-avatar" style={{ background: primary.is_external ? '#f97316' : '#6b7280' }}>
@@ -1167,10 +1176,15 @@ function App() {
                     key={agent.slug}
                     className={`agent-list-item ${activeAgent?.slug === agent.slug ? 'active' : ''}`}
                     onClick={() => {
-                      setActiveAgent(agent)
-                      setMessages([])
+                      if (activeAgent?.slug !== agent.slug) {
+                        setActiveAgent(agent)
+                        setMessages([])
+                        setView({ type: 'chat' })
+                      } else if (view.type !== 'chat') {
+                        // Same agent but not in chat view — just switch view
+                        setView({ type: 'chat' })
+                      }
                       setAgentSearch('')
-                      setView({ type: 'chat' })
                     }}
                   >
                     <span className="agent-list-avatar" style={{ background: agent.is_external ? '#f97316' : '#6b7280' }}>

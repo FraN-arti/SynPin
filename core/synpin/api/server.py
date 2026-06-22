@@ -37,10 +37,59 @@ for _sp in _settings_candidates:
             pass
         break
 
+import asyncio
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup/shutdown lifecycle — replaces deprecated on_event('startup')."""
+    # ── WS broadcast: capture the running loop for thread-safe broadcasts ──
+    from .. import ws_broadcast
+    ws_broadcast.init(asyncio.get_running_loop())
+    logger.info("[ws_broadcast] loop initialized")
+
+    # ── Background tasks ──────────────────────────────────────────────────
+    from .version_router import _update_check_loop
+    asyncio.create_task(_update_check_loop())
+    logger.info("[update-check] GitHub update-checker running (every 6h)")
+
+    try:
+        from ..kanban.service import KanbanService
+        from ..kanban.auto_delete import schedule_auto_delete
+        svc = KanbanService()
+        task = schedule_auto_delete(svc)
+        if task:
+            logger.info("[auto-delete] worker running")
+    except Exception as e:
+        logger.warning("[auto-delete] failed to start: %s", e)
+
+    try:
+        from ..kanban.deadline import schedule_deadline_checker
+        task = schedule_deadline_checker()
+        if task:
+            logger.info("[deadline] checker running")
+    except Exception as e:
+        logger.warning("[deadline] failed to start: %s", e)
+
+    try:
+        from ..connections.auto_approval import schedule_auto_approval
+        task = schedule_auto_approval()
+        if task:
+            logger.info("[auto-approval] worker running")
+    except Exception as e:
+        logger.warning("[auto-approval] failed to start: %s", e)
+
+    yield  # ← app runs here
+
+    # ── Shutdown (if needed) ──────────────────────────────────────────────
+
+
 app = FastAPI(
     title="SynPin",
     description="Agent-Driven Organization Platform",
     version=__version__,
+    lifespan=lifespan,
 )
 
 # Allow Vite dev server to reach the API
@@ -156,111 +205,9 @@ app.include_router(version_router)
 from .widgets_router import router as widgets_router
 app.include_router(widgets_router)
 
-# Set up thread-safe WS broadcast (used by all modules)
-import asyncio
-from .. import ws_broadcast
-
-try:
-    loop = asyncio.get_running_loop()
-    ws_broadcast.init(loop)
-except RuntimeError:
-    @app.on_event("startup")
-    def _setup_ws_broadcast():
-        ws_broadcast.init(asyncio.get_event_loop())
-
-
-# ---------------------------------------------------------------------------
-# Background update-checker — registered as a startup hook ALWAYS,
-# not just inside the except branch above. This way the checker
-# fires whether the import-time loop was available or not, and
-# (more importantly) the same code path runs in dev and prod.
-# ---------------------------------------------------------------------------
-
-@app.on_event("startup")
-async def _start_update_checker():
-    """Start the background GitHub update-checker.
-
-    The checker polls every 6 hours and pushes a
-    'version:update_available' event over WebSocket when a
-    newer release is published. It also runs once 2 seconds
-    after startup so users don't have to wait for the first
-    poll to see an "Update available" pill if they're on an
-    older version.
-    """
-    from .version_router import _update_check_loop
-    asyncio.create_task(_update_check_loop())
-    console.print(
-        f"  [update-check] GitHub update-checker running (every 6h, "
-        f"repo=FraN-arti/SynPin)"
-    )
-
-
 @app.get("/api/health")
 def health():
     return {"status": "ok", "version": __version__}
-
-
-@app.on_event("startup")
-def _start_auto_delete():
-    """Start the background auto-delete worker.
-
-    Every hour (or AUTO_DELETE_INTERVAL_S env var) the worker
-    runs a pass that deletes tasks from configured source
-    columns whose last activity is older than
-    auto_archive_days. The user configures both via the Kanban
-    board settings UI.
-    """
-    try:
-        from ..kanban.service import KanbanService
-        from ..kanban.auto_delete import schedule_auto_delete
-        svc = KanbanService()
-        task = schedule_auto_delete(svc)
-        if task:
-            console.print("  [auto-delete] worker running (default 1h, override via AUTO_DELETE_INTERVAL_S)")
-        else:
-            console.print("  [auto-delete] no event loop yet, worker will start on next request")
-    except Exception as e:
-        console.print(f"  [auto-delete] failed to start: {e}")
-
-
-@app.on_event("startup")
-def _start_deadline_checker():
-    """Start the background deadline checker.
-
-    Every 5 minutes (or DEADLINE_CHECK_INTERVAL_S env var) checks
-    all tasks with deadlines. Warns at <1h remaining, auto-escalates
-    overdue tasks to BLOCKED.
-    """
-    try:
-        from ..kanban.service import KanbanService
-        from ..kanban.deadline import schedule_deadline_checker
-        svc = KanbanService()
-        task = schedule_deadline_checker(svc)
-        if task:
-            console.print("  [deadline] checker running (default 5min, override via DEADLINE_CHECK_INTERVAL_S)")
-        else:
-            console.print("  [deadline] no event loop yet, checker will start on next request")
-    except Exception as e:
-        console.print(f"  [deadline] failed to start: {e}")
-
-
-@app.on_event("startup")
-def _start_auto_approval():
-    """Start the background auto-escalation worker.
-
-    Every 5 minutes (or AUTO_ESCALATION_INTERVAL_S env var) checks
-    connections with auto_trigger configured. Escalates blocked tasks
-    to parent departments after timeout.
-    """
-    try:
-        from ..connections.auto_approval import schedule_auto_approval
-        task = schedule_auto_approval()
-        if task:
-            console.print("  [auto-escalation] worker running (default 5min, override via AUTO_ESCALATION_INTERVAL_S)")
-        else:
-            console.print("  [auto-escalation] no event loop yet, worker will start on next request")
-    except Exception as e:
-        console.print(f"  [auto-escalation] failed to start: {e}")
 
 
 @app.post("/api/admin/reload")

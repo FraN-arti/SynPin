@@ -47,6 +47,8 @@ from .image_analyze import image_analyze
 from .summarize import summarize
 from .otdel_manage import otdel_manage
 from .project_manage import project_manage
+from .otdel_message import otdel_message
+from .otdel_history import otdel_history
 
 # Registry dict mapping tool names to handler functions (loaded lazily)
 _tool_handlers: dict[str, ToolHandler] | None = None
@@ -87,6 +89,8 @@ def get_tool_registry() -> dict[str, ToolHandler]:
             "summarize": summarize,
             "otdel_manage": otdel_manage,
             "project_manage": project_manage,
+            "otdel_message": otdel_message,
+            "otdel_history": otdel_history,
         }
     return _tool_handlers
 
@@ -125,4 +129,6 @@ __all__ = [
     "summarize",
     "otdel_manage",
     "project_manage",
+    "otdel_message",
+    "otdel_history",
 ]

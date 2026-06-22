@@ -224,6 +224,20 @@ def _build_otdel_system_prompt(otdel: dict, agent: dict, is_head: bool) -> str:
 {separator}"""
     parts.append(otdel_block)
 
+    # Main agent info — every agent in otdel should know about the main agent
+    main_agent_block = """
+## Главный агент
+
+🤖 В системе есть **Главный ассистент** — это центральный управляющий агент.
+Он может:
+- Отправлять тебе сообщения и задания
+- Запрашивать информацию о задачах и проектах
+- Делегировать задачи через систему связей
+
+Если ты получаешь сообщение от «🤖 Главный ассистент» — это НЕ пользователь, а системный агент.
+Отвечай на его сообщения, выполняй его инструкции и уведомляй о результатах."""
+    parts.append(main_agent_block)
+
     # Connections context — modular prompts per connection type
     otdel_id = otdel.get("otdelid", "")
     if otdel_id:
@@ -441,6 +455,7 @@ def _build_head_context(history: list[dict], agent_slug: str, exclude_last: bool
     - User messages → role: user
     - Head's own previous messages → role: assistant
     - Worker messages → role: user with name label
+    - Main agent messages → role: user with "Главный ассистент" label
 
     exclude_last: True when building context for the NEXT agent call (exclude current trigger).
                   False for follow-up (need ALL messages including last worker response).
@@ -456,6 +471,9 @@ def _build_head_context(history: list[dict], agent_slug: str, exclude_last: bool
             if m.get("images"):
                 entry["images"] = m["images"]
             context.append(entry)
+        elif sender == "main_agent":
+            # Main agent message — show as instruction from the system
+            context.append({"role": "user", "content": f"[🤖 Главный ассистент]: {content}"})
         elif sender == agent_slug:
             # Head's own previous messages
             context.append({"role": "assistant", "content": content})
@@ -473,6 +491,7 @@ def _build_worker_context(history: list[dict], agent_slug: str, head_slug: str, 
     Worker sees:
     - User messages → role: user
     - Head's messages → role: user with name
+    - Main agent messages → role: user with "Главный ассистент" label
     - Own previous messages → role: assistant
     """
     context = []
@@ -485,6 +504,9 @@ def _build_worker_context(history: list[dict], agent_slug: str, head_slug: str, 
             if m.get("images"):
                 entry["images"] = m["images"]
             context.append(entry)
+        elif sender == "main_agent":
+            # Main agent message — show as instruction from the system
+            context.append({"role": "user", "content": f"[🤖 Главный ассистент]: {content}"})
         elif sender == agent_slug:
             # Worker's own previous messages
             context.append({"role": "assistant", "content": content})

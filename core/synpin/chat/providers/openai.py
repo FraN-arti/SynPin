@@ -142,34 +142,7 @@ class OpenAIProvider(BaseProvider):
                             except Exception as e:
                                 _log.error("[provider] Could not parse error: %s", e)
                             _log.error("[provider] 400 response: %s", resp.text[:1000])
-                            # Also write to file for debugging
-                            try:
-                                import os
-                                debug_path = os.path.join(os.environ.get("APPDATA", "."), "synpin", "debug_400.log")
-                                os.makedirs(os.path.dirname(debug_path), exist_ok=True)
-                                with open(debug_path, "a", encoding="utf-8") as f:
-                                    f.write(f"\n{'='*60}\n")
-                                    f.write(f"400 Bad Request at {__import__('datetime').datetime.now().isoformat()}\n")
-                                    f.write(f"Model: {model}\n")
-                                    # Try to extract bad message index
-                                    try:
-                                        err_data = resp.json()
-                                        err_inner = json.loads(err_data.get("error", {}).get("message", "{}"))
-                                        err_text = err_inner.get("error", {}).get("message", "")
-                                        f.write(f"Error: {err_text}\n")
-                                        import re
-                                        idx_match = re.search(r'messages\.(\d+)\.content', err_text)
-                                        if idx_match:
-                                            bad_idx = int(idx_match.group(1))
-                                            msgs = body.get("messages", [])
-                                            if bad_idx < len(msgs):
-                                                bad = msgs[bad_idx]
-                                                f.write(f"BAD message[{bad_idx}]: role={bad.get('role')}, content={repr(bad.get('content'))[:300]}, keys={list(bad.keys())}\n")
-                                    except Exception:
-                                        f.write(f"Response: {resp.text[:2000]}\n")
-                                    f.write(f"Total messages: {len(body.get('messages', []))}\n")
-                            except Exception:
-                                pass
+
                         resp.raise_for_status()
                         data = resp.json()
                         break

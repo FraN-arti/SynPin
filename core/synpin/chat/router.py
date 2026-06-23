@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from .providers import ProviderRegistry
 from .providers.base import ChatMessage
 from .task_manager import task_manager
+from ..time import now as _now
 
 logger = logging.getLogger(__name__)
 
@@ -336,7 +337,7 @@ def _check_session_auto_reset(agent_slug: str, channel_id: str) -> bool:
         except ValueError:
             return False
 
-        now = datetime.now()
+        now = _now()
         mode = memory.get("session_auto_reset_mode", 
                           global_settings.get("auto_reset_mode", "daily"))
         needs_reset = False
@@ -401,13 +402,13 @@ def _archive_session(agent_slug: str, channel_id: str, session: dict):
             return
 
         # Create archive entry
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = _now().strftime("%Y%m%d_%H%M%S")
         archive_file = archive_dir / f"{channel_id}_{timestamp}.json"
         archive_data = {
             "channel_id": channel_id,
             "session": session,
             "messages": history,
-            "archived_at": datetime.now().isoformat(),
+            "archived_at": _now().isoformat(),
         }
         with open(archive_file, "w", encoding="utf-8") as f:
             json.dump(archive_data, f, ensure_ascii=False, indent=1)
@@ -915,18 +916,18 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
         "type": "function",
         "function": {
             "name": "kanban_task",
-            "description": "Работа с канбан-тасками: список задач отдела, создание, запись истории, переназначение, закрытие, доработка, статус.",
+            "description": "Работа с канбан-тасками: создание, список, редактирование, удаление, архивация, история, переназначение, завершение, доработка, блокировка, начало работы, отправка на ревью, одобрение, статус.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "command": {
                         "type": "string",
-                        "enum": ["create", "list", "history", "reassign", "complete", "rework", "status"],
-                        "description": "Команда: list=список задач отдела, create=создать, history=история, reassign=переназначить, complete=завершить, rework=доработка, status=статус",
+                        "enum": ["create", "list", "history", "reassign", "complete", "rework", "block", "unblock", "status"],
+                        "description": "Команда: list=список задач, create=создать, history=история, reassign=переназначить, complete=завершить, rework=доработка, block=заблокировать, unblock=разблокировать, status=статус",
                     },
                     "task_id": {
                         "type": "string",
-                        "description": "ID таска (T-001, T-002, ...) — для status/history/complete/rework",
+                        "description": "ID таска (T-001, T-002, ...) — для status/history/complete/rework/block/unblock",
                     },
                     "title": {
                         "type": "string",
@@ -1266,14 +1267,44 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
             },
         },
     },
+    "cron_manage": {
+        "type": "function",
+        "function": {
+            "name": "cron_manage",
+            "description": "Управление запланированными задачами (cron). Создавай, обновляй, удаляй крон-задачи, смотри историю запусков, запускай немедленно. Типы: cron (повторяющиеся), once (одноразовые), interval (интервал). Действия: send_message (в отдел), run_prompt (запустить агента).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "type": "string",
+                        "enum": ["list", "get", "create", "update", "delete", "history", "run_now"],
+                        "description": "Команда",
+                    },
+                    "job_id": {"type": "string", "description": "ID задачи (для get/update/delete/history/run_now)"},
+                    "name": {"type": "string", "description": "Название задачи"},
+                    "schedule_type": {"type": "string", "enum": ["cron", "once", "interval"], "description": "Тип расписания"},
+                    "schedule_expr": {"type": "string", "description": "Расписание. Относительное: 2m, 1h, 30s, 2h30m. Абсолютное: 2026-06-23T13:00:00. Cron: 0 13 * * *."},
+                    "action_type": {"type": "string", "enum": ["run_prompt"], "description": "Тип действия"},
+                    "action_target": {"type": "string", "description": "Куда отправить: 'private' (приватный чат агента), 'otdel:ID' (чат отдела), или otdel_id"},
+                    "action_message": {"type": "string", "description": "Текст сообщения или промпт для агента"},
+                    "action_agent": {"type": "string", "description": "Slug агента для run_prompt (например 'main_agent')"},
+                    "description": {"type": "string", "description": "Описание задачи"},
+                    "status": {"type": "string", "enum": ["active", "paused"], "description": "Статус задачи"},
+                },
+                "required": ["command"],
+            },
+        },
+    },
 }
 
 
 BUILTINS = {"memory_read", "memory_write", "image_analyze", "summarize"}
 
-# Head-only tools — not available to regular workers
+# Head-only tools — available to department heads
+# (main agent also gets these via include_head=True)
 HEAD_TOOLS = {"head_delegate", "head_evaluate", "head_retry", "head_decide", "head_block", "kanban_task",
-              "head_approve", "head_reline", "head_approval_status"}
+              "head_approve", "head_reline", "head_approval_status",
+              "cron_manage"}
 
 # Primary-only tools — only available to the main agent (is_primary=true)
 PRIMARY_TOOLS = {"otdel_manage", "project_manage",
@@ -1344,9 +1375,15 @@ def build_tool_descriptions(tool_names: list[str]) -> str:
         if name == "kanban_task":
             lines.append("")
             lines.append("Пример вызова:")
-            lines.append('```tool_call')
+            lines.append("```tool_call")
             lines.append('{"name": "kanban_task", "params": {"command": "list"}}')
-            lines.append('```')
+            lines.append("```")
+        if name == "cron_manage":
+            lines.append("")
+            lines.append("Пример вызова (создание одноразовой задачи через 2 минуты):")
+            lines.append("```tool_call")
+            lines.append('{"name": "cron_manage", "params": {"command": "create", "name": "Шутка", "schedule_type": "once", "schedule_expr": "2m", "action_type": "run_prompt", "action_agent": "main_agent", "action_target": "private", "action_message": "Напиши пользователю шутку."}}')
+            lines.append("```")
         if props:
             param_parts = []
             for pname, pdef in props.items():
@@ -1396,21 +1433,7 @@ async def execute_tool(tool_name: str, params: dict, agent_slug: str | None = No
                 params = {**params, "_agent_provider": agent_provider, "_agent_model": agent_model}
 
         logging.getLogger("synpin.chat").info("[tool] Executing %s with params=%s", tool_name, {k: str(v)[:100] for k, v in params.items()})
-        try:
-            import os
-            _dbg = os.path.join(os.environ.get("APPDATA", "."), "synpin", "chat_debug.log")
-            with open(_dbg, "a", encoding="utf-8") as f:
-                f.write(f"[tool] Executing {tool_name} with params={dict(params)}\n")
-        except Exception:
-            pass
         result = await handler(params)
-        logging.getLogger("synpin.chat").info("[tool] %s result: success=%s, output=%s",
-                                              tool_name, result.get("success"), str(result.get("output", ""))[:200])
-        try:
-            with open(_dbg, "a", encoding="utf-8") as f:
-                f.write(f"[tool] {tool_name} result: success={result.get('success')}, output={str(result.get('output', ''))[:500]}\n")
-        except Exception:
-            pass
         return result
     except Exception as e:
         logging.getLogger("synpin.chat").error("[tool] %s error: %s", tool_name, e)
@@ -1583,18 +1606,6 @@ async def stream_response(
     _log = logging.getLogger("synpin.chat")
     _tool_names_sent = [t.get("function", {}).get("name", "?") for t in (native_tools or [])]
     _log.info("CHAT tools=%s model=%s provider=%s", _tool_names_sent, model, provider_name if provider else "NONE")
-    # Debug: write to file since uvicorn filters INFO
-    try:
-        import os
-        _dbg = os.path.join(os.environ.get("APPDATA", "."), "synpin", "chat_debug.log")
-        os.makedirs(os.path.dirname(_dbg), exist_ok=True)
-        with open(_dbg, "a", encoding="utf-8") as f:
-            f.write(f"\n{'='*40}\n")
-            f.write(f"stream_response called: model={model}, provider={provider_name}\n")
-            f.write(f"tools={_tool_names_sent}\n")
-            f.write(f"native_tools count={len(native_tools) if native_tools else 0}\n")
-    except Exception:
-        pass
     if native_tools:
         _log.info("CHAT sending %d native tools to provider", len(native_tools))
     else:
@@ -1635,14 +1646,6 @@ async def stream_response(
                       "unknown" if not model_tool_calls else "has_calls")
             if full_text:
                 _log.info("LLM text preview: %s", full_text[:500])
-                try:
-                    import os
-                    _dbg = os.path.join(os.environ.get("APPDATA", "."), "synpin", "chat_debug.log")
-                    with open(_dbg, "a", encoding="utf-8") as f:
-                        f.write(f"LLM response: text={len(full_text)} chars, tool_calls={len(model_tool_calls)}\n")
-                        f.write(f"LLM text: {full_text[:1000]}\n")
-                except Exception:
-                    pass
             # Determine
             is_text_fallback = False
             if not model_tool_calls:
@@ -1813,6 +1816,14 @@ def _build_system_prompt_with_memory(req: ChatRequest) -> str:
                     main_prompt = prompt_path.read_text(encoding="utf-8").strip()
                     if main_prompt:
                         system_prompt = f"{system_prompt}\n\n{main_prompt}" if system_prompt else main_prompt
+        except Exception:
+            pass
+
+        # Inject current server time so agent knows "now" for cron scheduling
+        try:
+            from ..time import now_str as _now_str
+            _now_str_val = _now_str()
+            system_prompt = f"{system_prompt}\n\n## Текущее серверное время\nСейчас: {_now_str_val}. Используй это время для вычисления schedule_expr в cron_manage."
         except Exception:
             pass
 

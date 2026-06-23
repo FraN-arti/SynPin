@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ..time import now as _now
 from .models import (
     Project,
     load_project,
@@ -89,6 +90,6 @@ class ProjectConfig:
         """Append entry to TOGLE.md."""
         current = self.read_togle(project_id)
         from datetime import datetime
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        timestamp = _now().strftime("%Y-%m-%d %H:%M")
         new_entry = f"\n\n## [{timestamp}]\n{entry}"
         self.write_togle(project_id, current + new_entry)

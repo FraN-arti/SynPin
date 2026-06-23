@@ -49,6 +49,7 @@ from .otdel_manage import otdel_manage
 from .project_manage import project_manage
 from .otdel_message import otdel_message
 from .otdel_history import otdel_history
+from .cron_manage import cron_manage
 
 # Registry dict mapping tool names to handler functions (loaded lazily)
 _tool_handlers: dict[str, ToolHandler] | None = None
@@ -91,6 +92,7 @@ def get_tool_registry() -> dict[str, ToolHandler]:
             "project_manage": project_manage,
             "otdel_message": otdel_message,
             "otdel_history": otdel_history,
+            "cron_manage": cron_manage,
         }
     return _tool_handlers
 
@@ -131,4 +133,5 @@ __all__ = [
     "project_manage",
     "otdel_message",
     "otdel_history",
+    "cron_manage",
 ]

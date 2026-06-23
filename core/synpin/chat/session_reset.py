@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 _last_reset: dict[str, float] = {}
 
 
+from ..time import now as _now
 from ..paths import (
     get_data_dir_or_none as _get_data_dir,
     get_config_dir_or_none as _get_config_dir,
@@ -68,7 +69,7 @@ def _should_reset(sessions_cfg: dict) -> bool:
         return False
 
     mode = auto_reset.get("mode", "daily")
-    now = datetime.now()
+    now = _now()
 
     if mode == "daily":
         reset_time = auto_reset.get("reset_time", "00:00")
@@ -110,7 +111,7 @@ def _should_reset(sessions_cfg: dict) -> bool:
 def _archive_session(session_path: Path, archive_dir: Path):
     """Archive a session file."""
     archive_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = _now().strftime("%Y%m%d_%H%M%S")
     stem = session_path.stem
     archive_name = f"{stem}_{timestamp}.json"
     archive_path = archive_dir / archive_name
@@ -154,7 +155,7 @@ def _reset_sessions():
         if archive_retention_days > 0:
             archive_dir = sessions_dir / "archive"
             if archive_dir.exists():
-                cutoff = datetime.now() - timedelta(days=archive_retention_days)
+                cutoff = _now() - timedelta(days=archive_retention_days)
                 for archive_file in archive_dir.glob("*.json"):
                     try:
                         mtime = datetime.fromtimestamp(archive_file.stat().st_mtime)
@@ -183,7 +184,7 @@ def _reset_sessions():
                     if last_ts:
                         try:
                             last_dt = datetime.fromisoformat(last_ts.replace("Z", "+00:00"))
-                            age = datetime.now().astimezone() - last_dt
+                            age = _now().astimezone() - last_dt
                             if age > timedelta(hours=24):
                                 needs_reset = True
                         except Exception:

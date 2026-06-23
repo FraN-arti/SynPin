@@ -1,5 +1,7 @@
 """
 Project models — Pydantic schemas for the project management system.
+from ..time import now as _now
+
 
 Projects group departments, tasks, and history under a single goal.
 Each project is stored as a YAML file in data/projects/{project_id}/project.yaml.
@@ -129,14 +131,14 @@ class Project(BaseModel):
             role=role,
             is_main=is_main,
         ))
-        self.updated_at = datetime.now()
+        self.updated_at = _now()
     
     def remove_department(self, dept_id: str) -> bool:
         """Remove a department from the project."""
         initial_len = len(self.departments)
         self.departments = [d for d in self.departments if d.id != dept_id]
         if len(self.departments) < initial_len:
-            self.updated_at = datetime.now()
+            self.updated_at = _now()
             return True
         return False
     
@@ -149,7 +151,7 @@ class Project(BaseModel):
             description=description,
         )
         self.goals.append(goal)
-        self.updated_at = datetime.now()
+        self.updated_at = _now()
         return goal
     
     def remove_goal(self, goal_id: str) -> bool:
@@ -157,7 +159,7 @@ class Project(BaseModel):
         initial_len = len(self.goals)
         self.goals = [g for g in self.goals if g.id != goal_id]
         if len(self.goals) < initial_len:
-            self.updated_at = datetime.now()
+            self.updated_at = _now()
             return True
         return False
     
@@ -173,7 +175,7 @@ class Project(BaseModel):
             reason=reason,
         )
         self.archive.append(entry)
-        self.updated_at = datetime.now()
+        self.updated_at = _now()
         return entry
     
     def archive_milestone(self, title: str, task_ids: list[str], summary: str = "") -> ArchiveEntry:
@@ -187,7 +189,7 @@ class Project(BaseModel):
             summary=summary,
         )
         self.archive.append(entry)
-        self.updated_at = datetime.now()
+        self.updated_at = _now()
         return entry
     
     def get_head_department(self) -> ProjectDepartment | None:

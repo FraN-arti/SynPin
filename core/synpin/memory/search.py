@@ -1,6 +1,7 @@
 """FTS5 Search — full-text search across agent memory.
 
-Uses SQLite FTS5 for fast text search across:
+
+Uses SQLite FTS5
 - MEMORY.md files
 - USER.md files
 - facts/*.md files
@@ -17,6 +18,7 @@ import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from ..time import now as _now
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +128,7 @@ class MemorySearch:
                 self._conn.execute(
                     "INSERT INTO documents (agent_id, file_path, file_type, content, indexed_at) "
                     "VALUES (?, ?, ?, ?, ?)",
-                    (agent_id, str(file_path), file_type, content, datetime.now().timestamp())
+                    (agent_id, str(file_path), file_type, content, _now().timestamp())
                 )
                 
                 self._conn.commit()

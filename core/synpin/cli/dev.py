@@ -213,42 +213,69 @@ def _kill_orphan_vite() -> None:
 
     We detect orphans by asking the OS what's listening on 2099 and
     2088. Anything there that isn't us is killed. We only kill
-    processes whose parent or whose image basename looks like
-    'node' / 'python' to avoid nuking unrelated services.
+    processes whose image basename looks like 'node' / 'python' to
+    avoid nuking unrelated services.
+
+    Uses ``netstat -ano`` (native Windows, instant) instead of
+    PowerShell to avoid hangs on fresh installs.
     """
     if os.name != "nt":
         return  # Unix: signal propagation is reliable, no orphans
     for port in (CORE_PORT, WEB_PORT):
         if port == 0:
             continue
-        # Ask Windows who's listening on this port.
-        result = subprocess.run(
-            ["powershell", "-NoProfile", "-Command",
-             f"Get-NetTCPConnection -LocalPort {port} -State Listen -ErrorAction SilentlyContinue "
-             f"| Select-Object -ExpandProperty OwningProcess -Unique"],
-            capture_output=True, text=True, timeout=5,
-        )
-        pids = {int(x) for x in result.stdout.split() if x.strip().isdigit()}
+        # Ask Windows who's listening on this port via netstat (fast, no PowerShell).
+        try:
+            result = subprocess.run(
+                ["netstat", "-ano"],
+                capture_output=True, text=True, timeout=10,
+            )
+            pids: set[int] = set()
+            for line in result.stdout.splitlines():
+                # Lines like:  TCP  0.0.0.0:2088  0.0.0.0:0  LISTENING  12345
+                parts = line.split()
+                if len(parts) < 5:
+                    continue
+                local = parts[1]
+                state = parts[3]
+                try:
+                    pid = int(parts[4])
+                except ValueError:
+                    continue
+                if state != "LISTENING":
+                    continue
+                # Match port — local is "ip:port" or "[::]:port"
+                if local.endswith(f":{port}"):
+                    pids.add(pid)
+        except (subprocess.TimeoutExpired, Exception):
+            # netstat failed — skip orphan cleanup, not critical.
+            continue
+
         for pid in pids:
             if pid == 0 or pid == os.getpid():
                 continue
-            # Sanity check: only kill if it's node or python.
-            # We don't want to nuke a Postgres or a Redis that
-            # happens to listen on 2088.
-            info = subprocess.run(
-                ["powershell", "-NoProfile", "-Command",
-                 f"(Get-Process -Id {pid} -ErrorAction SilentlyContinue).ProcessName"],
-                capture_output=True, text=True, timeout=5,
-            )
-            name = info.stdout.strip().lower()
-            if name in ("node", "node.exe", "python", "python.exe"):
-                console.print(
-                    f"[dim]Cleaning up orphan {name} (pid {pid}) on port {port}[/dim]"
+            # Get process name via wmic (fast, no PowerShell).
+            try:
+                info = subprocess.run(
+                    ["wmic", "process", "where", f"ProcessId={pid}",
+                     "get", "Name", "/value"],
+                    capture_output=True, text=True, timeout=5,
                 )
-                subprocess.run(
-                    ["taskkill", "/F", "/T", "/PID", str(pid)],
-                    capture_output=True, timeout=5,
-                )
+                name = ""
+                for part in info.stdout.strip().split("\r\n"):
+                    if part.startswith("Name="):
+                        name = part.split("=", 1)[1].strip().lower()
+                        break
+                if name in ("node", "node.exe", "python", "python.exe"):
+                    console.print(
+                        f"[dim]Cleaning up orphan {name} (pid {pid}) on port {port}[/dim]"
+                    )
+                    subprocess.run(
+                        ["taskkill", "/F", "/T", "/PID", str(pid)],
+                        capture_output=True, timeout=5,
+                    )
+            except (subprocess.TimeoutExpired, Exception):
+                pass  # Non-critical — skip this PID
         # Brief settle so the kernel reclaims the port.
         if pids:
             time.sleep(0.5)

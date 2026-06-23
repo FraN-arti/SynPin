@@ -1,4 +1,6 @@
 """Kanban Task models — Pydantic schemas for the global task board.
+from ..time import now as _now
+
 
 Each task is stored as a YAML file in kanban/tasks/T-{id}.yaml.
 The model handles validation, serialization, and business logic.
@@ -45,6 +47,8 @@ class ActionType(str, Enum):
     RESPONDED = "responded"       # Worker responded with result
     REWORK = "rework"             # Sent back for rework
     COMPLETED = "completed"       # Task completed
+    BLOCKED = "blocked"           # Task blocked
+    UNBLOCKED = "unblocked"       # Task unblocked
     WORK_STARTED = "work_started"
     WORK_COMPLETED = "work_completed"
     REVIEW_PASSED = "review_passed"
@@ -157,7 +161,7 @@ class Task(BaseModel):
             **kwargs,
         )
         self.history.append(entry)
-        self.updated_at = datetime.now()
+        self.updated_at = _now()
 
     def assign_worker(self, agent_id: str, subtask: str) -> None:
         """Assign a worker to a subtask."""
@@ -180,7 +184,7 @@ class Task(BaseModel):
             detail=f"{old_status.value} → {new_status.value}",
         )
         if new_status == TaskStatus.DONE:
-            self.completed_at = datetime.now()
+            self.completed_at = _now()
 
     def summon(self, target_department: str, reason: str, actor: str = "head") -> None:
         """Transfer task to another department via Summon."""

@@ -13,6 +13,7 @@ from .models import (
     create_project,
 )
 from .config import ProjectConfig
+from ..time import now as _now
 
 
 class ProjectService:
@@ -105,7 +106,7 @@ class ProjectService:
         if tags is not None:
             project.tags = tags
         
-        project.updated_at = datetime.now()
+        project.updated_at = _now()
         self.config.save_project(project)
         return project
     
@@ -250,7 +251,7 @@ class ProjectService:
                 if status is not None:
                     goal.status = status
                     if status == "completed":
-                        goal.completed_at = datetime.now()
+                        goal.completed_at = _now()
                 if description is not None:
                     goal.description = description
                 break
@@ -339,7 +340,7 @@ class ProjectService:
         overdue = sum(
             1 for t in tasks
             if getattr(t, 'deadline', None) and
-            getattr(t, 'deadline', None) < datetime.now() and
+            getattr(t, 'deadline', None) < _now() and
             getattr(t, 'status', None) != 'done'
         )
         

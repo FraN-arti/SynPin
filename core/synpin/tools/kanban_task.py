@@ -9,7 +9,6 @@ from datetime import datetime
 from typing import Any
 
 from .base import ToolResult, make_success, make_error
-
 # Configurable API base URL (defaults to standard dev port)
 _API_BASE = os.environ.get("SYNPIN_API_BASE", "http://127.0.0.1:2088")
 
@@ -21,10 +20,18 @@ async def kanban_task(params: dict[str, Any]) -> ToolResult:
     Commands:
       create   — create a new task
       list     — list tasks for your department
+      update   — edit title, description, priority, deadline, or tags
+      delete   — permanently delete a task
+      archive  — move task to archive
       history  — write a history entry
       reassign — transfer to another department
       complete — mark task as done
       rework   — send back for rework
+      block    — mark task as blocked
+      unblock  — unblock a blocked task
+      start    — move task to in_progress
+      submit   — submit work for review
+      approve  — approve completed work
       status   — get task status
 
     Params:
@@ -33,13 +40,19 @@ async def kanban_task(params: dict[str, Any]) -> ToolResult:
     """
     command = params.get("command", "")
     if not command:
-        return make_error("command required: create, list, history, reassign, complete, rework, status")
+        return make_error("command required: create, list, update, delete, archive, history, reassign, complete, rework, block, unblock, start, submit, approve, status")
 
     try:
         if command == "create":
             return await _create(params)
         elif command == "list":
             return await _list(params)
+        elif command == "update":
+            return await _update(params)
+        elif command == "delete":
+            return await _delete(params)
+        elif command == "archive":
+            return await _archive(params)
         elif command == "history":
             return await _history(params)
         elif command == "reassign":
@@ -48,10 +61,20 @@ async def kanban_task(params: dict[str, Any]) -> ToolResult:
             return await _complete(params)
         elif command == "rework":
             return await _rework(params)
+        elif command == "block":
+            return await _block(params)
+        elif command == "unblock":
+            return await _unblock(params)
+        elif command == "start":
+            return await _start(params)
+        elif command == "submit":
+            return await _submit(params)
+        elif command == "approve":
+            return await _approve(params)
         elif command == "status":
             return await _status(params)
         else:
-            return make_error(f"Unknown command: {command}. Use: create, history, reassign, complete, rework, status")
+            return make_error(f"Unknown command: {command}. Use: create, list, update, delete, archive, history, reassign, complete, rework, block, unblock, start, submit, approve, status")
     except Exception as e:
         return make_error(f"kanban_task error: {e}")
 
@@ -338,6 +361,94 @@ async def _rework(params: dict[str, Any]) -> ToolResult:
     })
 
 
+# ── block ──────────────────────────────────────────────────────────────────
+
+async def _block(params: dict[str, Any]) -> ToolResult:
+    """
+    Mark task as blocked — needs human help or external dependency.
+
+    Params:
+      task_id: str (required)
+      reason: str (required) — why blocked
+    """
+    import httpx
+
+    task_id = params.get("task_id", "")
+    if not task_id:
+        return make_error("task_id required")
+
+    reason = params.get("reason", "")
+    if not reason:
+        return make_error("reason required")
+
+    # Add history entry
+    await _history({
+        "task_id": task_id,
+        "action": "blocked",
+        "detail": reason,
+        "actor": params.get("actor", "head"),
+    })
+
+    # Update status to blocked
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.patch(
+            f"{_API_BASE}/api/kanban/tasks/{task_id}",
+            json={"status": "blocked"},
+        )
+        if res.status_code != 200:
+            return make_error(f"Failed to block task: {res.text}")
+        task = res.json()
+
+    return make_success({
+        "success": True,
+        "status": "blocked",
+        "history_count": len(task.get("history", [])),
+    })
+
+
+# ── unblock ────────────────────────────────────────────────────────────────
+
+async def _unblock(params: dict[str, Any]) -> ToolResult:
+    """
+    Unblock a blocked task — resume work.
+
+    Params:
+      task_id: str (required)
+      reason: str — why unblocked
+    """
+    import httpx
+
+    task_id = params.get("task_id", "")
+    if not task_id:
+        return make_error("task_id required")
+
+    reason = params.get("reason", "Task unblocked")
+
+    # Add history entry
+    await _history({
+        "task_id": task_id,
+        "action": "unblocked",
+        "detail": reason,
+        "actor": params.get("actor", "head"),
+    })
+
+    # Update status to in_progress
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.patch(
+            f"{_API_BASE}/api/kanban/tasks/{task_id}",
+            json={"status": "in_progress"},
+        )
+        if res.status_code != 200:
+            return make_error(f"Failed to unblock task: {res.text}")
+        task = res.json()
+
+    return make_success({
+        "success": True,
+        "status": "in_progress",
+        "history_count": len(task.get("history", [])),
+    })
+
+
 # ── status ──────────────────────────────────────────────────────────────────
 
 async def _status(params: dict[str, Any]) -> ToolResult:
@@ -370,6 +481,216 @@ async def _status(params: dict[str, Any]) -> ToolResult:
         "assigned_workers": task.get("assigned_workers", []),
         "history_count": len(history),
         "last_history": last,
+    })
+
+
+# ── update ─────────────────────────────────────────────────────────────────
+
+async def _update(params: dict[str, Any]) -> ToolResult:
+    """
+    Edit a task's fields.
+
+    Params:
+      task_id: str (required)
+      title: str (optional)
+      description: str (optional)
+      priority: str (optional) — low/medium/high/critical
+      deadline: str (optional) — ISO date
+      tags: list[str] (optional)
+      status: str (optional) — move to a different column/status
+    """
+    import httpx
+
+    task_id = params.get("task_id", "")
+    if not task_id:
+        return make_error("task_id required")
+
+    payload = {}
+    for key in ("title", "description", "priority", "deadline", "tags", "status"):
+        if key in params and params[key] is not None:
+            payload[key] = params[key]
+
+    if not payload:
+        return make_error("Nothing to update — provide at least one of: title, description, priority, deadline, tags, status")
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.patch(f"{_API_BASE}/api/kanban/tasks/{task_id}", json=payload)
+        if res.status_code != 200:
+            return make_error(f"Failed to update task: {res.text}")
+        task = res.json()
+
+    return make_success({
+        "success": True,
+        "task_id": task["id"],
+        "status": task["status"],
+        "title": task["title"],
+        "updated_fields": list(payload.keys()),
+    })
+
+
+# ── delete ─────────────────────────────────────────────────────────────────
+
+async def _delete(params: dict[str, Any]) -> ToolResult:
+    """
+    Permanently delete a task.
+
+    Params:
+      task_id: str (required)
+    """
+    import httpx
+
+    task_id = params.get("task_id", "")
+    if not task_id:
+        return make_error("task_id required")
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.delete(f"{_API_BASE}/api/kanban/tasks/{task_id}")
+        if res.status_code != 200:
+            return make_error(f"Failed to delete task: {res.text}")
+
+    return make_success({
+        "success": True,
+        "deleted": task_id,
+        "message": f"Task {task_id} permanently deleted",
+    })
+
+
+# ── archive ────────────────────────────────────────────────────────────────
+
+async def _archive(params: dict[str, Any]) -> ToolResult:
+    """
+    Move task to archive.
+
+    Params:
+      task_id: str (required)
+    """
+    import httpx
+
+    task_id = params.get("task_id", "")
+    if not task_id:
+        return make_error("task_id required")
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.post(f"{_API_BASE}/api/kanban/tasks/{task_id}/archive")
+        if res.status_code != 200:
+            return make_error(f"Failed to archive task: {res.text}")
+
+    return make_success({
+        "success": True,
+        "archived": task_id,
+        "message": f"Task {task_id} archived",
+    })
+
+
+# ── start ──────────────────────────────────────────────────────────────────
+
+async def _start(params: dict[str, Any]) -> ToolResult:
+    """
+    Mark task as in_progress (start working on it).
+
+    Params:
+      task_id: str (required)
+      actor: str — who is starting (default: "head")
+    """
+    import httpx
+
+    task_id = params.get("task_id", "")
+    if not task_id:
+        return make_error("task_id required")
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.post(
+            f"{_API_BASE}/api/kanban/tasks/{task_id}/start",
+            json={"actor": params.get("actor", "head"), "detail": params.get("detail", "")},
+        )
+        if res.status_code != 200:
+            return make_error(f"Failed to start task: {res.text}")
+        task = res.json()
+
+    return make_success({
+        "success": True,
+        "task_id": task["id"],
+        "status": task["status"],
+        "message": f"Task {task_id} now in progress",
+    })
+
+
+# ── submit ─────────────────────────────────────────────────────────────────
+
+async def _submit(params: dict[str, Any]) -> ToolResult:
+    """
+    Submit completed work for review.
+
+    Params:
+      task_id: str (required)
+      actor: str — who is submitting (default: "head")
+    """
+    import httpx
+
+    task_id = params.get("task_id", "")
+    if not task_id:
+        return make_error("task_id required")
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.post(
+            f"{_API_BASE}/api/kanban/tasks/{task_id}/submit-review",
+            json={"actor": params.get("actor", "head"), "detail": params.get("detail", "")},
+        )
+        if res.status_code != 200:
+            return make_error(f"Failed to submit task: {res.text}")
+        task = res.json()
+
+    return make_success({
+        "success": True,
+        "task_id": task["id"],
+        "status": task["status"],
+        "message": f"Task {task_id} submitted for review",
+    })
+
+
+# ── approve ────────────────────────────────────────────────────────────────
+
+async def _approve(params: dict[str, Any]) -> ToolResult:
+    """
+    Approve completed work — task moves to done.
+
+    Params:
+      task_id: str (required)
+      actor: str — who is approving (default: "head")
+      summary: str — optional completion summary
+    """
+    import httpx
+
+    task_id = params.get("task_id", "")
+    if not task_id:
+        return make_error("task_id required")
+
+    summary = params.get("summary", "")
+
+    # Add history entry if summary provided
+    if summary:
+        await _history({
+            "task_id": task_id,
+            "action": "completed",
+            "detail": summary,
+            "actor": params.get("actor", "head"),
+        })
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.post(
+            f"{_API_BASE}/api/kanban/tasks/{task_id}/approve",
+            json={"actor": params.get("actor", "head"), "detail": summary or "Approved"},
+        )
+        if res.status_code != 200:
+            return make_error(f"Failed to approve task: {res.text}")
+        task = res.json()
+
+    return make_success({
+        "success": True,
+        "task_id": task["id"],
+        "status": task["status"],
+        "completed_at": task.get("completed_at"),
+        "message": f"Task {task_id} approved and done",
     })
 
 

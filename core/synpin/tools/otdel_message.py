@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Any
 
 from .base import ToolResult, make_success, make_error
+from ..time import now as _now
 
 
 async def _resolve_otdel_id(otdel_id: str, otdel_name: str) -> tuple[str, str]:
@@ -82,7 +83,7 @@ async def otdel_message(params: dict[str, Any]) -> ToolResult:
             "role": "user",
             "sender": "main_agent",
             "content": message,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": _now().isoformat(),
         }
         history.append(user_msg)
         _save_history(otdel_id, history)
@@ -175,7 +176,7 @@ async def _process_head(otdel_id: str, message: str):
                 "sender_name": head_agent.get("name", head_slug),
                 "content": full_response,
                 "is_head": True,
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": _now().isoformat(),
                 "model": model,
                 "provider": provider_name,
             }

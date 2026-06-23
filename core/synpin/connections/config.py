@@ -175,7 +175,7 @@ def update_connection(conn_id: str, updates: dict[str, Any]) -> Connection | Non
                     value = AutoTriggerConfig(**value)
                 if hasattr(conn, key):
                     setattr(conn, key, value)
-            conn.updated_at = datetime.now()
+            conn.updated_at = _now()
             connections[i] = conn
             save_connections(connections)
             logger.info("Updated connection %s", conn_id)
@@ -221,7 +221,7 @@ def load_history() -> list[ApprovalRecord]:
                 reason=item.get("reason", ""),
                 report=item.get("report", ""),
                 status=item.get("status", "pending"),
-                timestamp=datetime.fromisoformat(item["timestamp"]) if item.get("timestamp") else datetime.now(),
+                timestamp=datetime.fromisoformat(item["timestamp"]) if item.get("timestamp") else _now(),
                 resolved_at=datetime.fromisoformat(item["resolved_at"]) if item.get("resolved_at") else None,
                 resolution=item.get("resolution", ""),
             )

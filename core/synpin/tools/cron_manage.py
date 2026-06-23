@@ -1,0 +1,158 @@
+"""Cron management tool — for agents to create/manage scheduled tasks."""
+from __future__ import annotations
+
+import os
+from typing import Any
+from .base import ToolResult, make_success, make_error
+_API_BASE = os.environ.get("SYNPIN_API_BASE", "http://127.0.0.1:2088")
+
+async def cron_manage(params: dict[str, Any]) -> ToolResult:
+    """
+    Управление запланированными задачами (cron).
+    Позволяет создавать, обновлять, удалять и просматривать крон-задачи.
+    Commands:
+      list    — все крон-задачи
+      get     — одна задача по ID
+      create  — создать задачу
+      update  — обновить задачу
+      delete  — удалить задачу
+      history — история запусков задачи (run_count, last_run_at, next_run_at)
+      run_now — немедленный запуск задачи
+    """
+    import httpx
+
+    command = params.get("command", "")
+    if not command:
+        return make_error("command required: list, get, create, update, delete, history, run_now")
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            if command == "list":
+                res = await client.get(f"{_API_BASE}/api/cron/jobs")
+                if res.status_code != 200:
+                    return make_error(f"Failed to list jobs: {res.text}")
+                data = res.json()
+                jobs = data.get("jobs", [])
+                # Format for readability
+                formatted = []
+                for j in jobs:
+                    schedule = f"{j.get('schedule_type', '?')}: {j.get('schedule_expr', '?')}"
+                    action = f"{j.get('action_type', '?')} -> {j.get('action_target', '?')}"
+                    status = j.get("status", "?")
+                    runs = j.get("run_count", 0)
+                    formatted.append(f"  [{j['id']}] {j['name']} | {schedule} | {action} | {status} | runs:{runs}")
+                return make_success({
+                    "jobs": jobs,
+                    "count": len(jobs),
+                    "formatted": formatted,
+                })
+
+            elif command == "get":
+                job_id = params.get("job_id", "")
+                if not job_id:
+                    return make_error("job_id required")
+                res = await client.get(f"{_API_BASE}/api/cron/jobs/{job_id}")
+                if res.status_code != 200:
+                    return make_error(f"Job not found: {job_id}")
+                return make_success(res.json())
+
+            elif command == "create":
+                name = params.get("name", "")
+                if not name:
+                    return make_error("name required")
+                action_type = params.get("action_type", "run_prompt")
+                action_target = params.get("action_target", "") or "private"
+                action_agent = params.get("action_agent", "") or "main_agent"
+                payload = {
+                    "name": name,
+                    "schedule_type": params.get("schedule_type", "cron"),
+                    "schedule_expr": params.get("schedule_expr", ""),
+                    "action_type": action_type,
+                    "action_target": action_target,
+                    "action_message": params.get("action_message", ""),
+                    "action_agent": action_agent,
+                    "description": params.get("description", ""),
+                    "created_by": params.get("created_by", "main_agent"),
+                    "timezone": params.get("timezone", "Europe/Moscow"),
+                }
+                res = await client.post(f"{_API_BASE}/api/cron/jobs", json=payload)
+                if res.status_code != 200:
+                    return make_error(f"Failed to create job: {res.text}")
+                job = res.json()
+                return make_success({
+                    "status": "created",
+                    "job_id": job.get("id"),
+                    "name": job.get("name"),
+                    "next_run_at": job.get("next_run_at"),
+                })
+
+            elif command == "update":
+                job_id = params.get("job_id", "")
+                if not job_id:
+                    return make_error("job_id required")
+                payload = {}
+                for key in ("name", "schedule_type", "schedule_expr", "action_type",
+                             "action_target", "action_message", "action_agent",
+                             "description", "status", "timezone"):
+                    if key in params:
+                        payload[key] = params[key]
+                if not payload:
+                    return make_error("Nothing to update")
+                res = await client.put(f"{_API_BASE}/api/cron/jobs/{job_id}", json=payload)
+                if res.status_code != 200:
+                    return make_error(f"Failed to update job: {res.text}")
+                return make_success({"status": "updated", "job_id": job_id})
+
+            elif command == "delete":
+                job_id = params.get("job_id", "")
+                if not job_id:
+                    return make_error("job_id required")
+                res = await client.delete(f"{_API_BASE}/api/cron/jobs/{job_id}")
+                if res.status_code != 200:
+                    return make_error(f"Failed to delete job: {res.text}")
+                return make_success({"status": "deleted", "job_id": job_id})
+
+            elif command == "history":
+                job_id = params.get("job_id", "")
+                if not job_id:
+                    return make_error("job_id required")
+                res = await client.get(f"{_API_BASE}/api/cron/jobs/{job_id}")
+                if res.status_code != 200:
+                    return make_error(f"Job not found: {job_id}")
+                job = res.json()
+                return make_success({
+                    "job_id": job.get("id"),
+                    "name": job.get("name"),
+                    "status": job.get("status"),
+                    "schedule_type": job.get("schedule_type"),
+                    "schedule_expr": job.get("schedule_expr"),
+                    "run_count": job.get("run_count", 0),
+                    "last_run_at": job.get("last_run_at"),
+                    "next_run_at": job.get("next_run_at"),
+                    "created_at": job.get("created_at"),
+                    "updated_at": job.get("updated_at"),
+                    "created_by": job.get("created_by"),
+                })
+
+            elif command == "run_now":
+                job_id = params.get("job_id", "")
+                if not job_id:
+                    return make_error("job_id required")
+                res = await client.post(f"{_API_BASE}/api/cron/jobs/{job_id}/run")
+                if res.status_code != 200:
+                    return make_error(f"Failed to run job: {res.text}")
+                data = res.json()
+                return make_success({
+                    "status": "triggered",
+                    "job_id": job_id,
+                    "name": data.get("name", ""),
+                    "note": data.get("note", "Job executed immediately"),
+                })
+
+            else:
+                return make_error(f"Unknown command: {command}")
+
+    except httpx.ConnectError:
+        return make_error("Cannot connect to SynPin server")
+    except Exception as e:
+        return make_error(f"cron_manage error: {e}")

@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from ..time import now as _now
 from .models import (
     ActionType,
     Priority,
@@ -173,7 +174,7 @@ class KanbanService:
     def save_task(self, task: Task) -> Path:
         """Save task changes to disk and broadcast update."""
         with self._lock:
-            task.updated_at = datetime.now()
+            task.updated_at = _now()
             path = save_task(task, self._data_dir)
             # Broadcast live update to all connected clients
             _broadcast({

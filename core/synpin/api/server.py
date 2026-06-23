@@ -66,7 +66,7 @@ async def lifespan(app: FastAPI):
 
     try:
         from ..kanban.deadline import schedule_deadline_checker
-        task = schedule_deadline_checker()
+        task = schedule_deadline_checker(svc)
         if task:
             logger.info("[deadline] checker running")
     except Exception as e:
@@ -79,6 +79,14 @@ async def lifespan(app: FastAPI):
             logger.info("[auto-approval] worker running")
     except Exception as e:
         logger.warning("[auto-approval] failed to start: %s", e)
+
+    # ── Cron scheduler ────────────────────────────────────────────────
+    try:
+        from ..cron.scheduler import start_scheduler
+        start_scheduler()
+        logger.info("[cron] Scheduler started")
+    except Exception as e:
+        logger.warning("[cron] Failed to start scheduler: %s", e)
 
     yield  # ← app runs here
 
@@ -164,6 +172,10 @@ app.include_router(external_agents_router)
 # Connections — inter-department relationships
 from .connections_router import router as connections_router
 app.include_router(connections_router)
+
+# Cron — scheduled tasks for agents
+from .cron_router import router as cron_router
+app.include_router(cron_router)
 
 # Hermes Agent chat proxy
 from .hermes_chat_router import router as hermes_chat_router

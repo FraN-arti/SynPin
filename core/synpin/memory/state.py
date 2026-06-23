@@ -1,6 +1,7 @@
 """AgentState — bookmarks per agent per channel.
 
-state.json tracks where the agent left off in each channel,
+
+state.json tracks where the agent left off
 enabling quick recovery after restart.
 
 Structure:
@@ -36,6 +37,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
+from ..time import now as _now
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +120,7 @@ class AgentState:
             "last_position": last_position,
             "last_action": last_action,
             "waiting_for": waiting_for,
-            "updated_at": datetime.now().isoformat(),
+            "updated_at": _now().isoformat(),
         }
         self.save()
     
@@ -129,7 +131,7 @@ class AgentState:
             session["last_position"] = last_position
             if last_action:
                 session["last_action"] = last_action
-            session["updated_at"] = datetime.now().isoformat()
+            session["updated_at"] = _now().isoformat()
             self.save()
     
     def clear_channel(self, channel: str):
@@ -146,7 +148,7 @@ class AgentState:
     
     def set_last_compaction(self, timestamp: Optional[str] = None):
         """Record when the last compaction happened."""
-        self._state["last_compaction"] = timestamp or datetime.now().isoformat()
+        self._state["last_compaction"] = timestamp or _now().isoformat()
         self.save()
     
     def get_last_compaction(self) -> Optional[str]:

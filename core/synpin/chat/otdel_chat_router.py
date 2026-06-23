@@ -34,6 +34,7 @@ MAX_WORKER_RETRY = 2  # original + 1 retry
 
 # Import shared history + helpers from otdel_helpers (single source of truth)
 from .ws_router import create_head_state, get_head_state
+from ..time import now as _now
 from .otdel_helpers import (
     _load_history,
     _save_history,
@@ -107,7 +108,7 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
         "role": "user",
         "sender": req.sender,
         "content": req.message,
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": _now().isoformat(),
     }
     history.append(user_msg)
     save_result = _save_history(otdel_id, history)
@@ -271,7 +272,7 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                     "sender_name": agent_name_val,
                     "content": full_response,
                     "is_head": is_head,
-                    "timestamp": datetime.now().isoformat(),
+                    "timestamp": _now().isoformat(),
                     "model": model,
                     "provider": provider_name,
                 }
@@ -433,7 +434,7 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                     "sender_name": head_name,
                     "content": full_response,
                     "is_head": True,
-                    "timestamp": datetime.now().isoformat(),
+                    "timestamp": _now().isoformat(),
                     "model": model,
                     "provider": provider_name,
                 }

@@ -208,11 +208,11 @@ function App() {
             if (!data?.messages) return
             const msgs = data.messages
             if (msgs.length === 0) return
-            const restored = msgs.map((m: { role: string; content: string; model?: string; agent_name?: string; prompt_tokens?: number; completion_tokens?: number; tools?: any[] }, i: number) => ({
+            const restored = msgs.map((m: { role: string; content: string; timestamp?: string; model?: string; agent_name?: string; prompt_tokens?: number; completion_tokens?: number; tools?: any[] }, i: number) => ({
               id: `recovered-${Date.now()}-${i}`,
               role: m.role as 'user' | 'assistant',
               content: m.content,
-              timestamp: new Date(),
+              timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
               model: m.model,
               agent_name: m.agent_name,
               prompt_tokens: m.prompt_tokens,
@@ -262,6 +262,32 @@ function App() {
     })
     return off
   }, [wsOn])
+
+  // Cron job completed — message arrives as a full message (not streamed)
+  // Lives as a persistent useEffect so it's ALWAYS listening, not just during handleSend
+  useEffect(() => {
+    const off = wsOn('chat:cron', (msg) => {
+      if (msg.agent_slug !== activeAgent?.slug) return
+      const raw = msg.message as any
+      const chatMsg = {
+        id: raw.id || `cron-${Date.now()}`,
+        role: 'assistant',
+        content: typeof raw.content === 'string' ? raw.content : JSON.stringify(raw.content ?? ''),
+        sender: raw.sender || msg.agent_slug,
+        sender_name: raw.sender_name || raw.agent_name || '',
+        timestamp: raw.timestamp || new Date().toISOString(),
+        is_head: raw.is_head || false,
+        model: raw.model || '',
+        provider: raw.provider || '',
+      } as any
+      setMessages(prev => {
+        if (!prev) return [chatMsg]
+        if (prev.some(m => m.id === chatMsg.id)) return prev
+        return [...prev, chatMsg]
+      })
+    })
+    return off
+  }, [wsOn, activeAgent?.slug])
 
   // Listen for primary agent changes
   useEffect(() => {
@@ -546,11 +572,11 @@ function App() {
         const hasPendingTask = lastMsg?.role === 'user'
 
         if (msgs.length > 0) {
-          let restored: Message[] = msgs.map((m: { role: string; content: string; model?: string; agent_name?: string; prompt_tokens?: number; completion_tokens?: number; tools?: ToolCall[] }, i: number) => ({
+          let restored: Message[] = msgs.map((m: { role: string; content: string; timestamp?: string; model?: string; agent_name?: string; prompt_tokens?: number; completion_tokens?: number; tools?: ToolCall[] }, i: number) => ({
             id: `restored-${i}`,
             role: m.role as 'user' | 'assistant',
             content: m.content,
-            timestamp: new Date(),
+            timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
             model: m.model,
             agent_name: m.agent_name,
             prompt_tokens: m.prompt_tokens,
@@ -839,6 +865,8 @@ function App() {
       setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, content: fullContent, thinking: fullThinking || undefined } : m))
     })
 
+
+
     const onToolStart = wsOn('chat:tool_start', (msg) => {
       if (msg.agent_slug !== activeAgent?.slug) return
       const toolName = String(msg.tool || '')
@@ -911,9 +939,10 @@ function App() {
     }
   }
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-  }
+  const formatTime = (date: Date | string) => {
+      const d = typeof date === 'string' ? new Date(date) : date
+      return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+    }
 
   const renderMeta = (msg: Message) => {
     if (msg.role === 'user') {

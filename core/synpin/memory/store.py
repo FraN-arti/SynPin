@@ -1,5 +1,6 @@
 """MemoryStore — bounded curated memory with file persistence.
 
+
 Two stores per agent:
   - MEMORY.md: agent's personal notes (patterns, conventions, anti-patterns)
   - USER.md: what the agent knows about the user
@@ -23,6 +24,7 @@ import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from ..time import now as _now
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +258,7 @@ class MemoryStore:
             return {"success": False, "error": "Content cannot be empty."}
 
         if date is None:
-            date = datetime.now().strftime("%Y-%m-%d")
+            date = _now().strftime("%Y-%m-%d")
 
         # Sanitize topic for filename
         safe_topic = re.sub(r"[^\w\-]", "_", topic.lower())[:50]

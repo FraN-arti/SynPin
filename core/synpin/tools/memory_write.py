@@ -19,6 +19,7 @@ USER_CHAR_LIMIT = 1375
 DELIM = "\n§\n"
 
 from ..paths import get_data_dir as _get_data_dir
+from ..time import now as _now
 
 
 def _read_entries(path: Path) -> list[str]:
@@ -284,7 +285,7 @@ async def memory_write(params: dict[str, Any]) -> dict[str, Any]:
 
         import re
         from datetime import datetime
-        date = datetime.now().strftime("%Y-%m-%d")
+        date = _now().strftime("%Y-%m-%d")
         safe_topic = re.sub(r"[^\w\-]", "_", topic.lower())[:50]
         filename = f"{date}_{safe_topic}.md"
         filepath = facts_dir / filename

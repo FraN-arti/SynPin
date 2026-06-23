@@ -16,6 +16,7 @@ from typing import Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from .ws_manager import ws_manager
+from ..time import now as _now
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +179,7 @@ async def _handle_chat_send(user_id: str, msg: dict):
 
     # Load history + add user message (with images)
     history = _load_chat_history(agent_slug, channel_id)
-    user_entry = {"role": "user", "content": message, "timestamp": datetime.now().isoformat()}
+    user_entry = {"role": "user", "content": message, "timestamp": _now().isoformat()}
     if images:
         user_entry["images"] = images
     history.append(user_entry)
@@ -306,7 +307,7 @@ async def _handle_chat_send(user_id: str, msg: dict):
 
     # Save assistant response to history
     if full_response:
-        assistant_entry = {"role": "assistant", "content": full_response, "timestamp": datetime.now().isoformat()}
+        assistant_entry = {"role": "assistant", "content": full_response, "timestamp": _now().isoformat()}
         if model:
             assistant_entry["model"] = model
         if provider_name:
@@ -370,7 +371,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         "role": "user",
         "sender": "user",
         "content": message,
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": _now().isoformat(),
     }
     if images:
         user_msg["images"] = images
@@ -625,7 +626,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 "sender_name": agent_name_val,
                 "content": full_response,
                 "is_head": is_head,
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": _now().isoformat(),
                 "model": model,
                 "provider": provider_name,
             }
@@ -846,7 +847,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 "sender_name": head_name,
                 "content": full_response,
                 "is_head": True,
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": _now().isoformat(),
                 "model": model,
                 "provider": provider_name,
             }
@@ -964,7 +965,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 "id": agent_msg_id, "role": "assistant",
                 "sender": agent_slug_val, "sender_name": agent_name_val,
                 "content": full_response, "is_head": is_head,
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": _now().isoformat(),
                 "model": model, "provider": provider_name,
             }
             history = _load_history(otdel_id)

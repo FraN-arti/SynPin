@@ -133,7 +133,7 @@ switch -Regex ($args[0]) {
             $pkgContent = Get-Content $pkgPath -Raw -Encoding UTF8
             $newPkgContent = $pkgContent -replace '"version"\s*:\s*"[^"]+"', "`"version`": `"$targetVersion`""
             if ($pkgContent -ne $newPkgContent) {
-                Set-Content -Path $pkgPath -Value $newPkgContent -Encoding UTF8 -NoNewline
+                [System.IO.File]::WriteAllText($pkgPath, $newPkgContent, (New-Object System.Text.UTF8Encoding $false))
                 Write-Host "[dev] synced web/package.json -> $targetVersion" -ForegroundColor Green
             }
         }

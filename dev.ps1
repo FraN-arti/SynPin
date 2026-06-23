@@ -149,6 +149,7 @@ switch -Regex ($args[0]) {
                     } else {
                         Write-Host "[dev] reinstall failed, continuing with $installed." -ForegroundColor DarkYellow
                     }
+            }
         } catch {
             # Best-effort; don't block startup if version check fails
         }

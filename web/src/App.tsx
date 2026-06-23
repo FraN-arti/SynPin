@@ -150,6 +150,14 @@ function App() {
 
   const [view, setView] = useState<View>({ type: 'chat' })
 
+  // Manual override: ?setup=1 forces wizard (for testing / dev mode)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('setup') === '1') {
+      setView({ type: 'setup' })
+    }
+  }, [])
+
   // Switch to setup wizard when virgin system is detected
   useEffect(() => {
     if (needsSetup === true) {

@@ -17,6 +17,7 @@ export default defineConfig({
     sourcemap: true,
   },
   server: {
+    open: false,
     host: '0.0.0.0',
     port: 2099,
     proxy: {

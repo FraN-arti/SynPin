@@ -190,50 +190,20 @@ function App() {
   }, [])
 
   // Handle WS connection state changes:
-  // - Disconnect: clear typing + remove empty placeholders (no polling fallback)
-  // - Reconnect: refetch history to recover messages from interrupted stream
+  // - Always clear stale placeholders when switching to chat view or WS changes
   const wasConnectedRef = useRef(false)
-  useEffect(() => {
+    const isStreamingRef = useRef(false)
+    useEffect(() => {
     if (wasConnectedRef.current && !wsConnected) {
-      // WS just disconnected — clear typing and remove stuck placeholders
+      // WS disconnected — clear typing and remove stuck placeholders
       clearStuckState()
-    } else if (wsConnected && !wasConnectedRef.current) {
-      // WS just reconnected — refetch history to recover any messages saved during disconnect
+    }
+    // Always clear stale placeholders when connected and in chat view
+    // BUT NOT during active streaming — isStreamingRef guards fresh placeholders
+    if (wsConnected && !isStreamingRef.current) {
       const hasEmptyPlaceholder = (messages ?? []).some(m => m.role === 'assistant' && !m.content)
       if (hasEmptyPlaceholder && activeAgent && view.type === 'chat') {
         clearStuckState()
-        fetch(`${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web&limit=20`)
-          .then(r => r.ok ? r.json() : null)
-          .then(data => {
-            if (!data?.messages) return
-            const msgs = data.messages
-            if (msgs.length === 0) return
-            const restored = msgs.map((m: { role: string; content: string; timestamp?: string; model?: string; agent_name?: string; prompt_tokens?: number; completion_tokens?: number; tools?: any[] }, i: number) => ({
-              id: `recovered-${Date.now()}-${i}`,
-              role: m.role as 'user' | 'assistant',
-              content: m.content,
-              timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
-              model: m.model,
-              agent_name: m.agent_name,
-              prompt_tokens: m.prompt_tokens,
-              completion_tokens: m.completion_tokens,
-              tools: m.tools,
-            }))
-            // If last message is user (backend still thinking), add placeholder and wait for WS
-            const lastMsg = msgs[msgs.length - 1]
-            if (lastMsg?.role === 'user') {
-              restored.push({
-                id: `placeholder-${Date.now()}`,
-                role: 'assistant',
-                content: '',
-                timestamp: new Date(),
-                tools: [],
-              })
-              setIsTyping(true)
-            }
-            setMessages(restored)
-          })
-          .catch(() => { /* silent — WS will handle updates */ })
       }
     }
     wasConnectedRef.current = wsConnected
@@ -730,6 +700,7 @@ function App() {
     }
 
     setIsTyping(true)
+    isStreamingRef.current = true
 
     // Create user message + assistant placeholder in one atomic update
     const assistantId = (Date.now() + 1).toString()
@@ -896,11 +867,17 @@ function App() {
     // ── SynPin agents: WebSocket ─────────────────────────────────
     const cleanupFns: (() => void)[] = []
 
+    let gotChunk = false
     const onChunk = wsOn('chat:chunk', (msg) => {
-      if (msg.agent_slug !== activeAgent?.slug) return
+      if (msg.agent_slug !== activeAgent?.slug) {
+        console.log('[WS-DBG] chunk SKIP slug:', msg.agent_slug, '!==', activeAgent?.slug)
+        return
+      }
+      gotChunk = true
       const { thinking: t, content: c } = processChunk(msg.content)
       if (t) fullThinking += t
       if (c) fullContent += c
+      console.log('[WS-DBG] chunk OK fullContent.length=' + fullContent.length)
       setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, content: fullContent, thinking: fullThinking || undefined } : m))
     })
 
@@ -929,9 +906,19 @@ function App() {
     })
 
     const onDone = wsOn('chat:done', (msg) => {
-      if (msg.agent_slug !== activeAgent?.slug) return
+      if (msg.agent_slug !== activeAgent?.slug) {
+        console.log('[WS-DBG] done SKIP slug:', msg.agent_slug, '!==', activeAgent?.slug)
+        return
+      }
+      console.log('[WS-DBG] done gotChunk=' + gotChunk)
+      isStreamingRef.current = false
       setMessages(prev => {
         const updated = prev ?? []
+        // If we got tool_calls but NO text chunk — remove the empty bubble
+        if (!gotChunk) {
+          const filtered = updated.filter(m => m.id !== assistantId)
+          return filtered
+        }
         return updated.map(m => {
           if (m.id !== assistantId) return m
           const content = m.content || ''
@@ -950,6 +937,7 @@ function App() {
     })
 
     const onError = wsOn('chat:error', (msg) => {
+      isStreamingRef.current = false
       cleanup()
       setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, content: m.content || `⚠️ Ошибка: ${msg.message || 'Stream error'}` } : m))
     })

@@ -72,6 +72,17 @@ def clear_head_state(otdel_id: str):
     _head_states.pop(otdel_id, None)
 
 
+def _task_done_callback(task, user_id: str, msg_type: str):
+    """Log errors from fire-and-forget tasks (asyncio.create_task swallows them)."""
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc:
+        logger.error("[ws_task] %s for %s FAILED: %s: %s", msg_type, user_id, type(exc).__name__, exc)
+    else:
+        logger.debug("[ws_task] %s for %s completed OK", msg_type, user_id)
+
+
 @router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     """Single WebSocket endpoint for all real-time communication."""
@@ -98,9 +109,11 @@ async def websocket_endpoint(ws: WebSocket):
 
             # Route to appropriate handler
             if msg_type == "chat:send":
-                asyncio.create_task(_handle_chat_send(user_id, msg))
+                task = asyncio.create_task(_handle_chat_send(user_id, msg))
+                task.add_done_callback(lambda t, _uid=user_id: _task_done_callback(t, _uid, "chat:send"))
             elif msg_type == "otdel:send":
-                asyncio.create_task(_handle_otdel_send(user_id, msg))
+                task = asyncio.create_task(_handle_otdel_send(user_id, msg))
+                task.add_done_callback(lambda t, _uid=user_id: _task_done_callback(t, _uid, "otdel:send"))
             else:
                 await ws_manager.send(user_id, {
                     "type": "error",

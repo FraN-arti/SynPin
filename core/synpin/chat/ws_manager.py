@@ -1,5 +1,4 @@
 """WebSocket Connection Manager — single WS per client, multiplexed messaging."""
-
 import json
 import logging
 from fastapi import WebSocket
@@ -19,25 +18,25 @@ class ConnectionManager:
     async def connect(self, ws: WebSocket, user_id: str = "default") -> None:
         """Accept a new WebSocket connection."""
         await ws.accept()
-        self._connections[user_id] = ws
-        self._connection_order.append(user_id)
-        logger.info(f"[ws] Client connected: {user_id} (total: {len(self._connections)})")
-
-        # Check if session reset was missed while offline
-        try:
-            from .session_reset import _should_reset, _get_sessions_config, _reset_sessions
-            cfg = _get_sessions_config()
-            if _should_reset(cfg):
-                logger.info("[ws] Session reset was missed — triggering on connect")
-                _reset_sessions()
-        except Exception:
-            pass
+        # Close any existing connection for this user
+        old = self._connections.get(user_id)
+        if old:
             try:
                 await old.close(code=4001, reason="replaced by new connection")
             except Exception:
                 pass
         self._connections[user_id] = ws
         logger.info("WS connected: %s (total: %d)", user_id, len(self._connections))
+
+        # Check if session reset was missed while offline
+        try:
+            from .session_reset import _should_reset, _get_sessions_config, _reset_sessions
+            cfg = _get_sessions_config()
+            if cfg and _should_reset(cfg):
+                logger.info("[ws] Session reset was missed — triggering on connect")
+                _reset_sessions()
+        except Exception as e:
+            logger.debug("[ws] Session reset check skipped: %s", e)
 
     def disconnect(self, user_id: str):
         """Remove a WebSocket connection."""

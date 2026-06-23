@@ -111,6 +111,8 @@ Each department has:
 - **Isolated memory** — departments don't leak context
 - **Links** — task escalation, delegation, and collaboration between departments
 
+But the key insight: **agents inside one department work on the same task together**. Not each on their own — as a team. One writes code, another reviews for bugs, a third documents in parallel — all in a single cycle. Each agent uses its strength. The fast one tests hypotheses. The precise one validates logic. The creative one proposes solutions. The head sees the full picture and assembles the result like a puzzle.
+
 ### Autonomy
 
 SynPin works without you.

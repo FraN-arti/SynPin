@@ -1,12 +1,12 @@
 """
 Project models — Pydantic schemas for the project management system.
-from ..time import now as _now
-
 
 Projects group departments, tasks, and history under a single goal.
 Each project is stored as a YAML file in data/projects/{project_id}/project.yaml.
 """
 from __future__ import annotations
+
+from ..time import now as _now
 
 import re
 import yaml

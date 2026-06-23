@@ -52,6 +52,9 @@ _ANSI_ESCAPE_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
 # ASCII-fallbacking them keeps the dev output readable everywhere.
 _UNICODE_GLYPH_MAP = str.maketrans({
     "➜": ">",   # Vite's "Local: ..." / "Network: ..." prefix
+    "⚡": "*",  # Vite "ready in" / "Local:" / "Network:" prefix
+    "🚀": "",   # Vite banner emoji — remove (renders as ??? on legacy conhost)
+    "↻": "R",   # Vite HMR reload icon
     "‣": "*",   # misc
     "—": "-",  # em-dash (some fonts show it as a tofu on old conhost)
     "–": "-",  # en-dash

@@ -1,11 +1,11 @@
 """Kanban Task models — Pydantic schemas for the global task board.
-from ..time import now as _now
-
 
 Each task is stored as a YAML file in kanban/tasks/T-{id}.yaml.
 The model handles validation, serialization, and business logic.
 """
 from __future__ import annotations
+
+from ..time import now as _now
 
 import re
 import yaml

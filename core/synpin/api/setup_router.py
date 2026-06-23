@@ -21,9 +21,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/setup", tags=["setup"])
 
-# One-shot dev wizard flag — set by d+enter in dev console
-_dev_wizard_force = False
-
 
 @router.get("/status")
 def setup_status() -> dict:
@@ -31,17 +28,8 @@ def setup_status() -> dict:
 
     Returns:
         needs_setup: true if providers are empty/missing (virgin system)
-            OR if dev wizard was force-triggered via d+enter
         message: human-readable status
     """
-    global _dev_wizard_force
-    if _dev_wizard_force:
-        _dev_wizard_force = False  # one-shot only
-        return {
-            "needs_setup": True,
-            "message": "Dev-визард (d + enter)",
-        }
-
     config_dir = get_config_dir()
     providers_file = config_dir / "providers.yaml"
 
@@ -70,13 +58,6 @@ def setup_status() -> dict:
         "message": "SynPin настроен и готов к работе.",
     }
 
-
-@router.post("/force")
-def force_setup_wizard() -> dict:
-    """Force-set the dev wizard flag (one-shot). Called by dev console d+enter."""
-    global _dev_wizard_force
-    _dev_wizard_force = True
-    return {"status": "ok"}
 
 
 @router.post("")

@@ -150,6 +150,15 @@ function App() {
 
   const [view, setView] = useState<View>({ type: 'chat' })
 
+  // Route: /start/ forces setup wizard (for first-run and dev mode)
+  useEffect(() => {
+    if (window.location.pathname === '/start/'
+        || window.location.pathname === '/start'
+        || window.location.pathname.startsWith('/start')) {
+      setView({ type: 'setup' })
+    }
+  }, [])
+
   // Switch to setup wizard when virgin system is detected
   useEffect(() => {
     if (needsSetup === true) {

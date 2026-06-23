@@ -1,4 +1,4 @@
-/* SetupWizard — matches main UI theme (base.css tokens) */
+/* SetupWizard — uses tokens from base.css (--orange, --bg-card, --glass-*, etc.) */
 
 .setup-wizard {
   position: fixed;
@@ -6,27 +6,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  background: var(--black);
   z-index: 9999;
   overflow: hidden;
-  background:
-    radial-gradient(ellipse 80% 60% at 10% 90%, var(--orange-muted) 0%, transparent 50%),
-    radial-gradient(ellipse 60% 50% at 90% 10%, var(--glow-border) 0%, transparent 50%),
-    radial-gradient(ellipse 50% 40% at 50% 50%, var(--black) 0%, transparent 70%),
-    linear-gradient(170deg, var(--black) 0%, var(--glass-bg-heavy) 30%, var(--glass-bg) 60%, var(--black) 100%);
 }
 
-/* Subtle grid pattern — matches app-container::before */
-.setup-wizard::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image:
-    radial-gradient(circle at 1px 1px, var(--glass-border) 1px, transparent 0);
-  background-size: 40px 40px;
-  pointer-events: none;
-}
-
-/* Ambient glow behind card — softer, positioned like main UI */
+/* Ambient glow behind card */
 .wizard-glow {
   position: absolute;
   top: -20%;
@@ -36,7 +21,7 @@
   height: 400px;
   background: radial-gradient(ellipse, var(--accent-glow) 0%, transparent 70%);
   pointer-events: none;
-  opacity: 0.35;
+  opacity: 0.5;
 }
 
 /* ── Card ─────────────────────────────────────────────── */

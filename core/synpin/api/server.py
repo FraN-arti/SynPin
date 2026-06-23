@@ -241,6 +241,10 @@ app.include_router(projects_router)
 from .version_router import router as version_router
 app.include_router(version_router)
 
+# Setup wizard API (virgin detection, first-run config)
+from .setup_router import router as setup_router
+app.include_router(setup_router)
+
 # Widget layout endpoint
 from .widgets_router import router as widgets_router
 app.include_router(widgets_router)

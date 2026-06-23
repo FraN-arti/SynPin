@@ -124,8 +124,7 @@ def _copy_template(filename: str) -> None:
     if target.exists():
         return
 
-    # Template lives in the same directory under templates/
-    template = config_dir / filename
+    # Template lives in the templates/ subdirectory
     alt = config_dir / "templates" / filename
     if alt.exists():
         content = alt.read_text(encoding="utf-8")

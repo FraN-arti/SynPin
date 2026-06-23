@@ -4,9 +4,9 @@
 
 <img src="synpin.png" alt="SynPin" width="400">
 
-**The operating system for AI agents.**
+**Операционная система для ИИ-агентов.**
 
-Not a chat, not a copilot — an autonomous organization that works while you sleep.
+Не чат и не копилот — автономная организация, которая работает пока ты спишь.
 
 <br/>
 
@@ -25,7 +25,7 @@ Not a chat, not a copilot — an autonomous organization that works while you sl
 
 <br/>
 
-[English](README.md) · [Русский](README.ru.md)
+[English](README.en.md) · [Русский](README.md)
 
 </div>
 
@@ -33,137 +33,137 @@ Not a chat, not a copilot — an autonomous organization that works while you sl
 
 <br/>
 
-## The problem
+## Проблема
 
-Every AI coding tool today works the same way: you write a prompt, the agent executes, you wait. A single agent, a single thread, a single context window.
+Каждый AI-инструмент сегодня работает одинаково: ты пишешь промт, агент выполняет, ты ждёшь. Один агент, один поток, одно окно контекста.
 
-But what happens when you want the agent to **work on its own**? When you want it to plan, delegate, review, and ship — without you sitting in front of the keyboard at 2 AM?
+Но что происходит, когда ты хочешь, чтобы агент **работал сам**? Планировал, делегировал, проверял и выкладывал код — пока ты не сидишь за клавиатурой в 2 часа ночи?
 
-**Nothing.** Because none of them are built for that.
-
----
-
-## The shift
-
-A month ago, models had 256K context windows. A year ago — 128K. Today, production models have 1M. And within months — **10M tokens** of context.
-
-This changes everything.
-
-With 10M tokens, an agent can hold your entire codebase, all open issues, last month of logs, every decision you ever made — and still have room to think.
-
-But a **single** agent, no matter how much context it has, is still a single agent. It cannot specialize, cannot delegate, cannot work in parallel.
-
-To use 10M tokens effectively, you need **more than one agent**. You need a system.
+**Ничего.** Потому что никто не строил для этого.
 
 ---
 
-## The idea
+## Перелом
 
-SynPin is not an AI coding assistant. It is a **multi-agent operating system** — a platform where AI agents live and work as an autonomous organization, not as anonymous chatbots.
+Месяц назад у моделей было 256K контекста. Год назад — 128K. Сегодня production-модели имеют 1M. А через несколько месяцев — **10M токенов** контекста.
 
-Think of it like an orchestra:
+Это меняет всё.
 
-- **The user is the conductor.** One gesture sets the direction. You don't play every instrument — you guide.
-- **The agents are the musicians.** Each has a role, a specialization, a place in the hierarchy.
-- **The departments are the sections.** Strings, brass, woodwinds — isolated, focused, synchronous.
-- **The cron scheduler is the metronome.** Work happens even when you're not in the room.
-- **The Kanban board is the sheet music.** Every task has a place, a status, a performer.
+С 10M токенов агент может держать в контексте всю твою кодовую базу, все открытые issues, последний месяц логов, каждое решение — и ещё останется место для размышлений.
 
-You don't write twenty prompts to ship a feature. You describe the feature once. The orchestrator plans, delegates to departments, monitors execution, and delivers the result.
+Но **один** агент, сколько бы контекста у него ни было, остаётся одним агентом. Он не может специализироваться, делегировать, работать параллельно.
+
+Чтобы использовать 10M токенов эффективно, нужно **больше чем один агент**. Нужна система.
 
 ---
 
-## How it works
+## Идея
 
-### Hierarchy
+SynPin — это не AI-ассистент для кода. Это **мульти-агентная операционная система** — платформа, где ИИ-агенты живут и работают как автономная организация.
+
+Представь оркестр:
+
+- **Пользователь — дирижёр.** Одно движение задаёт направление. Ты не играешь на каждом инструменте — ты направляешь.
+- **Агенты — музыканты.** У каждого роль, специализация, место в иерархии.
+- **Отделы — секции оркестра.** Струнные, духовые, ударные — изолированы, сфокусированы, синхронны.
+- **Планировщик cron — метроном.** Работа идёт, даже когда тебя нет в комнате.
+- **Канбан-доска — партитура.** У каждой задачи есть место, статус, исполнитель.
+
+Ты не пишешь двадцать промтов, чтобы выпустить фичу. Ты описываешь её один раз. Оркестратор планирует, делегирует отделам, контролирует выполнение и доставляет результат.
+
+---
+
+## Как это работает
+
+### Иерархия
 
 ```
               ┌─────────────────────┐
-              │   Orchestrator AI   │  ← sees everything, plans, delegates
-              │  (main agent)       │
+              │   Оркестратор AI    │  ← видит всё, планирует, делегирует
+              │  (главный агент)    │
               └──────┬──────┬───────┘
                      │      │
            ┌─────────┘      └─────────┐
            ▼                          ▼
     ┌──────────────┐         ┌──────────────┐
-    │  Department  │         │  Department  │  ← isolated memory & context
-    │  Head AI     │◄───────►│  Head AI     │  ← cross-department links
+    │   Отдел 1    │         │   Отдел 2    │  ← изолированная память
+    │  Глава AI    │◄───────►│  Глава AI    │  ← связи между отделами
     └──────┬───────┘         └──────┬───────┘
            │                        │
       ┌────┼────┐              ┌────┼────┐
       ▼    ▼    ▼              ▼    ▼    ▼
-   Worker Worker Worker    Worker Worker Worker  ← parallel execution
+   Работник Работник Работник  Работник Работник Работник  ← параллельное исполнение
 ```
 
-Each department has:
-- A **head** — receives tasks, decomposes, delegates, synthesizes results
-- **Workers** — specialists who execute in parallel
-- **Isolated memory** — departments don't leak context
-- **Links** — task escalation, delegation, and collaboration between departments
+Каждый отдел имеет:
+- **Главу** — принимает задачи, декомпозирует, делегирует, собирает результат
+- **Работников** — специалисты, выполняющие задачи параллельно
+- **Изолированную память** — отделы не видят контекст друг друга
+- **Связи** — эскалация, делегирование и коллаборация между отделами
 
-### Autonomy
+### Автономность
 
-SynPin works without you.
+SynPin работает без тебя.
 
-- **Cron** schedules nightly QA runs, report generation, task creation
-- **Kanban** tracks every task from creation to delivery across departments
-- **Memory** persists across sessions — agents remember what they learned
-- **Orchestrator** monitors all departments, reassigns blocked tasks, escalates bottlenecks
+- **Cron** запускает ночные QA-тесты, генерацию отчётов, создание задач
+- **Kanban** отслеживает каждую задачу от создания до сдачи
+- **Память** сохраняется между сессиями — агенты помнят что узнали
+- **Оркестратор** следит за всеми отделами, перераспределяет заблокированные задачи, эскалирует узкие места
 
-You wake up to a daily report. Not because you asked for it at midnight — because the system knew you'd need it in the morning.
+Ты просыпаешься с готовым daily-отчётом. Не потому что попросил в полночь — а потому что система знала, что он понадобится утром.
 
 ---
 
-## What makes SynPin different
+## Чем SynPin отличается
 
-| | Single-agent tools | SynPin |
+| | Одноагентные инструменты | SynPin |
 |---|---|---|
-| **Structure** | One agent per session | Hierarchical multi-agent organization |
-| **Autonomy** | Requires user for every step | Works independently on schedule |
-| **Memory** | Session-scoped (forgets on restart) | Persistent per agent and department |
-| **Parallelism** | Single thread | Multiple agents execute simultaneously |
-| **Context model** | One window per task | Shared context across orchestrated agents |
-| **User role** | Operator | Conductor |
+| **Структура** | Один агент на сессию | Иерархическая мульти-агентная организация |
+| **Автономность** | Требует пользователя на каждом шаге | Работает самостоятельно по расписанию |
+| **Память** | Живёт только в сессии | Сохраняется у каждого агента и отдела |
+| **Параллельность** | Один поток | Множество агентов одновременно |
+| **Контекст** | Одно окно на задачу | Разделённый контекст всей системы |
+| **Роль пользователя** | Оператор | Дирижёр |
 
 ---
 
-## Quick start
+## Быстрый старт
 
 ```bash
 git clone https://github.com/FraN-arti/SynPin.git
 cd SynPin
 .\install.ps1          # Windows
 ./install.sh           # Linux / macOS
-synpin dev             # development mode
+synpin dev             # режим разработки
 ```
 
-Open `http://localhost:2099`.
+Открой `http://localhost:2099`.
 
-Or run with the system wizard:
+Или через системный визард:
 ```bash
-synpin setup           # interactive first-run wizard
-synpin start           # production mode
+synpin setup           # интерактивный визард первого запуска
+synpin start           # production-режим
 ```
 
 ---
 
-## Why open source
+## Почему open source
 
-Because the AI agent ecosystem should not be owned by one company.
+Экосистема ИИ-агентов не должна принадлежать одной компании.
 
-SynPin is licensed under AGPL v3 — you can use it, fork it, modify it. If you build on it publicly, the changes stay open.
+SynPin распространяется под лицензией AGPL v3 — ты можешь использовать, форкать, модифицировать. Если ты строишь на его основе публичный продукт — изменения остаются открытыми.
 
-Commercial use without source disclosure? Reach out.
+Коммерческое использование без раскрытия исходников? Напиши.
 
 ---
 
-## The road ahead
+## Дорога вперёд
 
-The models are getting smarter. The context windows are exploding. The cost of inference is dropping.
+Модели становятся умнее. Контекстные окна взрываются. Стоимость инференса падает.
 
-In 2026, the question is no longer "can an AI write code?" — it's "can a system of AI agents run a project?"
+В 2026 году вопрос уже не "может ли ИИ писать код?" — вопрос "может ли система ИИ-агентов вести проект?"
 
-SynPin is our answer.
+SynPin — наш ответ.
 
 <br/>
 
@@ -171,7 +171,7 @@ SynPin is our answer.
 
 <br/>
 
-**You are not the trigger. You are the conductor.**
+**Ты не триггер. Ты дирижёр.**
 
 <br/>
 

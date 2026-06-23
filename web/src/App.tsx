@@ -136,39 +136,30 @@ function App() {
     | { type: 'setup' }
   // ── Virgin detection ──────────────────────────────────────────────
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null)
-
-  useEffect(() => {
-    fetch('/api/setup/status')
-      .then(r => r.json())
-      .then(data => {
-        setNeedsSetup(data.needs_setup === true)
-      })
-      .catch(() => {
-        setNeedsSetup(false) // backend down — don't block
-      })
-  }, [])
-
   const [view, setView] = useState<View>({ type: 'chat' })
 
-  // Route: /start/ — only shows wizard if needs_setup is true or virgin
-  // Otherwise redirects to / to prevent access after setup
+  // Single fetch: virgin detection + /start/ guard
   useEffect(() => {
     const isStartRoute = window.location.pathname === '/start/'
       || window.location.pathname === '/start'
       || window.location.pathname.startsWith('/start')
-    if (!isStartRoute) return
 
     fetch('/api/setup/status')
       .then(r => r.json())
       .then(data => {
-        if (data.needs_setup) {
-          setView({ type: 'setup' })
-        } else {
-          window.location.href = '/'
+        const needSetup = data.needs_setup === true
+        setNeedsSetup(needSetup)
+
+        if (isStartRoute) {
+          if (needSetup) {
+            setView({ type: 'setup' })
+          } else {
+            window.location.href = '/'
+          }
         }
       })
       .catch(() => {
-        setView({ type: 'setup' }) // backend down — show wizard anyway
+        setNeedsSetup(false)
       })
   }, [])
 

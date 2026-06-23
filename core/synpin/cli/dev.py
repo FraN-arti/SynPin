@@ -423,6 +423,50 @@ def _check_prerequisites() -> None:
         console.print("[success]Web dependencies installed.[/success]")
 
 
+def _stdin_listener(core_port: int, stop: threading.Event, started: threading.Event) -> None:
+    """Listen for keyboard shortcuts on stdin.
+
+    Supported:
+      d + enter -> open dev wizard in browser
+    """
+    import sys as _sys
+    import subprocess as _sp
+    import urllib.request as _url
+    import threading as _th
+
+    started.set()
+    while not stop.is_set():
+        try:
+            line = _sys.stdin.readline()
+            if not line:
+                _th.Event().wait(0.5)
+                continue
+            cmd = line.strip().lower()
+
+            if cmd == "d":
+                # Open dev wizard in browser
+                try:
+                    _url.urlopen(f"http://localhost:{core_port}/api/setup/status", timeout=2)
+                except Exception:
+                    pass
+                url = f"http://localhost:2099/?setup=1"
+                console.print(f"[info]Opening dev wizard: {url}[/info]")
+                if os.name == "nt":
+                    _sp.Popen(["start", url], shell=True)
+                else:
+                    import subprocess as _sp2
+                    try:
+                        _sp2.Popen(["xdg-open", url])
+                    except FileNotFoundError:
+                        try:
+                            _sp2.Popen(["open", url])
+                        except FileNotFoundError:
+                            pass
+        except (EOFError, OSError):
+            # Stdin closed (e.g., piped input)
+            break
+
+
 def run_dev_server() -> None:
     """Main entry: orchestrate Core + Web in parallel with unified output."""
     from .commands import _get_version
@@ -533,6 +577,15 @@ def run_dev_server() -> None:
     strip_ansi = os.name == "nt"
     printer = threading.Thread(target=_output_printer, args=(output_queue, printer_stop, strip_ansi), daemon=True)
     printer.start()
+
+    # Start stdin listener (daemon thread reads keyboard shortcuts)
+    _listener_started = threading.Event()
+    listener = threading.Thread(
+        target=_stdin_listener,
+        args=(core_port, printer_stop, _listener_started),
+        daemon=True,
+    )
+    listener.start()
 
     # Start Core
     console.print("[success]Starting Core...[/success]")

@@ -10,6 +10,7 @@ import { KanbanBoard } from './components/KanbanBoard'
 import { ConnectionsCanvas } from './components/ConnectionsCanvas'
 import { DeadlinesPage } from './components/DeadlinesPage'
 import { ProjectsPage } from './components/ProjectsPage'
+import { SetupWizard } from './components/SetupWizard'
 import { ChatSkeleton } from './components/ChatSkeleton'
 import { PageTransition } from './components/PageTransition'
 import {
@@ -132,7 +133,13 @@ function App() {
     | { type: 'connections' }
     | { type: 'deadlines' }
     | { type: 'projects' }
-  const [view, setView] = useState<View>({ type: 'chat' })
+    | { type: 'setup' }
+  // Auto-show setup wizard if URL has ?setup=1
+  const initialView: View = (typeof window !== 'undefined')
+    && new URLSearchParams(window.location.search).get('setup') === '1'
+    ? { type: 'setup' }
+    : { type: 'chat' }
+  const [view, setView] = useState<View>(initialView)
   const [otdelSettingsOpen, setOtdelSettingsOpen] = useState(false)
   // null = not loaded yet (show skeleton), [] = loaded but empty chat
   const [messages, setMessages] = useState<Message[] | null>(null)
@@ -1338,6 +1345,7 @@ function App() {
           else if (view.type === 'connections') pageKey = 'connections'
           else if (view.type === 'deadlines') pageKey = 'deadlines'
           else if (view.type === 'projects') pageKey = 'projects'
+          else if (view.type === 'setup') pageKey = 'setup'
           else if (view.type === 'settings') pageKey = 'settings'
           else if (view.type === 'otdel') pageKey = `otdel-${view.id}`
           else if (!agentsLoaded || (activeAgent && messages === null)) pageKey = 'chat-loading'
@@ -1351,6 +1359,8 @@ function App() {
             body = <DeadlinesPage wsOn={wsOn} />
           } else if (view.type === 'projects') {
             body = <ProjectsPage wsOn={wsOn} />
+          } else if (view.type === 'setup') {
+            body = <SetupWizard onComplete={() => setView({ type: 'chat' })} />
           } else if (view.type === 'connections') {
             body = <ConnectionsCanvas wsOn={wsOn} />
           } else if (view.type === 'settings') {

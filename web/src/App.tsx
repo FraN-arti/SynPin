@@ -134,12 +134,29 @@ function App() {
     | { type: 'deadlines' }
     | { type: 'projects' }
     | { type: 'setup' }
-  // Auto-show setup wizard if URL has ?setup=1
-  const initialView: View = (typeof window !== 'undefined')
-    && new URLSearchParams(window.location.search).get('setup') === '1'
-    ? { type: 'setup' }
-    : { type: 'chat' }
-  const [view, setView] = useState<View>(initialView)
+  // ── Virgin detection ──────────────────────────────────────────────
+  const [needsSetup, setNeedsSetup] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    fetch('/api/setup/status')
+      .then(r => r.json())
+      .then(data => {
+        setNeedsSetup(data.needs_setup === true)
+      })
+      .catch(() => {
+        setNeedsSetup(false) // backend down — don't block
+      })
+  }, [])
+
+  const [view, setView] = useState<View>({ type: 'chat' })
+
+  // Switch to setup wizard when virgin system is detected
+  useEffect(() => {
+    if (needsSetup === true) {
+      setView({ type: 'setup' })
+    }
+  }, [needsSetup])
+
   const [otdelSettingsOpen, setOtdelSettingsOpen] = useState(false)
   // null = not loaded yet (show skeleton), [] = loaded but empty chat
   const [messages, setMessages] = useState<Message[] | null>(null)
@@ -1360,7 +1377,7 @@ function App() {
           } else if (view.type === 'projects') {
             body = <ProjectsPage wsOn={wsOn} />
           } else if (view.type === 'setup') {
-            body = <SetupWizard onComplete={() => setView({ type: 'chat' })} />
+            body = <SetupWizard onComplete={() => { window.location.reload() }} />
           } else if (view.type === 'connections') {
             body = <ConnectionsCanvas wsOn={wsOn} />
           } else if (view.type === 'settings') {

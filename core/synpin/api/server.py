@@ -82,8 +82,36 @@ async def lifespan(app: FastAPI):
 
     # ── Cron scheduler ────────────────────────────────────────────────
     try:
-        from ..cron.scheduler import start_scheduler
-        start_scheduler()
+        # Start all background services via DaemonManager
+        from ..services.daemon_manager import DaemonManager
+        _daemon_manager = DaemonManager()
+        app.state.daemon_manager = _daemon_manager
+
+        # 1. Cron scheduler
+        from ..cron.scheduler import _tick_loop
+        _daemon_manager.register("cron-scheduler", _tick_loop, interval=60, is_async=True)
+
+        # 2. Session auto-reset
+        from ..chat.session_reset import _reset_sessions, _should_reset, _get_sessions_config
+        import time as _time_module
+        _last_reset_by_mode: dict = {}
+
+        async def _session_reset_tick():
+            try:
+                cfg = _get_sessions_config()
+                if _should_reset(cfg):
+                    _reset_sessions()
+                    mode = cfg.get("auto_reset", {}).get("mode", "daily")
+                    _last_reset_by_mode[mode] = _time_module.time()
+                    _last_reset_by_mode["daily"] = _time_module.time()
+            except Exception:
+                pass
+
+        _daemon_manager.register("session-reset", _session_reset_tick, interval=60, is_async=True)
+
+        # Start all
+        _daemon_manager.start()
+        print("  [services] DaemonManager: cron + session-reset started")
         logger.info("[cron] Scheduler started")
     except Exception as e:
         logger.warning("[cron] Failed to start scheduler: %s", e)

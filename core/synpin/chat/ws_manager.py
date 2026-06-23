@@ -16,12 +16,22 @@ class ConnectionManager:
     def __init__(self):
         self._connections: dict[str, WebSocket] = {}
 
-    async def connect(self, ws: WebSocket, user_id: str = "default"):
-        """Accept and register a WebSocket connection."""
+    async def connect(self, ws: WebSocket, user_id: str = "default") -> None:
+        """Accept a new WebSocket connection."""
         await ws.accept()
-        # Close existing connection if any (one per user)
-        old = self._connections.pop(user_id, None)
-        if old:
+        self._connections[user_id] = ws
+        self._connection_order.append(user_id)
+        logger.info(f"[ws] Client connected: {user_id} (total: {len(self._connections)})")
+
+        # Check if session reset was missed while offline
+        try:
+            from .session_reset import _should_reset, _get_sessions_config, _reset_sessions
+            cfg = _get_sessions_config()
+            if _should_reset(cfg):
+                logger.info("[ws] Session reset was missed — triggering on connect")
+                _reset_sessions()
+        except Exception:
+            pass
             try:
                 await old.close(code=4001, reason="replaced by new connection")
             except Exception:

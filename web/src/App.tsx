@@ -383,6 +383,45 @@ function App() {
     return off
   }, [wsOn, refreshDepartments])
 
+  // Listen for real-time otdel messages
+  useEffect(() => {
+    const off = wsOn('otdel:message', (msg: any) => {
+      // Fire a custom event so the OtdelChatView component can handle it
+      window.dispatchEvent(new CustomEvent('otdel:message', { detail: msg }))
+    })
+    return off
+  }, [wsOn])
+
+  // Listen for kanban task updates
+  useEffect(() => {
+    const off = wsOn('kanban:task_created', (msg: any) => {
+      window.dispatchEvent(new CustomEvent('kanban:refresh', { detail: msg }))
+    })
+    return off
+  }, [wsOn])
+
+  useEffect(() => {
+    const off = wsOn('kanban:task_updated', (msg: any) => {
+      window.dispatchEvent(new CustomEvent('kanban:refresh', { detail: msg }))
+    })
+    return off
+  }, [wsOn])
+
+  useEffect(() => {
+    const off = wsOn('kanban:tasks_deleted', (msg: any) => {
+      window.dispatchEvent(new CustomEvent('kanban:refresh', { detail: msg }))
+    })
+    return off
+  }, [wsOn])
+
+  // Listen for project updates
+  useEffect(() => {
+    const off = wsOn('project:updated', (msg: any) => {
+      window.dispatchEvent(new CustomEvent('project:refresh', { detail: msg }))
+    })
+    return off
+  }, [wsOn])
+
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const attachRef = useRef<{ openPicker: () => void }>(null)

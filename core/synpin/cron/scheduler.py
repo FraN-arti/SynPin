@@ -15,6 +15,7 @@ from types import SimpleNamespace
 
 from .jobs import get_due_jobs, advance_next_run
 from ..time import now as _now
+from ..services.daemon_manager import DaemonManager
 
 logger = logging.getLogger(__name__)
 
@@ -492,4 +493,27 @@ def start_scheduler() -> None:
         _tick_task = loop.create_task(_tick_loop())
         logger.info("[cron] Scheduler started (tick every %ds)", _TICK_INTERVAL)
     except RuntimeError:
-        logger.warning("[cron] No running event loop — scheduler not started")
+        logger.warning("[cron] No running event loop, cannot start scheduler")
+
+
+def register_cron_scheduler(dm: DaemonManager) -> None:
+    """Register cron tick with DaemonManager."""
+    # Sweep missed jobs at registration time
+    from .jobs import sweep_missed_jobs
+    missed = sweep_missed_jobs()
+    if missed:
+        logger.info("[cron] Sweep: marked %d missed one-shot job(s): %s", len(missed), missed)
+
+    # Start the tick loop via DaemonManager
+    global _tick_task
+    try:
+        loop = asyncio.get_running_loop()
+        _tick_task = loop.create_task(_tick_loop())
+        dm._services["cron-scheduler"] = type("svc", (), {
+            "name": "cron-scheduler",
+            "_task": _tick_task,
+            "is_async": True,
+        })()
+        logger.info("[cron] Scheduler registered with DaemonManager")
+    except RuntimeError:
+        logger.warning("[cron] No running event loop")

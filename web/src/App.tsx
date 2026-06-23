@@ -140,13 +140,27 @@ function App() {
 
   // Virgin detection: if providers are empty, show setup wizard
   useEffect(() => {
+    const isStartRoute = window.location.pathname === '/start/'
+      || window.location.pathname.startsWith('/start')
+
     fetch('/api/setup/status')
       .then(r => r.json())
       .then(data => {
-        setNeedsSetup(data.needs_setup === true)
+        const needSetup = data.needs_setup === true
+
+        if (isStartRoute) {
+          // /start/ forces wizard regardless of virgin state
+          setView({ type: 'setup' })
+        } else {
+          setNeedsSetup(needSetup)
+        }
       })
       .catch(() => {
-        setNeedsSetup(false)
+        if (isStartRoute) {
+          setView({ type: 'setup' })
+        } else {
+          setNeedsSetup(false)
+        }
       })
   }, [])
 

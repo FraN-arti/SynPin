@@ -444,18 +444,8 @@ def _stdin_listener(core_port: int, stop: threading.Event, started: threading.Ev
             cmd = line.strip().lower()
 
             if cmd == "d":
-                # Force-set one-shot flag, then open /start/
-                try:
-                    req = _url.Request(
-                        f"http://localhost:{core_port}/api/setup/force",
-                        data=b"{}",
-                        headers={"Content-Type": "application/json"},
-                    )
-                    _url.urlopen(req, timeout=2)
-                except Exception:
-                    pass
-                url = f"http://localhost:2099/start/"
-                console.print(f"[info]Opening dev wizard: {url}[/info]")
+                url = f"http://localhost:2099/"
+                console.print(f"[info]Opening browser: {url}[/info]")
                 if os.name == "nt":
                     _sp.Popen(["start", url], shell=True)
                 else:

@@ -138,25 +138,12 @@ function App() {
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null)
   const [view, setView] = useState<View>({ type: 'chat' })
 
-  // Single fetch: virgin detection + /start/ guard
+  // Virgin detection: if providers are empty, show setup wizard
   useEffect(() => {
-    const isStartRoute = window.location.pathname === '/start/'
-      || window.location.pathname === '/start'
-      || window.location.pathname.startsWith('/start')
-
     fetch('/api/setup/status')
       .then(r => r.json())
       .then(data => {
-        const needSetup = data.needs_setup === true
-        setNeedsSetup(needSetup)
-
-        if (isStartRoute) {
-          if (needSetup) {
-            setView({ type: 'setup' })
-          } else {
-            window.location.href = '/'
-          }
-        }
+        setNeedsSetup(data.needs_setup === true)
       })
       .catch(() => {
         setNeedsSetup(false)

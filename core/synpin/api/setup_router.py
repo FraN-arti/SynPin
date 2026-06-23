@@ -10,6 +10,7 @@ auto-navigate to the wizard on first run.
 """
 
 import logging
+import time
 from pathlib import Path
 
 import yaml
@@ -21,8 +22,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/setup", tags=["setup"])
 
-# One-shot dev wizard flag — set by d+enter in dev console
-_dev_wizard_force = False
+# Dev wizard flag with TTL — set by d+enter, lasts 60s
+_dev_wizard_expires: float = 0.0
+_DEV_WIZARD_TTL = 60.0  # seconds
 
 
 @router.get("/status")
@@ -34,9 +36,8 @@ def setup_status() -> dict:
             OR if dev wizard was force-triggered via d+enter
         message: human-readable status
     """
-    global _dev_wizard_force
-    if _dev_wizard_force:
-        _dev_wizard_force = False  # one-shot only
+    global _dev_wizard_expires
+    if time.time() < _dev_wizard_expires:
         return {
             "needs_setup": True,
             "message": "Dev-визард (d + enter)",
@@ -127,14 +128,18 @@ def save_setup(data: dict) -> dict:
     _copy_template("widget_layout.yaml")
     _copy_template("web_search.yaml")
 
+    # Clear dev wizard flag (wizard completed)
+    global _dev_wizard_expires
+    _dev_wizard_expires = 0.0
+
     return {"status": "ok", "message": "SynPin настроен!"}
 
 
 @router.post("/force")
 def force_setup_wizard() -> dict:
-    """Force-set the dev wizard flag (one-shot). Called by dev console d+enter."""
-    global _dev_wizard_force
-    _dev_wizard_force = True
+    """Set dev wizard flag with TTL. Called by dev console d+enter."""
+    global _dev_wizard_expires
+    _dev_wizard_expires = time.time() + _DEV_WIZARD_TTL
     return {"status": "ok"}
 
 

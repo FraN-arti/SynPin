@@ -444,12 +444,17 @@ def _stdin_listener(core_port: int, stop: threading.Event, started: threading.Ev
             cmd = line.strip().lower()
 
             if cmd == "d":
-                # Open dev wizard in browser
+                # Force-set dev wizard flag, then open browser
                 try:
-                    _url.urlopen(f"http://localhost:{core_port}/api/setup/status", timeout=2)
+                    req = _url.Request(
+                        f"http://localhost:{core_port}/api/setup/force",
+                        data=b"{}",
+                        headers={"Content-Type": "application/json"},
+                    )
+                    _url.urlopen(req, timeout=2)
                 except Exception:
                     pass
-                url = f"http://localhost:2099/?setup=1"
+                url = f"http://localhost:2099/"
                 console.print(f"[info]Opening dev wizard: {url}[/info]")
                 if os.name == "nt":
                     _sp.Popen(["start", url], shell=True)

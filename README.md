@@ -14,6 +14,13 @@ Not a chat, not a copilot — an autonomous organization that works while you sl
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg)](https://react.dev)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg)](https://fastapi.tiangolo.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6.svg)](https://typescriptlang.org)
+[![WebSocket](https://img.shields.io/badge/WebSocket-realtime-4FC08D.svg)](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket)
+[![React Flow](https://img.shields.io/badge/React%20Flow-12-FF007F.svg)](https://reactflow.dev)
+[![dnd-kit](https://img.shields.io/badge/dnd--kit-latest-FF6B35.svg)](https://dndkit.com)
+[![ChromaDB](https://img.shields.io/badge/ChromaDB-latest-FF6F00.svg)](https://www.trychroma.com)
+[![YAML](https://img.shields.io/badge/Config-YAML-0B5D9C.svg)](https://yaml.org)
+[![Pydantic](https://img.shields.io/badge/Pydantic-v2-E92063.svg)](https://docs.pydantic.dev)
+[![Vite](https://img.shields.io/badge/Vite-6-646CFF.svg)](https://vite.dev)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
 </div>

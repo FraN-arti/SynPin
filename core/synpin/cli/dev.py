@@ -93,7 +93,7 @@ def _normalize_glyphs(line: str) -> str:
     # Second: nuke remaining non-ASCII. ASCII letters/digits/punct
     # (0x20..0x7E) and tab/newline pass through. Anything else
     # becomes '?'.
-    return "".join(c if (0x20 <= ord(c) <= 0x7E or c in "\t\n") else "?" for c in out)
+    return "".join(c if (0x20 <= ord(c) <= 0x7E or c in "\t\n") else ">" for c in out)
 
 
 # Uvicorn and most Python loggers prefix each line with a level tag

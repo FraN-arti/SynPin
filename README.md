@@ -23,6 +23,10 @@ Not a chat, not a copilot — an autonomous organization that works while you sl
 [![Vite](https://img.shields.io/badge/Vite-6-646CFF.svg)](https://vite.dev)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
+<br/>
+
+[English](README.md) · [Русский](README.ru.md)
+
 </div>
 
 ---
@@ -32,8 +36,6 @@ Not a chat, not a copilot — an autonomous organization that works while you sl
 ## The problem
 
 Every AI coding tool today works the same way: you write a prompt, the agent executes, you wait. A single agent, a single thread, a single context window.
-
-Cursor, Windsurf, Claude Code, Kilo Code — they are all variations of the same idea: *an AI assistant that helps you write code.* You are the project manager, the architect, the reviewer, the deployer. The agent just types.
 
 But what happens when you want the agent to **work on its own**? When you want it to plan, delegate, review, and ship — without you sitting in front of the keyboard at 2 AM?
 
@@ -57,7 +59,7 @@ To use 10M tokens effectively, you need **more than one agent**. You need a syst
 
 ## The idea
 
-SynPin is not an AI coding assistant. It is an **multi-agent operating system** — a platform where AI agents live and work as an autonomous organization, not as anonymous chatbots.
+SynPin is not an AI coding assistant. It is a **multi-agent operating system** — a platform where AI agents live and work as an autonomous organization, not as anonymous chatbots.
 
 Think of it like an orchestra:
 
@@ -114,7 +116,7 @@ You wake up to a daily report. Not because you asked for it at midnight — beca
 
 ## What makes SynPin different
 
-| | Single-agent tools (Cursor, Windsurf, Claude Code, Kilo) | SynPin |
+| | Single-agent tools | SynPin |
 |---|---|---|
 | **Structure** | One agent per session | Hierarchical multi-agent organization |
 | **Autonomy** | Requires user for every step | Works independently on schedule |

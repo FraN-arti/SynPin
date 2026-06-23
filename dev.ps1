@@ -122,33 +122,22 @@ switch -Regex ($args[0]) {
             Write-Host "[dev] using Python: $pythonExe" -ForegroundColor Gray
         }
 
-        # Version sync: read single source of truth (pyproject.toml)
-        $tomlPath = Join-Path $ScriptDir "core\pyproject.toml"
-        $tomlMatch = Select-String -Path $tomlPath -Pattern 'version\s*=\s*"(.+)"' -ErrorAction SilentlyContinue
-        $targetVersion = if ($tomlMatch) { $tomlMatch.Matches[0].Groups[1].Value } else { "0.0.0" }
-
-        # Sync web/package.json to match pyproject.toml version
-        $pkgPath = Join-Path $ScriptDir "web\package.json"
-        if (Test-Path $pkgPath) {
-            $pkgContent = Get-Content $pkgPath -Raw -Encoding UTF8
-            $newPkgContent = $pkgContent -replace '"version"\s*:\s*"[^"]+"', "`"version`": `"$targetVersion`""
-            if ($pkgContent -ne $newPkgContent) {
-                [System.IO.File]::WriteAllText($pkgPath, $newPkgContent, (New-Object System.Text.UTF8Encoding $false))
-                Write-Host "[dev] synced web/package.json -> $targetVersion" -ForegroundColor Green
-            }
-        }
-
-        # Reinstall synpin-core if version mismatches
+        # Version check: compare installed synpin-core vs pyproject.toml.
         try {
             $installed = & $pythonExe -c "from importlib.metadata import version; print(version('synpin-core'))" 2>$null
-            if ($installed -and $installed -ne $targetVersion) {
-                    Write-Host "[dev] synpin-core: installed=$installed, target=$targetVersion" -ForegroundColor Yellow
+            $tomlMatch = Select-String -Path "$ScriptDir\core\pyproject.toml" -Pattern 'version\s*=\s*"(.+)"'
+            if ($tomlMatch -and $installed) {
+                $target = $tomlMatch.Matches[0].Groups[1].Value
+                if ($installed -ne $target) {
+                    Write-Host "[dev] version mismatch: installed=$installed, target=$target" -ForegroundColor Yellow
+                    Write-Host "[dev] reinstalling synpin-core $target ..." -ForegroundColor Yellow
                     & $pythonExe -m pip install -e "$ScriptDir\core" --quiet 2>$null
                     if ($LASTEXITCODE -eq 0) {
-                        Write-Host "[dev] synpin-core $targetVersion installed." -ForegroundColor Green
+                        Write-Host "[dev] synpin-core $target installed." -ForegroundColor Green
                     } else {
                         Write-Host "[dev] reinstall failed, continuing with $installed." -ForegroundColor DarkYellow
                     }
+                }
             }
         } catch {
             # Best-effort; don't block startup if version check fails

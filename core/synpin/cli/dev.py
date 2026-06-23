@@ -440,8 +440,21 @@ def run_dev_server() -> None:
     web_port = _find_free_port(WEB_PORT)
     version = _get_version()
 
+    # Sync web/package.json version from pyproject.toml (single source of truth)
+    try:
+        import re as _re
+        pkg_path = Path(__file__).resolve().parent.parent.parent.parent / "web" / "package.json"
+        if pkg_path.exists():
+            pkg_text = pkg_path.read_text(encoding="utf-8")
+            new_text = _re.sub(r'"version"\s*:\s*"[^"]+"', f'"version": "{version}"', pkg_text)
+            if pkg_text != new_text:
+                pkg_path.write_text(new_text, encoding="utf-8")  # UTF-8 without BOM
+                console.print(f"  [dim]synced web/package.json -> {version}[/dim]")
+    except Exception:
+        pass  # Best-effort
+
     console.print()
-    console.print(f"[brand]🚀 SynPin v{version} — Development Mode[/brand]")
+    console.print(f"[brand]>> SynPin v{version} — Development Mode[/brand]")
     console.print()
     console.print(f"  [dim]Core:  http://{CORE_HOST}:{core_port}/api[/dim]")
     console.print(f"  [dim]Web:   http://localhost:{web_port}[/dim]")
@@ -458,7 +471,7 @@ def run_dev_server() -> None:
             return
         printer_stop.set()
         console.print()
-        console.print("[warning]⏳  Shutting down...[/warning]")
+        console.print("[warning]>> Shutting down...[/warning]")
         for proc in processes:
             if proc.poll() is None:
                 try:

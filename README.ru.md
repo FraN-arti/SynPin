@@ -2,7 +2,7 @@
 
 <br/>
 
-# SynPin
+<img src="synpin.png" alt="SynPin" width="400">
 
 **Операционная система для ИИ-агентов.**
 

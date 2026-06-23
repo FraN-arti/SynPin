@@ -444,7 +444,16 @@ def _stdin_listener(core_port: int, stop: threading.Event, started: threading.Ev
             cmd = line.strip().lower()
 
             if cmd == "d":
-                # Open dev wizard in browser
+                # Force-set one-shot flag, then open /start/
+                try:
+                    req = _url.Request(
+                        f"http://localhost:{core_port}/api/setup/force",
+                        data=b"{}",
+                        headers={"Content-Type": "application/json"},
+                    )
+                    _url.urlopen(req, timeout=2)
+                except Exception:
+                    pass
                 url = f"http://localhost:2099/start/"
                 console.print(f"[info]Opening dev wizard: {url}[/info]")
                 if os.name == "nt":
@@ -500,6 +509,7 @@ def run_dev_server() -> None:
     console.print(f"  [dim]Web:   http://localhost:{web_port}[/dim]")
     console.print(f"  [dim]Docs: http://{CORE_HOST}:{core_port}/docs[/dim]")
     console.print(f"  [dim]Stop: Ctrl+C[/dim]")
+    console.print(f"  [dim]press d + enter to open dev wizard[/dim]")
     console.print()
 
     processes: list[subprocess.Popen] = []

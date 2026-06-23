@@ -150,13 +150,26 @@ function App() {
 
   const [view, setView] = useState<View>({ type: 'chat' })
 
-  // Route: /start/ forces setup wizard (for first-run and dev mode)
+  // Route: /start/ — only shows wizard if needs_setup is true or virgin
+  // Otherwise redirects to / to prevent access after setup
   useEffect(() => {
-    if (window.location.pathname === '/start/'
-        || window.location.pathname === '/start'
-        || window.location.pathname.startsWith('/start')) {
-      setView({ type: 'setup' })
-    }
+    const isStartRoute = window.location.pathname === '/start/'
+      || window.location.pathname === '/start'
+      || window.location.pathname.startsWith('/start')
+    if (!isStartRoute) return
+
+    fetch('/api/setup/status')
+      .then(r => r.json())
+      .then(data => {
+        if (data.needs_setup) {
+          setView({ type: 'setup' })
+        } else {
+          window.location.href = '/'
+        }
+      })
+      .catch(() => {
+        setView({ type: 'setup' }) // backend down — show wizard anyway
+      })
   }, [])
 
   // Switch to setup wizard when virgin system is detected

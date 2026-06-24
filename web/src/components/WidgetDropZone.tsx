@@ -53,8 +53,8 @@ async function migrateLocalStorageIfNeeded(): Promise<WidgetLayout | null> {
     if (!raw) return null
     const parsed = JSON.parse(raw)
     const migrate = (arr: string[]) =>
-      (arr || []).map((w: string) => w === 'departments' ? 'otdels' : w)
-        .filter((w: string) => ['otdels', 'kanban'].includes(w))
+          (arr || []).map((w: string) => w === 'departments' ? 'otdels' : w)
+          .filter((w: string) => ['otdels', 'kanban'].includes(w)) as WidgetType[]
     let layout: WidgetLayout
     if (parsed.widgets && Array.isArray(parsed.widgets)) {
       layout = { left: migrate(parsed.widgets), right: [] }

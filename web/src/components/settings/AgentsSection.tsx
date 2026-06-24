@@ -208,7 +208,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: newRole }),
       })
-      if (res.ok) fetchAgents()
+      if (res.ok) { fetchAgents(); onAgentsChange?.() }
     } catch (e) { console.error('[agents] role change error:', e) }
   }
 
@@ -218,7 +218,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ department: newDept }),
       })
-      if (res.ok) fetchAgents()
+      if (res.ok) { fetchAgents(); onAgentsChange?.() }
     } catch (e) { console.error('[agents] dept change error:', e) }
   }
 
@@ -228,7 +228,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: !agent.enabled }),
       })
-      if (res.ok) fetchAgents()
+      if (res.ok) { fetchAgents(); onAgentsChange?.() }
     } catch (e) { console.error('[agents] toggle error:', e) }
   }
 
@@ -238,7 +238,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: newModel }),
       })
-      if (res.ok) fetchAgents()
+      if (res.ok) { fetchAgents(); onAgentsChange?.() }
     } catch (e) { console.error('[agents] model change error:', e) }
   }
 
@@ -248,7 +248,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [field]: value }),
       })
-      if (res.ok) fetchAgents()
+      if (res.ok) { fetchAgents(); onAgentsChange?.() }
     } catch (e) { console.error('[agents] field change error:', e) }
   }
 
@@ -265,7 +265,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
         setShowCreateModal(false)
         setCreateForm({ name: '', role: '', department: '', model: '', description: '', system_prompt: '', temperature: 0.7 })
         setFormTouched(false)
-        fetchAgents()
+        fetchAgents(); onAgentsChange?.()
       }
     } catch (e) { console.error('[agents] create error:', e) } finally { setCreating(false) }
   }
@@ -281,7 +281,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
     if (deleteInput !== deleteConfirm.name) return
     try {
       const res = await fetch(`${API_BASE}/api/agents/${deleteConfirm.slug}`, { method: 'DELETE' })
-      if (res.ok) { setHoveredAgent(null); fetchAgents() }
+      if (res.ok) { setHoveredAgent(null); fetchAgents(); onAgentsChange?.() }
     } catch (e) { console.error('[agents] delete error:', e) }
     setDeleteConfirm(null)
     setDeleteInput('')
@@ -317,15 +317,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
     } catch (e) { console.error('[external-agents] dept change error:', e) }
   }
 
-  const handleExternalFieldChange = async (agent: ExternalAgentData, field: string, value: unknown) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/external-agents/${agent.slug}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [field]: value }),
-      })
-      if (res.ok) detectExternalAgents()
-    } catch (e) { console.error('[external-agents] field change error:', e) }
-  }
+
 
   const modelOptions: string[] = []
   for (const p of providers) {

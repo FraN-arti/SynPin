@@ -163,14 +163,7 @@ export function GeneralSection() {
     }
   }, [saveSettings])
 
-  const updateSessions = useCallback((key: string, value: string | number | boolean) => {
-    setSettings(prev => {
-      if (!prev) return prev
-      const sessions = { ...(prev.sessions || {}), [key]: value }
-      return { ...prev, sessions }
-    })
-    saveSettings({ sessions: { [key]: value } } as unknown as Partial<SettingsData>)
-  }, [saveSettings])
+
 
   const saveWebSearchProvider = useCallback(async (provider: string, data: { enabled?: boolean; api_key?: string; search_engine_id?: string }) => {
     try {
@@ -180,11 +173,11 @@ export function GeneralSection() {
         body: JSON.stringify({ provider, ...data }),
       })
       if (res.ok) {
-        const result = await res.json()
+        await res.json()
         setWebSearchProviders(prev => ({
           ...prev,
           [provider]: { ...prev[provider], ...data },
-        }))
+        } as Record<string, { enabled: boolean; api_key: string; search_engine_id?: string }>))
       }
     } catch (e) {
       console.error('[web-search] save error:', e)

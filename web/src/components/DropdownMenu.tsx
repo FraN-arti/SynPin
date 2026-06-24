@@ -179,7 +179,7 @@ export function DropdownMenu({ value, options, onChange, width, disabled, menuMi
             onKeyDown={e => {
               if (e.key === 'ArrowDown') { e.preventDefault(); setHighlighted(h => Math.min(h + 1, filteredOptions.length - 1)) }
               else if (e.key === 'ArrowUp') { e.preventDefault(); setHighlighted(h => Math.max(h - 1, 0)) }
-              else if (e.key === 'Enter' && highlighted >= 0 && highlighted < filteredOptions.length) { e.preventDefault(); handleSelect(filteredOptions[highlighted]) }
+              else if (e.key === 'Enter' && highlighted >= 0 && highlighted < filteredOptions.length) { e.preventDefault(); handleSelect(filteredOptions[highlighted]!) }
             }}
             onMouseDown={e => e.stopPropagation()}
           />

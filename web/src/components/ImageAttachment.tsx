@@ -120,7 +120,7 @@ export function extractImagesFromPaste(e: React.ClipboardEvent): File[] {
   const files: File[] = []
   // Check clipboardData.items for image types
   for (let i = 0; i < e.clipboardData.items.length; i++) {
-    const item = e.clipboardData.items[i]
+    const item = e.clipboardData.items[i]!
     if (item.type.startsWith('image/')) {
       const file = item.getAsFile()
       if (file) files.push(file)

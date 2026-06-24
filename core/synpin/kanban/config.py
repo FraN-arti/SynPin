@@ -94,6 +94,7 @@ def _default_columns() -> list[ColumnConfig]:
         ColumnConfig(id=generate_id(), label="Revision", color="#ef4444", order=4),
         ColumnConfig(id=generate_id(), label="Blocked", color="#dc2626", order=5),
         ColumnConfig(id=generate_id(), label="Done", color="#22c55e", order=6),
+        ColumnConfig(id=generate_id(), label="Archive", color="#6b7280", order=7),
     ]
 
 

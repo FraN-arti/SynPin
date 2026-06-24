@@ -52,7 +52,7 @@ interface KanbanColumnForWidget {
 
 export function KanbanSection() {
   const [stats, setStats] = useState<Record<string, unknown> | null>(null)
-  const [boardSettingsKey, setBoardSettingsKey] = useState(0)
+  const [boardSettingsKey] = useState(0)
 
   useEffect(() => {
     fetch(`${API_BASE}/api/kanban/stats`)
@@ -90,7 +90,7 @@ export function KanbanSection() {
         )}
       </SettingsCard>
 
-      <KanbanColumnsConfig onStatusChange={() => setBoardSettingsKey(k => k + 1)} />
+      <KanbanColumnsConfig />
 
       {/* Status Reference */}
       <SettingsCard title="Справочник статусов">
@@ -129,10 +129,14 @@ export function KanbanSection() {
             <span className="status-ref-badge" style={{ background: 'rgba(34,197,94,0.2)', color: '#4ade80' }}>DONE</span>
             <span className="status-ref-desc">Выполнено и принято</span>
           </div>
+          <div className="status-ref-item">
+            <span className="status-ref-badge" style={{ background: 'rgba(107,114,128,0.3)', color: '#9ca3af' }}>ARCHIVE</span>
+            <span className="status-ref-desc">В архиве, скрыто с доски</span>
+          </div>
         </div>
       </SettingsCard>
 
-      {/* Board Settings — under columns */}
+      {/* Board Settings */}
       <BoardSettingsConfig refreshKey={boardSettingsKey} />
 
       <KanbanLabelsConfig />
@@ -157,7 +161,7 @@ export function KanbanSection() {
 
 // ── KanbanColumnsConfig ────────────────────────────────────────────
 
-function KanbanColumnsConfig({ onStatusChange }: { onStatusChange?: () => void }) {
+function KanbanColumnsConfig() {
   const DEFAULT_COLUMN_AUTO = '__auto__'
   const [columns, setColumns] = useState<KanbanColumnItem[]>([])
   const [defaultColumn, setDefaultColumn] = useState<string>(DEFAULT_COLUMN_AUTO)
@@ -273,16 +277,6 @@ function KanbanColumnsConfig({ onStatusChange }: { onStatusChange?: () => void }
     const newStatus = status === '' ? undefined : status
     setColumns(prev => prev.map((c, i) => i === index ? { ...c, status: newStatus } : c))
     patchColumn(col.id, { status: status === '' ? null : status } as any)
-
-    // Auto-link: if status is "blocked", set as blocked_column
-    if (status === 'blocked') {
-      fetch(`${API_BASE}/api/kanban/config/settings`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ blocked_column: col.id }),
-      }).catch(() => {})
-      onStatusChange?.()
-    }
   }
 
   const STATUS_COLORS: Record<string, string> = {
@@ -293,6 +287,7 @@ function KanbanColumnsConfig({ onStatusChange }: { onStatusChange?: () => void }
     review: '#fbbf24',
     revision: '#f472b6',
     blocked: '#f87171',
+    archive: '#6b7280',
     done: '#4ade80',
   }
 
@@ -981,8 +976,6 @@ function BoardSettingsConfig({ refreshKey }: { refreshKey?: number }) {
     archive_column: '' as string,
     blocked_column: '' as string,
   })
-  const [columns, setColumns] = useState<{ id: string; label: string; enabled: boolean }[]>([])
-
   const loadSettings = useCallback(() => {
     fetch(`${API_BASE}/api/kanban/config/settings`)
       .then(r => r.json())
@@ -1000,14 +993,7 @@ function BoardSettingsConfig({ refreshKey }: { refreshKey?: number }) {
 
   useEffect(() => { loadSettings() }, [loadSettings, refreshKey])
 
-  useEffect(() => {
-    fetch(`${API_BASE}/api/kanban/config/columns`)
-      .then(r => r.json())
-      .then((cols: { id: string; label: string; enabled: boolean }[]) => {
-        setColumns(cols.filter(c => c.enabled !== false))
-      })
-      .catch(() => {})
-  }, [])
+
 
   const save = useCallback(async (patch: Record<string, unknown>) => {
     try {
@@ -1060,53 +1046,17 @@ function BoardSettingsConfig({ refreshKey }: { refreshKey?: number }) {
           <span className="settings-hint">Лимит одновременно открытых задач</span>
         </div>
         <div className="settings-field">
-          <label>Автоудаление из колонок через</label>
+          <label>Автоудаление задач через</label>
           <CustomDropdown
             value={String(settings.auto_archive_days)}
             onChange={v => update({ auto_archive_days: parseInt(v) })}
             options={archiveDaysOptions.map(o => ({ value: String(o.value), label: o.label }))}
             width="100%"
           />
-          <span className="settings-hint">Задачи старше этого срока перемещаются в архив</span>
+          <span className="settings-hint">Задачи старше этого срока перемещаются в архив. Колонки выбираются в блоке «Конфигурация колонок»</span>
         </div>
       </div>
-      <div className="settings-divider-thin" />
-      <div className="settings-row-2">
-        <div className="settings-field">
-          <label>Колонка архива</label>
-          <CustomDropdown
-            value={settings.archive_column}
-            onChange={v => update({ archive_column: v })}
-            options={[
-              { value: '', label: 'Файловый архив (скрытый)' },
-              ...columns.map(col => ({ value: col.id, label: col.label })),
-            ]}
-            width="100%"
-          />
-          <span className="settings-hint">
-            {settings.archive_column
-              ? 'Архивированные задачи перемещаются в эту колонку'
-              : 'Архивированные задачи скрываются с доски (файловый архив)'}
-          </span>
-        </div>
-        <div className="settings-field">
-          <label>Колонка блокировок</label>
-          <CustomDropdown
-            value={settings.blocked_column}
-            onChange={v => update({ blocked_column: v })}
-            options={[
-              { value: '', label: 'Текущая колонка (по умолчанию)' },
-              ...columns.map(col => ({ value: col.id, label: col.label })),
-            ]}
-            width="100%"
-          />
-          <span className="settings-hint">
-            {settings.blocked_column
-              ? 'Заблокированные задачи перемещаются в эту колонку'
-              : 'Заблокированные задачи остаются в текущей колонке'}
-          </span>
-        </div>
-      </div>
+
       <div className="settings-divider-thin" />
       <div className="settings-field">
         <label>Уведомления <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>🚧 скоро</span></label>
@@ -1118,6 +1068,14 @@ function BoardSettingsConfig({ refreshKey }: { refreshKey?: number }) {
           />
         </div>
         <span className="settings-hint">Создание, смена статуса, утверждение и дедлайны задач</span>
+      </div>
+      <div className="settings-divider-thin" />
+      <div className="settings-hint" style={{ fontSize: '12px', lineHeight: 1.5 }}>
+        <strong>Маппинг колонок:</strong>{' '}
+        назначьте колонке статус{' '}
+        <span style={{ color: '#6b7280', fontWeight: 600 }}>ARCHIVE</span> — архивные задачи попадут туда.{' '}
+        Назначьте статус{' '}
+        <span style={{ color: '#f87171', fontWeight: 600 }}>BLOCKED</span> — заблокированные задачи автоматически переместятся в эту колонку.
       </div>
     </SettingsCard>
   )
@@ -1196,7 +1154,7 @@ function KanbanBulkCleanup() {
 
   const statusLabels: Record<string, string> = {
     backlog: 'Бэклог', todo: 'К выполнению', in_progress: 'В работе',
-    review: 'Ревью', revision: 'Ревизия', blocked: 'Заблокировано', done: 'Выполнено',
+    review: 'Ревью', revision: 'Ревизия', blocked: 'Заблокировано', archive: 'Архив', done: 'Выполнено',
   }
 
   return (

@@ -313,9 +313,8 @@ class KanbanService:
     def archive_task(self, task_id: str) -> bool:
         """Archive a task.
 
-        If archive_column is configured in BoardSettings, moves the
-        task to that column's status (keeps it visible on the board).
-        Otherwise falls back to moving the YAML file to tasks/archive/.
+        If a column mapped to ARCHIVE status exists, moves the task
+        to ARCHIVE status. Otherwise falls back to file-level archive.
         """
         from .config import load_settings, load_columns
 
@@ -323,21 +322,25 @@ class KanbanService:
         if task is None:
             return False
 
-        settings = load_settings()
+        # Auto-discover archive column from status mapping
+        cols = load_columns()
+        archive_col = next((c for c in cols if c.status == TaskStatus.ARCHIVE.value), None)
 
-        # Column-based archive
-        if settings.archive_column:
-            cols = load_columns()
-            target_col = next((c for c in cols if c.id == settings.archive_column), None)
-            if target_col and target_col.status:
-                try:
-                    new_status = TaskStatus(target_col.status)
-                except ValueError:
-                    new_status = None
-                if new_status:
-                    task.move_to(new_status, actor="system")
-                    self.save_task(task)
-                    return True
+        # Legacy: also check explicit archive_column setting
+        if not archive_col:
+            settings = load_settings()
+            if settings.archive_column:
+                archive_col = next((c for c in cols if c.id == settings.archive_column), None)
+
+        if archive_col:
+            try:
+                new_status = TaskStatus(archive_col.status)
+            except ValueError:
+                new_status = None
+            if new_status:
+                task.move_to(new_status, actor="system")
+                self.save_task(task)
+                return True
 
         # Fallback: file-level archive
         filepath = self._data_dir / f"{task_id}.yaml"

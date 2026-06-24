@@ -28,6 +28,7 @@ class TaskStatus(str, Enum):
     REVIEW = "review"          # Work done, head is checking
     REVISION = "revision"      # Sent back for rework
     BLOCKED = "blocked"        # Escalated to Council of Directors
+    ARCHIVE = "archive"        # Archived — hidden from active board
     DONE = "done"              # Completed and accepted
 
 

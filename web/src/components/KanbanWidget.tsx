@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { API_BASE } from '../config'
 import { LoadingSpinner } from './LoadingSpinner'
 
@@ -104,13 +104,22 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
     }
   }, [])
 
+  // Track whether initial config+columns are loaded
+  const configRef = useRef(config)
+  const columnsRef = useRef(columns)
+  configRef.current = config
+  columnsRef.current = columns
+
   const loadTasks = useCallback(async () => {
+    // Guard: don't load tasks until config + columns have been fetched at least once
+    if (columnsRef.current.length === 0 && configRef.current.show_columns.length > 0) {
+      // Columns not loaded yet and we need them for filtering — skip
+      return
+    }
     try {
       const res = await fetch(`${API_BASE}/api/kanban/tasks/board`)
       if (res.ok) {
         const data = await res.json()
-        // Flatten board into task list, attaching the status
-        // the backend already gave us via the column key.
         const allTasks: Task[] = []
         for (const [colKey, colTasks] of Object.entries(data)) {
           for (const t of (colTasks as Task[])) {
@@ -118,33 +127,21 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
           }
         }
 
-        // Resolve which statuses to show. show_columns may
-        // contain either column.id (new format) or TaskStatus
-        // strings (legacy). We normalise both into a set of
-        // TaskStatus values by joining with the columns table.
-        // If show_columns is empty, we show all enabled columns.
         let allowed: Set<string> | null = null
-        if (config.show_columns && config.show_columns.length > 0) {
+        const cfg = configRef.current
+        const cols = columnsRef.current
+        if (cfg.show_columns && cfg.show_columns.length > 0) {
           allowed = new Set()
-          for (const entry of config.show_columns) {
-            // Try to find this entry as a column id first.
-            const col = columns.find(c => c.id === entry)
+          for (const entry of cfg.show_columns) {
+            const col = cols.find(c => c.id === entry)
             if (col && col.status) {
               allowed.add(col.status)
             } else if (col && !col.status) {
-              // User-added column with no status mapping.
-              // Tasks in this column are unreachable via the
-              // status-keyed board, so we can only filter by
-              // id — which isn't a key in the board object. We
-              // fall back to including all tasks (best-effort
-              // visibility) but log a warning so the user
-              // knows to set a status on the column.
               console.warn(
                 `[kanban-widget] show_columns includes column '${entry}' which has no status; ` +
                 `tasks in that column won't appear here. Edit the column to set a status.`
               )
             } else {
-              // Treat as legacy TaskStatus value.
               allowed.add(entry)
             }
           }
@@ -155,13 +152,11 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
           filtered = allTasks.filter(t => allowed!.has(t.status))
         }
 
-        // Sort by priority
         const priorityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 }
         filtered.sort((a, b) => (priorityOrder[a.priority] ?? 4) - (priorityOrder[b.priority] ?? 4))
 
-        // Limit
-        if (config.max_items > 0) {
-          filtered = filtered.slice(0, config.max_items)
+        if (cfg.max_items > 0) {
+          filtered = filtered.slice(0, cfg.max_items)
         }
 
         setTasks(filtered)
@@ -171,27 +166,42 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
     } finally {
       setLoading(false)
     }
-  }, [config, columns])
+  }, [])
 
-  useEffect(() => { loadConfig() }, [loadConfig])
-  useEffect(() => { loadColumns() }, [loadColumns])
-  useEffect(() => { loadDeptMap() }, [loadDeptMap])
-  useEffect(() => { loadTasks() }, [loadTasks])
+  // Load order: config+columns first, then tasks
+  useEffect(() => {
+    let cancelled = false
+    const init = async () => {
+      await Promise.all([loadConfig(), loadColumns()])
+      if (!cancelled) {
+        loadDeptMap()
+        // Yield to let React flush config+columns state to refs
+        // Need multiple ticks for React to commit state
+        await new Promise(r => setTimeout(r, 50))
+        if (!cancelled) loadTasks()
+      }
+    }
+    init()
+    return () => { cancelled = true }
+  }, [])
 
   // WebSocket live updates for config changes + task mutations
   useEffect(() => {
     if (!wsOn) return
-    const unsub1 = wsOn('kanban:widget_updated', (msg: any) => {
+    const unsub1 = wsOn('kanban:widget_updated', async (msg: any) => {
       console.log('[kanban-widget] WS received widget_updated', msg.widget)
-      // Use data from WS event directly — no extra fetch needed
       if (msg.widget) {
         setConfig(msg.widget)
+        await new Promise(r => setTimeout(r, 0)) // yield to React
       } else {
-        loadConfig()
+        await loadConfig()
+        await new Promise(r => setTimeout(r, 0))
       }
+      loadTasks()
     })
-    const unsub2 = wsOn('kanban:columns_updated', () => {
-      loadColumns()
+    const unsub2 = wsOn('kanban:columns_updated', async () => {
+      await loadColumns()
+      await new Promise(r => setTimeout(r, 0)) // yield to React
       loadTasks()
     })
     const unsub3 = wsOn('kanban:labels_updated', () => {

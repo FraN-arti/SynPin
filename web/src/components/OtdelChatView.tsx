@@ -511,7 +511,7 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
       case 'kanban_task': {
         const cmd = tc.params?.command || ''
         if (cmd === 'list') return `📋 Задач: ${parsed?.count ?? parsed?.tasks?.length ?? '?'}`
-        if (cmd === 'create') { const t = tc.params?.title || ''; return `✅ Создана задача: "${t.slice(0,40)}${t.length>40?'...':''}"` }
+        if (cmd === 'create') { const t = String(tc.params?.title || ''); return `✅ Создана задача: "${t.slice(0,40)}${t.length>40?'...':''}"` }
         if (cmd === 'complete') return `✅ Задача закрыта`
         if (cmd === 'rework') return `🔄 Отправлено на доработку`
         if (cmd === 'history') return `📝 Записана история`
@@ -525,8 +525,8 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
       case 'head_evaluate': return `📊 Оценка выполнения`
       case 'head_retry': return `🔄 Повторная попытка`
       case 'head_decide': return `🎯 Принято решение`
-      case 'head_block': return `⚠️ Блокировка: ${(tc.params?.reason||'').slice(0,50)}`
-      case 'terminal': return `💻 ${(tc.params?.command||'').slice(0,50)}`
+      case 'head_block': return `⚠️ Блокировка: ${String(tc.params?.reason||'').slice(0,50)}`
+      case 'terminal': return `💻 ${String(tc.params?.command||'').slice(0,50)}`
       default: return tc.name
     }
   }, [])
@@ -556,10 +556,10 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
         break
       }
       case 'terminal': {
-        const cmd = tc.params?.command || ''
+        const cmd = String(tc.params?.command || '')
         return (<div className="tool-result-terminal">
           <div className="terminal-cmd">$ {cmd}</div>
-          {result && <pre>{result}</pre>}
+          {result && <pre>{String(result)}</pre>}
         </div>)
       }
     }

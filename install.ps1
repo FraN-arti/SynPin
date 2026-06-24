@@ -229,7 +229,7 @@ function Install-PythonDeps {
     Step "Installing Python dependencies (editable install of synpin-core)"
     & python -m pip install --upgrade pip --quiet
     if ($LASTEXITCODE -ne 0) { Fail "pip upgrade failed"; exit 1 }
-    & python -m pip install -e core/ --quiet
+    & python -m pip install core/ --quiet
     if ($LASTEXITCODE -ne 0) { Fail "pip install -e core/ failed"; exit 1 }
     Ok "synpin-core installed (editable)"
 }
@@ -250,6 +250,23 @@ function Install-WebDeps {
     Pop-Location
     if ($LASTEXITCODE -ne 0) { Fail "npm install failed"; exit 1 }
     Ok "web/node_modules installed"
+
+    # Build frontend for production
+    Step "Building web frontend (npm run build in web/)"
+    Push-Location web
+    & npm run build
+    Pop-Location
+    if ($LASTEXITCODE -ne 0) { Fail "npm run build failed"; exit 1 }
+    Ok "web/dist built"
+
+    # Copy dist to ~/.synpin/web/dist/ for production
+    Step "Copying web/dist to ~/.synpin/web/dist/"
+    $homeDist = Join-Path $env:USERPROFILE ".synpin\web"
+    if (-not (Test-Path $homeDist)) { New-Item -ItemType Directory -Path $homeDist -Force | Out-Null }
+    $destDist = Join-Path $homeDist "dist"
+    if (Test-Path $destDist) { Remove-Item -Recurse -Force $destDist }
+    Copy-Item -Path "web\dist" -Destination $destDist -Recurse
+    Ok "web/dist installed to ~/.synpin/web/dist/"
 }
 
 # ----------------------------------------------------------------------------
@@ -273,8 +290,21 @@ function Cmd-Install {
     Check-Node
     Install-PythonDeps
     Install-WebDeps
+
+    # Ask to remove source repo (everything is in site-packages + ~/.synpin now)
+    $repoDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    Step "Installation complete. Source repo: $repoDir"
+    $answer = Read-Host "`n  Remove source repository? (the installed package doesn't need it) [y/N]"
+    if ($answer -eq "y" -or $answer -eq "Y") {
+        Step "Removing source repository..."
+        Remove-Item -Recurse -Force $repoDir
+        Ok "Source repository removed."
+    } else {
+        Ok "Source repository kept at $repoDir"
+    }
+
     Step "Done."
-    Ok "SynPin installed. Run '.\bin\synpin.cmd start' or '.\bin\synpin.cmd dev' to begin."
+    Ok "SynPin installed. Run 'synpin start' or 'synpin dev' to begin."
 }
 
 function Cmd-Update {

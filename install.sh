@@ -237,10 +237,10 @@ check_node() {
 # ---------------------------------------------------------------------------
 
 install_python_deps() {
-    step "Installing Python dependencies (editable install of synpin-core)"
+    step "Installing Python dependencies (synpin-core)"
     python3 -m pip install --upgrade pip --quiet
-    python3 -m pip install -e core/ --quiet
-    ok "synpin-core installed (editable)"
+    python3 -m pip install core/ --quiet
+    ok "synpin-core installed"
 }
 
 install_web_deps() {
@@ -255,6 +255,21 @@ install_web_deps() {
     step "Installing web dependencies (npm install in web/)"
     (cd web && npm install --no-fund --no-audit)
     ok "web/node_modules installed"
+
+    # Build frontend for production
+    if [ -d web/dist ]; then
+        step "web/dist already exists — rebuilding..."
+    fi
+    step "Building web frontend (npm run build in web/)"
+    (cd web && npm run build)
+    ok "web/dist built"
+
+    # Copy dist to ~/.synpin/web/dist/ for production
+    step "Copying web/dist to ~/.synpin/web/dist/"
+    mkdir -p "$HOME/.synpin/web"
+    rm -rf "$HOME/.synpin/web/dist"
+    cp -r web/dist "$HOME/.synpin/web/dist"
+    ok "web/dist installed to ~/.synpin/web/dist/"
 }
 
 # ---------------------------------------------------------------------------
@@ -278,8 +293,23 @@ cmd_install() {
     check_node
     install_python_deps
     install_web_deps
+
+    # Ask to remove source repo (everything is in site-packages + ~/.synpin now)
+    REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+    step "Installation complete. Source repo: $REPO_DIR"
+    printf "
+  Remove source repository? (the installed package doesn't need it) [y/N] "
+    read -r answer
+    if [ "$answer" = "y" ] || [ "$answer" = "Y" ]; then
+        step "Removing source repository..."
+        rm -rf "$REPO_DIR"
+        ok "Source repository removed."
+    else
+        ok "Source repository kept at $REPO_DIR"
+    fi
+
     step "Done."
-    ok "SynPin installed. Run \`./bin/synpin start\` or \`./bin/synpin dev\` to begin."
+    ok "SynPin installed. Run \`synpin start\` or \`synpin dev\` to begin."
 }
 
 cmd_update() {

@@ -348,8 +348,13 @@ console.print(f"  [config] ConfigWatcher active: {watched} files, polling every 
 
 # Serve React SPA (built static files) — ONLY in production
 # In dev mode: use Vite dev server on port 2099
-# In production: ~/.synpin/web/dist/
-_STATIC_DIR = Path(__file__).resolve().parent.parent.parent.parent / "web" / "dist"
+# In production: ~/.synpin/web/dist/ (installed via pip install synpin)
+# Fallback: web/dist relative to source (for editable installs)
+_STATIC_DIR_CANDIDATES = [
+    Path.home() / ".synpin" / "web" / "dist",  # production (pip install)
+    Path(__file__).resolve().parent.parent.parent.parent / "web" / "dist",  # dev (editable)
+]
+_STATIC_DIR = next((p for p in _STATIC_DIR_CANDIDATES if p.exists()), _STATIC_DIR_CANDIDATES[0])
 
 # Only mount static files if NOT in dev mode (SYNPIN_DEV env var)
 if _STATIC_DIR.exists() and not os.environ.get("SYNPIN_DEV"):

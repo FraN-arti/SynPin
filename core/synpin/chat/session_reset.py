@@ -184,11 +184,14 @@ def _reset_sessions():
                     if last_ts:
                         try:
                             last_dt = datetime.fromisoformat(last_ts.replace("Z", "+00:00"))
-                            age = _now().astimezone() - last_dt
+                            # Strip tzinfo to compare naive datetimes consistently
+                            # (session timestamps are naive, _now() returns naive)
+                            last_dt_naive = last_dt.replace(tzinfo=None)
+                            age = _now() - last_dt_naive
                             if age > timedelta(hours=24):
                                 needs_reset = True
-                        except Exception:
-                            pass
+                        except (ValueError, TypeError) as e:
+                            logger.debug("Skipping session %s: %s", session_file.name, e)
 
                 if needs_reset:
                     if archive_on_reset:

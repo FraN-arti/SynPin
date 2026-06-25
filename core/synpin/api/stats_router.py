@@ -23,28 +23,10 @@ router = APIRouter(prefix="/api/stats", tags=["stats"])
 
 # ── Path Resolution ──────────────────────────────────────────────────────────
 
-_config_candidates = [
-    Path.home() / ".synpin" / "config",
-    Path(__file__).resolve().parent.parent / "config",
-]
+from ..paths import get_config_dir as _get_config_dir, get_data_dir_or_none as _get_data_dir
 
-_data_candidates = [
-    Path.home() / ".synpin" / "data",
-    Path(__file__).resolve().parent.parent / "data",
-]
-
-CONFIG_DIR: Path | None = None
-DATA_DIR: Path | None = None
-
-for c in _config_candidates:
-    if c.exists():
-        CONFIG_DIR = c
-        break
-
-for c in _data_candidates:
-    if c.exists():
-        DATA_DIR = c
-        break
+CONFIG_DIR: Path | None = _get_config_dir()
+DATA_DIR: Path | None = _get_data_dir()
 
 
 def _load_yaml(path: Path) -> dict:
@@ -127,11 +109,11 @@ async def get_overview():
     hours = (uptime_seconds % 86400) // 3600
     minutes = (uptime_seconds % 3600) // 60
     if days > 0:
-        uptime_str = f"{days}д {hours}ч {minutes}м"
+        uptime_str = f"{days}d {hours}h {minutes}m"
     elif hours > 0:
-        uptime_str = f"{hours}ч {minutes}м"
+        uptime_str = f"{hours}h {minutes}m"
     else:
-        uptime_str = f"{minutes}м"
+        uptime_str = f"{minutes}m"
 
     # Config files count
     config_count = 0
@@ -149,6 +131,17 @@ async def get_overview():
         "uptime_seconds": uptime_seconds,
         "started_at": datetime.fromtimestamp(_SERVER_START, tz=timezone.utc).isoformat(),
     }
+
+
+@router.get("/system")
+async def get_system():
+    """System info: hostname, IP, platform, version, uptime, time."""
+    try:
+        from ..time import get_system_info
+        return get_system_info()
+    except Exception as e:
+        logger.warning("Failed to get system info: %s", e)
+        return {"error": str(e)}
 
 
 @router.get("/usage")

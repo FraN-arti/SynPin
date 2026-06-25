@@ -98,6 +98,8 @@ export function MemorySection() {
     enabled: true, compaction_limit: 100,
   })
   const [contextWindowDefault, setContextWindowDefault] = useState(128000)
+  const [configLoaded, setConfigLoaded] = useState(false)
+  const [sessionConfigLoaded, setSessionConfigLoaded] = useState(false)
   const [sessionSettings, setSessionSettings] = useState({
     auto_reset_enabled: true,
     auto_reset_mode: 'daily' as 'daily' | 'weekly' | 'never',
@@ -126,15 +128,31 @@ export function MemorySection() {
 
   const loadConfig = async () => {
     try {
-      const res = await fetch(`${API}/api/config/memory`)
-      if (res.ok) {
-        const data = await res.json()
+      // Load memory-specific config (compaction, memory provider, otdel compaction)
+      const memRes = await fetch(`${API}/api/config/memory`)
+      if (memRes.ok) {
+        const data = await memRes.json()
         if (data.compaction) setCompactionForm(data.compaction)
         if (data.memory_provider) setProviderForm(data.memory_provider)
         if (data.memory) setMemorySettings(data.memory)
         if (data.otdel_compaction) setOtdelCompaction(data.otdel_compaction)
         if (data.context_window?.default) setContextWindowDefault(data.context_window.default)
-        if (data.sessions) setSessionSettings(prev => ({ ...prev, ...data.sessions }))
+        setConfigLoaded(true)
+      }
+      // Load session settings from settings.yaml (unified source)
+      const settingsRes = await fetch(`${API}/api/config/settings`)
+      if (settingsRes.ok) {
+        const data = await settingsRes.json()
+        const s = data.sessions || {}
+        const ar = s.auto_reset || {}
+        setSessionSettings({
+          auto_reset_enabled: ar.enabled ?? true,
+          auto_reset_mode: ar.mode ?? 'daily',
+          auto_reset_time: ar.reset_time ?? '00:00',
+          archive_on_reset: s.archive_on_reset ?? true,
+          archive_retention_days: s.archive_retention_days ?? 30,
+        })
+        setSessionConfigLoaded(true)
       }
     } catch (e) {
       console.error('[memory] config load error:', e)
@@ -158,16 +176,27 @@ export function MemorySection() {
   }
 
   const saveSessionSettings = async (key: string, value: unknown) => {
-    setSessionSettings(prev => ({ ...prev, [key]: value }))
-    try {
-      await fetch(`${API}/api/config/settings`, {
+    setSessionSettings(prev => {
+      const next = { ...prev, [key]: value }
+      // Build nested format for backend
+      const payload: Record<string, unknown> = {}
+      if (['auto_reset_enabled', 'auto_reset_mode', 'auto_reset_time'].includes(key)) {
+        payload.auto_reset = {
+          enabled: next.auto_reset_enabled,
+          mode: next.auto_reset_mode,
+          reset_time: next.auto_reset_time,
+        }
+      } else {
+        payload[key] = value
+      }
+      // Fire save
+      fetch(`${API}/api/config/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessions: { [key]: value } }),
-      })
-    } catch (e) {
-      console.error('[memory] session settings save error:', e)
-    }
+        body: JSON.stringify({ sessions: payload }),
+      }).catch(e => console.error('[memory] session settings save error:', e))
+      return next
+    })
   }
 
   // ── Render ──────────────────────────────────────────
@@ -175,7 +204,7 @@ export function MemorySection() {
   return (
     <div className="memory-section">
       {/* Block 1: User Profile (Global, Read-Only) */}
-      <SettingsCard title="Профиль пользователя">
+      <SettingsCard title="Профиль пользователя" loading={loading}>
         <p className="memory-card-desc">Общая информация о пользователе. Доступна всем агентам. Заполняется автоматически при общении.</p>
 
         <div className="memory-header">
@@ -244,7 +273,7 @@ export function MemorySection() {
       {/* Compaction + Sessions side by side */}
       <div className="memory-settings-row">
         {/* Block 2: Compaction */}
-        <SettingsCard title="Компакция" className="memory-settings-half">
+        <SettingsCard title="Компакция" className="memory-settings-half" loading={!configLoaded}>
           <p className="memory-card-desc">Автоматическое сжатие истории сообщений когда контекст заполняется. Не даёт диалогу «упасть» из-за переполнения.</p>
 
           <div className="memory-config-form">
@@ -322,7 +351,7 @@ export function MemorySection() {
         </SettingsCard>
 
         {/* Block 3: Memory Provider */}
-        <SettingsCard title="Memory Provider" className="memory-settings-half">
+        <SettingsCard title="Memory Provider" className="memory-settings-half" loading={!configLoaded}>
           <p className="memory-card-desc">Где агенты хранят долгосрочную память. Built-in использует MEMORY.md / USER.md файлы.</p>
 
           <div className="memory-config-form">
@@ -388,7 +417,7 @@ export function MemorySection() {
         </SettingsCard>
 
         {/* Block 4: Memory Settings */}
-        <SettingsCard title="Настройка памяти" className="memory-settings-half">
+        <SettingsCard title="Настройка памяти" className="memory-settings-half" loading={!configLoaded}>
           <p className="memory-card-desc">Параметры работы долгосрочной памяти агентов.</p>
 
           <div className="memory-config-form">
@@ -460,7 +489,7 @@ export function MemorySection() {
 
       <div className="memory-settings-row">
         {/* Block 4: Otdel Compaction */}
-        <SettingsCard title="Отделы" className="memory-settings-half">
+        <SettingsCard title="Отделы" className="memory-settings-half" loading={!configLoaded}>
           <p className="memory-card-desc">Настройки компакции чатов отделов. Глобальные правила для всех отделов.</p>
 
           <div className="memory-config-form">
@@ -500,7 +529,7 @@ export function MemorySection() {
         </SettingsCard>
 
         {/* Block 5: Agent Sessions */}
-        <SettingsCard title="Сессии агентов" className="memory-settings-half">
+        <SettingsCard title="Сессии агентов" className="memory-settings-half" loading={!sessionConfigLoaded}>
           <p className="memory-card-desc">Глобальные настройки сброса и архивации сессий.</p>
 
           <div className="memory-config-form">

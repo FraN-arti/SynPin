@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react'
 import { API_BASE } from '../../config'
 import { DropdownMenu } from '../DropdownMenu'
+import { LoadingSpinner } from '../LoadingSpinner'
 
 interface Otdel {
   otdelid: string
@@ -19,6 +20,7 @@ interface Otdel {
 
 export function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChange?: () => void }) {
   const [otdels, setOtdels] = useState<Otdel[]>([])
+  const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState<Otdel | null>(null)
   const [roles, setRoles] = useState<{ rolesid: string; name: string }[]>([])
@@ -31,6 +33,7 @@ export function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChang
       const data = await res.json()
       setOtdels(data.otdels || [])
     } catch {}
+    finally { setLoading(false) }
   }
 
   useEffect(() => {
@@ -159,6 +162,8 @@ export function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChang
       </div>
     </div>
   )
+
+  if (loading) return <LoadingSpinner text="Загрузка..." />
 
   return (
     <div className="settings-sections">

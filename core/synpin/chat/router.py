@@ -311,10 +311,12 @@ def _check_session_auto_reset(agent_slug: str, channel_id: str) -> bool:
 
         memory = agent.get("memory", {})
         global_settings = _get_global_session_settings()
-        
+
+        # Read from nested auto_reset block (settings.yaml format)
+        auto_reset = global_settings.get("auto_reset", {})
         # Merge: agent memory > global settings > defaults
-        auto_reset_enabled = memory.get("session_auto_reset_enabled", 
-                                         global_settings.get("auto_reset_enabled", False))
+        auto_reset_enabled = memory.get("session_auto_reset_enabled",
+                                         auto_reset.get("enabled", False))
         if not auto_reset_enabled:
             return False
 
@@ -338,13 +340,13 @@ def _check_session_auto_reset(agent_slug: str, channel_id: str) -> bool:
             return False
 
         now = _now()
-        mode = memory.get("session_auto_reset_mode", 
-                          global_settings.get("auto_reset_mode", "daily"))
+        mode = memory.get("session_auto_reset_mode",
+                          auto_reset.get("mode", "daily"))
         needs_reset = False
 
         if mode == "daily":
             reset_time_str = memory.get("session_auto_reset_time",
-                                        global_settings.get("auto_reset_time", "00:00"))
+                                        auto_reset.get("reset_time", "00:00"))
             try:
                 h, m = map(int, reset_time_str.split(":"))
                 today_reset = now.replace(hour=h, minute=m, second=0, microsecond=0)
@@ -354,7 +356,8 @@ def _check_session_auto_reset(agent_slug: str, channel_id: str) -> bool:
                 pass
 
         elif mode == "timer":
-            interval_hours = memory.get("session_auto_reset_interval", 24)
+            interval_hours = memory.get("session_auto_reset_interval",
+                                         auto_reset.get("interval_hours", 24))
             if (now - last_update) > timedelta(hours=interval_hours):
                 needs_reset = True
 

@@ -20,20 +20,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/config", tags=["config"])
 
 # ── Config Path Resolution ────────────────────────────────────────────────
+# Use get_config_dir() to stay consistent with the rest of the app
+# (respects SYNPIN_DEV=1 → dev config, else ~/.synpin/config)
 
-_config_candidates = [
-    Path.home() / ".synpin" / "config",
-    Path(__file__).resolve().parent.parent / "config",
-]
+from ..paths import get_config_dir as _get_config_dir, get_data_dir as _get_data_dir
 
-CONFIG_DIR: Optional[Path] = None
-for candidate in _config_candidates:
-    if candidate.exists():
-        CONFIG_DIR = candidate
-        break
-
+CONFIG_DIR: Optional[Path] = _get_config_dir()
 if CONFIG_DIR is None:
-    CONFIG_DIR = _config_candidates[0]
+    CONFIG_DIR = Path.home() / ".synpin" / "config"
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -277,11 +271,10 @@ _SETTINGS_DEFAULTS: dict[str, Any] = {
         "summarization": "",
     },
     "sessions": {
-        "auto_reset_enabled": True,
-        "auto_reset_mode": "daily",
-        "auto_reset_time": "00:00",
-        "max_history": 100,
+        "auto_reset": {"enabled": True, "mode": "daily", "reset_time": "00:00"},
         "archive_on_reset": True,
+        "archive_retention_days": 30,
+        "max_history": 100,
     },
     "feed": {
         "enabled": True,

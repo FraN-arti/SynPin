@@ -14,6 +14,7 @@ import type { SettingsData, OverviewStats } from './types'
 export function GeneralSection() {
   const [settings, setSettings] = useState<SettingsData | null>(null)
   const [overview, setOverview] = useState<OverviewStats | null>(null)
+  const [systemInfo, setSystemInfo] = useState<Record<string, unknown> | null>(null)
   const [availableModels, setAvailableModels] = useState<{ provider: string; model: string }[]>([])
   const [customThemes, setCustomThemes] = useState<{ id: string; name: string; source_url: string; dark?: Record<string, string>; light?: Record<string, string>; raw?: { light: Record<string, string>; dark: Record<string, string> } }[]>([])
   const [tweakcnUrl, setTweakcnUrl] = useState('')
@@ -42,6 +43,10 @@ export function GeneralSection() {
 
   useEffect(() => {
     fetch(`${API_BASE}/api/stats/overview`).then(r => r.ok ? r.json() : null).then(data => { if (data) setOverview(data) }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/stats/system`).then(r => r.ok ? r.json() : null).then(data => { if (data && !data.error) setSystemInfo(data) }).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -238,6 +243,34 @@ export function GeneralSection() {
           </div>
         </div>
       </SettingsCard>
+
+      {/* Информация о системе */}
+      {systemInfo && (
+        <SettingsCard title="Информация о системе">
+          <div className="stats-summary">
+            <div className="stats-card">
+              <span className="stats-card-value">{(systemInfo.synpin_version as string) ?? '—'}</span>
+              <span className="stats-card-label">SynPin</span>
+              <span className="stats-card-detail">версия</span>
+            </div>
+            <div className="stats-card">
+              <span className="stats-card-value">{(systemInfo.hostname as string) ?? '—'}</span>
+              <span className="stats-card-label">Хост</span>
+              <span className="stats-card-detail">{(systemInfo.platform as string) ?? ''}</span>
+            </div>
+            <div className="stats-card">
+              <span className="stats-card-value">{Array.isArray(systemInfo.ip_addresses) ? (systemInfo.ip_addresses as string[])[0] ?? '—' : '—'}</span>
+              <span className="stats-card-label">IP адрес</span>
+              <span className="stats-card-detail">Python {String(systemInfo.python_version ?? '')}</span>
+            </div>
+            <div className="stats-card">
+              <span className="stats-card-value">{(() => { const t = systemInfo.time as Record<string, string> | undefined; return t?.time ?? '—' })()}</span>
+              <span className="stats-card-label">{(() => { const t = systemInfo.time as Record<string, string> | undefined; return t?.weekday ?? '' })()}</span>
+              <span className="stats-card-detail">{(() => { const t = systemInfo.time as Record<string, string> | undefined; return t?.timezone ?? '' })()}</span>
+            </div>
+          </div>
+        </SettingsCard>
+      )}
 
       <SettingsCard title="Сервер" badge="требует перезапуск" disabled>
         <div className="settings-row-2">

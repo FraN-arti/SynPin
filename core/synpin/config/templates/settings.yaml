@@ -4,3 +4,10 @@ server:
   host: 0.0.0.0
   port: 2088
   dev_port: 2099
+cron:
+  agent_limit_per_creator: 3   # global cap on active cron jobs per created_by
+  proactive_triggers:
+    enabled: true
+    "завтра": "09:00"
+    "через час": "1h"
+    "на следующей неделе": "next-monday-09:00"

@@ -1330,7 +1330,7 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
         "type": "function",
         "function": {
             "name": "cron_manage",
-            "description": "Управление запланированными задачами (cron). Создавай, обновляй, удаляй крон-задачи, смотри историю запусков, запускай немедленно. Типы: cron (повторяющиеся), once (одноразовые), interval (интервал). Действия: send_message (в отдел), run_prompt (запустить агента).",
+            "description": "Управление запланированными задачами (cron). Создавай, обновляй, удаляй крон-задачи, смотри историю запусков, запускай немедленно. Типы: cron (повторяющиеся), once (одноразовые), interval (интервал). Действия: send_message (в отдел), run_prompt (запустить агента). ПРОАКТИВНЫЙ CRON: когда пользователь говорит про будущее событие («завтра», «через час», «на следующей неделе») — СТАВЬ cron САМОСТОЯТЕЛЬНО через cron_manage(command='create', schedule_type='once' или 'interval'). НЕ СПРАШИВАЙ разрешения — твоя работа замечать такие моменты. Параметр delivery: 'private' (по умолчанию, результат → в чат пользователю) | 'otdel' (в чат отдела) | 'silent' (только лог, без чата — для фоновых проверок).",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -1349,6 +1349,7 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
                     "action_agent": {"type": "string", "description": "Slug агента для run_prompt (например 'main_agent')"},
                     "description": {"type": "string", "description": "Описание задачи"},
                     "status": {"type": "string", "enum": ["active", "paused"], "description": "Статус задачи"},
+                    "delivery": {"type": "string", "enum": ["private", "otdel", "silent"], "description": "Куда доставить результат. 'private' (по умолчанию, в чат пользователю) — для личных напоминаний. 'otdel' (в чат отдела) — для командных задач. 'silent' — только лог, без чата (для фоновых проверок)."},
                 },
                 "required": ["command"],
             },

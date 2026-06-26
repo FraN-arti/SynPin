@@ -16,6 +16,43 @@ from .models import CronJob, ScheduleType, ActionType, JobStatus
 logger = logging.getLogger(__name__)
 
 
+# ── Global agent limit (per created_by) ──────────────────────────────────
+#
+# A single global cap prevents any one agent from flooding the system
+# with cron jobs. Read from settings.yaml (cron.agent_limit_per_creator)
+# with a sane default of 3. Live reloads on settings change because the
+# value is read on every create_job() call — no cache.
+
+DEFAULT_AGENT_LIMIT = 3
+
+
+def get_agent_limit() -> int:
+    """Read global per-creator cron limit from settings.yaml.
+
+    Returns DEFAULT_AGENT_LIMIT if config is missing or invalid.
+    """
+    try:
+        from ..config.manager import load_yaml
+        data = load_yaml("settings.yaml")
+        cron_cfg = (data or {}).get("cron", {}) or {}
+        val = cron_cfg.get("agent_limit_per_creator", DEFAULT_AGENT_LIMIT)
+        return max(1, int(val))
+    except Exception:
+        return DEFAULT_AGENT_LIMIT
+
+
+def count_active_for_creator(created_by: str) -> int:
+    """Count active cron jobs owned by `created_by`.
+
+    Used to enforce the global per-creator cap.
+    """
+    count = 0
+    for job in list_jobs(include_disabled=True):
+        if job.created_by == created_by and job.status == JobStatus.ACTIVE:
+            count += 1
+    return count
+
+
 def _cron_dir() -> Path:
     d = get_data_dir() / "cron" / "jobs"
     d.mkdir(parents=True, exist_ok=True)
@@ -44,6 +81,21 @@ def _load_job(path: Path) -> Optional[CronJob]:
     except Exception as e:
         logger.warning("Failed to load cron job %s: %s", path.name, e)
     return None
+
+
+class CronLimitExceeded(Exception):
+    """Raised when a creator tries to exceed their per-creator cron cap.
+
+    Caller (API layer) translates this into HTTP 409 with a clear message.
+    """
+    def __init__(self, creator: str, current: int, limit: int):
+        self.creator = creator
+        self.current = current
+        self.limit = limit
+        super().__init__(
+            f"Creator '{creator}' already has {current} active cron jobs "
+            f"(limit {limit}). Pause or delete existing jobs first."
+        )
 
 # ── Cron expression → next run ──────────────────────────────────────────────
 
@@ -140,8 +192,22 @@ def create_job(
     created_by: str = "user",
     description: str = "",
     timezone: str = "Europe/Moscow",
+    delivery: str = "private",
 ) -> CronJob:
-    """Create a new cron job."""
+    """Create a new cron job.
+
+    Raises CronLimitExceeded if `created_by` already has the maximum
+    number of active jobs (see get_agent_limit).
+    """
+    # Enforce per-creator limit BEFORE writing anything to disk.
+    limit = get_agent_limit()
+    current = count_active_for_creator(created_by)
+    if current >= limit:
+        raise CronLimitExceeded(created_by, current, limit)
+
+    # Lazy import to avoid circular deps (DeliveryMode is in models.py)
+    from .models import DeliveryMode
+
     job_id = f"cron-{uuid.uuid4().hex[:8]}"
     job = CronJob(
         id=job_id,
@@ -155,6 +221,7 @@ def create_job(
         action_target=action_target,
         action_message=action_message,
         action_agent=action_agent,
+        delivery=DeliveryMode(delivery),
     )
     job.next_run_at = compute_next_run(job)
 

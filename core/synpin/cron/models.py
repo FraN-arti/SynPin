@@ -26,6 +26,25 @@ class JobStatus(str, Enum):
     MISSED = "missed"        # one-shot job whose fire time passed while server was offline
 
 
+class DeliveryMode(str, Enum):
+    """Where the result of a cron-triggered agent run is delivered.
+
+    Critical for avoiding "chat spam" — most cron jobs are silent
+    (check a status, log to memory, send to otdel) and only a few
+    should ping the user's private chat.
+    """
+    PRIVATE = "private"   # agent output → user's private chat (default)
+    OTDEL = "otdel"      # agent output → otdel chat (action_target)
+    SILENT = "silent"     # no chat message; only memory/log
+
+
+class LastResult(str, Enum):
+    """Outcome of the most recent execution."""
+    SUCCESS = "success"   # job ran, agent finished
+    ERROR = "error"       # job ran, agent raised or timed out
+    SKIPPED = "skipped"   # job didn't run (e.g. server offline, agent busy)
+
+
 class CronJob(BaseModel):
     id: str
     name: str
@@ -43,10 +62,18 @@ class CronJob(BaseModel):
     action_message: str = ""           # message text or prompt
     action_agent: str = ""             # agent to run (for run_prompt)
 
+    # Delivery — where the result goes. Default "private" to keep
+    # backward compatibility with existing jobs.
+    delivery: DeliveryMode = DeliveryMode.PRIVATE
+
     # State
     status: JobStatus = JobStatus.ACTIVE
     last_run_at: Optional[str] = None
     next_run_at: Optional[str] = None
     run_count: int = 0
+    # Last execution record (set by the scheduler after each run)
+    last_result: LastResult = LastResult.SUCCESS
+    last_result_message: str = ""      # short reason on error/skipped, tooltip in UI
+    last_duration_ms: Optional[int] = None
     created_at: str = Field(default_factory=lambda: _now().isoformat())
     updated_at: str = Field(default_factory=lambda: _now().isoformat())

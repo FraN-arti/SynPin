@@ -24,7 +24,19 @@ _TICK_INTERVAL = 60  # seconds
 
 
 async def _execute_job(job: Any) -> None:
-    """Execute a fired cron job."""
+    """Execute a fired cron job.
+
+    Records execution outcome (last_result, last_result_message,
+    last_duration_ms, last_run_at) on the job BEFORE advancing the
+    schedule. Honors job.delivery — silent jobs skip chat messages.
+    """
+    from .models import LastResult
+    from .jobs import _save_job, get_job
+    from ..time import now as _now
+    import time
+
+    started = time.time()
+    started_iso = _now().isoformat()
     try:
         if job.action_type.value == "send_message":
             await _execute_send_message(job)
@@ -34,12 +46,33 @@ async def _execute_job(job: Any) -> None:
 
         # Advance next run
         advance_next_run(job)
+        # Mark success
+        job.last_run_at = started_iso
+        job.last_result = LastResult.SUCCESS
+        job.last_result_message = ""
+        job.last_duration_ms = int((time.time() - started) * 1000)
+        _save_job(job)
         logger.info("Cron job %s executed: %s", job.id, job.name)
 
     except Exception as e:
+        # Record error, but still advance one-shot jobs to avoid infinite
+        # retry loops. For repeating jobs (cron/interval) we keep the
+        # schedule so the next attempt still runs.
         logger.error("Cron job %s failed: %s", job.id, e)
         import traceback
         traceback.print_exc()
+        try:
+            advance_next_run(job)
+        except Exception:
+            pass
+        try:
+            job.last_run_at = started_iso
+            job.last_result = LastResult.ERROR
+            job.last_result_message = str(e)[:200]
+            job.last_duration_ms = int((time.time() - started) * 1000)
+            _save_job(job)
+        except Exception as save_err:
+            logger.error("Failed to record cron error for %s: %s", job.id, save_err)
 
 
 # ── run_prompt: one-shot LLM call ────────────────────────────────────────
@@ -224,8 +257,17 @@ async def _execute_run_prompt(job: Any) -> None:
         assistant_entry["prompt_tokens"] = usage.get("prompt_tokens", 0)
         assistant_entry["completion_tokens"] = usage.get("completion_tokens", 0)
 
-    # Save to correct destination: otdel chat or agent session
-    if is_otdel:
+    # Save to correct destination: otdel chat, agent private session, or
+    # skip entirely (silent). The is_otdel branch is decided ABOVE based on
+    # job.action_target format. The job.delivery field is an orthogonal
+    # axis: even if is_otdel=True, a delivery='silent' job skips chat writes.
+    from .models import DeliveryMode
+    delivery = getattr(job, "delivery", DeliveryMode.PRIVATE)
+
+    if delivery == DeliveryMode.SILENT:
+        # Silent: log to memory but don't bloat the chat.
+        logger.info("Cron run_prompt: SILENT delivery — skipping chat save/broadcast for %s", job.id)
+    elif is_otdel:
         from ..chat.otdel_helpers import _load_history as _load_otdel_history, _save_history as _save_otdel_history
         otdel_history = _load_otdel_history(channel_id)
         otdel_history.append({
@@ -244,53 +286,67 @@ async def _execute_run_prompt(job: Any) -> None:
         history.append(assistant_entry)
         _save_chat_history(agent_slug, channel_id, history)
 
-    # Broadcast via WS
+    # Broadcast via WS — silent jobs do NOT broadcast chat messages.
+    # 'cron:fired' event still goes out so the UI can update its stats card.
     from ..chat.ws_manager import ws_manager
 
-    assistant_msg = {
-        "id": f"cron-{job.id[-8:]}",
-        "role": "assistant",
-        "sender": agent_slug,
-        "sender_name": agent_data.get("name", agent_slug),
-        "content": full_response,
-        "timestamp": _now().isoformat(),
-        "cron_job_id": job.id,
-        "is_head": agent_data.get("is_head", False),
-        "model": model,
-        "provider": provider_name,
-    }
+    if delivery != DeliveryMode.SILENT:
+        assistant_msg = {
+            "id": f"cron-{job.id[-8:]}",
+            "role": "assistant",
+            "sender": agent_slug,
+            "sender_name": agent_data.get("name", agent_slug),
+            "content": full_response,
+            "timestamp": _now().isoformat(),
+            "cron_job_id": job.id,
+            "is_head": agent_data.get("is_head", False),
+            "model": model,
+            "provider": provider_name,
+        }
 
-    if is_otdel:
-        await ws_manager.broadcast({
-            "type": "otdel:message",
-            "otdel_id": channel_id,
-            "message": assistant_msg,
-        })
-    else:
-        await ws_manager.broadcast({
-            "type": "chat:cron",
-            "agent_slug": agent_slug,
-            "message": assistant_msg,
-        })
+        if is_otdel:
+            await ws_manager.broadcast({
+                "type": "otdel:message",
+                "otdel_id": channel_id,
+                "message": assistant_msg,
+            })
+        else:
+            await ws_manager.broadcast({
+                "type": "chat:cron",
+                "agent_slug": agent_slug,
+                "message": assistant_msg,
+            })
 
+    # Always broadcast cron:fired so the UI stats card updates.
     await ws_manager.broadcast({
         "type": "cron:fired",
         "job_id": job.id,
         "job_name": job.name,
         "agent_slug": agent_slug,
         "channel": channel_id,
+        "delivery": delivery.value,
     })
 
-    logger.info("Cron run_prompt: response saved for %s (%d chars)", agent_slug, len(full_response))
+    logger.info("Cron run_prompt: response saved for %s (%d chars, delivery=%s)",
+                agent_slug, len(full_response), delivery.value)
 
 
 # ── send_message: save to otdel + trigger head ────────────────────────────
 
 
 async def _execute_send_message(job: Any) -> None:
-    """Save message to otdel history, trigger head agent, broadcast WS."""
+    """Save message to otdel history, trigger head agent, broadcast WS.
+
+    Honors job.delivery:
+      "private" — N/A here (send_message is always to an otdel).
+      "otdel"   — write message + trigger head + broadcast (default here).
+      "silent"  — skip chat write AND skip head agent trigger. Useful
+                  for jobs that just write to memory/log without
+                  disrupting the team chat.
+    """
     from ..chat.otdel_helpers import _load_history, _save_history
     from ..chat.ws_manager import ws_manager
+    from .models import DeliveryMode
     import uuid
 
     otdel_id = job.action_target
@@ -298,8 +354,9 @@ async def _execute_send_message(job: Any) -> None:
         logger.warning("Cron job %s has no action_target", job.id)
         return
 
-    # Save user message
-    history = _load_history(otdel_id)
+    delivery = getattr(job, "delivery", DeliveryMode.OTDEL)
+
+    # Build the message regardless of delivery — we always want it for logs
     msg = {
         "id": f"cron-{uuid.uuid4().hex[:8]}",
         "role": "user",
@@ -308,6 +365,14 @@ async def _execute_send_message(job: Any) -> None:
         "timestamp": _now().isoformat(),
         "cron_job_id": job.id,
     }
+
+    if delivery == DeliveryMode.SILENT:
+        # Silent: log only, no chat write, no head trigger, no WS broadcast.
+        logger.info("Cron send_message: SILENT delivery — skipping chat/head for %s (%s)", job.id, job.name)
+        return
+
+    # Save user message
+    history = _load_history(otdel_id)
     history.append(msg)
     _save_history(otdel_id, history)
 
@@ -321,7 +386,8 @@ async def _execute_send_message(job: Any) -> None:
     # Trigger head agent to process the message
     await _trigger_head_agent(otdel_id, job)
 
-    logger.info("Cron send_message: saved to otdel %s, head triggered", otdel_id)
+    logger.info("Cron send_message: saved to otdel %s, head triggered (delivery=%s)",
+                otdel_id, delivery.value)
 
 
 async def _trigger_head_agent(otdel_id: str, job: Any) -> None:

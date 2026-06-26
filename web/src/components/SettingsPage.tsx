@@ -11,6 +11,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { PROVIDER_CATALOG, providerKey, type ProviderInfo } from '../lib/providers'
 import { MemorySection } from './MemorySection'
+import { CronSection } from './settings/CronSection'
 import { type DropdownOption } from './DropdownMenu'
 import { useDraggable } from '@dnd-kit/core'
 import { PageTransition } from './PageTransition'
@@ -205,6 +206,7 @@ export function SettingsPage({ onAgentsChange, onDepartmentsChange, wsOn }: Sett
             />
           )}
           {activeTab === 'memory' && <MemorySection />}
+          {activeTab === 'cron' && <CronSection />}
           {activeTab === 'channels' && <ChannelsSection onAddChannel={() => setActiveModal('add-channel')} />}
           {activeTab === 'departments' && <DepartmentsSection onDepartmentsChange={onDepartmentsChange} />}
           {activeTab === 'skills' && <SkillsSection />}

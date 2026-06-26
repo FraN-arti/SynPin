@@ -18,11 +18,12 @@ memory_provider:
   provider: built-in    # Default: MEMORY.md + USER.md files
   api_key: ""           # API key for cloud providers (if needed)
   endpoint: ""          # Custom endpoint for self-hosted providers
-  max_chars: 50000      # Max characters per memory entry
   max_chars: 10000      # Max characters per memory entry
   auto_refactor: false  # Auto-refactor memory entries (coming soon)
-# Memory settings
+
+# Agent-level memory limits — exposed in the UI under "Настройка памяти"
 memory:
   enabled: true
-  max_chars: 10000      # Total memory limit per agent
-  auto_refactor: false  # Automatically refactor/merge similar memories
+  max_chars: 2200         # MEMORY.md (agent notes) per-agent limit
+  max_chars_user: 1375    # USER.md (shared user profile) limit
+  auto_refactor: false    # On overflow: LLM-summarize and retry, instead of failing

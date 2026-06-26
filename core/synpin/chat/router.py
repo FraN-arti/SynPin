@@ -422,60 +422,82 @@ def _archive_session(agent_slug: str, channel_id: str, session: dict):
 
 
 def _load_memory_block(agent_slug: str) -> str:
-    """Load agent memory and return block for system prompt injection."""
+    """Load agent memory data (USER, MEMORY, FACTS) for system prompt injection.
+
+    Returns ONLY the memory data — no instructions.
+    Instructions are added separately at the END of system prompt via _get_memory_instructions().
+
+    Uses the shared MemoryManager cache (synpin.memory.get_manager) so the
+    same instance is reused across tool calls, system-prompt assembly, and
+    HTTP API calls within a single process.
+    """
     if not agent_slug:
         return ""
     try:
-        from ..memory import MemoryManager
-        data_dir = _get_data_dir()
-        if not data_dir:
-            return ""
-        manager = MemoryManager(agent_slug, data_dir)
-        manager.initialize()
-        block = manager.get_system_prompt_block()
-        manager.close()
-
-        # Always add memory instructions (even for new agents with empty memory)
-        instructions = (
-            "\n\n══════════════════════════════════════════════\n"
-            "MEMORY INSTRUCTIONS\n"
-            "══════════════════════════════════════════════\n"
-            "You have persistent memory tools:\n"
-            "- memory_write(action='add', target='memory', content='...') — save your own notes\n"
-            "- memory_write(action='add', target='user', content='...') — save info about the user\n"
-            "- memory_read(target='memory'/'user'/'facts') — recall saved information\n\n"
-            "When to save to USER (about the user — ONLY about the human you're talking to):\n"
-            "- Only when the user explicitly shares personal info about THEMSELVES (name, role, preferences, timezone)\n"
-            "- Or when they say 'remember this' / 'запомни' about themselves\n"
-            "- Do NOT save task descriptions, delegation requests, or work items here\n"
-            "- Do NOT save info about other agents or departments here\n"
-            "- Do NOT save on every message — be selective\n"
-            "- WRONG: 'QA Инженер просит написать шутки' → this is a task, use target='memory'\n"
-            "- RIGHT: 'Имя: Артур. Роль: разработчик.' → this IS about the user\n\n"
-            "When to save to MEMORY (your notes):\n"
-            "- Important decisions and their reasoning\n"
-            "- Errors encountered and how they were fixed\n"
-            "- Project context that you'll need later\n\n"
-            "Do NOT save:\n"
-            "- Greetings, status updates, 'working on...' messages\n"
-            "- Temporary debugging info\n"
-            "- Information already saved (read first, then decide)\n"
-            "- Trivial conversation content\n\n"
-            "Auto-compaction: memory auto-compacts when full (dedup + remove old entries). "
-            "If you get an error about limit, use memory_write(action='remove') to free space first.\n\n"
-            "FACTS (датированные факты):\n"
-            "- memory_write(action='fact', topic='...', content='...') — сохранить датированный факт\n"
-            "- memory_read(target='facts') — список сохранённых фактов\n"
-            "- Факты хранятся в facts/ как отдельные .md файлы с датой в имени\n"
-            "- Используй для: ключевых решений, вех проекта, важных находок\n"
-            "- НЕ используй для: временных заметок, промежуточных результатов"
-        )
-        block = (block or "") + instructions
-
-        return block or ""
+        from ..memory import get_manager
+        manager = get_manager(agent_slug)
+        return manager.get_system_prompt_block() or ""
     except Exception as e:
         logger.warning("Failed to load memory for %s: %s", agent_slug, e)
         return ""
+
+
+def _get_memory_instructions() -> str:
+    """Memory usage instructions — injected at the END of system prompt.
+
+    Being last means the model reads this right before generating a response,
+    so it remembers to use memory/session tools when appropriate.
+    """
+    return (
+        "\n\n══════════════════════════════════════════════\n"
+        "ПАМЯТЬ И ИСТОРИЯ — КАК ИСПОЛЬЗАТЬ\n"
+        "══════════════════════════════════════════════\n"
+        "Твоя память (USER, MEMORY, FACTS) уже загружена в начале этого промпта.\n"
+        "Ты видишь её — НЕ НУЖНО вызывать memory_read перед каждым ответом.\n\n"
+        "КРИТИЧЕСКИ ВАЖНО — НЕ ВРИ ПРО ЗАПИСЬ:\n"
+        "Ты НЕ ДОЛЖЕН говорить 'Записал', 'Запомнил', 'Добавил в память' если НЕ вызвал\n"
+        "memory_write в этом же ответе. Если факт стоит запомнить — ВЫЗОВИ memory_write,\n"
+        "дождись ответа 'success', и ТОЛЬКО ПОТОМ подтверждай запись пользователю.\n"
+        "Если ты не вызвал memory_write — так и скажи: 'Это интересно, хочешь чтобы я запомнил?'\n"
+        "Не подтверждай действие, которое не произошло. Это вводит пользователя в заблуждение.\n\n"
+        "КОГДА ВЫЗЫВАТЬ memory_read:\n"
+        "- Когда нужно вспомнить конкретный факт или деталь\n"
+        "- 'А что мы решали?', 'как называлась задача?'\n"
+        "- memory_read(target='facts') — датированные решения\n\n"
+        "КОГДА ВЫЗЫВАТЬ session_history:\n"
+        "- 'Что мы обсуждали', 'помнишь', 'а в прошлый раз', 'что было вчера'\n"
+        "- session_history(action='list') — покажи список архивов\n"
+        "- session_history(action='search', query='...') — ищи по ключевым словам\n\n"
+        "ЗАПИСЫВАЙ В ПАМЯТЬ САМОСТОЯТЕЛЬНО — НЕ ЖДИ ПОКА ПОПРОСЯТ:\n"
+        "Когда пользователь сообщает факт о себе, своей жизни или работе — запомни это\n"
+        "автоматически через memory_write. Пользователь НЕ ДОЛЖЕН говорить 'запиши'.\n"
+        "Это твоя работа — замечать важное и сохранять без напоминаний.\n"
+        "Формат записи: memory_write(action='add', target='user', content='...').\n\n"
+        "ТРИ ХРАНИЛИЩА, РАЗНАЯ СЕМАНТИКА. Перед записью определи КУДА идёт факт:\n\n"
+        "**USER.md — личность пользователя (target='user'):**\n"
+        "- Имя, возраст, профессия, навыки, опыт\n"
+        "- Характер, манера общения, предпочтения в формате ответов\n"
+        "- Семья, важные люди, регулярные маршруты\n"
+        "- Хронические особенности здоровья, лекарства\n"
+        "- НЕ пиши сюда события или планы — это для MEMORY\n\n"
+        "**MEMORY.md — долгоживущая память (target='memory'):**\n"
+        "- События жизни: был у врача, поездка, что-то важное\n"
+        "- Планы: 'на выходные хочу заняться SynPin', 'через месяц отпуск'\n"
+        "- Контекст, важный через недели/месяцы: что обсуждали, что обещали\n"
+        "- Используй чтобы спустя время напомнить: 'а помнишь ты хотел...'\n"
+        "- НЕ пиши сюда итоги решений — это для FACTS\n\n"
+        "**FACTS (action='fact') — блокнот решений:**\n"
+        "- Итог обсуждения задачи: 'решили использовать Sonnet 4 для бэкенда'\n"
+        "- Финальный выбор после сравнения вариантов\n"
+        "- ADR-style заметки о том, КАК что-то сделали\n"
+        "- Записывается ТОЛЬКО когда был реальный ход обсуждения → появился итог\n"
+        "- НЕ пиши сюда 'привет как дела' или мелкие операции\n\n"
+        "НЕ ПИШИ В ПАМЯТЬ ВООБЩЕ:\n"
+        "- Приветствия, статусы, 'работаю над...'\n"
+        "- Повторы того что уже в памяти (сначала прочитай)\n"
+        "- Мелкие технические операции (открыл файл, прочитал строку)\n"
+        "- Информацию из архивных сессий, если она уже там сохранена"
+    )
 
 
 def _load_session_context(agent_slug: str, channel_id: str) -> str:
@@ -751,6 +773,40 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
                     },
                 },
                 "required": ["action", "target"],
+            },
+        },
+    },
+    "session_history": {
+        "type": "function",
+        "function": {
+            "name": "session_history",
+            "description": "Поиск в архивах прошлых сессий. Используй когда пользователь спрашивает 'что мы обсуждали', 'помнишь в прошлый раз', 'что было вчера'. Также для поиска ключевых слов в истории разговоров.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": ["list", "read", "search"],
+                        "description": "'list' — список архивов, 'read' — прочитать конкретный архив, 'search' — поиск по содержимому",
+                    },
+                    "channel": {
+                        "type": "string",
+                        "description": "Фильтр по каналу (опционально): 'web', 'cron', или otdel_id",
+                    },
+                    "filename": {
+                        "type": "string",
+                        "description": "Имя файла архива (для action='read')",
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "Текст для поиска (для action='search')",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Максимум результатов (по умолчанию 10)",
+                    },
+                },
+                "required": ["action"],
             },
         },
     },
@@ -1301,7 +1357,7 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
 }
 
 
-BUILTINS = {"memory_read", "memory_write", "image_analyze", "summarize"}
+BUILTINS = {"memory_read", "memory_write", "image_analyze", "summarize", "session_history"}
 
 # Head-only tools — available to department heads
 # (main agent also gets these via include_head=True)
@@ -1414,7 +1470,7 @@ async def execute_tool(tool_name: str, params: dict, agent_slug: str | None = No
             return {"success": False, "output": "", "error": f"Tool '{tool_name}' not found in registry"}
 
         # Inject agent_id for memory tools
-        if agent_slug and tool_name in ("memory_read", "memory_write"):
+        if agent_slug and tool_name in ("memory_read", "memory_write", "session_history"):
             params = {**params, "agent_id": agent_slug}
 
         # Inject otdel_id for head protocol tools
@@ -1840,6 +1896,9 @@ def _build_system_prompt_with_memory(req: ChatRequest) -> str:
 - НЕ запускай команды которые меняют core/synpin
 - Отвечай: "У меня нет доступа к модификации ядра SynPin. Это системные файлы."
 - Можешь анализировать и объяснять код, но НЕ изменять его."""
+
+    # Memory instructions at the very END — last thing the model reads before responding
+    system_prompt += _get_memory_instructions()
 
     return system_prompt
 

@@ -50,6 +50,7 @@ from .project_manage import project_manage
 from .otdel_message import otdel_message
 from .otdel_history import otdel_history
 from .cron_manage import cron_manage
+from .session_history import session_history
 from .get_current_time import get_current_time
 from .get_system_info import get_system_info
 
@@ -95,6 +96,7 @@ def get_tool_registry() -> dict[str, ToolHandler]:
             "otdel_message": otdel_message,
             "otdel_history": otdel_history,
             "cron_manage": cron_manage,
+            "session_history": session_history,
             "get_current_time": get_current_time,
             "get_system_info": get_system_info,
         }

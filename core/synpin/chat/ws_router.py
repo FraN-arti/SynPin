@@ -89,6 +89,13 @@ async def websocket_endpoint(ws: WebSocket):
     user_id = "default"  # No auth for now
     await ws_manager.connect(ws, user_id)
 
+    # Run session reset check on first connect (primary trigger)
+    try:
+        from .session_reset import check_and_reset_on_connect
+        check_and_reset_on_connect()
+    except Exception as e:
+        logger.debug("Session reset on connect failed (non-critical): %s", e)
+
     try:
         while True:
             raw = await ws.receive_text()
@@ -311,12 +318,20 @@ async def _handle_chat_send(user_id: str, msg: dict):
                     ws_msg = {"type": ws_type, "agent_slug": agent_slug}
                     ws_msg.update({k: v for k, v in payload.items() if k != "type"})
                     await ws_manager.send(user_id, ws_msg)
-            except Exception:
-                pass
+            except Exception as parse_err:
+                logger.debug("Chunk parse error for %s: %s", agent_slug, parse_err)
     except Exception as e:
         logger.error("Chat stream error for %s: %s", agent_slug, e)
         await ws_manager.send(user_id, {"type": "error", "message": str(e)})
         return
+
+    # If streaming completed but no response was captured, notify client
+    if not full_response:
+        await ws_manager.send(user_id, {
+            "type": "chat:error",
+            "agent_slug": agent_slug,
+            "message": "Agent did not produce a response. Check server logs.",
+        })
 
     # Save assistant response to history
     if full_response:

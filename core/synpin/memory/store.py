@@ -330,16 +330,71 @@ class MemoryStore:
     # ── Frozen Snapshot ──────────────────────────────────────────────────
 
     def format_for_system_prompt(self, target: str) -> Optional[str]:
-        """Return the frozen snapshot for system prompt injection.
+            """Render the current memory state as a system-prompt block.
 
-        This returns the state captured at load_from_disk() time, NOT the live
-        state. Mid-session writes do not affect this. This keeps the system
-        prompt stable across all turns, preserving the prefix cache.
-        """
-        block = self._system_prompt_snapshot.get(target, "")
-        return block if block else None
+            Renders live state from in-memory entries (the same state tools
+            mutate). The historical name "format_for_system_prompt" and the
+            "frozen snapshot" semantic are misleading — what actually needs to
+            stay stable across requests is the system prompt itself, and that
+            happens naturally because the entries only change when the agent
+            writes; when they do, we want the next system prompt to reflect it.
+
+            Returns None when there is nothing to render (empty memory).
+            """
+            if target == "user":
+                entries = self.user_entries
+            else:
+                entries = self.memory_entries
+            block = self._render_block(target, entries)
+            return block if block else None
 
     # ── Internal Helpers ─────────────────────────────────────────────────
+
+    def _auto_compact(self, target: str, limit: int, incoming_chars: int = 0) -> Dict[str, Any]:
+        """Shrink entries to fit within `limit` chars, leaving room for `incoming_chars`.
+
+        Strategy:
+          1. Drop exact duplicates (preserves order).
+          2. Drop oldest entries until entries_total + incoming_chars + delim <= limit.
+
+        Returns {"compacted": True/False, "removed": N, "new_total": int}.
+        Does NOT touch the new content being added — only existing entries.
+        """
+        with self._file_lock(self._path_for(target)):
+            self._reload_target(target)
+            entries = self._entries_for(target)
+            original_count = len(entries)
+
+            # Step 1: dedup
+            seen = set()
+            deduped = []
+            for e in entries:
+                if e not in seen:
+                    seen.add(e)
+                    deduped.append(e)
+            entries = deduped
+
+            # Step 2: drop oldest until project fits within limit
+            while len(entries) > 0:
+                total = len(ENTRY_DELIMITER.join(entries)) if entries else 0
+                # After appending incoming: total + delim + incoming_chars
+                delim_extra = len(ENTRY_DELIMITER) if entries else 0
+                projected = total + delim_extra + incoming_chars
+                if projected <= limit:
+                    break
+                entries = entries[1:]
+
+            removed = original_count - len(entries)
+            if removed > 0:
+                self._set_entries(target, entries)
+                self.save_to_disk(target)
+                return {
+                    "compacted": True,
+                    "removed": removed,
+                    "new_total": len(ENTRY_DELIMITER.join(entries)) if entries else 0,
+                }
+            return {"compacted": False, "removed": 0, "new_total": self._char_count(target)}
+
 
     def _success_response(self, target: str, message: Optional[str] = None) -> Dict[str, Any]:
         entries = self._entries_for(target)

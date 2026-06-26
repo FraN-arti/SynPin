@@ -82,6 +82,11 @@ class MemoryConfigUpdate(BaseRequest):
     compaction: Optional[Dict[str, Any]] = None
     sessions: Optional[Dict[str, Any]] = None
     otdel_compaction: Optional[Dict[str, Any]] = None
+    # Agent-level memory limits — exposed in the UI under "Настройка памяти".
+    # `memory` controls MEMORY.md (agent notes), `memory_provider` controls
+    # the storage backend; USER.md has its own max_chars (max_chars_user).
+    memory: Optional[Dict[str, Any]] = None
+    memory_provider: Optional[Dict[str, Any]] = None
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────
@@ -111,6 +116,17 @@ async def get_memory_config():
             "otdel_compaction": full.get("otdel_compaction", {
                 "enabled": True,
                 "compaction_limit": 100,
+            }),
+            "memory": full.get("memory", {
+                "enabled": True,
+                "max_chars": 2200,
+                "max_chars_user": 1375,
+                "auto_refactor": False,
+            }),
+            "memory_provider": full.get("memory_provider", {
+                "provider": "built-in",
+                "max_chars": 10000,
+                "auto_refactor": False,
             }),
         }
     except Exception as e:
@@ -157,8 +173,35 @@ async def update_memory_config(req: MemoryConfigUpdate):
                 req.otdel_compaction,
             )
 
+        if req.memory is not None:
+            full["memory"] = _deep_merge(
+                full.get("memory", {
+                    "enabled": True, "max_chars": 2200,
+                    "max_chars_user": 1375, "auto_refactor": False,
+                }),
+                req.memory,
+            )
+
+        if req.memory_provider is not None:
+            full["memory_provider"] = _deep_merge(
+                full.get("memory_provider", {
+                    "provider": "built-in", "max_chars": 10000,
+                    "auto_refactor": False,
+                }),
+                req.memory_provider,
+            )
+
         _save_yaml(path, full)
         logger.info("memory.yaml updated via API")
+
+        # Limits may have changed — drop the cached MemoryManager instances
+        # so the next request rebuilds with fresh values. Without this,
+        # changing a UI limit wouldn't take effect for up to 5 minutes.
+        try:
+            from ..memory import clear_cache
+            clear_cache()
+        except Exception:
+            pass
 
         return {
             "success": True,
@@ -166,6 +209,8 @@ async def update_memory_config(req: MemoryConfigUpdate):
             "compaction": full.get("compaction"),
             "sessions": full.get("sessions"),
             "otdel_compaction": full.get("otdel_compaction"),
+            "memory": full.get("memory"),
+            "memory_provider": full.get("memory_provider"),
         }
     except Exception as e:
         logger.error("Failed to update memory config: %s", e)

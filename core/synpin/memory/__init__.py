@@ -31,7 +31,7 @@ from .store import MemoryStore, FileLock
 from .frozen_snapshot import FrozenSnapshot
 from .state import AgentState
 from .search import MemorySearch
-from .manager import MemoryManager
+from .manager import MemoryManager, get_manager, invalidate_manager, clear_cache, get_cache_stats
 
 __all__ = [
     "MemoryStore",
@@ -40,4 +40,8 @@ __all__ = [
     "AgentState",
     "MemorySearch",
     "MemoryManager",
+    "get_manager",
+    "invalidate_manager",
+    "clear_cache",
+    "get_cache_stats",
 ]

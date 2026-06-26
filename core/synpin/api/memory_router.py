@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/memory", tags=["memory"])
 
-# ── Data Directory ───────────────────────────────────────────────────────
+# ── Data Directory ────────────────────────────────────────────────────────
 
 # Use the same DATA_DIR as tools (paths.py)
 from ..paths import get_data_dir as _get_data_dir
@@ -52,34 +52,22 @@ from ..paths import get_data_dir as _get_data_dir
 DATA_DIR: Path = _get_data_dir()
 
 # ── Manager Cache ────────────────────────────────────────────────────────
+#
+# MemoryManager instances are cached in synpin.memory.get_manager() (shared
+# across the API router, agent tools, and system-prompt assembly). That way
+# a write via /api/memory/{id}/add is visible to the next tool call or
+# the next system prompt without waiting for TTL.
 
-import time
-
-_MANAGER_TTL = 300  # 5 minutes in seconds
-_managers: Dict[str, MemoryManager] = {}
-_manager_timestamps: Dict[str, float] = {}
+from ..memory import get_manager as _cached_get_manager
 
 
 def get_manager(agent_id: str) -> MemoryManager:
-    """Get or create MemoryManager for an agent. Cache expires after 5 min."""
-    now = time.time()
-    if agent_id in _managers:
-        # Check if cache is still valid
-        created = _manager_timestamps.get(agent_id, 0)
-        if now - created > _MANAGER_TTL:
-            # Cache expired, recreate
-            try:
-                _managers[agent_id].close()
-            except Exception:
-                pass
-            del _managers[agent_id]
-            del _manager_timestamps[agent_id]
-    if agent_id not in _managers:
-        manager = MemoryManager(agent_id, DATA_DIR)
-        manager.initialize()
-        _managers[agent_id] = manager
-        _manager_timestamps[agent_id] = now
-    return _managers[agent_id]
+    """Get or create a cached MemoryManager for an agent.
+
+    Thin wrapper around synpin.memory.get_manager — kept here so existing
+    call sites inside this router don't need to change.
+    """
+    return _cached_get_manager(agent_id, DATA_DIR)
 
 
 # ── Request/Response Models ──────────────────────────────────────────────

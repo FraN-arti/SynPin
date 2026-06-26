@@ -1,64 +1,79 @@
-"""memory_read — read agent's own memory (MEMORY.md or USER.md).
+"""memory_read — read agent's own memory (MEMORY.md / USER.md / facts/).
 
 Built-in tool: always enabled, not shown in agent UI.
+
+Thin wrapper around MemoryManager (synpin.memory). Live entries are returned
+(the same state tools/memory_write mutates), so an agent that just wrote
+something will see it on the next read without waiting for any TTL.
 """
-from pathlib import Path
 from typing import Any
 
-from ..paths import get_data_dir as _get_data_dir
+from ..memory import get_manager
 
 
 async def memory_read(params: dict[str, Any]) -> dict[str, Any]:
     """Read agent memory.
 
     Params:
-        target (str): "memory" for MEMORY.md, "user" for USER.md, "facts" for list of fact files.
-        agent_id (str): Agent slug/id.
-        filename (str, optional): For facts, specific filename to read.
+        target (str): "memory" for MEMORY.md, "user" for USER.md,
+            "facts" for the list of dated fact files.
+        agent_id (str): Agent slug/id. Injected by execute_tool().
+        filename (str, optional): For target='facts', specific filename to read.
+        limit (int, optional): For target='facts', max files to list. Default 20.
+
+    Returns:
+        ToolResult dict: {"success": bool, "output": str, "error": str|None}.
     """
     target = params.get("target", "memory")
     agent_id = params.get("agent_id", "")
     filename = params.get("filename", "")
+    limit = int(params.get("limit", 20))
 
     if not agent_id:
         return {"success": False, "output": "", "error": "agent_id is required"}
 
-    data_dir = _get_data_dir()
-    agent_dir = data_dir / "agents" / agent_id
+    try:
+        manager = get_manager(agent_id)
+    except Exception as e:
+        return {"success": False, "output": "", "error": f"memory subsystem unavailable: {e}"}
 
-    if target == "memory":
-        path = agent_dir / "MEMORY.md"
-        if not path.exists():
-            return {"success": True, "output": "(пусто — нет записей)", "error": None}
-        content = path.read_text(encoding="utf-8").strip()
-        return {"success": True, "output": content or "(пусто)", "error": None}
+    if target in ("memory", "user"):
+        result = manager.read(target)
+        if not result.get("success"):
+            return {"success": False, "output": "", "error": result.get("error", "read failed")}
+        entries = result.get("entries", [])
+        usage = result.get("usage", "")
+        if not entries:
+            return {"success": True, "output": f"(empty — {usage})", "error": None}
+        body = "\n§\n".join(entries)
+        return {"success": True, "output": f"{body}\n\n[{usage}]", "error": None}
 
-    if target == "user":
-        # Global USER.md — shared across all agents
-        path = data_dir / "shared" / "USER.md"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if not path.exists():
-            return {"success": True, "output": "(пусто — нет данных о пользователе)", "error": None}
-        content = path.read_text(encoding="utf-8").strip()
-        return {"success": True, "output": content or "(пусто)", "error": None}
-
-    elif target == "facts":
-        facts_dir = agent_dir / "facts"
-        if not facts_dir.exists():
-            return {"success": True, "output": "(нет фактов)", "error": None}
-        files = sorted(facts_dir.glob("*.md"), reverse=True)
-        if not files:
-            return {"success": True, "output": "(нет фактов)", "error": None}
+    if target == "facts":
         if filename:
-            # Read specific fact
-            fact_path = facts_dir / filename
-            if not fact_path.exists():
-                return {"success": False, "output": "", "error": f"Fact not found: {filename}"}
-            content = fact_path.read_text(encoding="utf-8").strip()
-            return {"success": True, "output": content, "error": None}
-        else:
-            # List all facts
-            listing = "\n".join(f.name for f in files[:20])
-            return {"success": True, "output": listing, "error": None}
+            result = manager.read_fact(filename)
+            if not result.get("success"):
+                return {"success": False, "output": "", "error": result.get("error", "fact not found")}
+            return {
+                "success": True,
+                "output": f"{result.get('content', '')}\n\n[{result.get('size', 0)} bytes]",
+                "error": None,
+            }
+        result = manager.list_facts(limit)
+        if not result.get("success"):
+            return {"success": False, "output": "", "error": result.get("error", "list failed")}
+        facts = result.get("facts", [])
+        if not facts:
+            return {"success": True, "output": "(no facts)", "error": None}
+        # Compact listing: filename + date + size
+        lines = []
+        for f in facts:
+            name = f.get("filename", "?")
+            size = f.get("size", 0)
+            lines.append(f"- {name} ({size} B)")
+        return {
+            "success": True,
+            "output": f"{len(facts)} fact file(s):\n" + "\n".join(lines),
+            "error": None,
+        }
 
     return {"success": False, "output": "", "error": f"Unknown target: {target}"}

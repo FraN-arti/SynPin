@@ -209,6 +209,10 @@ class AgentLimitUpdate(BaseModel):
     agent_limit_per_creator: int
 
 
+class RetentionUpdate(BaseModel):
+    retention_days: int
+
+
 @router.get("/agent-limit")
 def api_get_agent_limit() -> dict[str, Any]:
     """Read the current global per-creator cap."""
@@ -233,4 +237,30 @@ def api_set_agent_limit(req: AgentLimitUpdate) -> dict[str, Any]:
     cron_cfg["agent_limit_per_creator"] = val
     save_yaml("settings.yaml", data)
     return {"agent_limit_per_creator": val}
+
+
+@router.get("/retention")
+def api_get_retention() -> dict[str, Any]:
+    """Read the current retention_days setting (with the default exposed)."""
+    from ..cron.jobs import get_retention_days, DEFAULT_RETENTION_DAYS
+    return {
+        "retention_days": get_retention_days(),
+        "retention_default": DEFAULT_RETENTION_DAYS,
+    }
+
+
+@router.put("/retention")
+def api_set_retention(req: RetentionUpdate) -> dict[str, Any]:
+    """Update the retention_days setting.
+
+    Completed and missed jobs older than this many days are deleted
+    by the hourly sweep. Range: 1..365.
+    """
+    val = max(1, min(365, int(req.retention_days)))
+    from ..config.manager import load_yaml, save_yaml
+    data = load_yaml("settings.yaml") or {}
+    cron_cfg = data.setdefault("cron", {})
+    cron_cfg["retention_days"] = val
+    save_yaml("settings.yaml", data)
+    return {"retention_days": val}
 

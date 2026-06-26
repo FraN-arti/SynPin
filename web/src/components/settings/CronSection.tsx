@@ -104,18 +104,30 @@ export function CronSection({ wsOn }: { wsOn?: (type: string, handler: (data: an
   const [filter, setFilter] = useState<'all' | 'active' | 'paused' | 'completed' | 'missed'>('all')
   const [pageSize] = useState(10)
   const [page, setPage] = useState(0)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [holdProgress, setHoldProgress] = useState(0)  // 0..1, animation for hold-to-confirm
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const holdStartRef = useRef<number>(0)
+  const holdFrameRef = useRef<number | null>(null)
   const [agentLimit, setAgentLimit] = useState<number>(3)
   const [limitInput, setLimitInput] = useState<string>('3')
   const [savingLimit, setSavingLimit] = useState(false)
   const limitSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [retentionDays, setRetentionDays] = useState<number>(30)
+  const [retentionInput, setRetentionInput] = useState<string>('30')
+  const [retentionDefault, setRetentionDefault] = useState<number>(30)
+  const [savingRetention, setSavingRetention] = useState(false)
+  const retentionSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const loadAll = async () => {
     setLoading(true)
     try {
-      const [statsRes, jobsRes, limitRes] = await Promise.all([
+      const [statsRes, jobsRes, limitRes, retentionRes] = await Promise.all([
         fetch(`${API}/api/cron/stats`),
         fetch(`${API}/api/cron/jobs`),
         fetch(`${API}/api/cron/agent-limit`),
+        fetch(`${API}/api/cron/retention`),
       ])
       if (statsRes.ok) setStats(await statsRes.json())
       if (jobsRes.ok) {
@@ -126,6 +138,12 @@ export function CronSection({ wsOn }: { wsOn?: (type: string, handler: (data: an
         const data = await limitRes.json()
         setAgentLimit(data.agent_limit_per_creator)
         setLimitInput(String(data.agent_limit_per_creator))
+      }
+      if (retentionRes.ok) {
+        const data = await retentionRes.json()
+        setRetentionDays(data.retention_days)
+        setRetentionInput(String(data.retention_days))
+        setRetentionDefault(data.retention_default)
       }
     } catch (e) {
       console.error('Failed to load cron data', e)
@@ -159,6 +177,83 @@ export function CronSection({ wsOn }: { wsOn?: (type: string, handler: (data: an
   // Reset page when filter changes
   useEffect(() => { setPage(0) }, [filter])
 
+  // Clear selection when filter changes — selected IDs may not be on the
+  // new page and would confuse the user.
+  useEffect(() => { setSelected(new Set()) }, [filter])
+  // Clear selection after a refresh if some jobs were deleted elsewhere
+  useEffect(() => {
+    setSelected(prev => {
+      const existing = new Set<string>()
+      for (const j of jobs) existing.add(j.id)
+      const next = new Set<string>()
+      for (const id of prev) if (existing.has(id)) next.add(id)
+      return next
+    })
+  }, [jobs])
+
+  // Hold-to-confirm bulk delete (1.5s). Mouse down starts, up cancels,
+// timeout completes. Animates a 0→1 progress that drives a SVG ring.
+  const HOLD_MS = 1500
+  const startHold = () => {
+    if (holdTimerRef.current) return
+    holdStartRef.current = performance.now()
+    setHoldProgress(0)
+    const tick = () => {
+      const elapsed = performance.now() - holdStartRef.current
+      const p = Math.min(1, elapsed / HOLD_MS)
+      setHoldProgress(p)
+      if (p < 1) {
+        holdFrameRef.current = requestAnimationFrame(tick)
+      } else {
+        // Fire the actual delete
+        const ids = Array.from(selected)
+        Promise.all(ids.map(id =>
+          fetch(`${API}/api/cron/jobs/${id}`, { method: 'DELETE' })
+        )).then(() => {
+          setSelected(new Set())
+          setHoldProgress(0)
+          loadAll()
+        })
+      }
+    }
+    holdFrameRef.current = requestAnimationFrame(tick)
+    holdTimerRef.current = setTimeout(() => {
+      // safety net in case rAF stops firing
+    }, HOLD_MS + 100)
+  }
+  const cancelHold = () => {
+    if (holdFrameRef.current) cancelAnimationFrame(holdFrameRef.current)
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current)
+    holdFrameRef.current = null
+    holdTimerRef.current = null
+    setHoldProgress(0)
+  }
+  // Cleanup hold timers on unmount
+  useEffect(() => () => cancelHold(), [])
+
+  const toggleSelected = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+  const selectAllOnPage = () => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      for (const j of pagedJobs) next.add(j.id)
+      return next
+    })
+  }
+  const deselectAllOnPage = () => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      for (const j of pagedJobs) next.delete(j.id)
+      return next
+    })
+  }
+
   const totalPages = Math.max(1, Math.ceil(filteredJobs.length / pageSize))
   const pagedJobs = filteredJobs.slice(page * pageSize, (page + 1) * pageSize)
 
@@ -179,10 +274,17 @@ export function CronSection({ wsOn }: { wsOn?: (type: string, handler: (data: an
     loadAll()
   }
   const handleDelete = async (id: string) => {
-    if (!confirm('Удалить cron-задачу?')) return
+    // Inline confirmation — no native confirm() dialog.
+    // UI swaps the Delete button with [Yes] [Cancel] inline.
+    if (confirmDeleteId !== id) {
+      setConfirmDeleteId(id)
+      return
+    }
     await fetch(`${API}/api/cron/jobs/${id}`, { method: 'DELETE' })
+    setConfirmDeleteId(null)
     loadAll()
   }
+  const cancelDelete = () => setConfirmDeleteId(null)
   const handleRunNow = async (id: string) => {
     await fetch(`${API}/api/cron/jobs/${id}/run`, { method: 'POST' })
     loadAll()
@@ -190,24 +292,58 @@ export function CronSection({ wsOn }: { wsOn?: (type: string, handler: (data: an
   const scheduleLimitSave = (val: number) => {
     if (limitSaveTimerRef.current) clearTimeout(limitSaveTimerRef.current)
     limitSaveTimerRef.current = setTimeout(async () => {
-      if (val < 1 || val === agentLimit) return
+      if (val < 1) return
       setSavingLimit(true)
       try {
-        await fetch(`${API}/api/cron/agent-limit`, {
+        const res = await fetch(`${API}/api/cron/agent-limit`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ agent_limit_per_creator: val }),
         })
-        await loadAll()
+        if (res.ok) {
+          await loadAll()
+        } else {
+          console.error('Failed to save agent limit:', res.status, await res.text())
+        }
+      } catch (e) {
+        console.error('Agent limit save error:', e)
       } finally {
         setSavingLimit(false)
       }
     }, 600) // 600ms debounce — saves when user stops typing
   }
 
+  const scheduleRetentionSave = (val: number) => {
+    if (retentionSaveTimerRef.current) clearTimeout(retentionSaveTimerRef.current)
+    retentionSaveTimerRef.current = setTimeout(async () => {
+      if (val < 1) return
+      setSavingRetention(true)
+      try {
+        const res = await fetch(`${API}/api/cron/retention`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ retention_days: val }),
+        })
+        if (res.ok) {
+          // Confirm by reading back from API; don't blindly trust
+          // state. If the server-side save didn't take, we'll catch
+          // the mismatch in loadAll() on the next tick.
+          await loadAll()
+        } else {
+          console.error('Failed to save retention:', res.status, await res.text())
+        }
+      } catch (e) {
+        console.error('Retention save error:', e)
+      } finally {
+        setSavingRetention(false)
+      }
+    }, 600)
+  }
+
   // Cleanup on unmount
   useEffect(() => () => {
     if (limitSaveTimerRef.current) clearTimeout(limitSaveTimerRef.current)
+    if (retentionSaveTimerRef.current) clearTimeout(retentionSaveTimerRef.current)
   }, [])
 
   return (
@@ -284,6 +420,49 @@ export function CronSection({ wsOn }: { wsOn?: (type: string, handler: (data: an
               )}
             </button>
           ))}
+
+          {/* Spacer pushes bulk-action to the right */}
+          <div className="cron-filters-spacer" />
+
+          {/* Bulk action — appears when at least one job is selected.
+              Fades in/out instead of mount/unmount to feel smoother. */}
+          <div className={`cron-bulk-action ${selected.size > 0 ? 'visible' : ''}`}>
+            <span className="cron-bulk-count">Выбрано: {selected.size}</span>
+            {selected.size === pagedJobs.length && pagedJobs.length > 0 ? (
+              <button onClick={deselectAllOnPage} className="cron-link-btn">Снять все</button>
+            ) : (
+              <button onClick={selectAllOnPage} className="cron-link-btn">Выбрать все</button>
+            )}
+            <button
+              onMouseDown={startHold}
+              onMouseUp={cancelHold}
+              onMouseLeave={cancelHold}
+              onTouchStart={startHold}
+              onTouchEnd={cancelHold}
+              className={`cron-hold-btn ${holdProgress > 0 ? 'holding' : ''}`}
+              disabled={selected.size === 0}
+              title="Удерживай 1.5с чтобы удалить"
+              style={{
+                '--hold-progress': holdProgress,
+              } as React.CSSProperties}
+            >
+              <svg className="cron-hold-ring" viewBox="0 0 24 24">
+                <circle
+                  className="cron-hold-ring-bg"
+                  cx="12" cy="12" r="10"
+                />
+                <circle
+                  className="cron-hold-ring-progress"
+                  cx="12" cy="12" r="10"
+                  strokeDasharray={`${2 * Math.PI * 10}`}
+                  strokeDashoffset={`${2 * Math.PI * 10 * (1 - holdProgress)}`}
+                />
+              </svg>
+              <span className="cron-hold-label">
+                {holdProgress > 0 ? 'Удерживай...' : `Удалить (${selected.size})`}
+              </span>
+            </button>
+          </div>
         </div>
 
         {pagedJobs.length === 0 ? (
@@ -294,9 +473,20 @@ export function CronSection({ wsOn }: { wsOn?: (type: string, handler: (data: an
           </div>
         ) : (
           <>
-          <div className="cron-jobs">
+          <div className="cron-jobs" key={page}>
             {pagedJobs.map(job => (
-              <div key={job.id} className={`cron-job ${job.status}`}>
+              <div
+              key={job.id}
+              className={`cron-job ${job.status} ${selected.has(job.id) ? 'cron-job-selected' : ''}`}
+            >
+              <label className="cron-job-checkbox" title="Выбрать">
+                <input
+                  type="checkbox"
+                  checked={selected.has(job.id)}
+                  onChange={() => toggleSelected(job.id)}
+                />
+              </label>
+              <div className="cron-job-body">
                 <div className="cron-job-header">
                   <span className="cron-job-name">{job.name}</span>
                   <span className="cron-job-status" style={{ color: statusColor(job.status) }}>
@@ -340,8 +530,17 @@ export function CronSection({ wsOn }: { wsOn?: (type: string, handler: (data: an
                     <button onClick={() => handleResume(job.id)} className="cron-action-btn">Возобновить</button>
                   )}
                   <button onClick={() => handleRunNow(job.id)} className="cron-action-btn">Запустить</button>
+                  {confirmDeleteId === job.id ? (
+                  <>
+                    <span className="cron-confirm-text">Удалить?</span>
+                    <button onClick={() => handleDelete(job.id)} className="cron-action-btn cron-action-danger">Да</button>
+                    <button onClick={cancelDelete} className="cron-action-btn">Нет</button>
+                  </>
+                ) : (
                   <button onClick={() => handleDelete(job.id)} className="cron-action-btn cron-action-danger">Удалить</button>
+                )}
                 </div>
+              </div>
               </div>
             ))}
           </div>
@@ -396,8 +595,9 @@ export function CronSection({ wsOn }: { wsOn?: (type: string, handler: (data: an
           />
           <span className="cron-limit-hint">
             {savingLimit ? '⏳ сохраняю...' :
-             agentLimit === parseInt(limitInput, 10) ? `✓ (дефолт: ${stats?.agent_limit_default ?? 3})` :
-             (stats?.agent_limit_default ?? 3) !== agentLimit ? `(дефолт: ${stats?.agent_limit_default ?? 3})` : ''}
+             agentLimit !== parseInt(limitInput, 10) ? `не сохранено (${limitInput})` :
+             agentLimit === stats?.agent_limit_default ? `по умолчанию: ${agentLimit}` :
+             `текущий: ${agentLimit} (по умолчанию: ${stats?.agent_limit_default ?? 3})`}
           </span>
         </div>
 
@@ -434,6 +634,44 @@ export function CronSection({ wsOn }: { wsOn?: (type: string, handler: (data: an
             фактические лимиты и текущее использование.
           </p>
         </div>
+      </SettingsCard>
+
+      {/* Card 4: Retention — auto-cleanup of old completed/missed jobs */}
+      <SettingsCard title="Автоочистка">
+        <p className="cron-card-desc">
+          Завершённые и ошибочные крон-задачи старше указанного количества дней
+          удаляются автоматически (раз в час). Активные и приостановленные
+          задачи НЕ трогаются. Изменение применяется мгновенно.
+        </p>
+
+        <div className="cron-limit-row">
+          <label className="cron-limit-label">Удалять выполненные старше (дней):</label>
+          <input
+            type="number"
+            className="cron-limit-input"
+            min={1}
+            max={365}
+            value={retentionInput}
+            onChange={e => {
+              const next = e.target.value
+              setRetentionInput(next)
+              const parsed = parseInt(next, 10)
+              if (!isNaN(parsed) && parsed >= 1) scheduleRetentionSave(parsed)
+            }}
+          />
+          <span className="cron-limit-hint">
+            {savingRetention ? '⏳ сохраняю...' :
+             retentionDays !== parseInt(retentionInput, 10) ? `не сохранено (${retentionInput})` :
+             retentionDays === retentionDefault ? `по умолчанию: ${retentionDays}` :
+             `текущий: ${retentionDays} (по умолчанию: ${retentionDefault})`}
+          </span>
+        </div>
+
+        <p className="cron-policy-hint">
+          Диапазон: 1–365 дней. Если папка <code>data/cron/jobs/</code> разрастается —
+          уменьшите значение, чтобы старые записи вычищались быстрее.
+          Активные напоминания и расписания никогда не удаляются автоматически.
+        </p>
       </SettingsCard>
     </div>
   )

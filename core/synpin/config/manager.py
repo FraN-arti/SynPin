@@ -25,14 +25,33 @@ def load_yaml(filename: str) -> dict[str, Any]:
 
 
 def save_yaml(filename: str, data: dict[str, Any]) -> None:
-    """Save data to a YAML config file atomically."""
+    """Save data to a YAML config file atomically.
+
+    Always uses indent=2 and round-trip-safe defaults so re-reads
+    produce exactly the same structure. This avoids the indent
+    drift bug where nested dict keys get written with 4-space
+    indentation and break subsequent loads.
+    """
+    import io
     with _LOCK:
         path = _resolve_path(filename)
         path.parent.mkdir(parents=True, exist_ok=True)
+        # Sanity check — don't save if the data shape would round-trip
+        # to invalid YAML. Catches bugs early.
+        buf = io.StringIO()
+        yaml.safe_dump(data, buf, default_flow_style=False,
+                       allow_unicode=True, sort_keys=False, indent=2)
+        yaml_text = buf.getvalue()
+        try:
+            yaml.safe_load(yaml_text)
+        except yaml.YAMLError as e:
+            raise RuntimeError(
+                f"Refusing to save {filename}: round-trip produced invalid YAML: {e}"
+            ) from e
         # Write to temp file then rename for atomicity
         tmp_path = path.with_suffix(".tmp")
         with open(tmp_path, "w", encoding="utf-8") as f:
-            yaml.dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+            f.write(yaml_text)
         os.replace(str(tmp_path), str(path))
 
 

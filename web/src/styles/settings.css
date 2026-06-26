@@ -170,16 +170,33 @@
 
 /* Cards */
 .settings-card {
+  position: relative;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 16px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  /* Always-on depth shadow + subtle border accent.
+     Hover intensifies the accent. */
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.02) inset,
+    0 4px 16px rgba(0, 0, 0, 0.25),
+    0 1px 3px rgba(0, 0, 0, 0.15);
+  /* Glassmorphism — slight blur of whatever is behind the card.
+     Falls back gracefully on browsers that don't support backdrop-filter. */
+  backdrop-filter: blur(8px) saturate(120%);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, backdrop-filter 0.2s ease;
 }
 
 .settings-card:hover {
-  border-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(249, 115, 22, 0.12);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.03) inset,
+    0 6px 24px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(249, 115, 22, 0.06);
 }
+
+/* Cards */
 
 .settings-card-disabled {
   opacity: 0.5;
@@ -205,7 +222,12 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: var(--orange);
+  /* Subtle gradient: orange → lighter orange, only for accents. */
+  background: linear-gradient(135deg, var(--orange) 0%, #fb923c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
   margin: 0 0 14px 0;
 }
 
@@ -2347,6 +2369,14 @@
 
 .cron-stat-value {
   color: var(--text, #eee);
+  font-weight: 400;
+  font-size: 13px;
+}
+
+.cron-stat-value b {
+  font-weight: 500;
+  color: var(--text, #eee);
+  font-size: 13px;
 }
 
 .cron-stat-value code {
@@ -2358,7 +2388,8 @@
 
 .cron-stat-meta {
   color: var(--text-dim, #888);
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 400;
 }
 
 .cron-stat-empty {
@@ -2433,6 +2464,13 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  /* Page transition: fade-in when key (page number) changes. */
+  animation: cron-jobs-fade-in 180ms ease;
+}
+
+@keyframes cron-jobs-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .cron-job {
@@ -2527,6 +2565,15 @@
   cursor: pointer;
 }
 
+.cron-confirm-text {
+  font-size: 11px;
+  color: #ef4444;
+  font-weight: 600;
+  padding: 4px 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .cron-action-btn:hover {
   background: rgba(255, 255, 255, 0.1);
 }
@@ -2544,6 +2591,181 @@
   text-align: center;
   color: var(--text-dim, #888);
   font-style: italic;
+}
+
+/* Bulk selection — flex layout for jobs, checkbox on the left.
+   Original .cron-job styling (border, padding, etc.) is preserved
+   below as the base; we just turn it into a flex container. */
+.cron-job {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  border-left: 3px solid var(--orange, #f97316);
+}
+
+.cron-job-checkbox {
+  display: flex;
+  align-items: flex-start;
+  padding-top: 12px;
+  padding-left: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.cron-job-checkbox input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--orange, #f97316);
+  cursor: pointer;
+}
+
+.cron-job-body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Selected state — red glow + tinted border. Subtle but clear. */
+.cron-job-selected {
+  border-left-color: #ef4444 !important;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.4),
+              0 2px 12px rgba(239, 68, 68, 0.15);
+  background: rgba(239, 68, 68, 0.04);
+}
+
+.cron-job-selected .cron-job-name {
+  color: #fff;
+}
+
+/* Filters row — bulk action lives on the right of the same row */
+.cron-filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.cron-filters-spacer {
+  flex: 1;
+}
+
+.cron-bulk-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(8px);
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.cron-bulk-action.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.cron-bulk-count {
+  font-size: 11px;
+  color: #ef4444;
+  font-weight: 600;
+  padding: 4px 10px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 3px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.cron-link-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-dim, #aaa);
+  border-radius: 3px;
+  font-size: 11px;
+  padding: 4px 10px;
+  cursor: pointer;
+  /* Match sibling height so it sits flush in the filters row. */
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.cron-link-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text, #eee);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Hold-to-confirm button — progressive ring around the label.
+   Like a fingerprint scanner: press, hold, ring fills, action fires.
+   Releases cancel. */
+.cron-hold-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 6px;
+  /* Match .cron-action-btn height (4px top/bottom + 11px font + border). */
+  height: 26px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition: background 150ms ease, border-color 150ms ease, transform 100ms ease;
+}
+
+.cron-hold-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.cron-hold-btn:active:not(:disabled),
+.cron-hold-btn.holding {
+  transform: scale(0.98);
+  background: rgba(239, 68, 68, 0.22);
+}
+
+.cron-hold-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cron-hold-ring {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  transform: rotate(-90deg);  /* start at 12 o'clock */
+}
+
+.cron-hold-ring-bg {
+  fill: none;
+  stroke: rgba(239, 68, 68, 0.2);
+  stroke-width: 2.5;
+}
+
+.cron-hold-ring-progress {
+  fill: none;
+  stroke: #ef4444;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  /* 2*pi*10 ≈ 62.83. Animated via JS-driven strokeDashoffset. */
+  transition: stroke-dashoffset 50ms linear;
+}
+
+.cron-hold-label {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .cron-pagination {
@@ -2728,3 +2950,4 @@
   line-height: 1.5;
   margin: 0;
 }
+

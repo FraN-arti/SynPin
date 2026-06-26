@@ -4,11 +4,9 @@
 
 <img src="synpin.png" alt="SynPin" width="400">
 
-# SynPin
+### Operating system for AI agents.
 
-### An operating system for AI agents.
-
-Not a chatbot. Not a copilot. **An organization that works while you sleep.**
+**An organization that works while you sleep.**
 
 <br/>
 
@@ -64,10 +62,10 @@ This is infrastructure for AI agents. **Process management. Persistent state. Pr
 
 ## What it looks like in practice
 
-At 9 PM you tell Lyutik: *"Tomorrow I want to talk about the oncologist"*.
+At 9 PM you tell Lyutik: *"Tomorrow I want to review the quarterly report"*.
 
 Lyutik:
-1. Checks `MEMORY.md` — there's "Arthur is usually home by 9 PM".
+1. Checks `MEMORY.md` — there's "User is usually home by 9 PM".
 2. Calculates: tomorrow, 9 PM.
 3. **Itself** creates a cron job with the right `target`, `agent`, `delivery`.
 4. Confirms: *"Done. I'll remind you tomorrow at 9 PM."*

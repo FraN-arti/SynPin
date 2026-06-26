@@ -112,17 +112,33 @@ class SetSessionRequest(BaseRequest):
 
 @router.get("/user")
 async def read_global_user():
-    """Read the global shared USER.md profile."""
+    """Read the global shared USER.md profile.
+
+    Limit is read from memory.yaml (memory.max_chars_user) via the same
+    config helper the rest of the memory subsystem uses, NOT from the
+    module constant USER_CHAR_LIMIT. This way the UI shows the same
+    limit that's actually enforced on writes.
+    """
     try:
         path = _get_shared_user_path()
+        # Read the same limit that MemoryStore enforces on writes — so
+        # the UI counter can never disagree with what the writer sees.
+        try:
+            from ..config.manager import get_memory_limits
+            limit = int(get_memory_limits()["user_max_chars"])
+        except Exception:
+            from ..memory.store import USER_CHAR_LIMIT
+            limit = USER_CHAR_LIMIT
         if not path.exists():
-            return {"success": True, "target": "user", "entries": [], "usage": "0% — 0/1,375 chars", "entry_count": 0}
+            return {"success": True, "target": "user", "entries": [],
+                    "usage": f"0% — 0/{limit:,} chars", "entry_count": 0}
         content = path.read_text(encoding="utf-8")
         entries = [e.strip() for e in content.split("\n§\n") if e.strip()]
         current = len(content)
-        limit = USER_CHAR_LIMIT
         pct = min(100, int((current / limit) * 100)) if limit > 0 else 0
-        return {"success": True, "target": "user", "entries": entries, "usage": f"{pct}% — {current:,}/{limit:,} chars", "entry_count": len(entries)}
+        return {"success": True, "target": "user", "entries": entries,
+                "usage": f"{pct}% — {current:,}/{limit:,} chars",
+                "entry_count": len(entries)}
     except Exception as e:
         logger.error("Failed to read user profile: %s", e)
         raise HTTPException(500, "Failed to read user profile")

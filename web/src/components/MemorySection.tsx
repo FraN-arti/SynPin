@@ -74,7 +74,8 @@ interface MemoryProviderConfig {
 
 interface MemorySettingsConfig {
   enabled: boolean
-  max_chars: number
+  max_chars: number          // MEMORY.md (agent notes) limit
+  max_chars_user: number     // USER.md (shared profile) limit
   auto_refactor: boolean
 }
 
@@ -92,7 +93,7 @@ export function MemorySection() {
     provider: 'built-in', api_key: '', endpoint: '', max_chars: 10000, auto_refactor: false,
   })
   const [memorySettings, setMemorySettings] = useState<MemorySettingsConfig>({
-    enabled: true, max_chars: 10000, auto_refactor: true,
+    enabled: true, max_chars: 10000, max_chars_user: 1375, auto_refactor: true,
   })
   const [otdelCompaction, setOtdelCompaction] = useState({
     enabled: true, compaction_limit: 100,
@@ -438,16 +439,32 @@ export function MemorySection() {
 
             <div className="settings-field">
               <div className="settings-field-label">
-                <label>Макс. символов (всего)</label>
-                <span className="settings-field-hint">Общий лимит памяти на агента — при достижении начнёт забывать старое</span>
+                <label>Макс. символов (профиль)</label>
+                <span className="settings-field-hint">Лимит на USER.md — общий профиль пользователя. Рекомендуется держать коротким.</span>
               </div>
               <input
                 type="number"
                 className="settings-input"
-                min={10000}
+                min={100}
+                max={100000}
+                value={memorySettings.max_chars_user}
+                onChange={e => setMemorySettings({ ...memorySettings, max_chars_user: Math.min(100000, Math.max(100, Number(e.target.value))) })}
+                onBlur={() => saveConfig({ memory: memorySettings })}
+              />
+            </div>
+
+            <div className="settings-field">
+              <div className="settings-field-label">
+                <label>Макс. символов (память)</label>
+                <span className="settings-field-hint">Лимит на MEMORY.md для каждого агента — заметки, планы, контекст.</span>
+              </div>
+              <input
+                type="number"
+                className="settings-input"
+                min={1000}
                 max={1000000}
                 value={memorySettings.max_chars}
-                onChange={e => setMemorySettings({ ...memorySettings, max_chars: Math.min(1000000, Math.max(10000, Number(e.target.value))) })}
+                onChange={e => setMemorySettings({ ...memorySettings, max_chars: Math.min(1000000, Math.max(1000, Number(e.target.value))) })}
                 onBlur={() => saveConfig({ memory: memorySettings })}
               />
             </div>

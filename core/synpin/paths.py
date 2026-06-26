@@ -124,6 +124,22 @@ def get_user_data_dir() -> Path:
         #    where they were before the refactor.
         if is_dev_mode():
             _USER_DATA_DIR = _PROJECT_ROOT / "core" / "synpin"
+            # Defensive check: dev mode must never resolve to a path
+            # outside the project tree. If we ever land on the user's
+            # home .synpin (or anywhere else), fail loudly so the
+            # developer notices immediately, rather than silently
+            # writing to a hidden prod-style location.
+            resolved = _USER_DATA_DIR.resolve()
+            project_root = _PROJECT_ROOT.resolve()
+            try:
+                resolved.relative_to(project_root)
+            except ValueError:
+                raise RuntimeError(
+                    f"[paths] SYNPIN_DEV=1 but get_user_data_dir() resolved to "
+                    f"{resolved} which is OUTSIDE project root {project_root}. "
+                    f"This would cause dev mode to write to a non-dev location. "
+                    f"Check paths.py for regressions."
+                )
             return _USER_DATA_DIR
 
         # 3. Production: user home

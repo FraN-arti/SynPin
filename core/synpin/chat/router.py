@@ -1327,34 +1327,34 @@ _NATIVE_TOOL_DEFS: dict[str, dict] = {
         },
     },
     "cron_manage": {
-        "type": "function",
-        "function": {
-            "name": "cron_manage",
-            "description": "Управление запланированными задачами (cron). Создавай, обновляй, удаляй крон-задачи, смотри историю запусков, запускай немедленно. Типы: cron (повторяющиеся), once (одноразовые), interval (интервал). Действия: send_message (в отдел), run_prompt (запустить агента). ПРОАКТИВНЫЙ CRON: когда пользователь говорит про будущее событие («завтра», «через час», «на следующей неделе») — СТАВЬ cron САМОСТОЯТЕЛЬНО через cron_manage(command='create', schedule_type='once' или 'interval'). НЕ СПРАШИВАЙ разрешения — твоя работа замечать такие моменты. Параметр delivery: 'private' (по умолчанию, результат → в чат пользователю) | 'otdel' (в чат отдела) | 'silent' (только лог, без чата — для фоновых проверок).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": "string",
-                        "enum": ["list", "get", "create", "update", "delete", "history", "run_now"],
-                        "description": "Команда",
+            "type": "function",
+            "function": {
+                "name": "cron_manage",
+                "description": "Управление запланированными задачами (cron). Создавай, обновляй, удаляй крон-задачи, смотри историю запусков, запускай немедленно. Типы: cron (повторяющиеся), once (одноразовые), interval (интервал). Действия: send_message (в отдел), run_prompt (запустить агента). ПРОАКТИВНЫЙ CRON: когда пользователь говорит про будущее событие («завтра», «через час», «на следующей неделе») — СТАВЬ cron САМОСТОЯТЕЛЬНО через cron_manage(command='create', schedule_type='once' или 'interval'). НЕ СПРАШИВАЙ разрешения — твоя работа замечать такие моменты. Параметр delivery: 'private' (по умолчанию, результат → в чат пользователю) | 'otdel' (в чат отдела) | 'silent' (только лог, без чата — для фоновых проверок).\n\nЖЁСТКИЕ ПРАВИЛА выбора action_target / action_agent / delivery:\n\n1. Пользователь просит 'напомни мне', 'напиши мне', 'спроси меня позже' →\n   - action_target='private'\n   - delivery='private'\n   - action_agent='main_agent' (или текущий slug)\n   - action_message: прямой текст напоминания\n\n2. Пользователь просит 'попроси главу отдела X сделать Y' / 'напомни отделу Z' / 'через час проверь отдел' →\n   - action_target='otdel:<ID>' (формат otdel:<slug_or_id>)\n   - delivery='otdel'\n   - action_agent='<head_slug_отдела_X>' (НЕ main_agent!)\n   - action_message: 'Сделай Y в контексте своего отдела'\n   Чтобы найти slug/id отдела/head: используй tool otdel_manage(command='list').\n\n3. Пользователь просит 'проверь логи тихо', 'посмотри статус молча', 'просто запиши факт' →\n   - action_target='private'\n   - delivery='silent'\n   - action_agent='main_agent'\n   - action_message: пиши факт в MEMORY через memory_write (НЕ пиши в чат)\n\nЗАПРЕЩЕНО: ставить cron с action_target='private' + action_agent='main_agent' для задач которые должны идти в отдел. Это приведёт к тому что результат попадёт в личный чат пользователя вместо чата отдела. Если сомневаешься — посмотри otdel_manage(command='list') и возьми head slug оттуда.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "enum": ["list", "get", "create", "update", "delete", "history", "run_now"],
+                            "description": "Команда",
+                        },
+                        "job_id": {"type": "string", "description": "ID задачи (для get/update/delete/history/run_now)"},
+                        "name": {"type": "string", "description": "Название задачи"},
+                        "schedule_type": {"type": "string", "enum": ["cron", "once", "interval"], "description": "Тип расписания"},
+                        "schedule_expr": {"type": "string", "description": "Расписание. Относительное: 2m, 1h, 30s, 2h30m. Абсолютное: 2026-06-23T13:00:00. Cron: 0 13 * * *."},
+                        "action_type": {"type": "string", "enum": ["run_prompt"], "description": "Тип действия"},
+                        "action_target": {"type": "string", "description": "Куда отправить результат: 'private' (в чат пользователю) | 'otdel:<ID>' (в чат отдела, ID — slug из otdel_manage) | 'otdel_id' напрямую. См. правила в description."},
+                        "action_message": {"type": "string", "description": "Текст сообщения или промпт для агента"},
+                        "action_agent": {"type": "string", "description": "Slug агента для run_prompt. Для напоминаний пользователю → 'main_agent'. Для задач в отдел → head_slug отдела (НЕ main_agent!)"},
+                        "description": {"type": "string", "description": "Описание задачи"},
+                        "status": {"type": "string", "enum": ["active", "paused"], "description": "Статус задачи"},
+                        "delivery": {"type": "string", "enum": ["private", "otdel", "silent"], "description": "Куда доставить результат. 'private' — в чат пользователю (для личных напоминаний). 'otdel' — в чат отдела (для командных задач). 'silent' — только лог, без чата (для фоновых проверок)."},
                     },
-                    "job_id": {"type": "string", "description": "ID задачи (для get/update/delete/history/run_now)"},
-                    "name": {"type": "string", "description": "Название задачи"},
-                    "schedule_type": {"type": "string", "enum": ["cron", "once", "interval"], "description": "Тип расписания"},
-                    "schedule_expr": {"type": "string", "description": "Расписание. Относительное: 2m, 1h, 30s, 2h30m. Абсолютное: 2026-06-23T13:00:00. Cron: 0 13 * * *."},
-                    "action_type": {"type": "string", "enum": ["run_prompt"], "description": "Тип действия"},
-                    "action_target": {"type": "string", "description": "Куда отправить: 'private' (приватный чат агента), 'otdel:ID' (чат отдела), или otdel_id"},
-                    "action_message": {"type": "string", "description": "Текст сообщения или промпт для агента"},
-                    "action_agent": {"type": "string", "description": "Slug агента для run_prompt (например 'main_agent')"},
-                    "description": {"type": "string", "description": "Описание задачи"},
-                    "status": {"type": "string", "enum": ["active", "paused"], "description": "Статус задачи"},
-                    "delivery": {"type": "string", "enum": ["private", "otdel", "silent"], "description": "Куда доставить результат. 'private' (по умолчанию, в чат пользователю) — для личных напоминаний. 'otdel' (в чат отдела) — для командных задач. 'silent' — только лог, без чата (для фоновых проверок)."},
+                    "required": ["command"],
                 },
-                "required": ["command"],
             },
         },
-    },
 }
 
 

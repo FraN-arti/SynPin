@@ -2330,13 +2330,15 @@
 
 .cron-stat-line {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: baseline;
+  gap: 12px;
   font-size: 13px;
-  flex-wrap: wrap;
+  min-height: 22px;
+  padding: 2px 0;
 }
 
 .cron-stat-label {
+  flex: 0 0 180px;
   color: var(--text-dim, #888);
   font-size: 12px;
   text-transform: uppercase;
@@ -2542,6 +2544,47 @@
   text-align: center;
   color: var(--text-dim, #888);
   font-style: italic;
+}
+
+.cron-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px 0 4px;
+  margin-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.cron-page-btn {
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text, #eee);
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.cron-page-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.cron-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cron-page-info {
+  font-size: 12px;
+  color: var(--text-dim, #888);
+  min-width: 80px;
+  text-align: center;
+}
+
+.cron-page-total {
+  color: var(--text-dim, #666);
+  font-size: 11px;
 }
 
 .cron-card-desc {

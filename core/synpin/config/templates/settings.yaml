@@ -6,6 +6,7 @@ server:
   dev_port: 2099
 cron:
   agent_limit_per_creator: 3   # global cap on active cron jobs per created_by
+  retention_days: 30             # completed/missed jobs older than this are auto-deleted by sweep
   proactive_triggers:
     enabled: true
     "завтра": "09:00"

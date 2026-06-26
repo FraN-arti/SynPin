@@ -19,9 +19,6 @@ from ..services.daemon_manager import DaemonManager
 
 logger = logging.getLogger(__name__)
 
-_tick_task: asyncio.Task | None = None
-_TICK_INTERVAL = 60  # seconds
-
 
 async def _execute_job(job: Any) -> None:
     """Execute a fired cron job.
@@ -525,14 +522,30 @@ async def _trigger_head_agent(otdel_id: str, job: Any) -> None:
 
     logger.info("Cron head agent triggered in otdel %s", otdel_id)
 
-
-# ── Scheduler tick loop ──────────────────────────────────────────────────
+_tick_task: asyncio.Task | None = None
+_TICK_INTERVAL = 60  # seconds
+_SWEEP_INTERVAL = 3600  # seconds — run retention sweep once per hour
+_last_sweep_at: float = 0.0
 
 
 async def _tick_loop() -> None:
-    """Background loop — check for due jobs every minute."""
+    """Background loop — check for due jobs every minute, sweep old jobs hourly."""
+    global _last_sweep_at
+    _last_sweep_at = asyncio.get_event_loop().time()
     while True:
         try:
+            # Hourly retention sweep for completed/missed jobs
+            now_ts = asyncio.get_event_loop().time()
+            if now_ts - _last_sweep_at >= _SWEEP_INTERVAL:
+                try:
+                    from .jobs import sweep_old_completed_jobs
+                    deleted = sweep_old_completed_jobs()
+                    if deleted:
+                        logger.info("Cron sweep: deleted %d old completed/missed jobs", len(deleted))
+                except Exception as e:
+                    logger.warning("Cron sweep failed: %s", e)
+                _last_sweep_at = now_ts
+
             due = get_due_jobs()
             for job in due:
                 logger.info("Cron tick: firing job %s (%s)", job.id, job.name)

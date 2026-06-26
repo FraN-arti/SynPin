@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { API_BASE as API } from '../../config'
 import { SettingsCard } from '../SettingsCard'
 
@@ -97,14 +97,17 @@ function statusColor(s: CronJob['status']): string {
   }
 }
 
-export function CronSection() {
+export function CronSection({ wsOn }: { wsOn?: (type: string, handler: (data: any) => void) => () => void } = {}) {
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState<CronStats | null>(null)
   const [jobs, setJobs] = useState<CronJob[]>([])
   const [filter, setFilter] = useState<'all' | 'active' | 'paused' | 'completed' | 'missed'>('all')
+  const [pageSize] = useState(10)
+  const [page, setPage] = useState(0)
   const [agentLimit, setAgentLimit] = useState<number>(3)
   const [limitInput, setLimitInput] = useState<string>('3')
   const [savingLimit, setSavingLimit] = useState(false)
+  const limitSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const loadAll = async () => {
     setLoading(true)
@@ -133,14 +136,31 @@ export function CronSection() {
 
   useEffect(() => {
     loadAll()
-    // Refresh every 30s so the next_run countdown stays fresh
-    const id = setInterval(loadAll, 30000)
+    // Polling fallback every 60s
+    const id = setInterval(loadAll, 60000)
     return () => clearInterval(id)
   }, [])
+
+  // WS realtime — subscribe to cron:fired events for instant stats refresh.
+  // This is the primary path; polling is just a safety net.
+  useEffect(() => {
+    if (!wsOn) return
+    const off = wsOn('cron:fired', () => {
+      // Light refresh — just stats + jobs, not the full page
+      loadAll()
+    })
+    return off
+  }, [wsOn])
 
   const filteredJobs = filter === 'all'
     ? jobs
     : jobs.filter(j => j.status === filter)
+
+  // Reset page when filter changes
+  useEffect(() => { setPage(0) }, [filter])
+
+  const totalPages = Math.max(1, Math.ceil(filteredJobs.length / pageSize))
+  const pagedJobs = filteredJobs.slice(page * pageSize, (page + 1) * pageSize)
 
   const handlePause = async (id: string) => {
     await fetch(`${API}/api/cron/jobs/${id}`, {
@@ -167,21 +187,28 @@ export function CronSection() {
     await fetch(`${API}/api/cron/jobs/${id}/run`, { method: 'POST' })
     loadAll()
   }
-  const saveLimit = async () => {
-    const v = parseInt(limitInput, 10)
-    if (isNaN(v) || v < 1) return
-    setSavingLimit(true)
-    try {
-      await fetch(`${API}/api/cron/agent-limit`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agent_limit_per_creator: v }),
-      })
-      await loadAll()
-    } finally {
-      setSavingLimit(false)
-    }
+  const scheduleLimitSave = (val: number) => {
+    if (limitSaveTimerRef.current) clearTimeout(limitSaveTimerRef.current)
+    limitSaveTimerRef.current = setTimeout(async () => {
+      if (val < 1 || val === agentLimit) return
+      setSavingLimit(true)
+      try {
+        await fetch(`${API}/api/cron/agent-limit`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agent_limit_per_creator: val }),
+        })
+        await loadAll()
+      } finally {
+        setSavingLimit(false)
+      }
+    }, 600) // 600ms debounce — saves when user stops typing
   }
+
+  // Cleanup on unmount
+  useEffect(() => () => {
+    if (limitSaveTimerRef.current) clearTimeout(limitSaveTimerRef.current)
+  }, [])
 
   return (
     <div className="cron-section">
@@ -259,15 +286,16 @@ export function CronSection() {
           ))}
         </div>
 
-        {filteredJobs.length === 0 ? (
+        {pagedJobs.length === 0 ? (
           <div className="cron-empty">
             {filter === 'all'
-              ? 'Cron-задач пока нет. Агенты могут создавать их через cron_manage tool.'
+              ? 'Крон-задач пока нет. Агенты могут создавать их через cron_manage tool.'
               : `Нет задач со статусом "${filter}".`}
           </div>
         ) : (
+          <>
           <div className="cron-jobs">
-            {filteredJobs.map(job => (
+            {pagedJobs.map(job => (
               <div key={job.id} className={`cron-job ${job.status}`}>
                 <div className="cron-job-header">
                   <span className="cron-job-name">{job.name}</span>
@@ -317,6 +345,29 @@ export function CronSection() {
               </div>
             ))}
           </div>
+          {totalPages > 1 && (
+            <div className="cron-pagination">
+              <button
+                className="cron-page-btn"
+                disabled={page === 0}
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+              >
+                ← Пред
+              </button>
+              <span className="cron-page-info">
+                {page + 1} / {totalPages}
+                <span className="cron-page-total"> ({filteredJobs.length})</span>
+              </span>
+              <button
+                className="cron-page-btn"
+                disabled={page >= totalPages - 1}
+                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              >
+                След →
+              </button>
+            </div>
+          )}
+          </>
         )}
       </SettingsCard>
 
@@ -336,17 +387,17 @@ export function CronSection() {
             min={1}
             max={50}
             value={limitInput}
-            onChange={e => setLimitInput(e.target.value)}
+            onChange={e => {
+              const next = e.target.value
+              setLimitInput(next)
+              const parsed = parseInt(next, 10)
+              if (!isNaN(parsed) && parsed >= 1) scheduleLimitSave(parsed)
+            }}
           />
-          <button
-            className="cron-save-btn"
-            onClick={saveLimit}
-            disabled={savingLimit || parseInt(limitInput, 10) === agentLimit}
-          >
-            {savingLimit ? 'Сохранение...' : 'Сохранить'}
-          </button>
           <span className="cron-limit-hint">
-            (дефолт: {stats?.agent_limit_default ?? 3})
+            {savingLimit ? '⏳ сохраняю...' :
+             agentLimit === parseInt(limitInput, 10) ? `✓ (дефолт: ${stats?.agent_limit_default ?? 3})` :
+             (stats?.agent_limit_default ?? 3) !== agentLimit ? `(дефолт: ${stats?.agent_limit_default ?? 3})` : ''}
           </span>
         </div>
 

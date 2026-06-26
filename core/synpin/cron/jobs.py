@@ -41,6 +41,24 @@ def get_agent_limit() -> int:
         return DEFAULT_AGENT_LIMIT
 
 
+DEFAULT_RETENTION_DAYS = 30
+
+
+def get_retention_days() -> int:
+    """Read cron retention days from settings.yaml.
+
+    Completed and missed jobs older than this are deleted by sweep.
+    """
+    try:
+        from ..config.manager import load_yaml
+        data = load_yaml("settings.yaml")
+        cron_cfg = (data or {}).get("cron", {}) or {}
+        val = cron_cfg.get("retention_days", DEFAULT_RETENTION_DAYS)
+        return max(1, int(val))
+    except Exception:
+        return DEFAULT_RETENTION_DAYS
+
+
 def count_active_for_creator(created_by: str) -> int:
     """Count active cron jobs owned by `created_by`.
 
@@ -335,6 +353,43 @@ def sweep_missed_jobs() -> list[str]:
         missed.append(job.id)
         logger.warning("Sweep: marked missed one-shot job %s (%s)", job.id, job.name)
     return missed
+
+
+def sweep_old_completed_jobs() -> list[str]:
+    """Delete completed/missed jobs older than retention_days.
+
+    Runs periodically (e.g. once per hour) — keeps the cron/jobs
+    directory from accumulating stale entries. Returns list of
+    deleted job IDs. Active and paused jobs are NEVER touched.
+    """
+    from datetime import timedelta
+    retention_days = get_retention_days()
+    cutoff = _now() - timedelta(days=retention_days)
+    deleted: list[str] = []
+    for path in sorted(_cron_dir().glob("*.yaml")):
+        job = _load_job(path)
+        if not job:
+            continue
+        if job.status not in (JobStatus.COMPLETED, JobStatus.MISSED):
+            continue
+        # Use updated_at as the "completion time" approximation — that's
+        # when the job was last modified (set to completed/missed).
+        try:
+            last_change = datetime.fromisoformat(job.updated_at)
+        except Exception:
+            continue
+        if last_change < cutoff:
+            try:
+                path.unlink()
+                deleted.append(job.id)
+                logger.info("Sweep: deleted old %s job %s (%s)",
+                            job.status.value, job.id, job.name)
+            except Exception as e:
+                logger.warning("Sweep: failed to delete %s: %s", job.id, e)
+    if deleted:
+        logger.info("Sweep: removed %d old completed/missed jobs (retention=%d days)",
+                    len(deleted), retention_days)
+    return deleted
 
 
 def advance_next_run(job: CronJob) -> None:

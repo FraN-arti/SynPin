@@ -206,7 +206,7 @@ export function SettingsPage({ onAgentsChange, onDepartmentsChange, wsOn }: Sett
             />
           )}
           {activeTab === 'memory' && <MemorySection />}
-          {activeTab === 'cron' && <CronSection />}
+          {activeTab === 'cron' && <CronSection wsOn={wsOn} />}
           {activeTab === 'channels' && <ChannelsSection onAddChannel={() => setActiveModal('add-channel')} />}
           {activeTab === 'departments' && <DepartmentsSection onDepartmentsChange={onDepartmentsChange} />}
           {activeTab === 'skills' && <SkillsSection />}

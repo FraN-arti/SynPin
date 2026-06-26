@@ -10,7 +10,12 @@ from ._base import BaseRequest
 router = APIRouter(prefix="/api/themes", tags=["themes"])
 
 # --- Storage ---
-_themes_dir = Path.home() / ".synpin" / "themes"
+# User-saved custom themes live under config_dir (synced across
+# sessions). For dev (SYNPIN_DEV=1) this is the project's
+# core/synpin/config/ — no leaks to ~/.synpin/.
+from ..paths import get_config_dir
+
+_themes_dir = get_config_dir() / "themes"
 _themes_dir.mkdir(parents=True, exist_ok=True)
 _custom_themes_file = _themes_dir / "custom.json"
 

@@ -4,9 +4,11 @@
 
 <img src="synpin.png" alt="SynPin" width="400">
 
-**The operating system for AI agents.**
+# SynPin
 
-Not a chat, not a copilot — an autonomous organization that works while you sleep.
+### An operating system for AI agents.
+
+Not a chatbot. Not a copilot. **An organization that works while you sleep.**
 
 <br/>
 
@@ -14,16 +16,7 @@ Not a chat, not a copilot — an autonomous organization that works while you sl
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg)](https://react.dev)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg)](https://fastapi.tiangolo.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6.svg)](https://typescriptlang.org)
-[![WebSocket](https://img.shields.io/badge/WebSocket-realtime-4FC08D.svg)](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket)
-[![React Flow](https://img.shields.io/badge/React%20Flow-12-FF007F.svg)](https://reactflow.dev)
-[![dnd-kit](https://img.shields.io/badge/dnd--kit-latest-FF6B35.svg)](https://dndkit.com)
-[![ChromaDB](https://img.shields.io/badge/ChromaDB-latest-FF6F00.svg)](https://www.trychroma.com)
-[![YAML](https://img.shields.io/badge/Config-YAML-0B5D9C.svg)](https://yaml.org)
-[![Pydantic](https://img.shields.io/badge/Pydantic-v2-E92063.svg)](https://docs.pydantic.dev)
-[![Vite](https://img.shields.io/badge/Vite-6-646CFF.svg)](https://vite.dev)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
-
-<br/>
 
 [English](README.en.md) · [Русский](README.md)
 
@@ -33,111 +26,107 @@ Not a chat, not a copilot — an autonomous organization that works while you sl
 
 <br/>
 
-## The problem
+## One question
 
-Every AI coding tool today works the same way: you write a prompt, the agent executes, you wait. A single agent, a single thread, a single context window.
+What happens when you turn off your computer?
 
-But what happens when you want the agent to **work on its own**? When you want it to plan, delegate, review, and ship — without you sitting in front of the keyboard at 2 AM?
+Today's AI tools have one answer: **nothing**. They sleep. Close the tab, and everything they knew evaporates. No action taken while you were away.
 
-**Nothing.** Because none of them are built for that.
+But it doesn't have to be that way.
 
----
+You have work that can happen without you. Reports that are better written at night. Reminders that shouldn't depend on your memory. Checks that need to run every half hour. Ideas that happen in the background.
 
-## The shift
+**SynPin is agents living by those rules.**
 
-A year ago, models had 128K context windows. A month ago — 256K. Today, production models hit 1M. Tomorrow — **10M tokens**.
-
-Every leap is not just a bigger number. It is a fundamentally different level of understanding. With 10M tokens, an agent can hold your entire codebase, all open issues, last month of logs, every architectural decision — and still have room to think.
-
-But here is the thing: context is not just about volume. It is also about **purpose**.
-
-Different models have different context sizes, different speeds, different strengths. One writes brilliant code but chokes on creativity. Another responds in milliseconds but gets lost in complex architecture. A third sees images but cannot reason about numbers.
-
-Why force a code agent to write poetry? Why make a fast agent draw pictures? Why load a super-mind with a task a cheap model could handle in a fraction of the cost?
-
-In SynPin, every agent has **its place**.
-
-You can have a speed agent for routine checks, a creative one for ideation, a precise one for code, a cheap one for background tasks. Each works in its own context, each uses its own model, each specializes in what it does best. The orchestrator distributes tasks not by chance — it knows who should handle what.
-
-One agent, no matter how much context it has, is still one agent. It cannot be best at everything. It cannot delegate, cannot parallelize, cannot specialize.
-
-To use 10M tokens effectively, you do not need **one super-agent**. You need a **system of agents** — each in its rightful place.
-
-SynPin is the answer.
+<br/>
 
 ---
 
-## The idea
+<br/>
 
-SynPin is not an AI coding assistant. It is a **multi-agent operating system** — a platform where AI agents live and work as an autonomous organization, not as anonymous chatbots.
+## What it is
 
-Think of it like an orchestra:
+SynPin is not another chat framework. It's **an operating system for agents**, where:
 
-- **The user is the conductor.** One gesture sets the direction. You don't play every instrument — you guide.
-- **The agents are the musicians.** Each has a role, a specialization, a place in the hierarchy.
-- **The departments are the sections.** Strings, brass, woodwinds — isolated, focused, synchronous.
-- **The cron scheduler is the metronome.** Work happens even when you're not in the room.
-- **The Kanban board is the sheet music.** Every task has a place, a status, a performer.
+- **Agents set their own reminders.** You said *"tomorrow evening let's talk about X"* — the agent already remembers and will remind you itself, no prompting needed.
+- **The head agent delegates to departments** — and watches the progress itself, extends timers, escalates blocked work.
+- **Memory survives the session.** What an agent learned today, it remembers a month from now. Not as "vector DB search", but as **its own knowledge**.
+- **Cron, like Linux — but for agents.** Schedule, sweep, retention, daemon manager. All real.
+- **Three kinds of memory:** who you are (USER), what matters (MEMORY), what was decided (FACTS). Every fact goes where it belongs.
 
-You don't write twenty prompts to ship a feature. You describe the feature once. The orchestrator plans, delegates to departments, monitors execution, and delivers the result.
+This is infrastructure for AI agents. **Process management. Persistent state. Proactive autonomy.**
 
----
-
-## How it works
-
-### Hierarchy
-
-```
-              ┌─────────────────────┐
-              │   Orchestrator AI   │  ← sees everything, plans, delegates
-              │  (main agent)       │
-              └──────┬──────┬───────┘
-                     │      │
-           ┌─────────┘      └─────────┐
-           ▼                          ▼
-    ┌──────────────┐         ┌──────────────┐
-    │  Department  │         │  Department  │  ← isolated memory & context
-    │  Head AI     │◄───────►│  Head AI     │  ← cross-department links
-    └──────┬───────┘         └──────┬───────┘
-           │                        │
-      ┌────┼────┐              ┌────┼────┐
-      ▼    ▼    ▼              ▼    ▼    ▼
-   Worker Worker Worker    Worker Worker Worker  ← parallel execution
-```
-
-Each department has:
-- A **head** — receives tasks, decomposes, delegates, synthesizes results
-- **Workers** — specialists who execute in parallel
-- **Isolated memory** — departments don't leak context
-- **Links** — task escalation, delegation, and collaboration between departments
-
-But the key insight: **agents inside one department work on the same task together**. Not each on their own — as a team. One writes code, another reviews for bugs, a third documents in parallel — all in a single cycle. Each agent uses its strength. The fast one tests hypotheses. The precise one validates logic. The creative one proposes solutions. The head sees the full picture and assembles the result like a puzzle.
-
-### Autonomy
-
-SynPin works without you.
-
-- **Cron** schedules nightly QA runs, report generation, task creation
-- **Kanban** tracks every task from creation to delivery across departments
-- **Memory** persists across sessions — agents remember what they learned
-- **Orchestrator** monitors all departments, reassigns blocked tasks, escalates bottlenecks
-
-You wake up to a daily report. Not because you asked for it at midnight — because the system knew you'd need it in the morning.
+<br/>
 
 ---
 
-## What makes SynPin different
+<br/>
 
-| | Single-agent tools | SynPin |
-|---|---|---|
-| **Structure** | One agent per session | Hierarchical multi-agent organization |
-| **Autonomy** | Requires user for every step | Works independently on schedule |
-| **Memory** | Session-scoped (forgets on restart) | Persistent per agent and department |
-| **Parallelism** | Single thread | Multiple agents execute simultaneously |
-| **Context model** | One window per task | Shared context across orchestrated agents |
-| **User role** | Operator | Conductor |
+## What it looks like in practice
+
+At 9 PM you tell Lyutik: *"Tomorrow I want to talk about the oncologist"*.
+
+Lyutik:
+1. Checks `MEMORY.md` — there's "Arthur is usually home by 9 PM".
+2. Calculates: tomorrow, 9 PM.
+3. **Itself** creates a cron job with the right `target`, `agent`, `delivery`.
+4. Confirms: *"Done. I'll remind you tomorrow at 9 PM."*
+
+You **never told it** to create a cron. It saw the pattern and acted. That's **proactivity** — what makes SynPin feel alive instead of another form with a button.
+
+Another day you tell the head agent: *"In an hour, message the head of the Communication department to greet everyone"*.
+
+The head agent:
+1. Sees the "Communication" department in `otdels.yaml`.
+2. Takes the head's slug (not main_agent — this matters, otherwise the result goes to the wrong place).
+3. Creates a cron with `action_target="otdel:<id>"`, `delivery="otdel"`.
+4. In an hour — the department's head **itself** writes the greeting **in its own chat**, not in your private one.
+
+You don't run the process. You set the goal, and the agents choose the route.
+
+<br/>
 
 ---
+
+<br/>
+
+## Why this way
+
+In the LLM world today there are two extremes. **One agent doing everything** — even with 10M context it's still one agent. Can't delegate, can't parallelize, can't specialize.
+
+**One agent per role** — assistant for code, assistant for design, assistant for something else. Each on its own. No memory between them.
+
+SynPin is **the third path**. A system where agents are **citizens**, not tools.
+
+- Each has a role.
+- Each has a place in the hierarchy.
+- Each has long-term memory.
+- Each has the right to set reminders and take work.
+- Each has duties to the department.
+
+And most importantly — **they're not perfect workers, they're part of your life**. They remember what worried you a week ago. They ask "how are you". Not because they were told to — because they live in your context and they care.
+
+<br/>
+
+---
+
+<br/>
+
+## Already working
+
+You're not buying an idea — you run it and see:
+
+- **28 tests** covering memory, cron, limits, retention.
+- **3 hierarchy levels:** head agent → department heads → workers.
+- **Real-time WS** — events without polling.
+- **Glassmorphism UI** with dark theme.
+- **v0.5.1.42** on GitHub, AGPL-3.0.
+
+<br/>
+
+---
+
+<br/>
 
 ## Quick start
 
@@ -151,39 +140,31 @@ synpin dev             # development mode
 
 Open `http://localhost:2099`.
 
-Or run with the system wizard:
-```bash
-synpin setup           # interactive first-run wizard
-synpin start           # production mode
-```
+<br/>
 
 ---
-
-## Why open source
-
-Because the AI agent ecosystem should not be owned by one company.
-
-SynPin is licensed under AGPL v3 — you can use it, fork it, modify it. If you build on it publicly, the changes stay open.
-
-Commercial use without source disclosure? Reach out.
-
----
-
-## The road ahead
-
-The models are getting smarter. The context windows are exploding. The cost of inference is dropping.
-
-In 2026, the question is no longer "can an AI write code?" — it's "can a system of AI agents run a project?"
-
-SynPin is our answer.
 
 <br/>
+
+## The road
+
+This isn't an MVP. It's **a foundation**. Every day something gets added — but not for features. For **agents to feel at home**.
+
+A year ago models couldn't hold long context. Today they can. Tomorrow they'll hold everything. But context without **purpose** is just text in a buffer.
+
+SynPin gives agents **purpose**. Place, work, memory, colleagues.
+
+**This isn't about AI that answers questions. It's about AI that lives.**
+
+<br/>
+
+---
 
 <div align="center">
 
 <br/>
 
-**You are not the trigger. You are the conductor.**
+*SynPin — because one AI agent shouldn't be lonely.*
 
 <br/>
 

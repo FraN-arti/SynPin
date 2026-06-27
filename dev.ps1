@@ -69,13 +69,19 @@ function Show-Help {
     Write-Host ""
 }
 
-# Find a Python that has synpin-core available. Plain 'python' on
-# PATH often points to a tool venv (Hermes-agent) or a Microsoft
-# Store stub that doesn't have our package. We walk PATH plus
-# canonical install locations and test each candidate with a real
-# 'import synpin' before using it.
+# Find a Python that has synpin-core available. We prefer the repo's
+# own .venv first — that's where install.ps1 puts it, and it's where
+# editable installs point back at the dev repo's source. Only fall back
+# to walking PATH if .venv doesn't exist or doesn't have synpin-core.
 function Find-SynPinPython {
     $candidates = @()
+    # Highest priority: the repo's own .venv (created by install.ps1 or
+    # by the auto-install path below). Walking up from $ScriptDir covers
+    # the case where dev.ps1 is invoked from a subdirectory.
+    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    $venvCandidate = Join-Path $scriptDir ".venv\Scripts\python.exe"
+    if (Test-Path $venvCandidate) { $candidates += $venvCandidate }
+    # Fall back to PATH and canonical install locations.
     foreach ($p in ($env:PATH -split ';')) {
         if ($p -and (Test-Path (Join-Path $p 'python.exe'))) {
             $candidates += (Join-Path $p 'python.exe')
@@ -95,6 +101,14 @@ function Find-SynPinPython {
     foreach ($py in ($candidates | Select-Object -Unique)) {
         $out = & $py -c "import synpin; print(synpin.__file__)" 2>$null
         if ($LASTEXITCODE -eq 0 -and $out) {
+            # Reject site-packages installs — they point at a copy, not
+            # the repo. Without this filter, any shared venv (Hermes,
+            # system Python that previously saw synpin-core) gets picked
+            # over the repo's own .venv and _project_root() breaks.
+            if ($out -match '[\\/](site-packages|Lib)[\\/]synpin[\\/]__init__\.py$') {
+                Write-Host "[dev] skipping shared-venv install: $py" -ForegroundColor DarkGray
+                continue
+            }
             return $py
         }
     }

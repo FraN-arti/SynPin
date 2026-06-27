@@ -227,11 +227,25 @@ function Check-Node {
 
 function Install-PythonDeps {
     Step "Installing Python dependencies (editable install of synpin-core)"
-    & python -m pip install --upgrade pip --quiet
+
+    # Use the repo's own .venv, NOT the first 'python' on PATH.
+    # Plain 'python' often resolves to a shared venv (Hermes-agent,
+    # system Python with prior installs) which would put synpin-core
+    # in the wrong place — and would surprise anyone who has multiple
+    # tools installed. A dedicated .venv per repo is the standard.
+    $scriptDir = Split-Path -Parent $PSCommandPath
+    $venvPython = Join-Path $scriptDir ".venv\Scripts\python.exe"
+    if (-not (Test-Path $venvPython)) {
+        Step "Creating .venv in $scriptDir\.venv"
+        & python -m venv (Join-Path $scriptDir ".venv")
+        if ($LASTEXITCODE -ne 0) { Fail "venv creation failed"; exit 1 }
+    }
+
+    & $venvPython -m pip install --upgrade pip --quiet
     if ($LASTEXITCODE -ne 0) { Fail "pip upgrade failed"; exit 1 }
-    & python -m pip install core/ --quiet
+    & $venvPython -m pip install core/ --quiet
     if ($LASTEXITCODE -ne 0) { Fail "pip install -e core/ failed"; exit 1 }
-    Ok "synpin-core installed (editable)"
+    Ok "synpin-core installed (editable) into $scriptDir\.venv"
 }
 
 function Install-WebDeps {

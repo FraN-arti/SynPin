@@ -179,17 +179,28 @@ OUTPUT_POLL_INTERVAL_S = 0.1
 
 
 def _project_root() -> Path:
-    """Locate the project root (the directory containing pyproject.toml
-    and the web/ and wiki/ subdirs). The CLI is one level deep inside
-    synpin/cli/, so we walk up accordingly.
+    """Locate the project root from CWD, not from __file__.
 
-    This file is at core/synpin/cli/dev.py:
-      .parent        = core/synpin/cli/
-      .parent.parent = core/synpin/
-      .parent.parent.parent = core/
-      .parent.parent.parent.parent = project root
+    Rationale: when synpin-core is installed in site-packages (e.g. into a
+    shared venv like Hermes-agent), __file__ points to the copy there —
+    walking up from it lands inside that venv's Lib/, not in this repo.
+    That makes "core/" and "web/" searches fail for anyone whose Python
+    doesn't happen to be the repo's own .venv.
+
+    Instead, anchor to CWD (where the user ran dev.bat from) and walk up
+    until we find the canonical repo layout: both core/pyproject.toml and
+    web/package.json must exist in the same directory.
     """
-    return Path(__file__).resolve().parent.parent.parent.parent
+    cwd = Path.cwd()
+    for candidate in [cwd, *cwd.parents]:
+        if (
+            (candidate / "core" / "pyproject.toml").exists()
+            and (candidate / "web" / "package.json").exists()
+        ):
+            return candidate
+    # Fallback: assume CWD is the repo root. The caller will get a clear
+    # "Core not found" error from _check_prerequisites() if it isn't.
+    return cwd
 
 
 def _find_free_port(start: int, max_attempts: int = 10) -> int:

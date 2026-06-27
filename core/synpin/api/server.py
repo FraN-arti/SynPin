@@ -43,16 +43,25 @@ from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup/shutdown lifecycle — replaces deprecated on_event('startup')."""
+    """Startup/shutdown lifecycle — replaces deprecated on_event('startup').
+
+    Startup output is intentionally compact. Each subsystem registers itself
+    with `console.print(...)` and we print a single summary block at the end.
+    Verbose per-line logging is reserved for actual problems.
+    """
+    from ..cli.console import console as _startup_console
+
+    started: list[str] = []  # human-readable list for the final summary
+
     # ── WS broadcast: capture the running loop for thread-safe broadcasts ──
     from .. import ws_broadcast
     ws_broadcast.init(asyncio.get_running_loop())
-    logger.info("[ws_broadcast] loop initialized")
+    started.append("ws broadcast")
 
     # ── Background tasks ──────────────────────────────────────────────────
     from .version_router import _update_check_loop
     asyncio.create_task(_update_check_loop())
-    logger.info("[update-check] GitHub update-checker running (every 6h)")
+    started.append("github update-checker (6h)")
 
     try:
         from ..kanban.service import KanbanService
@@ -60,7 +69,7 @@ async def lifespan(app: FastAPI):
         svc = KanbanService()
         task = schedule_auto_delete(svc)
         if task:
-            logger.info("[auto-delete] worker running")
+            started.append("kanban auto-delete")
     except Exception as e:
         logger.warning("[auto-delete] failed to start: %s", e)
 
@@ -68,7 +77,7 @@ async def lifespan(app: FastAPI):
         from ..kanban.deadline import schedule_deadline_checker
         task = schedule_deadline_checker(svc)
         if task:
-            logger.info("[deadline] checker running")
+            started.append("deadline checker")
     except Exception as e:
         logger.warning("[deadline] failed to start: %s", e)
 
@@ -76,7 +85,7 @@ async def lifespan(app: FastAPI):
         from ..connections.auto_approval import schedule_auto_approval
         task = schedule_auto_approval()
         if task:
-            logger.info("[auto-approval] worker running")
+            started.append("connections auto-approval")
     except Exception as e:
         logger.warning("[auto-approval] failed to start: %s", e)
 
@@ -111,10 +120,22 @@ async def lifespan(app: FastAPI):
 
         # Start all
         _daemon_manager.start()
-        print("  [services] DaemonManager: cron + session-reset started")
-        logger.info("[cron] Scheduler started")
+        started.append("daemon manager (cron + session-reset)")
     except Exception as e:
         logger.warning("[cron] Failed to start scheduler: %s", e)
+
+    # Single compact summary instead of 12 individual lines.
+    if started:
+        joined = ", ".join(started)
+        _startup_console.print(f"   [info]Background:[/info] [dim]{joined}[/dim]")
+
+    # ConfigWatcher reports its file count here too — keeps startup output
+    # to a single block instead of one console.print per concern.
+    watcher_count = getattr(app.state, "_config_watcher_count", None)
+    if watcher_count is not None:
+        _startup_console.print(
+            f"   [info]ConfigWatcher:[/info] [dim]{watcher_count} files, polling every 5s[/dim]"
+        )
 
     yield  # ← app runs here
 
@@ -291,14 +312,17 @@ def _on_providers_changed(path: Path, mtime: float) -> None:
     """Reload providers when providers.yaml changes on disk."""
     if _loaded_registry:
         _loaded_registry.reload()
-        console.print(f"  [config] providers.yaml reloaded (mtime={mtime:.0f})")
+        # Use logger.debug instead of console.print so per-reload events
+        # stay quiet in normal startup. Flip the synpin logger to DEBUG
+        # (`synpin start --verbose`) to see them.
+        logger.debug("[config] providers.yaml reloaded (mtime=%.0f)", mtime)
         _broadcast_config_event("providers:updated", {"mtime": mtime})
 
 
 def _on_yaml_changed(label: str) -> "callable":
     """Return a callback that logs + broadcasts when a YAML changes."""
     def _cb(path: Path, mtime: float) -> None:
-        console.print(f"  [config] {label} reloaded from disk (mtime={mtime:.0f})")
+        logger.debug("[config] %s reloaded from disk (mtime=%.0f)", label, mtime)
         _broadcast_config_event(f"{label}:updated", {"mtime": mtime})
     return _cb
 
@@ -343,7 +367,10 @@ for yaml_name in ("columns.yaml", "labels.yaml", "settings.yaml", "widget.yaml")
 
 _config_watcher.start()
 watched = sum(1 for p, _ in _config_watcher._watches)
-console.print(f"  [config] ConfigWatcher active: {watched} files, polling every 5s")
+# Report watched files once via the lifespan summary rather than logging
+# here on the import path. We stash the count on app.state so lifespan
+# can include it in its compact summary line.
+app.state._config_watcher_count = watched
 
 
 # Serve React SPA (built static files) — ONLY in production

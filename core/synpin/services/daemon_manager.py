@@ -63,7 +63,7 @@ class DaemonManager:
         """
         svc = DaemonService(name, callback, interval, is_async)
         self._services[name] = svc
-        logger.info("[daemon] Registered: %s (interval=%ss, async=%s)", name, interval, is_async)
+        logger.debug("[daemon] Registered: %s (interval=%ss, async=%s)", name, interval, is_async)
         return svc
 
     def start(self) -> None:
@@ -77,7 +77,7 @@ class DaemonManager:
             try:
                 loop = asyncio.get_running_loop()
                 svc._task = loop.create_task(self._async_loop(svc))
-                logger.info("[daemon] Started async task: %s", svc.name)
+                logger.debug("[daemon] Started async task: %s", svc.name)
             except RuntimeError:
                 logger.warning("[daemon] No running event loop, deferring: %s", svc.name)
         else:
@@ -88,7 +88,7 @@ class DaemonManager:
                 name=f"daemon-{svc.name}",
             )
             svc._thread.start()
-            logger.info("[daemon] Started thread: %s", svc.name)
+            logger.debug("[daemon] Started thread: %s", svc.name)
 
     async def _async_loop(self, svc: DaemonService) -> None:
         """Run an async service loop."""

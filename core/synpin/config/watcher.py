@@ -38,7 +38,10 @@ class ConfigWatcher:
 
         self._watches.append((path, callback))
         self._mtimes[path] = path.stat().st_mtime
-        logger.info(f"[config-watcher] Watching: {path}")
+        # Per-file "Watching X" lines go to DEBUG — they're useful when
+        # debugging watcher behavior, but for normal startup we want a
+        # single summary, not N lines.
+        logger.debug(f"[config-watcher] Watching: {path}")
 
     def start(self) -> None:
         """Start the background polling thread."""
@@ -47,7 +50,9 @@ class ConfigWatcher:
         self._running = True
         self._thread = threading.Thread(target=self._poll_loop, daemon=True, name="config-watcher")
         self._thread.start()
-        logger.info(f"[config-watcher] Started (interval={self._interval}s)")
+        # The startup summary line ("ConfigWatcher: N files, polling every 5s")
+        # is emitted from lifespan. Keep this at DEBUG so we don't duplicate.
+        logger.debug(f"[config-watcher] Started (interval={self._interval}s)")
 
     def stop(self) -> None:
         """Stop the polling thread."""

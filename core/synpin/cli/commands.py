@@ -32,13 +32,22 @@ def _get_version() -> str:
 
 
 def cmd_start(args):
-    """Start SynPin server."""
+    """Start SynPin server.
+
+    By default the startup output is compact: only the header and a few
+    key events. WebSocket connect/disconnect and per-file watcher lines
+    are suppressed. Pass --verbose / -v to see every uvicorn INFO line
+    (useful when something fails to start).
+    """
     import uvicorn
     from rich.logging import RichHandler
 
     host = os.environ.get("SYNPIN_HOST", "0.0.0.0")
     port = int(os.environ.get("SYNPIN_PORT", "2088"))
     version = _get_version()
+
+    # --verbose / -v : show full uvicorn output. Default is compact.
+    verbose = any(a in ("--verbose", "-v") for a in args)
 
     # Kill existing process on port
     pid_file = SYNPIN_HOME / "synpin.pid"
@@ -70,13 +79,16 @@ def cmd_start(args):
     console.print(f"   [dim]Docs: http://{host}:{port}/docs[/dim]")
     console.print()
 
-    # Configure uvicorn to use Rich's logging handler so its INFO/
-    # WARNING/ERROR/DEBUG lines come out in the brand orange/amber
-    # family rather than uvicorn's default white. We also tighten
-    # the format: '%(message)s' means no "[2026-06-13 12:34:56]"
-    # timestamp prefix — the RichHandler already adds a timestamp
-    # column on the right of the line, so a second prefix is just
-    # noise.
+    # Per-logger levels. By default we want a quiet startup:
+    #   - uvicorn.access WARNING: no per-WS-connect spam
+    #   - synpin logger WARNING: only the important things bubble up
+    #     (the rich startup summary is printed directly to console from
+    #     lifespan, so we don't need logger.info for those steps).
+    # --verbose flips everything to INFO so debugging a broken startup
+    # still gives you the full picture.
+    access_level = "INFO" if verbose else "WARNING"
+    synpin_level = "INFO" if verbose else "WARNING"
+
     log_config = {
         "version": 1,
         "disable_existing_loggers": False,
@@ -92,17 +104,17 @@ def cmd_start(args):
                 "formatter": "rich",
                 "console": console,            # reuse the brand console
                 "rich_tracebacks": True,
-                "show_path": False,            # we don't need the file:line noise
-                "show_time": True,            # timestamp column on the right
-                "markup": True,                # allow [bold] etc. inside log records
+                "show_path": False,
+                "show_time": verbose,          # timestamps only when verbose
+                "markup": True,
                 "log_time_format": "[%X]",
             }
         },
         "loggers": {
-            "uvicorn":        {"handlers": ["rich"], "level": "INFO", "propagate": False},
-            "uvicorn.error":  {"handlers": ["rich"], "level": "INFO", "propagate": False},
-            "uvicorn.access": {"handlers": ["rich"], "level": "INFO", "propagate": False},
-            "synpin":         {"handlers": ["rich"], "level": "INFO", "propagate": False},
+            "uvicorn":        {"handlers": ["rich"], "level": "INFO",     "propagate": False},
+            "uvicorn.error":  {"handlers": ["rich"], "level": "INFO",     "propagate": False},
+            "uvicorn.access": {"handlers": ["rich"], "level": access_level, "propagate": False},
+            "synpin":         {"handlers": ["rich"], "level": synpin_level, "propagate": False},
         },
     }
 

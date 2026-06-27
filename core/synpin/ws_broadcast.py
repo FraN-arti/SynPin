@@ -31,7 +31,7 @@ def broadcast(event: dict[str, Any]) -> None:
     try:
         from .chat.ws_manager import ws_manager
 
-        _log.info("broadcast: %s (clients=%d)", event.get("type"), ws_manager.active_count)
+        _log.debug("broadcast: %s (clients=%d)", event.get("type"), ws_manager.active_count)
 
         async def _send():
             await ws_manager.broadcast(event)

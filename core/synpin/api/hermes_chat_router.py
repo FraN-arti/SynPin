@@ -16,7 +16,7 @@ import logging
 import uuid
 import asyncio
 from pathlib import Path
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from ._base import BaseRequest
 
@@ -192,7 +192,7 @@ async def stream_hermes_response(
 
 
 @router.post("/hermes/stream")
-async def hermes_chat_stream(req: HermesChatRequest):
+async def hermes_chat_stream(req: HermesChatRequest, request: Request):
     """Stream chat response from Hermes Agent via SSE.
 
     History persistence: SynPin saves conversation history to disk so that
@@ -282,14 +282,36 @@ async def hermes_chat_stream(req: HermesChatRequest):
     hermes_task = task_manager.create(task_id)
     hermes_task.task = asyncio.create_task(_background_execution())
 
-    # 3. SSE generator reads from queue (real-time streaming)
+    # 3. SSE generator reads from queue (real-time streaming).
+    # Audit fix BUG 3.2: poll for client disconnect so we can abort
+    # the background Hermes task if the user closes the chat window
+    # mid-generation — otherwise we'd keep billing tokens on a
+    # response nobody is reading. (Audit fix: BUG 3.2.)
     async def _sse_from_queue():
-        """Read chunks from background task queue."""
-        while True:
-            chunk = await hermes_task.queue.get()
-            if chunk is None:
-                break
-            yield chunk
+        """Read chunks from background task queue, abort if client disconnects."""
+        loop_forever = True
+        while loop_forever:
+            # Race the queue against a short sleep so we can detect
+            # client disconnect promptly without blocking forever.
+            queue_task = asyncio.create_task(hermes_task.queue.get())
+            disconnect_task = asyncio.create_task(asyncio.sleep(0.5))
+            done, pending = await asyncio.wait(
+                {queue_task, disconnect_task},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for t in pending:
+                t.cancel()
+            if disconnect_task in done and await request.is_disconnected():
+                # Client gave up — cancel the background LLM call
+                # so we stop charging tokens.
+                hermes_task.task.cancel()
+                task_manager.cleanup(task_id)
+                return
+            if queue_task in done:
+                chunk = queue_task.result()
+                if chunk is None:
+                    break
+                yield chunk
         # Cleanup
         task_manager.cleanup(task_id)
 

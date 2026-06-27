@@ -9,7 +9,7 @@ import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -1905,7 +1905,7 @@ def _build_system_prompt_with_memory(req: ChatRequest) -> str:
 
 
 @router.post("/stream")
-async def chat_stream(req: ChatRequest):
+async def chat_stream(req: ChatRequest, request: Request):
     """Stream chat response via SSE with native tool execution."""
     if registry is None:
         raise HTTPException(500, "Chat provider not configured")
@@ -2040,14 +2040,35 @@ async def chat_stream(req: ChatRequest):
     chat_task = task_manager.create(task_id)
     chat_task.task = asyncio.create_task(_background_execution())
 
-    # 3. SSE generator reads from queue (real-time streaming)
+    # 3. SSE generator reads from queue (real-time streaming).
+    # Audit fix BUG 3.2: poll for client disconnect so we can abort
+    # the background chat task if the user closes the window
+    # mid-generation — otherwise we'd keep charging tokens on a
+    # response nobody is reading.
     async def _sse_from_queue():
-        """Read chunks from background task queue."""
+        """Read chunks from background task queue, abort if client disconnects."""
         while True:
-            chunk = await chat_task.queue.get()
-            if chunk is None:
-                break
-            yield chunk
+            # Race the queue against a short sleep so we can detect
+            # client disconnect promptly without blocking forever.
+            queue_task = asyncio.create_task(chat_task.queue.get())
+            disconnect_task = asyncio.create_task(asyncio.sleep(0.5))
+            done, pending = await asyncio.wait(
+                {queue_task, disconnect_task},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for t in pending:
+                t.cancel()
+            if disconnect_task in done and await request.is_disconnected():
+                # Client gave up — cancel the background LLM call
+                # so we stop charging tokens.
+                chat_task.task.cancel()
+                task_manager.cleanup(task_id)
+                return
+            if queue_task in done:
+                chunk = queue_task.result()
+                if chunk is None:
+                    break
+                yield chunk
         # Cleanup
         task_manager.cleanup(task_id)
 

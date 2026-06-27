@@ -505,40 +505,48 @@ def upcoming_deadline() -> dict:
     """Return the nearest active task with a deadline.
 
     Used by the cockpit "БЛИЖАЙШИЕ СОБЫТИЯ" card. Returns null fields
-    when no active task has a deadline set.
+    when no active task has a deadline set. Always returns {"task": null}
+    or a populated object — never raises — so the cockpit UI degrades
+    to "нет задач с дедлайном" instead of a 500 error.
     """
     from datetime import datetime, timezone
-    svc = _get_service()
-    now = datetime.now(timezone.utc)
+    try:
+        svc = _get_service()
+        now = datetime.now(timezone.utc)
 
-    soonest = None
-    soonest_dt = None
-    for t in svc.list_tasks():
-        if not t.deadline:
-            continue
-        if t.status.value in ("done", "blocked", "archive"):
-            continue
-        # Normalize to UTC for comparison
-        dl = t.deadline if t.deadline.tzinfo else t.deadline.replace(tzinfo=timezone.utc)
-        if soonest_dt is None or dl < soonest_dt:
-            soonest_dt = dl
-            soonest = t
+        soonest = None
+        soonest_dt = None
+        for t in svc.list_tasks():
+            if not t.deadline:
+                continue
+            if t.status.value in ("done", "blocked", "archive"):
+                continue
+            # Normalize to UTC for comparison
+            dl = t.deadline if t.deadline.tzinfo else t.deadline.replace(tzinfo=timezone.utc)
+            if soonest_dt is None or dl < soonest_dt:
+                soonest_dt = dl
+                soonest = t
 
-    if soonest is None or soonest_dt is None:
-        return {"task": None}
+        if soonest is None or soonest_dt is None:
+            return {"task": None}
 
-    return {
-        "task": {
-            "id": soonest.id,
-            "title": soonest.title,
-            "priority": soonest.priority.value,
-            "status": soonest.status.value,
-            "department": soonest.department,
-            "at": soonest_dt.isoformat(),
-            "in_seconds": int((soonest_dt - now).total_seconds()),
-            "overdue": soonest_dt < now,
+        return {
+            "task": {
+                "id": soonest.id,
+                "title": soonest.title,
+                "priority": soonest.priority.value,
+                "status": soonest.status.value,
+                "department": soonest.department,
+                "at": soonest_dt.isoformat(),
+                "in_seconds": int((soonest_dt - now).total_seconds()),
+                "overdue": soonest_dt < now,
+            }
         }
-    }
+    except Exception as e:
+        # Log and degrade gracefully — cockpit should never crash
+        # the dashboard because of a kanban hiccup.
+        logger.warning("upcoming_deadline failed: %s", e)
+        return {"task": None}
 
 
 @router.get("/stats/extended")

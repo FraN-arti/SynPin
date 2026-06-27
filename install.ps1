@@ -292,7 +292,11 @@ function Cmd-Install {
     Install-WebDeps
 
     # Ask to remove source repo (everything is in site-packages + ~/.synpin now)
-    $repoDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    # Use $PSScriptRoot (always resolves to the script's directory even when
+    # called from within a function) instead of $MyInvocation.MyCommand.Path,
+    # which is NULL inside Cmd-Install because $MyInvocation refers to the
+    # function call site, not the script root.
+    $repoDir = $PSScriptRoot
     Step "Installation complete. Source repo: $repoDir"
     $answer = Read-Host "`n  Remove source repository? (the installed package doesn't need it) [y/N]"
     if ($answer -eq "y" -or $answer -eq "Y") {

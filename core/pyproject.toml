@@ -28,5 +28,18 @@ dev = [
 line-length = 100
 target-version = "py311"
 
-[project.scripts]
-synpin = "synpin.__main__:main"
+# Note: no [project.scripts] entry for 'synpin'.
+#
+# pip would generate a bundled launcher at venv/Scripts/synpin.exe (or
+# venv/bin/synpin on Unix) — a Python zipapp that hardcodes the Python
+# interpreter from the venv where pip ran. That launcher then leaks into
+# any PATH that lists that venv's Scripts/ directory (commonly the
+# case for tool venvs like Hermes-agent). Users end up running the
+# wrong launcher from the wrong venv, which is how the original
+# ModuleNotFoundError surfaced on a fresh install.
+#
+# The hand-written bin/synpin (Unix) and bin/synpin.cmd (Windows) in
+# the repo root are the canonical launchers. They resolve the repo
+# root at runtime, prefer the repo-local .venv, and fall back to a
+# legacy core/.venv location for backward compatibility. Add the
+# bin/ directory to PATH instead of relying on entry_points.

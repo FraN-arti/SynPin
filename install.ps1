@@ -318,13 +318,26 @@ function Cmd-Install {
     # function call site, not the script root.
     $repoDir = $PSScriptRoot
     Step "Installation complete. Source repo: $repoDir"
-    $answer = Read-Host "`n  Remove source repository? (the installed package doesn't need it) [y/N]"
-    if ($answer -eq "y" -or $answer -eq "Y") {
-        Step "Removing source repository..."
-        Remove-Item -Recurse -Force $repoDir
-        Ok "Source repository removed."
+
+    # Mark the install as 'prod-style' by writing a sentinel to ~/.synpin.
+    # The first 'synpin start' (production server, not 'synpin dev') will
+    # see this sentinel + a present source repo and auto-cleanup the
+    # repo, since after install it's no longer needed. This replaces the
+    # previous manual [y/N] prompt, which was the wrong place — users
+    # hit it right after install when they had no idea whether to keep
+    # the repo. Defer to runtime when the question is meaningful:
+    # 'this prod server is running; do we still need source?' No.
+    #
+    # If SYNPIN_KEEP_REPO=1 is set at install time, we skip the
+    # sentinel — the user has explicitly opted in to keep source.
+    if (-not (Test-Path (Join-Path $env:USERPROFILE '.synpin'))) {
+        New-Item -ItemType Directory -Path (Join-Path $env:USERPROFILE '.synpin') -Force | Out-Null
+    }
+    if (-not $env:SYNPIN_KEEP_REPO) {
+        Set-Content -Path (Join-Path $env:USERPROFILE '.synpin\.installed_from') -Value $repoDir -Encoding UTF8
+        Ok "Marked install source. Will auto-cleanup on first 'synpin start'."
     } else {
-        Ok "Source repository kept at $repoDir"
+        Ok "SYNPIN_KEEP_REPO=1 set: source will not be auto-removed."
     }
 
     Step "Done."

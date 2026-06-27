@@ -49,6 +49,48 @@ def cmd_start(args):
     # --verbose / -v : show full uvicorn output. Default is compact.
     verbose = any(a in ("--verbose", "-v") for a in args)
 
+    # Auto-cleanup source repo on first production start.
+    # install.ps1 writes ~/.synpin/.installed_from when it runs. If we
+    # see that sentinel AND the source repo still exists AND we're not
+    # in dev mode (SYNPIN_DEV not set), the repo has done its job and
+    # can be removed. This replaces the old [y/N] prompt at install
+    # time — that question belonged at runtime, when we know the server
+    # is about to run and source is no longer needed.
+    #
+    # Override: SYNPIN_KEEP_REPO=1 keeps source regardless of sentinel.
+    # Override: --keep-repo CLI flag for one-off "let me inspect first".
+    keep_repo = (
+        os.environ.get("SYNPIN_KEEP_REPO") == "1"
+        or "--keep-repo" in args
+    )
+    if not keep_repo:
+        sentinel = SYNPIN_HOME / ".installed_from"
+        if sentinel.exists():
+            try:
+                repo_dir = Path(sentinel.read_text(encoding="utf-8").strip())
+                # Safety: only remove if it still looks like a SynPin repo
+                # (contains bin/, .venv/, or core/). This prevents a
+                # corrupted sentinel from nuking unrelated dirs.
+                if repo_dir.exists() and (
+                    (repo_dir / "bin").exists()
+                    or (repo_dir / ".venv").exists()
+                    or (repo_dir / "core").exists()
+                ):
+                    console.print(
+                        f"[info]Cleaning up source repo:[/info] [dim]{repo_dir}[/dim]"
+                    )
+                    import shutil
+                    shutil.rmtree(repo_dir)
+                    sentinel.unlink()
+                    console.print(
+                        f"[success]Source repo removed.[/success] "
+                        f"[dim](set SYNPIN_KEEP_REPO=1 before install to skip this)[/dim]"
+                    )
+            except Exception as e:
+                console.print(
+                    f"[warning]Could not auto-cleanup source: {e}[/warning]"
+                )
+
     # Kill existing process on port
     pid_file = SYNPIN_HOME / "synpin.pid"
     if os.name == "nt":

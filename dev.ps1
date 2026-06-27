@@ -76,9 +76,11 @@ function Show-Help {
 function Find-SynPinPython {
     $candidates = @()
     # Highest priority: the repo's own .venv (created by install.ps1 or
-    # by the auto-install path below). Walking up from $ScriptDir covers
-    # the case where dev.ps1 is invoked from a subdirectory.
-    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    # by the auto-install path below). We use $PSScriptRoot here — same
+    # trick we used in install.ps1: $MyInvocation.MyCommand.Path is NULL
+    # inside a function because $MyInvocation refers to the call site,
+    # not the script root. $PSScriptRoot resolves correctly regardless.
+    $scriptDir = $PSScriptRoot
     $venvCandidate = Join-Path $scriptDir ".venv\Scripts\python.exe"
     if (Test-Path $venvCandidate) { $candidates += $venvCandidate }
     # Fall back to PATH and canonical install locations.

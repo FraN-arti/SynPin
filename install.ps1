@@ -114,7 +114,7 @@ function Check-Python {
             exit 1
         }
         # winget puts python on PATH but the new process may not see it
-        # yet. Try once more — if still missing, tell the user to open
+        # yet. Try once more - if still missing, tell the user to open
         # a fresh PowerShell.
         try {
             $pyOut = & python --version 2>&1 | Out-String
@@ -241,7 +241,7 @@ function Install-WebDeps {
         return
     }
     if (Test-Path "web/node_modules") {
-        Step "Web dependencies exist — checking for updates..."
+        Step "Web dependencies exist - checking for updates..."
     } else {
         Step "Installing web dependencies (npm install in web/)"
     }

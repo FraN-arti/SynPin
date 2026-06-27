@@ -500,6 +500,47 @@ def kanban_stats() -> dict:
     }
 
 
+@router.get("/upcoming-deadline")
+def upcoming_deadline() -> dict:
+    """Return the nearest active task with a deadline.
+
+    Used by the cockpit "БЛИЖАЙШИЕ СОБЫТИЯ" card. Returns null fields
+    when no active task has a deadline set.
+    """
+    from datetime import datetime, timezone
+    svc = _get_service()
+    now = datetime.now(timezone.utc)
+
+    soonest = None
+    soonest_dt = None
+    for t in svc.list_tasks():
+        if not t.deadline:
+            continue
+        if t.status.value in ("done", "blocked", "archive"):
+            continue
+        # Normalize to UTC for comparison
+        dl = t.deadline if t.deadline.tzinfo else t.deadline.replace(tzinfo=timezone.utc)
+        if soonest_dt is None or dl < soonest_dt:
+            soonest_dt = dl
+            soonest = t
+
+    if soonest is None or soonest_dt is None:
+        return {"task": None}
+
+    return {
+        "task": {
+            "id": soonest.id,
+            "title": soonest.title,
+            "priority": soonest.priority.value,
+            "status": soonest.status.value,
+            "department": soonest.department,
+            "at": soonest_dt.isoformat(),
+            "in_seconds": int((soonest_dt - now).total_seconds()),
+            "overdue": soonest_dt < now,
+        }
+    }
+
+
 @router.get("/stats/extended")
 def kanban_stats_extended() -> dict:
     """Extended statistics for charts and analytics."""

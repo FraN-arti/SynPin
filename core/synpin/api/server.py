@@ -14,10 +14,15 @@ import yaml
 logger = logging.getLogger(__name__)
 
 # ── CORS Origins — read from settings.yaml or use dev defaults ───────
+# Tauri webview origins are included so the desktop cockpit app can
+# reach the API from its own window without preflight failures.
 _default_origins = [
     "http://localhost:2099", "http://localhost:2100",
     "http://127.0.0.1:2099", "http://127.0.0.1:2100",
-]
+    "tauri://localhost",
+    "http://tauri.localhost",
+    "https://tauri.localhost",
+] 
 
 _cors_origins = _default_origins
 _settings_candidates = [

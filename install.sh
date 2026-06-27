@@ -34,7 +34,7 @@ fail() { color_red "✗ $*"; }
 # Auto-install helpers
 #
 # If a required tool is missing, try to install it via the system
-# package manager before bailing out. We never silently sudo — every
+# package manager before bailing out. We never silently sudo - every
 # privileged install is gated behind an interactive y/N prompt and
 # the script clearly states what it's about to do.
 # ---------------------------------------------------------------------------
@@ -45,7 +45,7 @@ PKG_INSTALL_CMD=""
 if [ -f /etc/os-release ]; then
     . /etc/os-release
     case "${ID:-}" in
-        ubuntu|debian|linuxmint|pop|elementary|kde neon|zorin)
+        ubuntu|debian|linuxmint|pop|elementary|"kde neon"|zorin)
             OS_KIND="debian"; PKG_INSTALL_CMD="sudo apt-get install -y" ;;
         fedora|rhel|centos|rocky|almalinux|nobara)
             OS_KIND="fedora"; PKG_INSTALL_CMD="sudo dnf install -y" ;;
@@ -62,7 +62,7 @@ if command -v brew >/dev/null 2>&1; then
 fi
 
 # Offer to run a privileged install. Returns 0 on success (or if
-# the user accepted the install but it failed — caller will re-check
+# the user accepted the install but it failed - caller will re-check
 # and decide), 1 if the user said no.
 offer_install() {
     local what="$1"
@@ -145,7 +145,7 @@ check_python() {
        { [ "$py_major" -eq "$REQUIRED_PYTHON_MAJOR" ] && [ "$py_minor" -lt "$REQUIRED_PYTHON_MINOR" ]; }; then
         # Try to install a newer Python via the package manager. On
         # Debian/Ubuntu, 3.11 isn't in the default repos of older
-        # releases — we point at the deadsnakes PPA as a last resort
+        # releases - we point at the deadsnakes PPA as a last resort
         # but only if the user opts in.
         if [ "$OS_KIND" = "debian" ] && [ "${SYNPIN_AUTO_INSTALL:-0}" = "1" ]; then
             warn "System Python is too old. Adding deadsnakes PPA + installing 3.11..."
@@ -249,7 +249,7 @@ install_web_deps() {
         return
     fi
     if ! command -v npm >/dev/null 2>&1; then
-        warn "npm not available — skipping web install. Run \`npm install\` in web/ manually."
+        warn "npm not available - skipping web install. Run \`npm install\` in web/ manually."
         return
     fi
     step "Installing web dependencies (npm install in web/)"
@@ -258,7 +258,7 @@ install_web_deps() {
 
     # Build frontend for production
     if [ -d web/dist ]; then
-        step "web/dist already exists — rebuilding..."
+        step "web/dist already exists - rebuilding..."
     fi
     step "Building web frontend (npm run build in web/)"
     (cd web && npm run build)
@@ -315,7 +315,7 @@ cmd_install() {
 cmd_update() {
     step "Updating SynPin"
     if [ ! -d .git ]; then
-        fail "Not a git repository — cannot update."
+        fail "Not a git repository - cannot update."
         exit 1
     fi
     git pull --rebase --autostash

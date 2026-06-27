@@ -20,15 +20,18 @@ REQUIRED_PYTHON_MAJOR=3
 REQUIRED_PYTHON_MINOR=11
 REQUIRED_NODE_MAJOR=18
 
-color_red()    { printf "\033[31m%s\033[0m\n" "$*"; }
-color_green()  { printf "\033[32m%s\033[0m\n" "$*"; }
-color_yellow() { printf "\033[33m%s\033[0m\n" "$*"; }
-color_blue()   { printf "\033[34m%s\033[0m\n" "$*"; }
+# Load shared SynPin brand colors. colors.sh defines SP_BRAND/SP_OK/
+# SP_WARN/SP_FAIL/etc. via ANSI 24-bit escape codes. It also defines
+# sp_ok/sp_step/sp_warn/sp_fail helper functions which we rewrap below
+# as step/ok/warn/fail to match the existing call sites in this file.
+. "$SCRIPT_DIR/colors.sh"
 
-step() { printf "\n\033[1;34m==> %s\033[0m\n" "$*"; }
-ok()   { color_green "✓ $*"; }
-warn() { color_yellow "⚠ $*"; }
-fail() { color_red "✗ $*"; }
+# Rewrap helpers to drop the emoji glyphs (some terminals and CI logs
+# render them as ???). SynPin ships clean text by design.
+step() { sp_step "$@"; }
+ok()   { printf "%b[OK]%b %s\n"   "$SP_OK"   "$SP_RESET" "$*"; }
+warn() { printf "%b[WARN]%b %s\n" "$SP_WARN" "$SP_RESET" "$*"; }
+fail() { printf "%b[FAIL]%b %s\n" "$SP_FAIL" "$SP_RESET" "$*" >&2; }
 
 # ---------------------------------------------------------------------------
 # Auto-install helpers
@@ -75,7 +78,7 @@ offer_install() {
     printf "\n  $what is missing. The installer can install it via:\n"
     printf "    $PKG_INSTALL_CMD $pkgname\n"
     if [ "${SYNPIN_AUTO_INSTALL:-0}" = "1" ]; then
-        color_yellow "  SYNPIN_AUTO_INSTALL=1 set, installing without prompt..."
+        warn "SYNPIN_AUTO_INSTALL=1 set, installing without prompt..."
         REPLY="y"
     else
         read -p "  Install $what now? [y/N] " -n 1 -r REPLY
@@ -86,10 +89,10 @@ offer_install() {
         return 1
     fi
     if $PKG_INSTALL_CMD "$pkgname"; then
-        color_green "  ok $what installed."
+        ok "$what installed."
         return 0
     else
-        color_red "  fail $what install failed. Check the output above."
+        fail "$what install failed. Check the output above."
         return 1
     fi
 }

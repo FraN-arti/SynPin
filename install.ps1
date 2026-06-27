@@ -31,10 +31,16 @@ $RequiredNodeMajor = 18
 # function defaults and avoid $PSStyle which only exists in PS 7+).
 # ----------------------------------------------------------------------------
 
-function Step($msg) { Write-Host ""; Write-Host "==> $msg" -ForegroundColor Cyan }
-function Ok($msg)   { Write-Host "[OK] $msg" -ForegroundColor Green }
-function Warn($msg) { Write-Host "[WARN] $msg" -ForegroundColor Yellow }
-function Fail($msg) { Write-Host "[FAIL] $msg" -ForegroundColor Red }
+# Load the shared SynPin brand colors. colors.ps1 maps each brand
+# color to the closest PowerShell-named color (PowerShell 5.1 can't
+# take hex codes in Write-Host). Keep that file in sync with
+# core/synpin/cli/console.py:synpin_theme.
+. (Join-Path $PSScriptRoot 'colors.ps1')
+
+function Step($msg) { Write-Host ""; Write-Host "==> $msg" -ForegroundColor $SynPinBrand }
+function Ok($msg)   { Write-Host "[OK] $msg" -ForegroundColor $SynPinOK }
+function Warn($msg) { Write-Host "[WARN] $msg" -ForegroundColor $SynPinWarn }
+function Fail($msg) { Write-Host "[FAIL] $msg" -ForegroundColor $SynPinFail }
 
 # ----------------------------------------------------------------------------
 # Auto-install helpers
@@ -73,10 +79,10 @@ function Offer-Install {
     }
     $cmd = "winget install --id $WingetId --accept-package-agreements --accept-source-agreements $WingetExtraArgs"
     Write-Host ""
-    Write-Host "  ${What} is missing. The installer can install it via:" -ForegroundColor Yellow
-    Write-Host "    $cmd" -ForegroundColor Gray
+    Write-Host "  ${What} is missing. The installer can install it via:" -ForegroundColor $SynPinWarn
+    Write-Host "    $cmd" -ForegroundColor $SynPinDim
     if ($env:SYNPIN_AUTO_INSTALL -eq "1") {
-        Write-Host "  SYNPIN_AUTO_INSTALL=1 set, installing without prompt..." -ForegroundColor Yellow
+        Write-Host "    SYNPIN_AUTO_INSTALL=1 set, installing without prompt..." -ForegroundColor $SynPinWarn
         $reply = "y"
     } else {
         $reply = Read-Host "  Install ${What} now? [y/N]"
@@ -85,7 +91,7 @@ function Offer-Install {
         Warn "Skipped ${What} install. The script will fail unless you install it manually."
         return $false
     }
-    Write-Host "  Running: $cmd" -ForegroundColor Gray
+    Write-Host "  Running: $cmd" -ForegroundColor $SynPinDim
     & winget install --id $WingetId --accept-package-agreements --accept-source-agreements $WingetExtraArgs
     if ($LASTEXITCODE -ne 0) {
         Fail "${What} install failed (winget exit $LASTEXITCODE). Check the output above."
@@ -352,9 +358,9 @@ if ($args.Count -eq 0) {
 } elseif ($args[0] -eq "update") {
     Cmd-Update
 } else {
-    Write-Host "Unknown command: $($args[0])" -ForegroundColor Red
+    Write-Host "Unknown command: $($args[0])" -ForegroundColor $SynPinFail
     Write-Host ""
-    Write-Host "Usage:" -ForegroundColor Yellow
+    Write-Host "Usage:" -ForegroundColor $SynPinInfo
     Write-Host "  .\install.ps1            install / verify (default)"
     Write-Host "  .\install.ps1 doctor    prerequisites check only"
     Write-Host "  .\install.ps1 update    git pull + reinstall"

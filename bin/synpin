@@ -12,8 +12,12 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Prefer project-local venv if it exists; otherwise system python3
-if [ -x "$REPO_ROOT/core/.venv/bin/python" ]; then
+# Prefer the repo's own .venv (created by install.sh alongside
+# install.sh at the repo root). Fall back to a legacy location under
+# core/.venv for older installs, then system python3.
+if [ -x "$REPO_ROOT/.venv/bin/python" ]; then
+    PYTHON="$REPO_ROOT/.venv/bin/python"
+elif [ -x "$REPO_ROOT/core/.venv/bin/python" ]; then
     PYTHON="$REPO_ROOT/core/.venv/bin/python"
 else
     PYTHON="$(command -v python3 || command -v python)"

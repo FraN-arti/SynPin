@@ -8,13 +8,23 @@ setlocal
 set "SCRIPT_DIR=%~dp0"
 set "REPO_ROOT=%SCRIPT_DIR%.."
 
-REM Anchor to core/ where the synpin package lives
-set "CORE_DIR=%REPO_ROOT%\core"
+REM Prefer the repo's own .venv (created by install.ps1 alongside
+REM dev.ps1 / install.ps1 at the repo root). Fall back to a legacy
+REM location under core/.venv for older installs, then system python.
+set "PYTHON="
 
-REM Prefer project-local venv if it exists; otherwise system python
-if exist "%CORE_DIR%\.venv\Scripts\python.exe" (
-    set "PYTHON=%CORE_DIR%\.venv\Scripts\python.exe"
-) else (
+REM 1. Repo-root .venv (current install.ps1 convention)
+if exist "%REPO_ROOT%\.venv\Scripts\python.exe" (
+    set "PYTHON=%REPO_ROOT%\.venv\Scripts\python.exe"
+)
+
+REM 2. Legacy core/.venv (kept for backward compatibility)
+if not defined PYTHON if exist "%REPO_ROOT%\core\.venv\Scripts\python.exe" (
+    set "PYTHON=%REPO_ROOT%\core\.venv\Scripts\python.exe"
+)
+
+REM 3. System python as last resort
+if not defined PYTHON (
     where python >nul 2>&1
     if errorlevel 1 (
         echo synpin: python not found in PATH. Run .\install.ps1 first. 1>&2
@@ -23,6 +33,6 @@ if exist "%CORE_DIR%\.venv\Scripts\python.exe" (
     set "PYTHON=python"
 )
 
-cd /d "%CORE_DIR%"
+cd /d "%REPO_ROOT%\core"
 "%PYTHON%" -m synpin %*
 endlocal

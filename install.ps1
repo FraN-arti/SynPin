@@ -329,6 +329,31 @@ function Cmd-Install {
 
     Step "Done."
     Ok "SynPin installed. Run 'synpin start' or 'synpin dev' to begin."
+
+    # ── Add <repo>/bin to user PATH (idempotent) ───────────────────────────
+    # The hand-written bin/synpin and bin/synpin.cmd are the canonical
+    # launchers. Without them on PATH, typing 'synpin' from anywhere
+    # else fails with 'Имя synpin не распознано'. We append the bin dir
+    # to the user's PATH (HKCU\Environment) so it persists across new
+    # PowerShell sessions. The current session still won't see it —
+    # the user must open a new terminal, or use the explicit path
+    # printed below.
+    $binDir = Join-Path $repoDir 'bin'
+    if (Test-Path $binDir) {
+        $currentUserPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+        $pathEntries = $currentUserPath -split ';' | Where-Object { $_ -and $_ -ne $binDir }
+        $pathEntries = @($binDir) + $pathEntries  # bin first so it wins
+        $newUserPath = $pathEntries -join ';'
+        [Environment]::SetEnvironmentVariable('Path', $newUserPath, 'User')
+        Ok "Added $binDir to user PATH (open new terminal to use)"
+    }
+
+    Step "Quick start"
+    Ok "  Open a NEW PowerShell, then:"
+    Ok "    synpin start     # production server (uses $repoDir\.venv)"
+    Ok "    synpin dev       # development with live reload"
+    Ok "  Or call the launcher explicitly:"
+    Ok "    $binDir\synpin.cmd"
 }
 
 function Cmd-Update {

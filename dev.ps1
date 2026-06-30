@@ -61,17 +61,17 @@ Set-Location $ScriptDir
 
 function Show-Help {
     Write-Host ""
-    Write-Host "SynPin Development launcher" $SynPinBrand
+    Write-Host "SynPin Development launcher" -ForegroundColor $SynPinBrand
     Write-Host ""
-    Write-Host "Usage:" $SynPinInfo
+    Write-Host "Usage:" -ForegroundColor $SynPinInfo
     Write-Host "  .\dev.ps1           " -NoNewline
-    Write-Host "# start dev server (foreground)" $SynPinDim
+    Write-Host "# start dev server (foreground)" -ForegroundColor $SynPinDim
     Write-Host "  .\dev.ps1 stop      " -NoNewline
-    Write-Host "# stop running dev server" $SynPinDim
+    Write-Host "# stop running dev server" -ForegroundColor $SynPinDim
     Write-Host "  .\dev.ps1 doctor    " -NoNewline
-    Write-Host "# run prerequisites check" $SynPinDim
+    Write-Host "# run prerequisites check" -ForegroundColor $SynPinDim
     Write-Host "  .\dev.ps1 help      " -NoNewline
-    Write-Host "# show this help" $SynPinDim
+    Write-Host "# show this help" -ForegroundColor $SynPinDim
     Write-Host ""
 }
 
@@ -114,7 +114,7 @@ function Find-SynPinPython {
             # system Python that previously saw synpin-core) gets picked
             # over the repo's own .venv and _project_root() breaks.
             if ($out -match '[\\/](site-packages|Lib)[\\/]synpin[\\/]__init__\.py$') {
-                Write-Host "[dev] skipping shared-venv install: $py" $SynPinDim
+                Write-Host "[dev] skipping shared-venv install: $py" -ForegroundColor $SynPinDim
                 continue
             }
             return $py
@@ -129,19 +129,19 @@ switch -Regex ($args[0]) {
         if (-not $pythonExe) {
             # No Python on PATH has synpin-core. Auto-install into
             # the first Python we can find.
-            Write-Host "[!] synpin-core is not pip-installed in any Python on PATH." $SynPinInfo
-            Write-Host "    Attempting to install into the first Python on PATH..." $SynPinInfo
+            Write-Host "[!] synpin-core is not pip-installed in any Python on PATH." -ForegroundColor $SynPinInfo
+            Write-Host "    Attempting to install into the first Python on PATH..." -ForegroundColor $SynPinInfo
             $firstPy = (& where.exe python.exe 2>$null | Select-Object -First 1)
             if (-not $firstPy) { $firstPy = "python" }
             & $firstPy -m pip install -e "$ScriptDir\core" --quiet
             if ($LASTEXITCODE -ne 0) {
-                Write-Host "[FAIL] auto-install failed. Run .\install.ps1 first." $SynPinFail
+                Write-Host "[FAIL] auto-install failed. Run .\install.ps1 first." -ForegroundColor $SynPinFail
                 exit 1
             }
             $pythonExe = $firstPy
-            Write-Host "[dev] installed into $pythonExe, continuing." $SynPinOK
+            Write-Host "[dev] installed into $pythonExe, continuing." -ForegroundColor $SynPinOK
         } else {
-            Write-Host "[dev] using Python: $pythonExe" $SynPinDim
+            Write-Host "[dev] using Python: $pythonExe" -ForegroundColor $SynPinDim
         }
 
         # Version check: compare installed synpin-core vs pyproject.toml.
@@ -151,13 +151,13 @@ switch -Regex ($args[0]) {
             if ($tomlMatch -and $installed) {
                 $target = $tomlMatch.Matches[0].Groups[1].Value
                 if ($installed -ne $target) {
-                    Write-Host "[dev] version mismatch: installed=$installed, target=$target" $SynPinInfo
-                    Write-Host "[dev] reinstalling synpin-core $target ..." $SynPinInfo
+                    Write-Host "[dev] version mismatch: installed=$installed, target=$target" -ForegroundColor $SynPinInfo
+                    Write-Host "[dev] reinstalling synpin-core $target ..." -ForegroundColor $SynPinInfo
                     & $pythonExe -m pip install -e "$ScriptDir\core" --quiet 2>$null
                     if ($LASTEXITCODE -eq 0) {
-                        Write-Host "[dev] synpin-core $target installed." $SynPinOK
+                        Write-Host "[dev] synpin-core $target installed." -ForegroundColor $SynPinOK
                     } else {
-                        Write-Host "[dev] reinstall failed, continuing with $installed." $SynPinAccent
+                        Write-Host "[dev] reinstall failed, continuing with $installed." -ForegroundColor $SynPinAccent
                     }
                 }
             }
@@ -175,7 +175,7 @@ switch -Regex ($args[0]) {
         & $pythonExe -m synpin dev
     }
     '^stop$|^--stop$' {
-        Write-Host "Stopping SynPin Dev..." $SynPinInfo
+        Write-Host "Stopping SynPin Dev..." -ForegroundColor $SynPinInfo
         # Kill uvicorn and node processes on known ports (2088, 2099)
         # without /T to avoid killing the batch file itself
         $ports = @(2088, 2099)
@@ -186,7 +186,7 @@ switch -Regex ($args[0]) {
                 Stop-Process -Id $conn.OwningProcess -Force -ErrorAction SilentlyContinue
             }
         }
-        Write-Host "Done." $SynPinOK
+        Write-Host "Done." -ForegroundColor $SynPinOK
     }
     '^doctor$' {
         & python -m synpin doctor
@@ -195,7 +195,7 @@ switch -Regex ($args[0]) {
         Show-Help
     }
     default {
-        Write-Host "Unknown command: $($args[0])" $SynPinFail
+        Write-Host "Unknown command: $($args[0])" -ForegroundColor $SynPinFail
         Show-Help
         exit 1
     }

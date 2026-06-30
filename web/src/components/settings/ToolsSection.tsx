@@ -104,7 +104,7 @@ export function ToolsSection() {
   // Загрузка списка при маунте.
   useEffect(() => {
     let cancelled = false
-    fetch('/api/tools')
+    fetch('/api/tools/settings')
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
@@ -144,7 +144,7 @@ export function ToolsSection() {
     setPending(prev => new Set(prev).add(name))
 
     try {
-      const r = await fetch('/api/tools/toggle', {
+      const r = await fetch('/api/tools/settings/toggle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, enabled: nextEnabled }),

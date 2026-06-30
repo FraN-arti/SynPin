@@ -31,7 +31,7 @@ from ..chat.router import (
 
 logger = logging.getLogger("synpin.api.tools")
 
-router = APIRouter(prefix="/api/tools", tags=["tools"])
+router = APIRouter(prefix="/api/tools/settings", tags=["tools"])
 
 
 # ── Metadata enrichment from tools.yaml ────────────────────────────────────────

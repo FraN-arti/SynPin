@@ -587,775 +587,89 @@ class ChatRequest(BaseModel):
 # ─── Native function calling tool definitions ────────────────────────
 # OpenAI function calling format — sent in the `tools` parameter
 
-_NATIVE_TOOL_DEFS: dict[str, dict] = {
-    "terminal": {
-        "type": "function",
-        "function": {
-            "name": "terminal",
-            "description": "Выполнение shell-команд (bash). Используй для запуска git, npm, python, ls, cat и любых других команд.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": "string",
-                        "description": "Shell-команда для выполнения",
-                    },
-                },
-                "required": ["command"],
-            },
-        },
-    },
-    "file_read": {
-        "type": "function",
-        "function": {
-            "name": "file_read",
-            "description": "Чтение содержимого файла. Возвращает содержимое с номерами строк.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Путь к файлу (абсолютный или относительный)",
-                    },
-                    "offset": {
-                        "type": "integer",
-                        "description": "Номер строки начала (1-based, опционально)",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Максимум строк для чтения (опционально)",
-                    },
-                },
-                "required": ["path"],
-            },
-        },
-    },
-    "file_write": {
-        "type": "function",
-        "function": {
-            "name": "file_write",
-            "description": "Запись/перезапись содержимого файла. Создаёт файл или перезаписывает существующий.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Путь к файлу",
-                    },
-                    "content": {
-                        "type": "string",
-                        "description": "Содержимое файла для записи",
-                    },
-                },
-                "required": ["path", "content"],
-            },
-        },
-    },
-    "search_files": {
-        "type": "function",
-        "function": {
-            "name": "search_files",
-            "description": "Поиск по содержимому или имени файла (grep/find).",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "pattern": {
-                        "type": "string",
-                        "description": "Шаблон поиска (regex для content, glob для files)",
-                    },
-                    "path": {
-                        "type": "string",
-                        "description": "Директория для поиска (опционально, по умолчанию текущая)",
-                    },
-                    "target": {
-                        "type": "string",
-                        "enum": ["content", "files"],
-                        "description": "'content' — поиск по содержимому, 'files' — поиск по именам файлов",
-                    },
-                    "file_glob": {
-                        "type": "string",
-                        "description": "Фильтр по расширению файлов (опционально, например '*.py')",
-                    },
-                },
-                "required": ["pattern"],
-            },
-        },
-    },
-    "web_search": {
-        "type": "function",
-        "function": {
-            "name": "web_search",
-            "description": "Поиск информации в интернете. Поддерживает несколько поисковых систем (DuckDuckGo, Tavily, EXA, Perplexity, Bing, SerpAPI, Google). Провайдер выбирается автоматически из настроек.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Поисковый запрос",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Максимальное количество результатов (по умолчанию 10)",
-                    },
-                },
-                "required": ["query"],
-            },
-        },
-    },
-    "code_exec": {
-        "type": "function",
-        "function": {
-            "name": "code_exec",
-            "description": "Выполнение Python-кода. Используй для вычислений, анализа данных, генерации контента.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "code": {
-                        "type": "string",
-                        "description": "Python-код для выполнения",
-                    },
-                },
-                "required": ["code"],
-            },
-        },
-    },
-    "memory_read": {
-        "type": "function",
-        "function": {
-            "name": "memory_read",
-            "description": "Чтение памяти агента. Используй чтобы вспомнить предыдущие разговоры, факты, информацию о пользователе.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "target": {
-                        "type": "string",
-                        "enum": ["memory", "user", "facts"],
-                        "description": "'memory' — память агента (MEMORY.md), 'user' — данные о пользователе (USER.md), 'facts' — список датированных фактов",
-                    },
-                    "filename": {
-                        "type": "string",
-                        "description": "Для facts: имя файла для чтения (опционально)",
-                    },
-                },
-                "required": ["target"],
-            },
-        },
-    },
-    "memory_write": {
-        "type": "function",
-        "function": {
-            "name": "memory_write",
-            "description": "Запись в память агента. Используй чтобы запомнить важную информацию, факты, решения, данные о пользователе.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "action": {
-                        "type": "string",
-                        "enum": ["add", "remove", "replace", "fact"],
-                        "description": "'add' — добавить запись, 'remove' — удалить запись, 'replace' — заменить запись, 'fact' — сохранить датированный факт",
-                    },
-                    "target": {
-                        "type": "string",
-                        "enum": ["memory", "user"],
-                        "description": "'memory' — память агента (MEMORY.md), 'user' — данные о пользователе (USER.md). Не используется для action='fact'",
-                    },
-                    "content": {
-                        "type": "string",
-                        "description": "Текст записи (для add/replace/fact)",
-                    },
-                    "old_text": {
-                        "type": "string",
-                        "description": "Текст для поиска (для remove/replace)",
-                    },
-                    "topic": {
-                        "type": "string",
-                        "description": "Тема факта (для action='fact'). Используется в имени файла.",
-                    },
-                },
-                "required": ["action", "target"],
-            },
-        },
-    },
-    "session_history": {
-        "type": "function",
-        "function": {
-            "name": "session_history",
-            "description": "Поиск в архивах прошлых сессий. Используй когда пользователь спрашивает 'что мы обсуждали', 'помнишь в прошлый раз', 'что было вчера'. Также для поиска ключевых слов в истории разговоров.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "action": {
-                        "type": "string",
-                        "enum": ["list", "read", "search"],
-                        "description": "'list' — список архивов, 'read' — прочитать конкретный архив, 'search' — поиск по содержимому",
-                    },
-                    "channel": {
-                        "type": "string",
-                        "description": "Фильтр по каналу (опционально): 'web', 'cron', или otdel_id",
-                    },
-                    "filename": {
-                        "type": "string",
-                        "description": "Имя файла архива (для action='read')",
-                    },
-                    "query": {
-                        "type": "string",
-                        "description": "Текст для поиска (для action='search')",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Максимум результатов (по умолчанию 10)",
-                    },
-                },
-                "required": ["action"],
-            },
-        },
-    },
-    # ── Head Protocol tools (otdel delegation) ──
-    "head_delegate": {
-        "type": "function",
-        "function": {
-            "name": "head_delegate",
-            "description": "Делегировать задачи работникам отдела. Ставит задачи агентам и инициирует их выполнение. Ответы придут автоматически — backend сам обработает workers и вернёт итог.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "workers": {
-                        "type": "array",
-                        "description": "Список работников с задачами",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "slug": {
-                                    "type": "string",
-                                    "description": "Slug работника (например 'k493rqqz')",
-                                },
-                                "task": {
-                                    "type": "string",
-                                    "description": "Задача для работника",
-                                },
-                            },
-                            "required": ["slug", "task"],
-                        },
-                    },
-                    "strategy": {
-                        "type": "string",
-                        "enum": ["parallel", "sequential", "pipeline"],
-                        "description": "Стратегия выполнения (по умолчанию parallel)",
-                    },
-                    "context": {
-                        "type": "string",
-                        "description": "Дополнительный контекст для работников",
-                    },
-                    "timeout_ms": {
-                        "type": "integer",
-                        "description": "Таймаут ожидания в миллисекундах (по умолчанию 120000)",
-                    },
-                },
-                "required": ["workers"],
-            },
-        },
-    },
-    "head_await": {
-        "type": "function",
-        "function": {
-            "name": "head_await",
-            "description": "УСТАРЕЛО: НЕ используй этот инструмент. Ответы работников приходят автоматически после head_delegate.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "delegation_id": {
-                        "type": "string",
-                        "description": "ID делегации (опционально, используется текущая если не указан)",
-                    },
-                    "timeout_ms": {
-                        "type": "integer",
-                        "description": "Таймаут ожидания в миллисекундах (по умолчанию 120000)",
-                    },
-                },
-                "required": [],
-            },
-        },
-    },
-    "head_evaluate": {
-        "type": "function",
-        "function": {
-            "name": "head_evaluate",
-            "description": "Оценить результаты работников по критериям. Проверяет удовлетворяют ли ответы поставленной задаче.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "task_description": {
-                        "type": "string",
-                        "description": "Описание исходной задачи для оценки",
-                    },
-                    "criteria": {
-                        "type": "array",
-                        "description": "Критерии оценки",
-                        "items": {"type": "string"},
-                    },
-                },
-                "required": ["task_description"],
-            },
-        },
-    },
-    "head_retry": {
-        "type": "function",
-        "function": {
-            "name": "head_retry",
-            "description": "Повторно отправить задачу работнику если он не ответил или ответил с ошибкой.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "worker_slug": {
-                        "type": "string",
-                        "description": "Slug работника для повторной попытки",
-                    },
-                    "error_context": {
-                        "type": "string",
-                        "description": "Описание ошибки или причины повтора",
-                    },
-                    "attempt": {
-                        "type": "integer",
-                        "description": "Номер попытки (автоинкремент если не указан)",
-                    },
-                },
-                "required": ["worker_slug"],
-            },
-        },
-    },
-    "head_decide": {
-        "type": "function",
-        "function": {
-            "name": "head_decide",
-            "description": "Принять стратегическое решение по делегации: продолжить, остановить, взять на себя или эскалировать пользователю.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "situation": {
-                        "type": "string",
-                        "enum": ["continue", "stop", "takeover", "escalate"],
-                        "description": "Решение: continue=продолжить, stop=остановить, takeover=взять на себя, escalate=эскалировать",
-                    },
-                    "reasoning": {
-                        "type": "string",
-                        "description": "Обоснование решения",
-                    },
-                },
-                "required": ["situation", "reasoning"],
-            },
-        },
-    },
-    "head_block": {
-        "type": "function",
-        "function": {
-            "name": "head_block",
-            "description": "Сообщить голове о блокере. Используй когда застрял и нужна помощь.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "reason": {
-                        "type": "string",
-                        "description": "Причина блокера (что мешает выполнить задачу)",
-                    },
-                    "severity": {
-                        "type": "string",
-                        "enum": ["low", "medium", "high", "critical"],
-                        "description": "Серьёзность: low=мелочь, medium=нужна помощь, high=критично, critical=срочно",
-                    },
-                    "context": {
-                        "type": "string",
-                        "description": "Дополнительный контекст (что уже попробовал, что не получилось)",
-                    },
-                },
-                "required": ["reason"],
-            },
-        },
-    },
-    "kanban_task": {
-        "type": "function",
-        "function": {
-            "name": "kanban_task",
-            "description": "Работа с канбан-тасками: создание, список, редактирование, удаление, архивация, история, переназначение, завершение, доработка, блокировка, начало работы, отправка на ревью, одобрение, статус.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": "string",
-                        "enum": ["create", "list", "history", "reassign", "complete", "rework", "block", "unblock", "status"],
-                        "description": "Команда: list=список задач, create=создать, history=история, reassign=переназначить, complete=завершить, rework=доработка, block=заблокировать, unblock=разблокировать, status=статус",
-                    },
-                    "task_id": {
-                        "type": "string",
-                        "description": "ID таска (T-001, T-002, ...) — для status/history/complete/rework/block/unblock",
-                    },
-                    "title": {
-                        "type": "string",
-                        "description": "Название таска (для create)",
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Описание/промт таска (для create)",
-                    },
-                    "department": {
-                        "type": "string",
-                        "description": "ID отдела (для create; для list необязательно — система автоматически подставляет ваш отдел. Для create тоже можно не указывать если вы в отделе)",
-                    },
-                    "priority": {
-                        "type": "string",
-                        "enum": ["low", "medium", "high", "critical"],
-                        "description": "Приоритет (для create)",
-                    },
-                    "deadline": {
-                        "type": "string",
-                        "description": "Дедлайн в ISO формате (для create)",
-                    },
-                    "tags": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Теги (для create)",
-                    },
-                    "action": {
-                        "type": "string",
-                        "enum": ["delegated", "responded", "rework", "completed", "comment", "assigned", "accepted", "work_started", "work_completed"],
-                        "description": "Тип действия (для history)",
-                    },
-                    "detail": {
-                        "type": "string",
-                        "description": "Описание действия (для history)",
-                    },
-                    "target_department": {
-                        "type": "string",
-                        "description": "ID целевого отдела (для reassign, history)",
-                    },
-                    "target_agent": {
-                        "type": "string",
-                        "description": "Slug агента (для history)",
-                    },
-                    "reason": {
-                        "type": "string",
-                        "description": "Причина (для reassign, rework)",
-                    },
-                    "summary": {
-                        "type": "string",
-                        "description": "Итог (для complete)",
-                    },
-                    "actor": {
-                        "type": "string",
-                        "description": "Кто выполняет действие (по умолчанию: head)",
-                    },
-                },
-                "required": ["command"],
-            },
-        },
-    },
-    "image_analyze": {
-        "type": "function",
-        "function": {
-            "name": "image_analyze",
-            "description": "Анализ изображения через vision-модель. Используй когда пользователь отправил картинку и нужно описать или проанализировать её содержимое.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "image_url": {
-                        "type": "string",
-                        "description": "Base64 data URL или HTTP URL изображения",
-                    },
-                    "prompt": {
-                        "type": "string",
-                        "description": "Что анализировать (по умолчанию: 'Опиши что изображено на картинке')",
-                    },
-                },
-                "required": ["image_url"],
-            },
-        },
-    },
-    "summarize": {
-        "type": "function",
-        "function": {
-            "name": "summarize",
-            "description": "Суммаризация текста. Используй когда нужно кратко описать длинный текст, диалог или документ.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "text": {
-                        "type": "string",
-                        "description": "Текст для суммаризации",
-                    },
-                    "max_length": {
-                        "type": "string",
-                        "enum": ["short", "medium", "detailed"],
-                        "description": "Длина суммаризации (по умолчанию: medium)",
-                    },
-                },
-                "required": ["text"],
-            },
-        },
-    },
-    "otdel_manage": {
-        "type": "function",
-        "function": {
-            "name": "otdel_manage",
-            "description": "Управление отделами (otdels) — чат-комнаты для общения. Список, просмотр, создание, обновление, удаление. Узнай кто глава отдела и сколько агентов.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": "string",
-                        "enum": ["list", "get", "create", "update", "delete"],
-                        "description": "Команда: list=все отделы, get=получить отдел, create=создать, update=обновить, delete=удалить",
-                    },
-                    "otdel_id": {
-                        "type": "string",
-                        "description": "ID отдела (для get/update/delete)",
-                    },
-                    "name": {
-                        "type": "string",
-                        "description": "Название отдела (для create/update)",
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Описание отдела (для create/update)",
-                    },
-                    "color": {
-                        "type": "string",
-                        "description": "Цвет отдела в hex (для create/update), по умолчанию #f97316",
-                    },
-                },
-                "required": ["command"],
-            },
-        },
-    },
-    "project_manage": {
-        "type": "function",
-        "function": {
-            "name": "project_manage",
-            "description": "Управление проектами: создание, редактирование, удаление, управление отделами в проекте. Используй для создания проектов и связывания их с отделами.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": "string",
-                        "enum": ["list", "get", "create", "update", "delete", "add_department", "remove_department"],
-                        "description": "Команда: list=все проекты, get=проект, create=создать, update=обновить, delete=удалить, add_department=добавить отдел, remove_department=убрать отдел",
-                    },
-                    "project_id": {
-                        "type": "string",
-                        "description": "ID проекта (для get/update/delete/add_department/remove_department)",
-                    },
-                    "name": {
-                        "type": "string",
-                        "description": "Название проекта (для create/update)",
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Описание проекта (для create/update)",
-                    },
-                    "status": {
-                        "type": "string",
-                        "enum": ["planning", "active", "on_hold", "completed", "archived"],
-                        "description": "Статус проекта (для update)",
-                    },
-                    "priority": {
-                        "type": "string",
-                        "enum": ["low", "medium", "high", "critical"],
-                        "description": "Приоритет (для update)",
-                    },
-                    "deadline": {
-                        "type": "string",
-                        "description": "Дедлайн в ISO формате (для create/update)",
-                    },
-                    "tags": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Теги (для create/update)",
-                    },
-                    "dept_id": {
-                        "type": "string",
-                        "description": "ID отдела (для add_department/remove_department)",
-                    },
-                    "role": {
-                        "type": "string",
-                        "description": "Роль отдела в проекте (для add_department)",
-                    },
-                    "is_main": {
-                        "type": "boolean",
-                        "description": "Основной отдел проекта (для add_department)",
-                    },
-                },
-                "required": ["command"],
-            },
-        },
-    },
-    # ── Connection & Approval Tools ──────────────────────────────────────
-    "head_approve": {
-        "type": "function",
-        "function": {
-            "name": "head_approve",
-            "description": "Передать задачу в другой отдел через связь (утверждение/делегирование). Используй когда задача требует проверки или выполнения другим отделом.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "task_id": {"type": "string", "description": "ID задачи (T-xxx)"},
-                    "target_otdel": {"type": "string", "description": "ID целевого отдела (опционально, авто-определение)"},
-                    "reason": {"type": "string", "description": "Причина передачи"},
-                    "report": {"type": "string", "description": "Детальный отчёт (опционально)"},
-                },
-                "required": ["task_id", "reason"],
-            },
-        },
-    },
-    "head_reline": {
-        "type": "function",
-        "function": {
-            "name": "head_reline",
-            "description": "Вернуть задачу предыдущему отделу с замечаниями (релайн). Используй когда задача выполнена некачественно или не соответствует требованиям.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "task_id": {"type": "string", "description": "ID задачи (T-xxx)"},
-                    "remarks": {"type": "string", "description": "Замечания — что нужно исправить"},
-                    "severity": {"type": "string", "enum": ["low", "medium", "high"], "description": "Серьёзность (по умолчанию medium)"},
-                },
-                "required": ["task_id", "remarks"],
-            },
-        },
-    },
-    "head_approval_status": {
-        "type": "function",
-        "function": {
-            "name": "head_approval_status",
-            "description": "Проверить статус утверждений или посмотреть последние передачи.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "task_id": {"type": "string", "description": "Фильтр по задаче (опционально)"},
-                    "status": {"type": "string", "enum": ["pending", "completed", "rejected"], "description": "Фильтр по статусу (опционально)"},
-                },
-                "required": [],
-            },
-        },
-    },
-    "connection_list": {
-        "type": "function",
-        "function": {
-            "name": "connection_list",
-            "description": "Показать все связи между отделами. Только для главного агента.",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": [],
-            },
-        },
-    },
-    "connection_create": {
-        "type": "function",
-        "function": {
-            "name": "connection_create",
-            "description": "Создать связь между отделами. Только для главного агента.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "from_otdel": {"type": "string", "description": "ID исходного отдела"},
-                    "to_otdel": {"type": "string", "description": "ID целевого отдела"},
-                    "type": {"type": "string", "enum": ["approval", "delegation", "peer"], "description": "Тип связи"},
-                    "label": {"type": "string", "description": "Название связи (опционально)"},
-                    "description": {"type": "string", "description": "Описание (опционально)"},
-                },
-                "required": ["from_otdel", "to_otdel", "type"],
-            },
-        },
-    },
-    "connection_delete": {
-        "type": "function",
-        "function": {
-            "name": "connection_delete",
-            "description": "Удалить связь по ID. Только для главного агента.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "connection_id": {"type": "string", "description": "ID связи (conn-xxx)"},
-                },
-                "required": ["connection_id"],
-            },
-        },
-    },
-    "connection_history": {
-        "type": "function",
-        "function": {
-            "name": "connection_history",
-            "description": "История передач/утверждений/релайнов. Только для главного агента.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "task_id": {"type": "string", "description": "Фильтр по задаче (опционально)"},
-                    "limit": {"type": "integer", "description": "Максимум записей (по умолчанию 20)"},
-                },
-                "required": [],
-            },
-        },
-    },
-    "otdel_message": {
-        "type": "function",
-        "function": {
-            "name": "otdel_message",
-            "description": "Отправить сообщение в чат отдела от имени главного агента. Глава отдела получит уведомление и может ответить. Принимает otdel_id ИЛИ otdel_name. Только для главного агента.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "otdel_id": {"type": "string", "description": "ID отдела (можно узнать через otdel_manage(list))"},
-                    "otdel_name": {"type": "string", "description": "Название отдела (например 'Разработка', 'Дизайн')"},
-                    "message": {"type": "string", "description": "Текст сообщения"},
-                },
-                "required": ["message"],
-            },
-        },
-    },
-    "otdel_history": {
-        "type": "function",
-        "function": {
-            "name": "otdel_history",
-            "description": "Прочитать историю чата отдела. Позволяет проверить ответы главы отдела и обсуждения. Принимает otdel_id ИЛИ otdel_name. Только для главного агента.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "otdel_id": {"type": "string", "description": "ID отдела (можно узнать через otdel_manage(list))"},
-                    "otdel_name": {"type": "string", "description": "Название отдела (например 'Разработка', 'Дизайн')"},
-                    "limit": {"type": "integer", "description": "Максимум последних сообщений (по умолчанию 20)"},
-                },
-                "required": [],
-            },
-        },
-    },
-    "cron_manage": {
+# ─── Native function calling tool definitions ────────────────────────
+# OpenAI function calling format — sent in the `tools` parameter.
+#
+# Built dynamically from tools/_registry. To add a new tool, write a
+# handler in tools/<name>.py wrapped in @register_tool(...). That's it.
+# Parameter schemas are omitted (handlers still take params: dict).
+# Recover full JSON schemas later via pydantic models per handler.
+#
+# Lazy build: the dict is filled on first use, not at module-import
+# time. Reason: chat/ws_router.py imports from this module, and
+# some tools/*.py modules import chat/ws_router — so eagerly building
+# here would cause circular imports on first boot.
+_NATIVE_TOOL_DEFS: dict[str, dict] = {}
+_BUILD_ATTEMPTED: bool = False
+
+
+def _rebuild_native_tool_defs() -> dict:
+    """Build OpenAI-style function definitions from the @register_tool registry.
+
+    Imports synpin.tools (fires every @register_tool decorator) and
+    walks the registry. Idempotent — safe to call from anywhere.
+    """
+    from .. import tools  # noqa: F401  -- triggers every @register_tool
+    from ..tools._registry import all_tools
+    return {
+        name: {
             "type": "function",
             "function": {
-                "name": "cron_manage",
-                "description": "Управление запланированными задачами (cron). Создавай, обновляй, удаляй крон-задачи, смотри историю запусков, запускай немедленно. Типы: cron (повторяющиеся), once (одноразовые), interval (интервал). Действия: send_message (в отдел), run_prompt (запустить агента). ПРОАКТИВНЫЙ CRON: когда пользователь говорит про будущее событие («завтра», «через час», «на следующей неделе») — СТАВЬ cron САМОСТОЯТЕЛЬНО через cron_manage(command='create', schedule_type='once' или 'interval'). НЕ СПРАШИВАЙ разрешения — твоя работа замечать такие моменты. Параметр delivery: 'private' (по умолчанию, результат → в чат пользователю) | 'otdel' (в чат отдела) | 'silent' (только лог, без чата — для фоновых проверок).\n\nЖЁСТКИЕ ПРАВИЛА выбора action_target / action_agent / delivery:\n\n1. Пользователь просит 'напомни мне', 'напиши мне', 'спроси меня позже' →\n   - action_target='private'\n   - delivery='private'\n   - action_agent='main_agent' (или текущий slug)\n   - action_message: прямой текст напоминания\n\n2. Пользователь просит 'попроси главу отдела X сделать Y' / 'напомни отделу Z' / 'через час проверь отдел' →\n   - action_target='otdel:<ID>' (формат otdel:<slug_or_id>)\n   - delivery='otdel'\n   - action_agent='<head_slug_отдела_X>' (НЕ main_agent!)\n   - action_message: 'Сделай Y в контексте своего отдела'\n   Чтобы найти slug/id отдела/head: используй tool otdel_manage(command='list').\n\n3. Пользователь просит 'проверь логи тихо', 'посмотри статус молча', 'просто запиши факт' →\n   - action_target='private'\n   - delivery='silent'\n   - action_agent='main_agent'\n   - action_message: пиши факт в MEMORY через memory_write (НЕ пиши в чат)\n\nЗАПРЕЩЕНО: ставить cron с action_target='private' + action_agent='main_agent' для задач которые должны идти в отдел. Это приведёт к тому что результат попадёт в личный чат пользователя вместо чата отдела. Если сомневаешься — посмотри otdel_manage(command='list') и возьми head slug оттуда.",
+                "name": spec.name,
+                "description": spec.description,
                 "parameters": {
                     "type": "object",
-                    "properties": {
-                        "command": {
-                            "type": "string",
-                            "enum": ["list", "get", "create", "update", "delete", "history", "run_now"],
-                            "description": "Команда",
-                        },
-                        "job_id": {"type": "string", "description": "ID задачи (для get/update/delete/history/run_now)"},
-                        "name": {"type": "string", "description": "Название задачи"},
-                        "schedule_type": {"type": "string", "enum": ["cron", "once", "interval"], "description": "Тип расписания"},
-                        "schedule_expr": {"type": "string", "description": "Расписание. Относительное: 2m, 1h, 30s, 2h30m. Абсолютное: 2026-06-23T13:00:00. Cron: 0 13 * * *."},
-                        "action_type": {"type": "string", "enum": ["run_prompt"], "description": "Тип действия"},
-                        "action_target": {"type": "string", "description": "Куда отправить результат: 'private' (в чат пользователю) | 'otdel:<ID>' (в чат отдела, ID — slug из otdel_manage) | 'otdel_id' напрямую. См. правила в description."},
-                        "action_message": {"type": "string", "description": "Текст сообщения или промпт для агента"},
-                        "action_agent": {"type": "string", "description": "Slug агента для run_prompt. Для напоминаний пользователю → 'main_agent'. Для задач в отдел → head_slug отдела (НЕ main_agent!)"},
-                        "description": {"type": "string", "description": "Описание задачи"},
-                        "status": {"type": "string", "enum": ["active", "paused"], "description": "Статус задачи"},
-                        "delivery": {"type": "string", "enum": ["private", "otdel", "silent"], "description": "Куда доставить результат. 'private' — в чат пользователю (для личных напоминаний). 'otdel' — в чат отдела (для командных задач). 'silent' — только лог, без чата (для фоновых проверок)."},
-                    },
-                    "required": ["command"],
+                    "properties": {},
+                    "required": [],
                 },
             },
-        },
-}
+        }
+        for name, spec in all_tools().items()
+    }
+
+
+def _ensure_defs_built() -> None:
+    """Populate _NATIVE_TOOL_DEFS on first use. Idempotent.
+
+    Note: this function may be reached via `from X import Y`, in which
+    case Python stores it under the importing module's namespace; the
+    enclosing function's `globals()` is NOT this module's dict. Resolve
+    the right dict via sys.modules + the function's __module__.
+    """
+    import sys
+    global _BUILD_ATTEMPTED
+    if _BUILD_ATTEMPTED:
+        return
+    _BUILD_ATTEMPTED = True
+    target = sys.modules[_ensure_defs_built.__module__]
+    target.__dict__["_NATIVE_TOOL_DEFS"] = _rebuild_native_tool_defs()
+
+
+def get_native_tool_defs() -> dict:
+    """Public accessor returning the live _NATIVE_TOOL_DEFS dict.
+
+    Always returns the current dict from the chat.router module —
+    callers must NOT hold onto the returned reference across rebinds,
+    or they can simply re-call this function. This avoids the classic
+    `from X import Y` trap where the importing module captures an
+    old binding of Y when X rebinds Y.
+    """
+    import sys
+    return sys.modules["synpin.chat.router"].__dict__["_NATIVE_TOOL_DEFS"]
+
+
+def _ensure_defs_built_first() -> dict:
+    """One-shot helper: ensures built and returns the live dict.
+
+    Preferred entry point for callers that don't already import the
+    symbol directly. Combining build + lookup into one function makes
+    sure both happen against the live module dict.
+    """
+    _ensure_defs_built()
+    return get_native_tool_defs()
+
+
+
 
 
 BUILTINS = {"memory_read", "memory_write", "image_analyze", "summarize", "session_history"}
@@ -1385,11 +699,13 @@ def get_all_tool_names(include_head: bool = False, include_primary: bool = False
     settings.yaml:tools.disabled. The disabled list is re-read on every
     call so UI toggles take effect immediately.
     """
+    # Use accessor that reads through to chat.router's live dict.
+    native_defs = get_native_tool_defs()
     from ..config.manager import get_disabled_tools
     disabled = set(get_disabled_tools())
 
     tools = [
-        n for n in _NATIVE_TOOL_DEFS
+        n for n in native_defs
         if n not in HEAD_TOOLS and n not in PRIMARY_TOOLS and n not in disabled
     ]
     if include_head:

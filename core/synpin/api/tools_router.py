@@ -22,11 +22,12 @@ from pydantic import BaseModel
 
 from ..config.manager import get_disabled_tools, set_disabled_tool
 from ..chat.router import (
-    _NATIVE_TOOL_DEFS,
     HEAD_TOOLS,
     PRIMARY_TOOLS,
     BUILTINS,
     DANGEROUS_TOOLS,
+    get_native_tool_defs,
+    _ensure_defs_built_first,
 )
 
 logger = logging.getLogger("synpin.api.tools")
@@ -86,11 +87,16 @@ def list_tools() -> list[ToolEntry]:
     (single source of truth for tool role policy). Display/description
     enrichment comes from tools.yaml where present.
     """
+    # Lazy build the @register_tool → JSON-schema dict on first use.
+    # get_native_tool_defs() always reads the current live dict from
+    # chat.router, even after _ensure_defs_built() rebinds it.
+    native_defs = _ensure_defs_built_first()
+
     meta = _load_tools_yaml_meta()
     disabled = set(get_disabled_tools())
 
     entries: list[ToolEntry] = []
-    for name, schema in _NATIVE_TOOL_DEFS.items():
+    for name, schema in native_defs.items():
         func = schema.get("function", {}) or {}
         m = meta.get(name, {}) or {}
 
@@ -135,7 +141,7 @@ def toggle_tool(req: ToolToggleRequest) -> ToolToggleResponse:
     take effect immediately for subsequent messages — in-flight streams
     that have already been sent their tool schema are unaffected.
     """
-    if req.name not in _NATIVE_TOOL_DEFS:
+    if req.name not in _ensure_defs_built_first():
         raise HTTPException(404, f"Unknown tool: {req.name}")
     changed = set_disabled_tool(req.name, not req.enabled)
     return ToolToggleResponse(

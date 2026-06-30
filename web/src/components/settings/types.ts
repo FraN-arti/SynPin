@@ -5,7 +5,7 @@
 
 // ── Tab definitions ────────────────────────────────────────────────
 
-export type Tab = 'general' | 'agents' | 'providers' | 'memory' | 'channels' | 'departments' | 'skills' | 'connections' | 'kanban' | 'deadlines' | 'projects' | 'widgets' | 'cron'
+export type Tab = 'general' | 'agents' | 'providers' | 'memory' | 'channels' | 'departments' | 'skills' | 'connections' | 'kanban' | 'deadlines' | 'projects' | 'widgets' | 'cron' | 'tools'
 
 export interface TabDef {
   id: Tab
@@ -17,6 +17,7 @@ export const SYSTEM_TABS: TabDef[] = [
   { id: 'agents', label: 'Агенты' },
   { id: 'providers', label: 'Провайдеры' },
   { id: 'memory', label: 'Память' },
+  { id: 'tools', label: 'Инструменты' },
   { id: 'cron', label: 'Крон' },
 ]
 
@@ -27,6 +28,7 @@ export const SPACE_TABS: TabDef[] = [
   { id: 'departments', label: 'Отделы' },
   { id: 'widgets', label: 'Виджеты' },
 ]
+
 export const SECTION_INFO: Record<Tab, { title: string; description: string }> = {
   general: { title: 'Общие настройки', description: 'Тема, язык, сервер и статистика' },
   agents: { title: 'Агенты', description: 'Управление AI-агентами и их параметрами' },
@@ -41,6 +43,7 @@ export const SECTION_INFO: Record<Tab, { title: string; description: string }> =
   deadlines: { title: 'Дедлайны', description: 'Настройки системы дедлайнов' },
   widgets: { title: 'Виджеты', description: 'Управление виджетами на главной панели' },
   cron: { title: 'Крон-задачи', description: 'Расписание, лимиты и проактивность' },
+  tools: { title: 'Инструменты', description: 'Управление инструментами агентов: включение и области доступа' },
 }
 
 // Tabs that can be dragged to widget zones

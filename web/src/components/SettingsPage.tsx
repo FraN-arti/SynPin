@@ -29,6 +29,7 @@ import { ConnectionsSection } from './settings/ConnectionsSection'
 import { KanbanSection } from './settings/KanbanSection'
 import { DeadlinesSection } from './settings/DeadlinesSection'
 import { ProjectsSection } from './settings/ProjectsSection'
+import { ToolsSection } from './settings/ToolsSection'
 import { WidgetsSection } from './settings/WidgetsSection'
 
 // ── Re-exports for backward compatibility ──────────────────────────
@@ -206,6 +207,7 @@ export function SettingsPage({ onAgentsChange, onDepartmentsChange, wsOn }: Sett
             />
           )}
           {activeTab === 'memory' && <MemorySection />}
+          {activeTab === 'tools' && <ToolsSection />}
           {activeTab === 'cron' && <CronSection wsOn={wsOn} />}
           {activeTab === 'channels' && <ChannelsSection onAddChannel={() => setActiveModal('add-channel')} />}
           {activeTab === 'departments' && <DepartmentsSection onDepartmentsChange={onDepartmentsChange} />}

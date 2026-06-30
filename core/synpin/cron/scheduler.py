@@ -327,8 +327,15 @@ async def _execute_run_prompt(job: Any) -> None:
         })
         _save_otdel_history(channel_id, otdel_history)
     else:
-        history.append(assistant_entry)
-        _save_chat_history(agent_slug, channel_id, history)
+        # Save to private chat: load existing history first, append the cron
+        # response, then save. Without the load, _save_chat_history would
+        # overwrite the entire user history with a single cron entry.
+        # Audit 2026-06-30: bug fixed — history = [] is for the LLM context
+        # (intentionally empty per the comment above); the on-disk history
+        # must be loaded separately.
+        existing_history = _load_chat_history(agent_slug, channel_id)
+        existing_history.append(assistant_entry)
+        _save_chat_history(agent_slug, channel_id, existing_history)
 
     # Broadcast via WS — silent jobs do NOT broadcast chat messages.
     # 'cron:fired' event still goes out so the UI can update its stats card.

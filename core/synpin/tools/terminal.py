@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .base import ToolResult, make_success, make_error
 from .security import get_allowed_roots
+from ._registry import register_tool
 
 # Default working directory for command execution
 def _get_work_root() -> Path:
@@ -21,6 +22,13 @@ def _get_work_root() -> Path:
 _TIMEOUT = 30
 
 
+@register_tool(
+    name="terminal",
+    description="Выполнение shell-команд (bash). Используй для запуска git, npm, python, ls, cat и любых других команд.",
+    category="code",
+    scope="all",
+    dangerous=True,
+)
 async def terminal(params: dict) -> ToolResult:
     """Execute a shell command and return stdout + stderr.
 

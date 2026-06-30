@@ -24,11 +24,14 @@ async def _execute_job(job: Any) -> None:
     """Execute a fired cron job.
 
     Records execution outcome (last_result, last_result_message,
-    last_duration_ms, last_run_at) on the job BEFORE advancing the
-    schedule. Honors job.delivery — silent jobs skip chat messages.
+    last_duration_ms, last_run_at) on the job. On success, advances
+    the schedule (ONCE → COMPLETED, CRON/INTERVAL → next tick). On
+    failure, marks the job appropriately (ONCE → MISSED so user sees
+    it failed; CRON/INTERVAL stays ACTIVE so the next tick retries)
+    WITHOUT advancing next_run_at — see mark_job_failed().
     """
     from .models import LastResult
-    from .jobs import _save_job, get_job
+    from .jobs import _save_job, get_job, mark_job_failed
     from ..time import now as _now
     import time
 
@@ -41,7 +44,8 @@ async def _execute_job(job: Any) -> None:
         elif job.action_type.value == "run_prompt":
             await _execute_run_prompt(job)
 
-        # Advance next run
+        # Advance next run only on success — ONCE becomes COMPLETED,
+        # CRON/INTERVAL move to the next tick.
         advance_next_run(job)
         # Mark success
         job.last_run_at = started_iso
@@ -52,21 +56,23 @@ async def _execute_job(job: Any) -> None:
         logger.info("Cron job %s executed: %s", job.id, job.name)
 
     except Exception as e:
-        # Record error, but still advance one-shot jobs to avoid infinite
-        # retry loops. For repeating jobs (cron/interval) we keep the
-        # schedule so the next attempt still runs.
+        # Don't advance the schedule on failure — repeating jobs will
+        # retry on the next tick naturally. One-shot jobs are marked
+        # MISSED so the UI surfaces the failure instead of showing a
+        # green "completed" checkmark for an LLM error.
         logger.error("Cron job %s failed: %s", job.id, e)
         import traceback
         traceback.print_exc()
         try:
-            advance_next_run(job)
-        except Exception:
-            pass
-        try:
-            job.last_run_at = started_iso
+            mark_job_failed(
+                job,
+                error_message=str(e),
+                duration_ms=int((time.time() - started) * 1000),
+            )
+            # Also stamp the error metadata so UI tooltips work even
+            # though mark_job_failed already updated last_run_at/duration.
             job.last_result = LastResult.ERROR
             job.last_result_message = str(e)[:200]
-            job.last_duration_ms = int((time.time() - started) * 1000)
             _save_job(job)
         except Exception as save_err:
             logger.error("Failed to record cron error for %s: %s", job.id, save_err)
@@ -563,7 +569,13 @@ async def _tick_loop() -> None:
 
 
 def start_scheduler() -> None:
-    """Start the cron scheduler background task."""
+    """Start the cron scheduler background task directly (legacy path).
+
+    New code should register `_tick_loop` via DaemonManager — see
+    server.py's lifespan startup. This function remains for tests
+    and any external callers that want a one-shot start without
+    going through the daemon manager.
+    """
     global _tick_task
     if _tick_task and not _tick_task.done():
         return  # already running
@@ -580,26 +592,3 @@ def start_scheduler() -> None:
         logger.info("[cron] Scheduler started (tick every %ds)", _TICK_INTERVAL)
     except RuntimeError:
         logger.warning("[cron] No running event loop, cannot start scheduler")
-
-
-def register_cron_scheduler(dm: DaemonManager) -> None:
-    """Register cron tick with DaemonManager."""
-    # Sweep missed jobs at registration time
-    from .jobs import sweep_missed_jobs
-    missed = sweep_missed_jobs()
-    if missed:
-        logger.info("[cron] Sweep: marked %d missed one-shot job(s): %s", len(missed), missed)
-
-    # Start the tick loop via DaemonManager
-    global _tick_task
-    try:
-        loop = asyncio.get_running_loop()
-        _tick_task = loop.create_task(_tick_loop())
-        dm._services["cron-scheduler"] = type("svc", (), {
-            "name": "cron-scheduler",
-            "_task": _tick_task,
-            "is_async": True,
-        })()
-        logger.info("[cron] Scheduler registered with DaemonManager")
-    except RuntimeError:
-        logger.warning("[cron] No running event loop")

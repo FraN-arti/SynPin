@@ -105,18 +105,59 @@ def api_update_job(job_id: str, req: CronJobUpdate) -> dict[str, Any]:
 
 
 @router.post("/jobs/{job_id}/run")
-async def api_run_job_now(job_id: str) -> dict[str, Any]:
-    """Trigger a cron job immediately (run now)."""
+async def api_run_job_now(job_id: str, wait: bool = False) -> dict[str, Any]:
+    """Trigger a cron job immediately (run now).
+
+    By default runs ASYNCHRONOUSLY and returns 202-style "triggered" status
+    immediately so HTTP clients don't hang for the duration of an LLM call
+    (a run_prompt job can take 30+ seconds). Use ?wait=true for synchronous
+    execution — returns the actual last_result/last_result_message when done,
+    useful for tests and the UI's "Run now" button when you want to see the
+    outcome before closing the dialog.
+
+    Note: even in wait=true mode we don't surface LLM errors as HTTP errors —
+    a job that "ran but failed" returns 200 with last_result=error, mirroring
+    how scheduled ticks are recorded.
+    """
     job = get_job(job_id)
     if not job:
         raise HTTPException(404, f"Job not found: {job_id}")
 
     from ..cron.scheduler import _execute_job
-    import asyncio
+
+    if wait:
+        # Synchronous: actually execute and return real outcome
+        try:
+            await _execute_job(job)
+        except Exception as e:
+            # _execute_job already records errors via mark_job_failed,
+            # so any exception here is a true bookkeeping failure.
+            logger.error("api_run_job_now(wait=true) raised: %s", e)
+        # Re-read the job to reflect what was actually written to disk
+        job_after = get_job(job_id) or job
+        return {
+            "status": "completed",
+            "job_id": job_id,
+            "name": job_after.name,
+            "last_result": job_after.last_result.value,
+            "last_result_message": job_after.last_result_message,
+            "last_duration_ms": job_after.last_duration_ms,
+            "schedule_advanced": (
+                job_after.status.value in ("completed", "active")
+                and job_after.last_run_at != job.last_run_at
+            ),
+        }
 
     # Fire-and-forget: schedule the job execution
+    import asyncio
     asyncio.create_task(_execute_job(job))
-    return {"status": "triggered", "job_id": job_id, "name": job.name}
+    return {
+        "status": "triggered",
+        "job_id": job_id,
+        "name": job.name,
+        "note": "Execution started in background. Poll GET /api/cron/jobs/{id} "
+                "or pass ?wait=true to wait for completion.",
+    }
 
 
 @router.delete("/jobs/{job_id}")

@@ -474,7 +474,16 @@ def sweep_old_completed_jobs() -> list[str]:
 
 
 def advance_next_run(job: CronJob) -> None:
-    """Advance the job's next_run_at after execution."""
+    """Advance the job's next_run_at after a SUCCESSFUL execution.
+
+    Successful run semantics:
+      - ONCE     → COMPLETED, no next_run.
+      - CRON     → next_run_at = compute_next_run(now).
+      - INTERVAL → next_run_at = last_run_at + interval.
+
+    On FAILURE the caller should NOT call this — instead use
+    mark_job_failed() so the schedule stays intact for retry.
+    """
     if job.schedule_type == ScheduleType.ONCE:
         job.status = JobStatus.COMPLETED
         job.next_run_at = None
@@ -484,6 +493,35 @@ def advance_next_run(job: CronJob) -> None:
     job.last_run_at = _now().isoformat()
     job.run_count += 1
     _save_job(job)
+
+
+def mark_job_failed(job: CronJob, error_message: str, duration_ms: int) -> None:
+    """Record a failed execution WITHOUT advancing the schedule.
+
+    - ONCE     → status MISSED. User can see it failed; no auto-retry.
+                 (Retrying a one-shot reminder after a transient LLM
+                 outage is more confusing than helpful — by the time
+                 the retry fires, the user has likely forgotten why
+                 the reminder was set.)
+      - CRON/INTERVAL → status stays ACTIVE, next_run_at unchanged.
+                 Next tick the scheduler will retry naturally.
+                 run_count is NOT incremented (failed attempts don't count).
+
+    Always writes last_result/last_result_message/last_duration_ms so the
+    UI can surface the error tooltip.
+    """
+    job.last_run_at = _now().isoformat()
+    job.last_duration_ms = duration_ms
+
+    if job.schedule_type == ScheduleType.ONCE:
+        job.status = JobStatus.MISSED
+        job.next_run_at = None
+
+    _save_job(job)
+    logger.info(
+        "Cron job %s marked failed (status=%s, next_run=%s): %s",
+        job.id, job.status.value, job.next_run_at, error_message[:120],
+    )
 
 
 def mark_job_run(job_id: str) -> None:

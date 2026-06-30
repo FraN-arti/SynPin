@@ -678,17 +678,9 @@ BUILTINS = {"memory_read", "memory_write", "image_analyze", "summarize", "sessio
 
 # Head-only tools — available to department heads
 # (main agent also gets these via include_head=True)
-#
-# NOTE: cron_manage was REMOVED on 2026-06-30 — scheduling intent is
-# now parsed directly from user_text via cron/intent_parser.py in
-# chat/router.py's auto-schedule hook. Letting agents call cron_manage
-# caused infinite recursion (agent re-scheduled itself on every cron
-# fire, producing "5 напомни про чайник" spam). The HTTP API
-# (/api/cron/jobs) and UI Settings → Крон remain available for manual
-# management — only the in-agent tool was removed.
 HEAD_TOOLS = {"head_delegate", "head_evaluate", "head_retry", "head_decide", "head_block", "kanban_task",
               "head_approve", "head_reline", "head_approval_status",
-              "skill_manage"}
+              "cron_manage", "skill_manage"}
 
 # Primary-only tools — only available to the main agent (is_primary=true)
 PRIMARY_TOOLS = {"otdel_manage", "project_manage",
@@ -1376,41 +1368,6 @@ async def chat_stream(req: ChatRequest, request: Request):
 
             # Save assistant response after streaming completes
             if agent_slug and channel_id and full_response:
-                # ── Auto-schedule hook ─────────────────────────────────
-                # Parse user_text for schedule intent. If found, create
-                # the cron job and append a 📌 marker to the response so
-                # the user sees the reminder was set.
-                #
-                # This replaces the old "agent uses cron_manage tool"
-                # loop which caused infinite recursion: agent re-scheduled
-                # itself on every cron fire, producing "5 напомни про
-                # чайник за 15 минут" spam. By moving parsing to a
-                # deterministic regex on user_text only, there's no
-                # tool, no LLM in the loop, no recursion possible.
-                try:
-                    from ..cron.intent_parser import (
-                        parse_schedule_intent,
-                        create_cron_from_intent,
-                        build_intent_marker,
-                    )
-                    spec = parse_schedule_intent(user_message)
-                    if spec is not None:
-                        job_id = create_cron_from_intent(
-                            spec, created_by="auto-intent-parser",
-                        )
-                        if job_id:
-                            marker = build_intent_marker(spec, job_id=job_id)
-                            # Append marker ONLY to the live SSE stream,
-                            # not to history — history should reflect
-                            # what the LLM said, not system-injected
-                            # appendages.
-                            await chat_task.queue.put(
-                                f'data: {{"type": "chunk", "content": '
-                                f'{json.dumps(marker, ensure_ascii=False)}}}\n\n'
-                            )
-                except Exception as parse_err:
-                    logger.warning("auto-schedule hook failed: %s", parse_err)
-
                 assistant_msg = {"role": "assistant", "content": full_response}
                 if req.agent_name:
                     assistant_msg["agent_name"] = req.agent_name
@@ -1559,29 +1516,7 @@ async def chat_complete(req: ChatRequest):
     if req.agent_slug and req.channel_id:
         _update_session_state(req.agent_slug, req.channel_id, req.message, message_count)
 
-    # ── Auto-schedule hook ─────────────────────────────────
-    # Same intent parser as the streaming endpoint — parses user_text,
-    # creates a cron if a schedule intent is detected, appends a 📌
-    # marker to the response so the user sees the reminder was set.
-    schedule_marker = ""
-    if req.agent_slug and req.channel_id:
-        try:
-            from ..cron.intent_parser import (
-                parse_schedule_intent,
-                create_cron_from_intent,
-                build_intent_marker,
-            )
-            spec = parse_schedule_intent(req.message)
-            if spec is not None:
-                job_id = create_cron_from_intent(
-                    spec, created_by="auto-intent-parser",
-                )
-                if job_id:
-                    schedule_marker = "\n\n" + build_intent_marker(spec, job_id=job_id)
-        except Exception as parse_err:
-            logger.warning("auto-schedule hook (complete) failed: %s", parse_err)
-
-    result = {"content": content + schedule_marker, "model": model}
+    result = {"content": content, "model": model}
     if req.agent_name:
         result["agent_name"] = req.agent_name
     if usage:

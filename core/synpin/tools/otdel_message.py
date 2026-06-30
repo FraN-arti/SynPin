@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Any
 
 from .base import ToolResult, make_success, make_error
+from ._registry import register_tool
 from ..time import now as _now
 
 
@@ -46,6 +47,14 @@ async def _resolve_otdel_id(otdel_id: str, otdel_name: str) -> tuple[str, str]:
     return "", ""
 
 
+
+@register_tool(
+    name='otdel_message',
+    description='Отправить сообщение в чат отдела от имени главного агента. Глава отдела получит уведомление и может ответить. Принимает otdel_id ИЛИ otdel_name. Только для главного агента.',
+    category='other',
+    scope='primary',
+    dangerous=False,
+)
 async def otdel_message(params: dict[str, Any]) -> ToolResult:
     """
     Отправить сообщение в чат отдела от имени главного агента.

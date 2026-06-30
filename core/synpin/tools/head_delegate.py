@@ -5,9 +5,18 @@ import uuid
 from typing import Any
 
 from ..chat.ws_router import get_head_state
+from ._registry import register_tool
 from .base import ToolResult, make_success, make_error
 
 
+
+@register_tool(
+    name='head_delegate',
+    description='Делегировать задачи работникам отдела. Ставит задачи агентам и инициирует их выполнение. Ответы придут автоматически — backend сам обработает workers и вернёт итог.',
+    category='head_protocol',
+    scope='head',
+    dangerous=False,
+)
 async def head_delegate(params: dict[str, Any]) -> ToolResult:
     """
     Structure a delegation to workers.

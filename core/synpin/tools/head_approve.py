@@ -4,8 +4,17 @@ from __future__ import annotations
 from typing import Any
 
 from .base import ToolResult, make_success, make_error
+from ._registry import register_tool
 
 
+
+@register_tool(
+    name='head_approve',
+    description='Передать задачу в другой отдел через связь (утверждение/делегирование). Используй когда задача требует проверки или выполнения другим отделом.',
+    category='other',
+    scope='head',
+    dangerous=False,
+)
 async def head_approve(params: dict[str, Any]) -> ToolResult:
     """
     Transfer a task to another department through a connection.

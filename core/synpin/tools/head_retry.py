@@ -4,9 +4,18 @@ from __future__ import annotations
 from typing import Any
 
 from ..chat.ws_router import get_head_state
+from ._registry import register_tool
 from .base import ToolResult, make_success, make_error
 
 
+
+@register_tool(
+    name='head_retry',
+    description='Повторно отправить задачу работнику если он не ответил или ответил с ошибкой.',
+    category='head_protocol',
+    scope='head',
+    dangerous=False,
+)
 async def head_retry(params: dict[str, Any]) -> ToolResult:
     """
     Retry a worker that failed or timed out.

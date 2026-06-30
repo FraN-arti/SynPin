@@ -13,10 +13,19 @@ import os
 from urllib.parse import unquote
 
 from .base import ToolResult, make_success, make_error
+from ._registry import register_tool
 
 _log = logging.getLogger("synpin.chat")
 
 
+
+@register_tool(
+    name='image_analyze',
+    description='Анализ изображения через vision-модель. Используй когда пользователь отправил картинку и нужно описать или проанализировать её содержимое.',
+    category='other',
+    scope='builtin',
+    dangerous=False,
+)
 async def image_analyze(params: dict) -> ToolResult:
     """Analyze an image using the configured vision model.
 

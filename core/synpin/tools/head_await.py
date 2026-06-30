@@ -5,9 +5,18 @@ import asyncio
 from typing import Any
 
 from ..chat.ws_router import get_head_state
+from ._registry import register_tool
 from .base import ToolResult, make_success, make_error
 
 
+
+@register_tool(
+    name='head_await',
+    description='УСТАРЕЛО: НЕ используй этот инструмент. Ответы работников приходят автоматически после head_delegate.',
+    category='head_protocol',
+    scope='all',
+    dangerous=False,
+)
 async def head_await(params: dict[str, Any]) -> ToolResult:
     """
     Wait for all expected workers to respond.

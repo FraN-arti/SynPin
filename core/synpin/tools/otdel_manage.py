@@ -5,10 +5,19 @@ import os
 from typing import Any
 
 from .base import ToolResult, make_success, make_error
+from ._registry import register_tool
 
 _API_BASE = os.environ.get("SYNPIN_API_BASE", "http://127.0.0.1:2088")
 
 
+
+@register_tool(
+    name='otdel_manage',
+    description='Управление отделами (otdels) — чат-комнаты для общения. Список, просмотр, создание, обновление, удаление. Узнай кто глава отдела и сколько агентов.',
+    category='other',
+    scope='primary',
+    dangerous=False,
+)
 async def otdel_manage(params: dict[str, Any]) -> ToolResult:
     """
     Управление отделами (otdels) — чат-комнаты для общения.

@@ -5,10 +5,19 @@ import os
 from typing import Any
 
 from .base import ToolResult, make_success, make_error
+from ._registry import register_tool
 
 _API_BASE = os.environ.get("SYNPIN_API_BASE", "http://127.0.0.1:2088")
 
 
+
+@register_tool(
+    name='project_manage',
+    description='Управление проектами: создание, редактирование, удаление, управление отделами в проекте. Используй для создания проектов и связывания их с отделами.',
+    category='other',
+    scope='primary',
+    dangerous=False,
+)
 async def project_manage(params: dict[str, Any]) -> ToolResult:
     """
     Управление проектами.

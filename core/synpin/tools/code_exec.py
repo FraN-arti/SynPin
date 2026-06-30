@@ -12,6 +12,7 @@ import traceback
 from typing import Any
 
 from .base import ToolResult, make_success, make_error
+from ._registry import register_tool
 
 # Dangerous builtins to remove from the sandbox
 _BLOCKED_NAMES = {
@@ -159,6 +160,14 @@ def _create_sandbox() -> dict[str, Any]:
     return namespace
 
 
+
+@register_tool(
+    name='code_exec',
+    description='Выполнение Python-кода. Используй для вычислений, анализа данных, генерации контента.',
+    category='code',
+    scope='all',
+    dangerous=True,
+)
 async def code_exec(params: dict) -> ToolResult:
     """Execute Python code in a restricted sandbox.
 

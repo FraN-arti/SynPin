@@ -11,10 +11,19 @@ import os
 from pathlib import Path
 
 from .base import ToolResult, make_success, make_error
+from ._registry import register_tool
 
 _log = logging.getLogger("synpin.chat")
 
 
+
+@register_tool(
+    name='summarize',
+    description='Суммаризация текста. Используй когда нужно кратко описать длинный текст, диалог или документ.',
+    category='other',
+    scope='builtin',
+    dangerous=False,
+)
 async def summarize(params: dict) -> ToolResult:
     """Summarize text using the configured summarization model.
 

@@ -9,10 +9,19 @@ from datetime import datetime
 from typing import Any
 
 from .base import ToolResult, make_success, make_error
+from ._registry import register_tool
 # Configurable API base URL (defaults to standard dev port)
 _API_BASE = os.environ.get("SYNPIN_API_BASE", "http://127.0.0.1:2088")
 
 
+
+@register_tool(
+    name='kanban_task',
+    description='Работа с канбан-тасками: создание, список, редактирование, удаление, архивация, история, переназначение, завершение, доработка, блокировка, начало работы, отправка на ревью, одобрение, статус.',
+    category='other',
+    scope='head',
+    dangerous=False,
+)
 async def kanban_task(params: dict[str, Any]) -> ToolResult:
     """
     Interact with kanban tasks.

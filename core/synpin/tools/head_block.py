@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..chat.ws_manager import ws_manager
+from ._registry import register_tool
 from .base import ToolResult, make_success, make_error
 
 
@@ -11,6 +12,14 @@ from .base import ToolResult, make_success, make_error
 _blockers: dict[str, list[dict]] = {}
 
 
+
+@register_tool(
+    name='head_block',
+    description='Сообщить голове о блокере. Используй когда застрял и нужна помощь.',
+    category='other',
+    scope='head',
+    dangerous=False,
+)
 async def head_block(params: dict[str, Any]) -> ToolResult:
     """
     Worker reports a blocker to head.

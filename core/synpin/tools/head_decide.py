@@ -4,9 +4,18 @@ from __future__ import annotations
 from typing import Any
 
 from ..chat.ws_router import get_head_state
+from ._registry import register_tool
 from .base import ToolResult, make_success, make_error
 
 
+
+@register_tool(
+    name='head_decide',
+    description='Принять стратегическое решение по делегации: продолжить, остановить, взять на себя или эскалировать пользователю.',
+    category='head_protocol',
+    scope='head',
+    dangerous=False,
+)
 async def head_decide(params: dict[str, Any]) -> ToolResult:
     """
     Make a strategic decision about the delegation.

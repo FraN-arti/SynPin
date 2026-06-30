@@ -9,9 +9,18 @@ import asyncio
 from pathlib import Path
 
 from .base import ToolResult, make_success, make_error
+from ._registry import register_tool
 from .security import get_allowed_roots, validate_path
 
 
+
+@register_tool(
+    name='file_write',
+    description='Запись/перезапись содержимого файла. Создаёт файл или перезаписывает существующий.',
+    category='files',
+    scope='all',
+    dangerous=True,
+)
 async def file_write(params: dict) -> ToolResult:
     """Write content to a file (overwrites existing content).
 

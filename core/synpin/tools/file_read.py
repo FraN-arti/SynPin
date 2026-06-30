@@ -8,12 +8,21 @@ import asyncio
 from pathlib import Path
 
 from .base import ToolResult, make_success, make_error
+from ._registry import register_tool
 from .security import get_allowed_roots, validate_path
 
 # Max characters to return (1 MB safety limit)
 _MAX_CHARS = 1_000_000
 
 
+
+@register_tool(
+    name='file_read',
+    description='Чтение содержимого файла. Возвращает содержимое с номерами строк.',
+    category='files',
+    scope='all',
+    dangerous=False,
+)
 async def file_read(params: dict) -> ToolResult:
     """Read a file's contents.
 

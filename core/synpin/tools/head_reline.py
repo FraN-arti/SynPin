@@ -4,8 +4,17 @@ from __future__ import annotations
 from typing import Any
 
 from .base import ToolResult, make_success, make_error
+from ._registry import register_tool
 
 
+
+@register_tool(
+    name='head_reline',
+    description='Вернуть задачу предыдущему отделу с замечаниями (релайн). Используй когда задача выполнена некачественно или не соответствует требованиям.',
+    category='other',
+    scope='head',
+    dangerous=False,
+)
 async def head_reline(params: dict[str, Any]) -> ToolResult:
     """
     Return a task to the previous department with review remarks (reline).

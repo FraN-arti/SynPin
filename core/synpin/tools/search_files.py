@@ -10,6 +10,7 @@ import re
 from pathlib import Path
 
 from .base import ToolResult, make_success, make_error
+from ._registry import register_tool
 from .security import get_allowed_roots, validate_path
 
 # Max results to return
@@ -22,6 +23,14 @@ def _get_search_root() -> Path:
     return roots[0] if roots else Path(r"D:\synpin")
 
 
+
+@register_tool(
+    name='search_files',
+    description='Поиск по содержимому или имени файла (grep/find).',
+    category='files',
+    scope='all',
+    dangerous=False,
+)
 async def search_files(params: dict) -> ToolResult:
     """Search for files by name pattern or content.
 

@@ -29,6 +29,14 @@ _TIMEOUT = 30
     scope="all",
     dangerous=True,
 )
+
+@register_tool(
+    name='terminal',
+    description='Выполнение shell-команд (bash). Используй для запуска git, npm, python, ls, cat и любых других команд.',
+    category='code',
+    scope='all',
+    dangerous=True,
+)
 async def terminal(params: dict) -> ToolResult:
     """Execute a shell command and return stdout + stderr.
 

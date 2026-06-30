@@ -4,9 +4,18 @@ from __future__ import annotations
 from typing import Any
 
 from ..chat.ws_router import get_head_state
+from ._registry import register_tool
 from .base import ToolResult, make_success, make_error
 
 
+
+@register_tool(
+    name='head_evaluate',
+    description='Оценить результаты работников по критериям. Проверяет удовлетворяют ли ответы поставленной задаче.',
+    category='head_protocol',
+    scope='head',
+    dangerous=False,
+)
 async def head_evaluate(params: dict[str, Any]) -> ToolResult:
     """
     Evaluate if worker results satisfy the task.

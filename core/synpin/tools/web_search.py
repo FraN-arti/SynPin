@@ -12,10 +12,19 @@ from html import unescape as html_unescape
 from urllib.parse import quote_plus, unquote
 
 from .base import ToolResult, make_success, make_error
+from ._registry import register_tool
 
 # Default number of results
 _DEFAULT_LIMIT = 10
 
+
+@register_tool(
+    name='web_search',
+    description='Поиск информации в интернете. Поддерживает несколько поисковых систем (DuckDuckGo, Tavily, EXA, Perplexity, Bing, SerpAPI, Google). Провайдер выбирается автоматически из настроек.',
+    category='web',
+    scope='all',
+    dangerous=False,
+)
 async def web_search(params: dict) -> ToolResult:
     """Search the web for information.
     

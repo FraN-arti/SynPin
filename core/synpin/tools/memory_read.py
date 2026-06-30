@@ -7,10 +7,19 @@ Thin wrapper around MemoryManager (synpin.memory). Live entries are returned
 something will see it on the next read without waiting for any TTL.
 """
 from typing import Any
+from ._registry import register_tool
 
 from ..memory import get_manager
 
 
+
+@register_tool(
+    name='memory_read',
+    description='Чтение памяти агента. Используй чтобы вспомнить предыдущие решения, факты, контекст сессий.',
+    category='memory',
+    scope='builtin',
+    dangerous=False,
+)
 async def memory_read(params: dict[str, Any]) -> dict[str, Any]:
     """Read agent memory.
 

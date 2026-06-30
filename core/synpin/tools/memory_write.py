@@ -9,12 +9,21 @@ tool-call schema into MemoryManager method calls.
 """
 import logging
 from typing import Any
+from ._registry import register_tool
 
 from ..memory import get_manager
 
 logger = logging.getLogger("synpin.memory")
 
 
+
+@register_tool(
+    name='memory_write',
+    description='Запись в память агента. Используй чтобы запомнить важную информацию на будущее.',
+    category='memory',
+    scope='builtin',
+    dangerous=False,
+)
 async def memory_write(params: dict[str, Any]) -> dict[str, Any]:
     """Write to agent memory.
 

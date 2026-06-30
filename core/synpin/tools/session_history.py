@@ -6,10 +6,19 @@ This is how agents remember past conversations after session reset.
 import json
 from pathlib import Path
 from typing import Any
+from ._registry import register_tool
 
 from ..paths import get_data_dir as _get_data_dir
 
 
+
+@register_tool(
+    name='session_history',
+    description='Поиск в архивах прошлых сессий. Используй когда пользователь ссылается на старые разговоры.',
+    category='memory',
+    scope='builtin',
+    dangerous=False,
+)
 async def session_history(params: dict[str, Any]) -> dict[str, Any]:
     """Read archived session history.
 

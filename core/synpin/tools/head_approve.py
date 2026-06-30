@@ -92,6 +92,14 @@ async def head_approve(params: dict[str, Any]) -> ToolResult:
         return make_error(f"Approval failed: {e}")
 
 
+@register_tool(
+    name='head_approval_status',
+    description='Проверить статус утверждений или посмотреть последние передачи по отделу.',
+    category='head_protocol',
+    scope='head',
+    dangerous=False,
+)
+
 async def head_approval_status(params: dict[str, Any]) -> ToolResult:
     """
     Check approval status or list recent approvals.

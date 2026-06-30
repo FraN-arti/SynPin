@@ -5,8 +5,17 @@ Agents can call this to know what time it is on the server.
 from __future__ import annotations
 from typing import Any
 from .base import ToolResult, make_success, make_error
+from ._registry import register_tool
 
 
+
+@register_tool(
+    name='get_current_time',
+    description='Получить текущую дату, время и таймзону сервера.',
+    category='system',
+    scope='builtin',
+    dangerous=False,
+)
 async def get_current_time(params: dict[str, Any]) -> ToolResult:
     """Return current server time with optional timezone info.
 

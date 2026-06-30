@@ -4,7 +4,16 @@ from __future__ import annotations
 from typing import Any
 
 from .base import ToolResult, make_success, make_error
+from ._registry import register_tool
 
+
+@register_tool(
+    name='connection_list',
+    description='Показать все связи между отделами. Только для главного агента.',
+    category='communication',
+    scope='primary',
+    dangerous=False,
+)
 
 async def connection_list(params: dict[str, Any]) -> ToolResult:
     """
@@ -47,6 +56,14 @@ async def connection_list(params: dict[str, Any]) -> ToolResult:
     except Exception as e:
         return make_error(f"Failed to list connections: {e}")
 
+
+@register_tool(
+    name='connection_create',
+    description='Создать связь между отделами. Только для главного агента.',
+    category='communication',
+    scope='primary',
+    dangerous=False,
+)
 
 async def connection_create(params: dict[str, Any]) -> ToolResult:
     """
@@ -131,6 +148,14 @@ async def connection_create(params: dict[str, Any]) -> ToolResult:
         return make_error(f"Failed to create connection: {e}")
 
 
+@register_tool(
+    name='connection_delete',
+    description='Удалить связь по ID. Только для главного агента.',
+    category='communication',
+    scope='primary',
+    dangerous=False,
+)
+
 async def connection_delete(params: dict[str, Any]) -> ToolResult:
     """
     Delete a connection by ID.
@@ -176,6 +201,14 @@ async def connection_delete(params: dict[str, Any]) -> ToolResult:
     except Exception as e:
         return make_error(f"Failed to delete connection: {e}")
 
+
+@register_tool(
+    name='connection_history',
+    description='История передач/утверждений/релайнов. Только для главного агента.',
+    category='communication',
+    scope='primary',
+    dangerous=False,
+)
 
 async def connection_history(params: dict[str, Any]) -> ToolResult:
     """

@@ -5,8 +5,17 @@ Agents can call this to know about the server environment.
 from __future__ import annotations
 from typing import Any
 from .base import ToolResult, make_success, make_error
+from ._registry import register_tool
 
 
+
+@register_tool(
+    name='get_system_info',
+    description='Получить информацию о сервере: hostname, IP, версия, аптайм.',
+    category='system',
+    scope='builtin',
+    dangerous=False,
+)
 async def get_system_info(params: dict[str, Any]) -> ToolResult:
     """Return system information.
 

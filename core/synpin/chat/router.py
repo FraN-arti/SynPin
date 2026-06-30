@@ -648,14 +648,16 @@ def _ensure_defs_built() -> None:
 def get_native_tool_defs() -> dict:
     """Public accessor returning the live _NATIVE_TOOL_DEFS dict.
 
-    Always returns the current dict from the chat.router module —
-    callers must NOT hold onto the returned reference across rebinds,
-    or they can simply re-call this function. This avoids the classic
-    `from X import Y` trap where the importing module captures an
-    old binding of Y when X rebinds Y.
+    Triggers lazy build on first call. Always returns the current
+    dict from the chat.router module — callers must NOT hold onto
+    the returned reference across rebinds, or they can simply
+    re-call this function.
     """
     import sys
-    return sys.modules["synpin.chat.router"].__dict__["_NATIVE_TOOL_DEFS"]
+    mod = sys.modules["synpin.chat.router"]
+    if not mod.__dict__["_NATIVE_TOOL_DEFS"]:
+        mod.__dict__["_ensure_defs_built"]()
+    return mod.__dict__["_NATIVE_TOOL_DEFS"]
 
 
 def _ensure_defs_built_first() -> dict:
@@ -723,17 +725,18 @@ def is_tool_dangerous(name: str) -> bool:
 def build_openai_tools(tool_names: list[str]) -> list[dict] | None:
     """Build OpenAI function calling tools list for enabled tools."""
     tools = []
+    native_defs = get_native_tool_defs()  # lazy-build safe accessor
 
     # Always include built-in tools
     for name in BUILTINS:
-        tool_def = _NATIVE_TOOL_DEFS.get(name)
+        tool_def = native_defs.get(name)
         if tool_def:
             tools.append(tool_def)
 
     # Add agent-specific tools
     for name in tool_names:
         if name not in BUILTINS:
-            tool_def = _NATIVE_TOOL_DEFS.get(name)
+            tool_def = native_defs.get(name)
             if tool_def:
                 tools.append(tool_def)
 
@@ -751,6 +754,8 @@ def build_tool_descriptions(tool_names: list[str]) -> str:
     if not all_names:
         return ""
 
+    native_defs = get_native_tool_defs()
+
     lines = ["\n## Инструменты\n",
              "Для работы с задачами используй инструменты. Формат вызова:",
              '```tool_call',
@@ -759,7 +764,7 @@ def build_tool_descriptions(tool_names: list[str]) -> str:
              "Можно вызвать несколько инструментов подряд. Результат вернётся автоматически.\n"]
 
     for name in all_names:
-        tool_def = _NATIVE_TOOL_DEFS.get(name)
+        tool_def = native_defs.get(name)
         if not tool_def:
             continue
         fn = tool_def.get("function", {})

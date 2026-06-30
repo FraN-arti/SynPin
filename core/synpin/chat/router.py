@@ -1233,7 +1233,9 @@ def _build_system_prompt_with_memory(req: ChatRequest) -> str:
         # Inject available skills (name + description only — full text via skill_view)
         try:
             from ..skills.manager import list_skills
-            skill_list = list_skills()
+            from ..config.manager import get_disabled_skills
+            skill_disabled = set(get_disabled_skills())
+            skill_list = [s for s in list_skills() if s.name not in skill_disabled]
             if skill_list:
                 lines = ["\n\n## Доступные скиллы\n"]
                 lines.append(

@@ -235,6 +235,10 @@ app.include_router(cron_router)
 from .tools_router import router as tools_router
 app.include_router(tools_router)
 
+# Skills — global enable/disable for skills library
+from .skills_router import router as skills_router
+app.include_router(skills_router)
+
 # Hermes Agent chat proxy
 from .hermes_chat_router import router as hermes_chat_router
 app.include_router(hermes_chat_router)

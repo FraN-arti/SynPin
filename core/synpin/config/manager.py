@@ -143,6 +143,45 @@ def set_disabled_tool(name: str, disabled: bool) -> bool:
     return True
 
 
+# ── Skills ─────────────────────────────────────────────────────────
+
+def get_disabled_skills() -> list[str]:
+    """Return globally disabled skill names from settings.yaml.
+
+    Same pattern as get_disabled_tools: fresh read every call so UI
+    toggles take effect immediately.
+    """
+    try:
+        data = load_yaml("settings.yaml")
+        skills_cfg = (data or {}).get("skills", {}) or {}
+        disabled = skills_cfg.get("disabled", [])
+        return [str(s) for s in disabled if s]
+    except Exception:
+        return []
+
+
+def set_disabled_skill(name: str, disabled: bool) -> bool:
+    """Add or remove `name` from the skills disabled list. Returns True on change."""
+    try:
+        data = load_yaml("settings.yaml") or {}
+    except Exception:
+        data = {}
+    if "skills" not in data or not isinstance(data.get("skills"), dict):
+        data["skills"] = {}
+    current = set(str(s) for s in data["skills"].get("disabled", []) if s)
+    if disabled:
+        if name in current:
+            return False
+        current.add(name)
+    else:
+        if name not in current:
+            return False
+        current.discard(name)
+    data["skills"]["disabled"] = sorted(current)
+    save_yaml("settings.yaml", data)
+    return True
+
+
 class ConfigManager:
     """Manager class wrapping config functions."""
     def get_providers(self):

@@ -1,9 +1,9 @@
 """External agents — detection and management of external agent integrations."""
 import os
 import httpx
-from pathlib import Path
 from typing import Any
 from ..agents import manager
+from ..paths import get_config_dir
 
 # External agent registry — each entry defines a detectable external agent
 EXTERNAL_AGENT_REGISTRY: list[dict[str, Any]] = [
@@ -78,13 +78,13 @@ async def detect_external_agents() -> list[dict[str, Any]]:
 
 def get_external_agents_config() -> dict[str, Any]:
     """Load external agents configuration."""
-    config_path = manager._get_config_dir() / "external_agents.yaml"
+    config_path = get_config_dir() / "external_agents.yaml"
     return manager._load_yaml(config_path)
 
 
 def save_external_agents_config(config: dict[str, Any]) -> None:
     """Save external agents configuration."""
-    config_path = manager._get_config_dir() / "external_agents.yaml"
+    config_path = get_config_dir() / "external_agents.yaml"
     manager._save_yaml(config_path, config)
 
 
@@ -193,7 +193,7 @@ def update_external_agent(slug: str, updates: dict[str, Any]) -> dict[str, Any] 
 
     # Sync is_primary with settings.yaml and broadcast
     if "is_primary" in updates:
-        settings_path = manager._get_config_dir() / "settings.yaml"
+        settings_path = get_config_dir() / "settings.yaml"
         settings_data = manager._load_yaml(settings_path)
         if updates["is_primary"]:
             settings_data["primary_agent_slug"] = slug

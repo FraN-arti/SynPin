@@ -7,11 +7,10 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-from pathlib import Path
 
 from .base import ToolResult, make_success, make_error
 from ._registry import register_tool
+from ..paths import get_config_dir
 
 _log = logging.getLogger("synpin.chat")
 
@@ -80,9 +79,10 @@ async def summarize(params: dict) -> ToolResult:
 def _load_summarization_config() -> tuple[str, str] | None:
     """Load summarization model from settings.yaml. Returns (provider, model) or None."""
     try:
-        config_dir = _get_config_dir()
-        settings_path = os.path.join(config_dir, "settings.yaml")
-        if not os.path.exists(settings_path):
+        config_dir = get_config_dir()
+        config_dir.mkdir(parents=True, exist_ok=True)
+        settings_path = config_dir / "settings.yaml"
+        if not settings_path.exists():
             return None
 
         import yaml
@@ -102,25 +102,13 @@ def _load_summarization_config() -> tuple[str, str] | None:
         return None
 
 
-def _get_config_dir() -> str:
-    """Find config directory — same logic as config_router.py."""
-    candidates = [
-        Path.home() / ".synpin" / "config",
-        Path(__file__).resolve().parent.parent / "config",
-    ]
-    for c in candidates:
-        if c.exists():
-            return str(c)
-    candidates[0].mkdir(parents=True, exist_ok=True)
-    return str(candidates[0])
-
-
 def _load_provider_config(provider_name: str) -> dict | None:
     """Load provider config from providers.yaml."""
     try:
-        config_dir = _get_config_dir()
-        providers_path = os.path.join(config_dir, "providers.yaml")
-        if not os.path.exists(providers_path):
+        config_dir = get_config_dir()
+        config_dir.mkdir(parents=True, exist_ok=True)
+        providers_path = config_dir / "providers.yaml"
+        if not providers_path.exists():
             return None
 
         import yaml

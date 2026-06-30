@@ -8,12 +8,13 @@ from __future__ import annotations
 import os
 import random
 import string
-from .models import TaskStatus
-import threading
 from pathlib import Path
 
 import yaml
 from pydantic import BaseModel, Field
+
+from ..paths import get_config_dir as _main_config_dir
+from .models import TaskStatus
 
 
 # ── ID Generation ────────────────────────────────────────────────────────────
@@ -110,8 +111,6 @@ def _default_labels() -> list[LabelConfig]:
 
 # ── Config directory ─────────────────────────────────────────────────────────
 
-_config_lock = threading.Lock()
-
 
 def _get_config_dir() -> Path:
     """Resolve kanban config directory.
@@ -121,7 +120,6 @@ def _get_config_dir() -> Path:
     mode it sits at core/synpin/kanban/config/ to keep the project's
     kanban config in version control; in prod it's ~/.synpin/config/kanban/.
     """
-    from ..paths import get_config_dir as _main_config_dir
     prod = _main_config_dir() / "kanban"
     dev = Path(__file__).resolve().parent / "config"
 
@@ -164,13 +162,12 @@ def _load_yaml(name: str) -> dict | list | None:
 
 def _save_yaml(name: str, data) -> None:
     """Save data to a YAML file."""
-    with _config_lock:
-        path = _yaml_path(name)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            yaml.dump(data, default_flow_style=False, allow_unicode=True, sort_keys=False, width=120),
-            encoding="utf-8",
-        )
+    path = _yaml_path(name)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        yaml.dump(data, default_flow_style=False, allow_unicode=True, sort_keys=False, width=120),
+        encoding="utf-8",
+    )
 
 
 # ── Columns ──────────────────────────────────────────────────────────────────

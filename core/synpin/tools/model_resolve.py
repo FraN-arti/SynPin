@@ -12,8 +12,8 @@ Usage in tools:
 from __future__ import annotations
 
 import logging
-import os
-from pathlib import Path
+
+from ..paths import get_config_dir
 
 _log = logging.getLogger("synpin.tools")
 
@@ -53,9 +53,10 @@ def resolve_specialized_model(
 def _read_settings_model(setting_key: str) -> str | None:
     """Read a model string from settings.yaml → models.{key}."""
     try:
-        config_dir = _get_config_dir()
-        settings_path = os.path.join(config_dir, "settings.yaml")
-        if not os.path.exists(settings_path):
+        config_dir = get_config_dir()
+        config_dir.mkdir(parents=True, exist_ok=True)
+        settings_path = config_dir / "settings.yaml"
+        if not settings_path.exists():
             return None
         import yaml
         with open(settings_path, "r", encoding="utf-8") as f:
@@ -65,16 +66,3 @@ def _read_settings_model(setting_key: str) -> str | None:
     except Exception as e:
         _log.warning("[model-resolve] Failed to read settings: %s", e)
         return None
-
-
-def _get_config_dir() -> str:
-    """Find config directory."""
-    candidates = [
-        Path.home() / ".synpin" / "config",
-        Path(__file__).resolve().parent.parent / "config",
-    ]
-    for c in candidates:
-        if c.exists():
-            return str(c)
-    candidates[0].mkdir(parents=True, exist_ok=True)
-    return str(candidates[0])

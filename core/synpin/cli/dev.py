@@ -393,15 +393,30 @@ def _start_core(port: int) -> subprocess.Popen:
 
 
 def _start_web(port: int, backend_port: int) -> subprocess.Popen:
-    """Start the Vite dev server."""
+    """Start the Vite dev server.
+
+    On Windows, npm is a .cmd shim — need shell=True to find it.
+    We also pass CREATE_NEW_PROCESS_GROUP so that Vite (node.exe) is
+    isolated from Ctrl+C signals sent to the parent console group.
+
+    Why this matters: when uvicorn --reload detects a .py change, it
+    sends SIGINT (CTRL_C_EVENT on Windows) to restart the worker. On
+    Windows, CTRL_C_EVENT goes to ALL processes in the same console
+    group — including Vite. Vite dies on every Core reload. Putting
+    Vite in its own process group means it never sees the signal and
+    keeps running. SIGBREAK (Ctrl+Break) would still reach it, but
+    uvicorn uses SIGINT, not SIGBREAK.
+
+    The trade-off: when the user hits real Ctrl+C, the _shutdown
+    handler kills Vite explicitly via taskkill /T, so the group
+    isolation doesn't prevent clean shutdown.
+    """
     env = os.environ.copy()
     env["BACKEND_PORT"] = str(backend_port)
     env["VITE_API_PROXY_TARGET"] = f"http://127.0.0.1:{backend_port}"
 
     cmd = ["npm", "run", "dev", "--", "--port", str(port)]
-    # On Windows, npm is a .cmd shim — need shell=True to find it
-    return subprocess.Popen(
-        cmd,
+    kwargs = dict(
         cwd=str(_project_root() / "web"),
         env=env,
         stdout=subprocess.PIPE,
@@ -410,6 +425,11 @@ def _start_web(port: int, backend_port: int) -> subprocess.Popen:
         bufsize=1,
         shell=(os.name == "nt"),
     )
+    if os.name == "nt":
+        # CREATE_NEW_PROCESS_GROUP = 0x00000200
+        # Isolates Vite from Ctrl+C signals originating from the parent.
+        kwargs["creationflags"] = 0x00000200
+    return subprocess.Popen(cmd, **kwargs)
 
 
 def _check_prerequisites() -> None:

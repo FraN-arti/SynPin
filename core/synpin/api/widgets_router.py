@@ -8,22 +8,13 @@ from typing import Any
 import yaml
 from fastapi import APIRouter
 
+from ..paths import get_config_dir
+
 router = APIRouter(prefix="/api/widgets", tags=["widgets"])
-
-# Config path — same dir as other YAML configs
-_config_dir: Path | None = None
-
-
-def _get_config_dir() -> Path:
-    global _config_dir
-    if _config_dir is None:
-        from ..paths import get_config_dir
-        _config_dir = get_config_dir()
-    return _config_dir
 
 
 def _yaml_path() -> Path:
-    return _get_config_dir() / "widget_layout.yaml"
+    return get_config_dir() / "widget_layout.yaml"
 
 
 def _load_layout() -> dict[str, Any]:

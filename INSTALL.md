@@ -77,8 +77,7 @@ D:\synpin\
         ├── kanban/         # kanban service + models
         ├── chat/           # chat routers
         ├── tools/          # agent tool implementations
-        ├── paths.py        # new path resolver (XDG/platformdirs)
-        └── paths_legacy.py # old resolvers, kept for back-compat
+        ├── paths.py        # path resolver (XDG/platformdirs)
 ```
 
 ## Updating

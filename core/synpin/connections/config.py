@@ -5,12 +5,13 @@ import json
 import logging
 import os
 from datetime import datetime
-from ..time import now as _now
 from pathlib import Path
 from typing import Any
 
 import yaml
 
+from ..paths import get_config_dir, get_data_dir
+from ..time import now as _now
 from .models import (
     AutoTriggerConfig,
     CanvasData,
@@ -25,28 +26,17 @@ logger = logging.getLogger("synpin.connections.config")
 
 # ── Path resolution ──────────────────────────────────────────────────────────
 
-def _get_config_dir() -> Path:
-    """Config directory (connections.yaml lives here)."""
-    from ..paths import get_config_dir
-    return get_config_dir()
-
-
-def _get_data_dir() -> Path:
-    """Data directory (approval_history.yaml, canvas/)."""
-    from ..paths import get_data_dir
-    return get_data_dir()
-
 
 def _connections_path() -> Path:
-    return _get_config_dir() / "connections.yaml"
+    return get_config_dir() / "connections.yaml"
 
 
 def _history_path() -> Path:
-    return _get_data_dir() / "approval_history.yaml"
+    return get_data_dir() / "approval_history.yaml"
 
 
 def _canvas_path() -> Path:
-    return _get_data_dir() / "canvas" / "positions.json"
+    return get_data_dir() / "canvas" / "positions.json"
 
 
 # ── YAML helpers ─────────────────────────────────────────────────────────────

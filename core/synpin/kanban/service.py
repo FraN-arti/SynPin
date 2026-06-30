@@ -6,13 +6,13 @@ Broadcasts WebSocket events on every task change for live board updates.
 from __future__ import annotations
 
 import asyncio
-import os
 import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from ..time import now as _now
+from ..paths import get_tasks_dir
 from .models import (
     ActionType,
     Priority,
@@ -33,32 +33,15 @@ def _broadcast(event: dict) -> None:
 
 # ── Directory resolution ─────────────────────────────────────────────────────
 
-_data_dir_lock = threading.Lock()
-
-
-def _get_data_dir() -> Path:
-    """Resolve kanban data directory (kanban uses its own subdirectory).
-
-    Kanban's tasks live at <data>/tasks/, not at <data>/ itself, so
-    we use get_tasks_dir() from paths.py.
-    """
-    from ..paths import get_tasks_dir
-    dev = get_tasks_dir()
-    prod = Path.home() / ".synpin" / "data" / "tasks"
-
-    if os.environ.get("SYNPIN_DEV") == "1":
-        return dev
-
-    if prod.exists():
-        return prod
-
-    # First run — use dev path
-    return dev
-
 
 def _get_tasks_dir() -> Path:
-    """Get tasks directory, create if needed."""
-    d = _get_data_dir()
+    """Get tasks directory, create if needed.
+
+    Uses paths.get_tasks_dir() as the single source of truth: in dev
+    mode that's core/synpin/data/tasks/, in prod it's ~/.synpin/data/tasks/.
+    Both were already the targets of the previous hand-rolled logic.
+    """
+    d = get_tasks_dir()
     d.mkdir(parents=True, exist_ok=True)
     return d
 

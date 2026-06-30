@@ -144,11 +144,45 @@ async def _execute_run_prompt(job: Any) -> None:
     req = SimpleNamespace(agent_slug=agent_slug, system_prompt="", channel_id=channel_id)
     full_system_prompt = _build_system_prompt_with_memory(req)
 
-    # Inject cron task as system instruction (NOT as user message in history)
-    full_system_prompt += "\n\n## Задача от планировщика (cron)\n" + prompt
+    # Strip the entire cron_manage section from the system prompt — the agent
+    # is being woken BY cron, so instructions about how to CREATE crons are
+    # irrelevant and cause confusion ("cron_manage недоступен!"). The model
+    # sees the text, tries to call the tool, can't find it, panics.
+    # Remove the "### Планирование (cron_manage)" section entirely.
+    import re
+    full_system_prompt = re.sub(
+        r"### Планирование \(cron_manage\).*?(?=\n### |\Z)",
+        "",
+        full_system_prompt,
+        flags=re.DOTALL,
+    )
+    # Also strip the standalone "ПРОАКТИВНЫЙ CRON" subsection if present.
+    full_system_prompt = re.sub(
+        r"### ПРОАКТИВНЫЙ CRON.*?(?=\n### |\Z)",
+        "",
+        full_system_prompt,
+        flags=re.DOTALL,
+    )
 
-    # Load history — last N messages for context, no cron trigger
-    history = _load_chat_history(agent_slug, channel_id)
+    # Inject cron task as system instruction (NOT as user message in history).
+    # Put the task FIRST and the context instruction SECOND — the task text
+    # is what matters most, so it goes right after a clear header.
+    full_system_prompt = (
+        f"\n\n## ⏰ ЗАДАЧА ОТ ПЛАНИРОВЩИКА (CRON)\n\n{prompt}\n\n"
+        "## ВАЖНОЕ УКАЗАНИЕ\n"
+        "Это не диалог с пользователем. Тебя разбудил планировщик по расписанию. "
+        "ВЫПОЛНИ задание выше прямо сейчас. Не ставь напоминания, не проверяй "
+        "инструменты, не пиши 'Готово, запланировано'. Просто сделай то, что "
+        "просят — и ответь результатом.\n\n"
+        f"{full_system_prompt}"
+    )
+
+    # For cron execution, do NOT send chat history. The history pollutes
+    # context with irrelevant conversation patterns — e.g. if the user
+    # recently asked "напомни через N", the model sees that Q&A pattern
+    # and mimics it instead of executing the cron task.
+    # The cron prompt is self-contained: system prompt + task = enough.
+    history = []
 
     # Get provider/model
     provider_name = agent_data.get("provider") or None

@@ -95,6 +95,8 @@ async def cron_manage(params: dict[str, Any]) -> ToolResult:
                     "job_id": job.get("id"),
                     "name": job.get("name"),
                     "next_run_at": job.get("next_run_at"),
+                    "_hint": "Крон создан. НЕ ВЫЗЫВАЙ cron_manage повторно для этой же задачи — "
+                             "задача уже стоит. Сразу отвечай пользователю кратко: что запланировано и когда.",
                 })
 
             elif command == "update":

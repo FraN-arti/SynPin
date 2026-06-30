@@ -109,8 +109,15 @@ export function ToolsSection() {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
       })
-      .then((data: Tool[]) => {
+      .then((data: unknown) => {
         if (cancelled) return
+        // Server might proxy through Vite and return HTML index for unknown
+        // routes when the backend is down. Guard against non-array payloads
+        // so we don't poison state with a string/object and crash later
+        // in .filter/.map with "tools is not iterable".
+        if (!Array.isArray(data)) {
+          throw new Error('Сервер вернул неожиданный ответ (ожидался JSON-массив)')
+        }
         setTools(data)
         setError(null)
       })

@@ -3096,3 +3096,19 @@
   font-size: 12px;
   margin-bottom: 12px;
 }
+
+/* === Card description (subtitle text under .settings-card-title) === */
+/*
+ *  Previously undefined — the description <p> in SettingsCard inherited
+ *  body styles and rendered bold/oversized. Mirrors .settings-section-desc
+ *  (12px, weight 400, dim color, 1.5 line-height) so secondary copy under
+ *  a card title reads as a note, not a heading. Used by every SettingsCard
+ *  that passes a `description` prop (Cron, Kanban, Agents, Tools, …).
+ */
+.settings-card-desc {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-dim, #aaa);
+  line-height: 1.5;
+  margin: 6px 0 0 0;
+}

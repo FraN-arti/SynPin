@@ -29,6 +29,7 @@ class CronJobCreate(BaseModel):
     created_by: str = "user"
     timezone: str = "Europe/Moscow"
     delivery: str = "private"       # "private" | "otdel" | "silent"
+    behavior: str = "merge"        # "merge" (default, dedup) | "replace" (force) | "new" (always create)
 
 
 class CronJobUpdate(BaseModel):
@@ -68,6 +69,7 @@ def api_create_job(req: CronJobCreate) -> dict[str, Any]:
             description=req.description,
             timezone=req.timezone,
             delivery=req.delivery,
+            behavior=req.behavior,
         )
     except CronLimitExceeded as e:
         raise HTTPException(

@@ -211,20 +211,76 @@ def create_job(
     description: str = "",
     timezone: str = "Europe/Moscow",
     delivery: str = "private",
+    behavior: str = "merge",
 ) -> CronJob:
-    """Create a new cron job.
+    """Create or update a cron job.
 
-    Raises CronLimitExceeded if `created_by` already has the maximum
-    number of active jobs (see get_agent_limit).
+    Dedup behaviour (controlled by `behavior`):
+      "merge"   (default) — if `created_by` already owns an ACTIVE job with
+                          the same `name`, update its schedule/action in place
+                          instead of creating a new one. This prevents the
+                          "5 напомни про чайник за 15 минут" spam — when the
+                          main agent re-prompts with a new schedule, the
+                          existing pending reminder is rescheduled, not
+                          duplicated. A "merged" job does NOT count as new
+                          against the per-creator limit.
+      "replace"            — same as merge, but forces replacement even if
+                          status is PAUSED/COMPLETED/MISSED (re-activates).
+      "new"                — always create a new job (bypass dedup). Caller
+                          is responsible for staying under the cap.
+
+    Raises CronLimitExceeded when behavior="new" (or "replace" re-activating)
+    pushes the creator over the per-creator cap. merge never raises this —
+    it reuses the existing slot.
+
+    Returns the resulting CronJob (newly created or updated).
     """
+    # Lazy import to avoid circular deps (DeliveryMode is in models.py)
+    from .models import DeliveryMode
+
+    # ── Dedup path: try to merge into an existing active job first ─────
+    if behavior in ("merge", "replace"):
+        existing = _find_active_job_by_name(created_by, name)
+        if existing:
+            # Update in place: new schedule/action overrides old.
+            existing.schedule_type = ScheduleType(schedule_type)
+            existing.schedule_expr = schedule_expr
+            existing.action_type = ActionType(action_type)
+            existing.action_target = action_target
+            existing.action_message = action_message
+            existing.action_agent = action_agent
+            existing.delivery = DeliveryMode(delivery)
+            existing.timezone = timezone
+            if description:
+                existing.description = description
+            # Force re-activation for replace (and merge on paused/completed).
+            if behavior == "replace" or existing.status != JobStatus.ACTIVE:
+                existing.status = JobStatus.ACTIVE
+                existing.last_run_at = None
+                existing.run_count = 0
+            existing.next_run_at = compute_next_run(existing)
+            existing.updated_at = _now().isoformat()
+
+            # Past-time one-shot → mark missed instead of active
+            if (existing.schedule_type == ScheduleType.ONCE
+                    and not existing.next_run_at):
+                existing.status = JobStatus.MISSED
+
+            _save_job(existing)
+            logger.info(
+                "Cron %s: merged into existing %s (%s) → schedule=%s:%s next=%s status=%s",
+                behavior, existing.id, name,
+                existing.schedule_type.value, existing.schedule_expr,
+                existing.next_run_at, existing.status.value,
+            )
+            return existing
+
+    # ── Fresh creation path ─────────────────────────────────────────────
     # Enforce per-creator limit BEFORE writing anything to disk.
     limit = get_agent_limit()
     current = count_active_for_creator(created_by)
     if current >= limit:
         raise CronLimitExceeded(created_by, current, limit)
-
-    # Lazy import to avoid circular deps (DeliveryMode is in models.py)
-    from .models import DeliveryMode
 
     job_id = f"cron-{uuid.uuid4().hex[:8]}"
     job = CronJob(
@@ -251,6 +307,31 @@ def create_job(
     _save_job(job)
     logger.info("Created cron job %s: %s (next: %s, status: %s)", job_id, name, job.next_run_at, job.status.value)
     return job
+
+
+def _find_active_job_by_name(created_by: str, name: str) -> Optional[CronJob]:
+    """Return the first job owned by `created_by` with matching name.
+
+    Used by dedup. Matching is exact (case-sensitive) on (created_by, name).
+    Looks at ACTIVE jobs first; if none found, falls back to PAUSED/COMPLETED
+    so behavior='replace' can re-activate a previously completed reminder.
+    If multiple jobs with the same name exist (created before dedup), the
+    oldest one wins — later ones can be cleaned up manually if needed.
+    """
+    all_jobs = list_jobs(include_disabled=True)
+    # Prefer an ACTIVE job with this name
+    for job in all_jobs:
+        if (job.created_by == created_by and job.name == name
+                and job.status == JobStatus.ACTIVE):
+            return job
+    # Fall back to most recently updated job (paused/completed/missed)
+    # so 'replace' can re-activate a previously completed reminder.
+    candidates = [j for j in all_jobs
+                 if j.created_by == created_by and j.name == name]
+    if not candidates:
+        return None
+    candidates.sort(key=lambda j: j.updated_at, reverse=True)
+    return candidates[0]
 
 
 def get_job(job_id: str) -> Optional[CronJob]:

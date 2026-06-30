@@ -187,7 +187,7 @@ function SkillCard({ skill, pending, onToggle }: SkillCardProps) {
           />
         </label>
       </div>
-      <p className="tool-card-desc" title={skill.description}>
+      <p className="tool-card-desc">
         {skill.description}
       </p>
       <div className="tool-card-meta">

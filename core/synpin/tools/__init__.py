@@ -53,6 +53,9 @@ from .cron_manage import cron_manage
 from .session_history import session_history
 from .get_current_time import get_current_time
 from .get_system_info import get_system_info
+from .skills_list import skills_list
+from .skill_view import skill_view
+from .skill_manage import skill_manage
 
 # Registry dict mapping tool names to handler functions (loaded lazily)
 _tool_handlers: dict[str, ToolHandler] | None = None
@@ -99,6 +102,9 @@ def get_tool_registry() -> dict[str, ToolHandler]:
             "session_history": session_history,
             "get_current_time": get_current_time,
             "get_system_info": get_system_info,
+            "skills_list": skills_list,
+            "skill_view": skill_view,
+            "skill_manage": skill_manage,
         }
     return _tool_handlers
 
@@ -142,4 +148,7 @@ __all__ = [
     "cron_manage",
     "get_current_time",
     "get_system_info",
+    "skills_list",
+    "skill_view",
+    "skill_manage",
 ]

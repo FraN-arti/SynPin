@@ -680,7 +680,7 @@ BUILTINS = {"memory_read", "memory_write", "image_analyze", "summarize", "sessio
 # (main agent also gets these via include_head=True)
 HEAD_TOOLS = {"head_delegate", "head_evaluate", "head_retry", "head_decide", "head_block", "kanban_task",
               "head_approve", "head_reline", "head_approval_status",
-              "cron_manage"}
+              "cron_manage", "skill_manage"}
 
 # Primary-only tools — only available to the main agent (is_primary=true)
 PRIMARY_TOOLS = {"otdel_manage", "project_manage",
@@ -1227,6 +1227,22 @@ def _build_system_prompt_with_memory(req: ChatRequest) -> str:
             from ..time import now_str as _now_str
             _now_str_val = _now_str()
             system_prompt = f"{system_prompt}\n\n## Текущее серверное время\nСейчас: {_now_str_val}. Используй это время для вычисления schedule_expr в cron_manage."
+        except Exception:
+            pass
+
+        # Inject available skills (name + description only — full text via skill_view)
+        try:
+            from ..skills.manager import list_skills
+            skill_list = list_skills()
+            if skill_list:
+                lines = ["\n\n## Доступные скиллы\n"]
+                lines.append(
+                    "Это процедуры и подходы для решения задач. "
+                    "Используй skill_view для получения полного текста скилла."
+                )
+                for s in skill_list:
+                    lines.append(f"- **{s.name}** — {s.description}")
+                system_prompt += "\n".join(lines)
         except Exception:
             pass
 

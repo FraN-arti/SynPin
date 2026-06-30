@@ -231,6 +231,10 @@ app.include_router(connections_router)
 from .cron_router import router as cron_router
 app.include_router(cron_router)
 
+# Tools — global enable/disable for LLM-callable tools
+from .tools_router import router as tools_router
+app.include_router(tools_router)
+
 # Hermes Agent chat proxy
 from .hermes_chat_router import router as hermes_chat_router
 app.include_router(hermes_chat_router)

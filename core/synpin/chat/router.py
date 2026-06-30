@@ -1371,15 +1371,37 @@ PRIMARY_TOOLS = {"otdel_manage", "project_manage",
                  "connection_list", "connection_create", "connection_delete", "connection_history",
                  "otdel_message", "otdel_history"}
 
+# Tools flagged as "dangerous" — UI shows warning icon and tooltip.
+# These tools can modify the system (filesystem, shell, code execution).
+# Kept as a constant (not a settings.yaml field) because it's a code-level
+# safety policy, not a user preference.
+DANGEROUS_TOOLS = {"terminal", "code_exec", "file_write"}
+
 
 def get_all_tool_names(include_head: bool = False, include_primary: bool = False) -> list[str]:
-    """Get all available tool names. All agents get all tools by default."""
-    tools = [n for n in _NATIVE_TOOL_DEFS if n not in HEAD_TOOLS and n not in PRIMARY_TOOLS]
+    """Get all available tool names for the agent context.
+
+    All agents get all tools by default, MINUS those globally disabled in
+    settings.yaml:tools.disabled. The disabled list is re-read on every
+    call so UI toggles take effect immediately.
+    """
+    from ..config.manager import get_disabled_tools
+    disabled = set(get_disabled_tools())
+
+    tools = [
+        n for n in _NATIVE_TOOL_DEFS
+        if n not in HEAD_TOOLS and n not in PRIMARY_TOOLS and n not in disabled
+    ]
     if include_head:
-        tools.extend(HEAD_TOOLS)
+        tools.extend(t for t in HEAD_TOOLS if t not in disabled)
     if include_primary:
-        tools.extend(PRIMARY_TOOLS)
+        tools.extend(t for t in PRIMARY_TOOLS if t not in disabled)
     return tools
+
+
+def is_tool_dangerous(name: str) -> bool:
+    """Return True if this tool can modify the system (terminal, code, files)."""
+    return name in DANGEROUS_TOOLS
 
 
 def build_openai_tools(tool_names: list[str]) -> list[dict] | None:

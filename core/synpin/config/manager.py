@@ -82,13 +82,65 @@ def add_provider(name: str, config: dict[str, Any]) -> dict[str, Any]:
 
 
 def remove_provider(name: str) -> bool:
-    """Remove a provider by name."""
+    """Remove a provider from providers.yaml."""
     data = get_providers()
     if "providers" in data and name in data["providers"]:
         del data["providers"][name]
         save_providers(data)
         return True
     return False
+
+
+# ── Tools — global enable/disable list (settings.yaml:tools.disabled) ──────────
+#
+# Single source of truth for which tools are turned OFF. Read on every LLM call
+# (via get_all_tool_names() in chat/router.py) so changes take effect immediately
+# without server restart. Format in settings.yaml:
+#
+#   tools:
+#     disabled: ["terminal", "code_exec"]
+#
+# Empty/missing list = everything enabled (default).
+
+def get_disabled_tools() -> list[str]:
+    """Return globally disabled tool names from settings.yaml.
+
+    Always returns a fresh read — settings can change at runtime via the
+    UI (api/tools_router.py) and we want to honor that immediately.
+    """
+    try:
+        data = load_yaml("settings.yaml")
+        tools_cfg = (data or {}).get("tools", {}) or {}
+        disabled = tools_cfg.get("disabled", [])
+        # Normalize to list[str], drop empty/None
+        return [str(t) for t in disabled if t]
+    except Exception:
+        return []
+
+
+def set_disabled_tool(name: str, disabled: bool) -> bool:
+    """Add or remove `name` from the disabled list. Returns True on change.
+
+    Persists to settings.yaml. UI calls this when toggling a tool.
+    """
+    try:
+        data = load_yaml("settings.yaml") or {}
+    except Exception:
+        data = {}
+    if "tools" not in data or not isinstance(data.get("tools"), dict):
+        data["tools"] = {}
+    current = set(str(t) for t in data["tools"].get("disabled", []) if t)
+    if disabled:
+        if name in current:
+            return False
+        current.add(name)
+    else:
+        if name not in current:
+            return False
+        current.discard(name)
+    data["tools"]["disabled"] = sorted(current)
+    save_yaml("settings.yaml", data)
+    return True
 
 
 class ConfigManager:

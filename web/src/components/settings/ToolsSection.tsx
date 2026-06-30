@@ -104,7 +104,7 @@ export function ToolsSection() {
   // Загрузка списка при маунте.
   useEffect(() => {
     let cancelled = false
-    fetch('/api/tools/settings')
+    fetch('/api/tools/settings/')
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()

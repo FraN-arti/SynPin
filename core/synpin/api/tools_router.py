@@ -78,7 +78,7 @@ class ToolToggleResponse(BaseModel):
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
-@router.get("", response_model=list[ToolEntry])
+@router.get("/")
 def list_tools() -> list[ToolEntry]:
     """Return all known tools with their current enabled state.
 

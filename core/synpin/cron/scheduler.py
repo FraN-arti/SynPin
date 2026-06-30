@@ -165,8 +165,15 @@ async def _execute_run_prompt(job: Any) -> None:
     if full_system_prompt:
         messages = [ChatMessage(role="system", content=full_system_prompt)] + messages
 
-    # Build tools — primary agent gets head tools too
+    # Build tools — primary agent gets head tools too.
+    # CRON CONTEXT: agent is being woken by scheduler, not the user. We
+    # MUST hide the cron_manage tool from the schema, otherwise the
+    # agent re-schedules itself on every fire (infinite recursion:
+    # "напомни про чайник через 3 минуты" → 7 nested crons in 20 min).
+    # Bug seen 2026-06-29. Defense in depth — even if the system prompt
+    # guard is ignored, model literally has no tool to call.
     tool_names = get_all_tool_names(include_head=is_primary, include_primary=is_primary)
+    tool_names = [t for t in tool_names if t != "cron_manage"]
     native_tools = build_openai_tools(tool_names)
     tool_desc = build_tool_descriptions(tool_names)
     if tool_desc and messages and messages[0].role == "system":

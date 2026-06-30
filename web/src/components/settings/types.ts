@@ -18,12 +18,12 @@ export const SYSTEM_TABS: TabDef[] = [
   { id: 'providers', label: 'Провайдеры' },
   { id: 'memory', label: 'Память' },
   { id: 'tools', label: 'Инструменты' },
+  { id: 'skills', label: 'Скиллы' },
   { id: 'cron', label: 'Крон' },
 ]
 
 export const SPACE_TABS: TabDef[] = [
   { id: 'channels', label: 'Каналы' },
-  { id: 'skills', label: 'Скиллы' },
   { id: 'connections', label: 'Связи' },
   { id: 'departments', label: 'Отделы' },
   { id: 'widgets', label: 'Виджеты' },

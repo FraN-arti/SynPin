@@ -3058,6 +3058,12 @@
   min-height: 32px;
 }
 
+/* Skill cards: don't clamp — show full description */
+.skill-card .tool-card-desc {
+  -webkit-line-clamp: unset;
+  min-height: 0;
+}
+
 .tool-card-meta {
   display: flex;
   gap: 4px;

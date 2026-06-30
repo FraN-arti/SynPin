@@ -169,7 +169,7 @@ function SkillCard({ skill, pending, onToggle }: SkillCardProps) {
 
   return (
     <div
-      className={`tool-card ${isOff ? 'tool-card-off' : ''} ${pending ? 'tool-card-pending' : ''}`}
+      className={`tool-card skill-card ${isOff ? 'tool-card-off' : ''} ${pending ? 'tool-card-pending' : ''}`}
     >
       <div className="tool-card-top">
         <div className="tool-card-name">

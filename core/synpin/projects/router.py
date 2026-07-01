@@ -9,26 +9,93 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 
-from ..paths import get_data_dir, get_otdels_dir
+from ..paths import get_data_dir, get_otdels_dir, get_agents_dir
 from .models import ProjectStatus
 from .config import ProjectConfig
 from .service import ProjectService
 
 
-# ── Department name enrichment ────────────────────────────────────────────
+# ── Department / agent name enrichment ────────────────────────────────────
+
+def _read_otdel(otdelid: str) -> dict | None:
+    """Read data/otdels/{id}/otdel.yaml into a flat dict.
+
+    Handles simple scalars plus a YAML inline list under `workers` (the
+    only nested field needed for project payloads). Cheap one-shot parse.
+    """
+    try:
+        path = get_otdels_dir() / otdelid / "otdel.yaml"
+        if not path.exists():
+            return None
+        text = path.read_text(encoding="utf-8")
+        out: dict = {}
+        workers: list[str] = []
+        in_workers = False
+        for raw in text.splitlines():
+            line = raw.rstrip()
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if not in_workers and ":" in stripped:
+                key, _, value = stripped.partition(":")
+                key = key.strip()
+                value = value.strip()
+                if key == "workers":
+                    in_workers = True
+                    # Flow-style list on the same line: workers: [a, b]
+                    if value.startswith("[") and value.endswith("]"):
+                        workers = [
+                            w.strip().strip("'\"")
+                            for w in value[1:-1].split(",")
+                            if w.strip()
+                        ]
+                        out["workers"] = workers
+                        in_workers = False
+                    continue
+                if value.startswith(("'", '"')) and value.endswith(("'", '"')) and len(value) >= 2:
+                    value = value[1:-1]
+                out[key] = value
+            elif in_workers and stripped.startswith("-"):
+                item = stripped.lstrip("-").strip()
+                if item.startswith(("'", '"')) and item.endswith(("'", '"')) and len(item) >= 2:
+                    item = item[1:-1]
+                if item:
+                    workers.append(item)
+        if workers or "workers" not in out:
+            out["workers"] = workers
+        # Strip the sentinel if no items accumulated
+        if isinstance(out.get("workers"), str):
+            out["workers"] = []
+        return out
+    except Exception:
+        return None
+
 
 def _read_otdel_name(otdelid: str) -> str | None:
-    """Read department name from data/otdels/{otdelid}/otdel.yaml.
-
-    Returns None if the file is missing or unreadable — never raises.
-    """
+    """Read department (otdel) name from data/otdels/{id}/otdel.yaml."""
     try:
         otdel_file = get_otdels_dir() / otdelid / "otdel.yaml"
         if not otdel_file.exists():
             return None
-        text = otdel_file.read_text(encoding="utf-8")
-        # Cheap key scan — no full YAML parse, project payloads stay cheap.
-        for line in text.splitlines():
+        for line in otdel_file.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if stripped.startswith("name:"):
+                value = stripped[len("name:"):].strip()
+                if value.startswith(("'", '"')) and value.endswith(("'", '"')) and len(value) >= 2:
+                    value = value[1:-1]
+                return value or None
+        return None
+    except Exception:
+        return None
+
+
+def _read_agent_name(agentid: str) -> str | None:
+    """Read agent name from data/agents/{id}/agent.yaml."""
+    try:
+        agent_file = get_agents_dir() / agentid / "agent.yaml"
+        if not agent_file.exists():
+            return None
+        for line in agent_file.read_text(encoding="utf-8").splitlines():
             stripped = line.strip()
             if stripped.startswith("name:"):
                 value = stripped[len("name:"):].strip()
@@ -41,19 +108,45 @@ def _read_otdel_name(otdelid: str) -> str | None:
 
 
 def _enrich_project(payload: dict) -> dict:
-    """Inject department names into a project payload (runtime-only, not persisted)."""
+    """Inject human-readable names into a project payload (runtime-only).
+
+    Enriches:
+      - departments[].name                  (otdel name)
+      - departments[].head_name             (head agent name)
+      - departments[].workers_names[]       (per-worker agent name)
+      - main_department_name                (top-level convenience)
+
+    Source of truth for head/workers is the department YAML, not the
+    ProjectDepartment payload (which only stores id/role/is_main).
+    """
     departments = payload.get("departments") or []
-    for dept in departments:
-        if not isinstance(dept, dict):
-            continue
-        name = _read_otdel_name(dept.get("id", ""))
-        if name is not None:
-            dept["name"] = name
+    for dept in (d for d in departments if isinstance(d, dict)):
+        did = dept.get("id", "")
+        if "name" not in dept:
+            n = _read_otdel_name(did)
+            if n is not None:
+                dept["name"] = n
+
+        otdel_yaml = _read_otdel(did) if did else None
+        if otdel_yaml:
+            if "head_name" not in dept and otdel_yaml.get("head"):
+                hn = _read_agent_name(otdel_yaml["head"])
+                if hn is not None:
+                    dept["head_name"] = hn
+            if "workers_names" not in dept and otdel_yaml.get("workers"):
+                workers = otdel_yaml["workers"]
+                if isinstance(workers, list):
+                    dept["workers_names"] = [
+                        {"id": w, "name": _read_agent_name(w)} if _read_agent_name(w)
+                        else {"id": w}
+                        for w in workers
+                    ]
+
     main_id = payload.get("main_department", "")
-    if main_id:
-        main_name = _read_otdel_name(main_id)
-        if main_name is not None:
-            payload["main_department_name"] = main_name
+    if main_id and "main_department_name" not in payload:
+        mn = _read_otdel_name(main_id)
+        if mn is not None:
+            payload["main_department_name"] = mn
     return payload
 
 

@@ -54,33 +54,7 @@ SynPin is not another chat framework. It's **an operating system for agents**, w
 
 This is infrastructure for AI agents. **Process management. Persistent state. Proactive autonomy.**
 
-<br/>
-
----
-
-<br/>
-
-## What it looks like in practice
-
-At 9 PM you tell Lyutik: *"Tomorrow I want to review the quarterly report"*.
-
-Lyutik:
-1. Checks `MEMORY.md` — there's "User is usually home by 9 PM".
-2. Calculates: tomorrow, 9 PM.
-3. **Itself** creates a cron job with the right `target`, `agent`, `delivery`.
-4. Confirms: *"Done. I'll remind you tomorrow at 9 PM."*
-
-You **never told it** to create a cron. It saw the pattern and acted. That's **proactivity** — what makes SynPin feel alive instead of another form with a button.
-
-Another day you tell the head agent: *"In an hour, message the head of the Communication department to greet everyone"*.
-
-The head agent:
-1. Sees the "Communication" department in `otdels.yaml`.
-2. Takes the head's slug (not main_agent — this matters, otherwise the result goes to the wrong place).
-3. Creates a cron with `action_target="otdel:<id>"`, `delivery="otdel"`.
-4. In an hour — the department's head **itself** writes the greeting **in its own chat**, not in your private one.
-
-You don't run the process. You set the goal, and the agents choose the route.
+And most importantly — **they're not perfect workers, they're part of your life**. They remember what worried you a week ago. They ask "how are you". Not because they were told to — because they live in your context and they care.
 
 <br/>
 
@@ -110,15 +84,11 @@ And most importantly — **they're not perfect workers, they're part of your lif
 
 <br/>
 
-## Already working
+## What's here now
 
-You're not buying an idea — you run it and see:
+SynPin is a living system. Agents with a hierarchy and long-term memory. Cron like in Linux. WebSocket without polling. Dark UI with glass panels.
 
-- **28 tests** covering memory, cron, limits, retention.
-- **3 hierarchy levels:** head agent → department heads → workers.
-- **Real-time WS** — events without polling.
-- **Glassmorphism UI** with dark theme.
-- **v0.5.1.42** on GitHub, AGPL-3.0.
+For the details — read the code, [CONTRIBUTING.md](CONTRIBUTING.en.md) and [INSTALL.md](INSTALL.md). This README is about the idea.
 
 <br/>
 

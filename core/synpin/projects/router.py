@@ -9,10 +9,52 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 
-from ..paths import get_data_dir
+from ..paths import get_data_dir, get_otdels_dir
 from .models import ProjectStatus
 from .config import ProjectConfig
 from .service import ProjectService
+
+
+# ── Department name enrichment ────────────────────────────────────────────
+
+def _read_otdel_name(otdelid: str) -> str | None:
+    """Read department name from data/otdels/{otdelid}/otdel.yaml.
+
+    Returns None if the file is missing or unreadable — never raises.
+    """
+    try:
+        otdel_file = get_otdels_dir() / otdelid / "otdel.yaml"
+        if not otdel_file.exists():
+            return None
+        text = otdel_file.read_text(encoding="utf-8")
+        # Cheap key scan — no full YAML parse, project payloads stay cheap.
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("name:"):
+                value = stripped[len("name:"):].strip()
+                if value.startswith(("'", '"')) and value.endswith(("'", '"')) and len(value) >= 2:
+                    value = value[1:-1]
+                return value or None
+        return None
+    except Exception:
+        return None
+
+
+def _enrich_project(payload: dict) -> dict:
+    """Inject department names into a project payload (runtime-only, not persisted)."""
+    departments = payload.get("departments") or []
+    for dept in departments:
+        if not isinstance(dept, dict):
+            continue
+        name = _read_otdel_name(dept.get("id", ""))
+        if name is not None:
+            dept["name"] = name
+    main_id = payload.get("main_department", "")
+    if main_id:
+        main_name = _read_otdel_name(main_id)
+        if main_name is not None:
+            payload["main_department_name"] = main_name
+    return payload
 
 
 # ── Request/Response models ─────────────────────────────────────────────────
@@ -128,7 +170,7 @@ async def list_projects():
     service = get_service()
     projects = service.get_all_projects()
     return {
-        "projects": [p.model_dump() for p in projects]
+        "projects": [_enrich_project(p.model_dump()) for p in projects]
     }
 
 
@@ -136,7 +178,7 @@ async def list_projects():
 async def create_project(request: CreateProjectRequest):
     """Create a new project."""
     service = get_service()
-    
+
     project = service.create_project(
         name=request.name,
         description=request.description,
@@ -147,10 +189,10 @@ async def create_project(request: CreateProjectRequest):
         deadline=request.deadline,
         tags=request.tags,
     )
-    
+
     await _broadcast("project:created", {"project_id": project.id})
-    
-    return {"project": project.model_dump()}
+
+    return {"project": _enrich_project(project.model_dump())}
 
 
 @router.get("/{project_id}")
@@ -158,11 +200,11 @@ async def get_project(project_id: str):
     """Get a project by ID."""
     service = get_service()
     project = service.get_project(project_id)
-    
+
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    
-    return {"project": project.model_dump()}
+
+    return {"project": _enrich_project(project.model_dump())}
 
 
 @router.put("/{project_id}")
@@ -186,7 +228,7 @@ async def update_project(project_id: str, request: UpdateProjectRequest):
     
     await _broadcast("project:updated", {"project_id": project_id})
     
-    return {"project": project.model_dump()}
+    return {"project": _enrich_project(project.model_dump())}
 
 
 @router.delete("/{project_id}")
@@ -225,7 +267,7 @@ async def add_department(project_id: str, request: AddDepartmentRequest):
         "dept_id": request.dept_id,
     })
     
-    return {"project": project.model_dump()}
+    return {"project": _enrich_project(project.model_dump())}
 
 
 @router.delete("/{project_id}/departments/{dept_id}")
@@ -242,7 +284,7 @@ async def remove_department(project_id: str, dept_id: str):
         "dept_id": dept_id,
     })
     
-    return {"project": project.model_dump()}
+    return {"project": _enrich_project(project.model_dump())}
 
 
 @router.put("/{project_id}/departments/{dept_id}")
@@ -254,7 +296,7 @@ async def update_department_role(project_id: str, dept_id: str, request: UpdateD
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    return {"project": project.model_dump()}
+    return {"project": _enrich_project(project.model_dump())}
 
 
 @router.put("/{project_id}/main-department")
@@ -268,7 +310,7 @@ async def set_main_department(project_id: str, request: SetMainDepartmentRequest
     
     await _broadcast("project:updated", {"project_id": project_id})
     
-    return {"project": project.model_dump()}
+    return {"project": _enrich_project(project.model_dump())}
 
 
 # ── Goals endpoints ─────────────────────────────────────────────────────────
@@ -330,7 +372,7 @@ async def update_goal(project_id: str, goal_id: str, request: UpdateGoalRequest)
         "goal_id": goal_id,
     })
     
-    return {"project": project.model_dump()}
+    return {"project": _enrich_project(project.model_dump())}
 
 
 @router.delete("/{project_id}/goals/{goal_id}")
@@ -342,7 +384,7 @@ async def delete_goal(project_id: str, goal_id: str):
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    return {"project": project.model_dump()}
+    return {"project": _enrich_project(project.model_dump())}
 
 
 # ── Archive endpoints ───────────────────────────────────────────────────────
@@ -419,7 +461,7 @@ async def delete_archive_entry(project_id: str, entry_id: str):
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     
-    return {"project": project.model_dump()}
+    return {"project": _enrich_project(project.model_dump())}
 
 
 # ── TOGLE endpoints ─────────────────────────────────────────────────────────

@@ -54,8 +54,6 @@ SynPin is not another chat framework. It's **an operating system for agents**, w
 
 This is infrastructure for AI agents. **Process management. Persistent state. Proactive autonomy.**
 
-And most importantly — **they're not perfect workers, they're part of your life**. They remember what worried you a week ago. They ask "how are you". Not because they were told to — because they live in your context and they care.
-
 <br/>
 
 ---

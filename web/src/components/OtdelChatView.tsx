@@ -357,6 +357,11 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
               provider: (finalMsg as any).provider || oldMsg.provider,
               prompt_tokens: (finalMsg as any).prompt_tokens || oldMsg.prompt_tokens,
               completion_tokens: (finalMsg as any).completion_tokens || oldMsg.completion_tokens,
+              // Preserve tool calls from finalMsg — backend already collected them
+              // in agent_msg["tools"] (see ws_router.py agent_msg build). Without
+              // this line the tool badges vanish on every live response, even
+              // though they were sent over the wire.
+              tools: (finalMsg as any).tools || oldMsg.tools,
             }
             return updated
           }
@@ -374,6 +379,7 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
             provider: (finalMsg as any).provider,
             prompt_tokens: (finalMsg as any).prompt_tokens,
             completion_tokens: (finalMsg as any).completion_tokens,
+            tools: (finalMsg as any).tools,
           }]
         })
       }
@@ -672,7 +678,7 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
                           )}
                         </div>
                       )}
-                      {msg.tools && msg.tools.length > 0 && !isStreaming && (
+                      {msg.tools && msg.tools.length > 0 && (
                         <div className="otdel-msg-tools-mini">
                           {msg.tools.map((tc, i) => (
                             <span key={i} className={`tool-mini-badge ${tc.status}`} title={`${tc.name}: ${tc.result || tc.error || ''}`}>

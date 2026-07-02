@@ -214,7 +214,18 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
             
             # Build messages for LLM
             messages = [ChatMessage(role=m["role"], content=m["content"]) for m in context_messages]
-            messages.append(ChatMessage(role="user", content=trigger_message))
+            # Worker trigger: distinguish "Head delegated a task" from "user wrote directly".
+            # Without this prefix the worker's LLM treats the trigger as a generic user
+            # message (role=user, no sender label) and answers as if Artur talked to it
+            # directly — losing the head→worker delegation context.
+            # Head trigger: keep the bare user-role — head context already labels
+            # previous worker responses with their sender name, so the head already knows
+            # who it is talking to.
+            if is_head:
+                trigger_content = trigger_message
+            else:
+                trigger_content = f"[📋 Задание от {head_name}]: {trigger_message}"
+            messages.append(ChatMessage(role="user", content=trigger_content))
             
             # Get provider/model info
             model = agent.get("model", "")

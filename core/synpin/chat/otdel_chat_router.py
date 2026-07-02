@@ -26,8 +26,11 @@ router = APIRouter(prefix="/api/otdels", tags=["otdel-chat"])
 # Global registry — set during app startup
 registry: ProviderRegistry | None = None
 
-# Worker retry settings
-MAX_WORKER_RETRY = 2  # original + 1 retry
+# Worker retry policy now lives in head_retry (protocol.yaml knob) —
+# see head_protocol/protocol.config.py. The hidden MAX_WORKER_RETRY auto-loop
+# was removed because it duplicated the knob and masked worker responses from
+# the head (responded_workers never got populated, head_retry kept failing
+# on phase gating).
 
 # Import shared history + helpers from otdel_helpers (single source of truth)
 from .ws_router import create_head_state, get_head_state
@@ -323,27 +326,25 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                         event_data = json.dumps(agent_msg, ensure_ascii=False)
                         await chat_task.queue.put(event_data)
                 else:
-                    # Worker response — check for errors and retry if needed
+                    # Worker response — track (best-effort) so head can see it.
+                    # In this loop there is no local HeadState; we record into
+                    # the global _head_states registry via get_head_state(). If
+                    # no state exists yet (this loop can run before any head
+                    # protocol activity), we skip silently — the head protocol
+                    # code path in ws_router.handle_message owns its own state.
                     is_error = full_response.startswith("⚠️ Ошибка:") or not full_response.strip()
-                    current_attempt = state.worker_attempts.get(agent_slug_val, 0)
-                    
-                    if is_error and current_attempt < MAX_WORKER_RETRY:
-                        # Retry: increment attempt and re-queue worker
-                        state.worker_attempts[agent_slug_val] = current_attempt + 1
-                        retry_task = f"[RETRY #{current_attempt + 1}] {trigger_message}"
-                        agent_queue.append((agent, False, retry_task))
-                        logger.warning("Otdel %s worker %s failed, retrying (attempt %d/%d)", 
-                                     otdel_id, agent_slug_val, current_attempt + 1, MAX_WORKER_RETRY)
-                        # Don't add to responded_workers yet
-                    else:
-                        # Success or max retries exceeded
-                        if is_error and current_attempt >= MAX_WORKER_RETRY:
-                            logger.error("Otdel %s worker %s failed after %d retries", 
-                                       otdel_id, agent_slug_val, MAX_WORKER_RETRY)
-                        responded_workers.add(agent_slug_val)
-                        workers_responded += 1
-                        event_data = json.dumps(agent_msg, ensure_ascii=False)
-                        await chat_task.queue.put(event_data)
+                    hs = get_head_state(otdel_id)
+                    if hs is not None:
+                        hs.responded_workers[agent_slug_val] = {
+                            "content": full_response,
+                            "model": agent.get("model", ""),
+                            "provider": agent.get("provider"),
+                            "is_error": is_error,
+                        }
+                    responded_workers.add(agent_slug_val)
+                    workers_responded += 1
+                    event_data = json.dumps(agent_msg, ensure_ascii=False)
+                    await chat_task.queue.put(event_data)
                 
                 processed_slugs.add(agent_slug_val)
             

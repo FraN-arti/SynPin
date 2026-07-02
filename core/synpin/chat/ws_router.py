@@ -21,8 +21,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["ws"])
 
-# Worker retry settings
-MAX_WORKER_RETRY = 2  # original + 1 retry
+# Worker retry policy now lives in head_retry (protocol.yaml knob) —
+# see head_protocol/protocol.config.py. The hidden MAX_WORKER_RETRY auto-loop
+# was removed because it duplicated the knob and masked worker responses from
+# the head (responded_workers never got populated, head_retry kept failing
+# on phase gating).
 WORKER_TIMEOUT_S = 60  # seconds to wait for worker response
 
 
@@ -893,36 +896,21 @@ async def _handle_otdel_send(user_id: str, msg: dict):
 
             processed_slugs.add(agent_slug_val)
             if not is_head:
-                # Check if worker response indicates failure
+                # Worker finished its turn. Track the response so the head
+                # can see it via head_checklist / head_retry / head_evaluate.
+                # Retry is owned by the head protocol (head_retry) — used to
+                # be a hidden auto-retry here, but it duplicated the protocol
+                # knob and masked state from the head (responded_workers
+                # never got populated, so head_retry kept failing on phase
+                # gating). The head now sees the failure and decides.
                 is_error = full_response.startswith("⚠️ Ошибка:") or not full_response.strip()
-                worker_attempts = head_state.worker_attempts if head_state else {}
-                current_attempt = worker_attempts.get(agent_slug_val, 0)
-
-                if is_error and current_attempt < MAX_WORKER_RETRY:
-                    # Retry: increment attempt and re-queue worker
-                    worker_attempts[agent_slug_val] = current_attempt + 1
-                    retry_task = f"[RETRY #{current_attempt + 1}] {trigger_message}"
-                    agent_queue.append((agent, False, retry_task))
-                    logger.warning(
-                        "Otdel %s worker %s failed, retrying (attempt %d/%d)",
-                        otdel_id,
-                        agent_slug_val,
-                        current_attempt + 1,
-                        MAX_WORKER_RETRY,
-                    )
-                    # Don't add to responded_workers yet - will be added on final response
-                else:
-                    # Success or max retries exceeded
-                    if is_error and current_attempt >= MAX_WORKER_RETRY:
-                        logger.error(
-                            "Otdel %s worker %s failed after %d retries, escalating to head",
-                            otdel_id,
-                            agent_slug_val,
-                            MAX_WORKER_RETRY,
-                        )
-                        # Head will be notified in follow-up
-                    responded_workers.add(agent_slug_val)
-                    workers_responded += 1
+                head_state.responded_workers[agent_slug_val] = {
+                    "content": full_response,
+                    "model": model,
+                    "provider": provider_name,
+                    "tools": tools_called,
+                    "is_error": is_error,
+                }
 
         processed_count += 1
 

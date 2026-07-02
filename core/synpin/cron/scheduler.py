@@ -9,13 +9,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import json
-from datetime import datetime
 from typing import Any
 from types import SimpleNamespace
 
 from .jobs import get_due_jobs, advance_next_run
 from ..time import now as _now
-from ..services.daemon_manager import DaemonManager
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +29,7 @@ async def _execute_job(job: Any) -> None:
     WITHOUT advancing next_run_at — see mark_job_failed().
     """
     from .models import LastResult
-    from .jobs import _save_job, get_job, mark_job_failed
+    from .jobs import _save_job, mark_job_failed
     from ..time import now as _now
     import time
 
@@ -445,13 +443,11 @@ async def _trigger_head_agent(otdel_id: str, job: Any) -> None:
     """After send_message, trigger the head agent to respond in otdel chat."""
     from ..agents.manager import get_otdel, get_agent
     from ..chat.router import (
-        registry, _build_system_prompt_with_memory, _load_chat_history,
-        _save_chat_history, execute_tool, build_openai_tools,
+        registry, execute_tool, build_openai_tools,
         get_all_tool_names, BUILTINS, build_tool_descriptions,
     )
     from ..chat.otdel_helpers import (
-        _build_otdel_system_prompt, _build_head_context,
-        _build_worker_context, _load_history, _save_history,
+        _build_otdel_system_prompt, _load_history, _save_history,
     )
     from ..chat.providers.base import ChatMessage
 

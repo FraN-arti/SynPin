@@ -20,6 +20,7 @@ interface ProjectGoal {
 
 interface ProjectDepartment {
   id: string
+  name?: string
   role: string
   is_main: boolean
   joined_at: string
@@ -60,7 +61,9 @@ interface Department {
   description?: string
   color?: string
   head?: string
+  head_name?: string
   workers?: string[]
+  workers_names?: { id: string; name?: string }[]
 }
 
 interface Task {
@@ -204,7 +207,7 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
 
   const loadProjects = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/projects`)
+      const res = await fetch(`${API_BASE}/api/projects`, { cache: 'no-store' })
       if (!res.ok) { setProjects([]); return }
       const data = await res.json()
       setProjects(data.projects || [])
@@ -218,7 +221,7 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
 
   const loadDepartments = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/otdels`)
+      const res = await fetch(`${API_BASE}/api/otdels`, { cache: 'no-store' })
       if (!res.ok) return
       const data = await res.json()
       setDepartments((data.otdels || []).map((d: any) => ({
@@ -227,7 +230,9 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
         description: d.description || '',
         color: d.color || '#f97316',
         head: d.head || '',
+        head_name: d.head_name || '',
         workers: d.workers || [],
+        workers_names: d.workers_names || [],
       })))
     } catch (e) {
       console.error('[departments] load error:', e)
@@ -236,7 +241,7 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
 
   const loadProjectTasks = useCallback(async (projectId: string) => {
     try {
-      const res = await fetch(`${API_BASE}/api/kanban/tasks?project_id=${projectId}`)
+      const res = await fetch(`${API_BASE}/api/kanban/tasks?project_id=${projectId}`, { cache: 'no-store' })
       if (!res.ok) return
       const data = await res.json()
       setProjectTasks(Array.isArray(data) ? data : [])
@@ -584,24 +589,24 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
                 return (
                   <div key={dept.id} className={`project-dept-block ${dept.is_main ? 'main' : ''}`}>
                     <div className="dept-block-header">
-                      <span className="dept-block-name">{dept.id}</span>
+                      <span className="dept-block-name">{deptInfo?.name || dept.id}</span>
                       {dept.is_main && <span className="dept-block-main-badge">★ Основной</span>}
                     </div>
                     {dept.role && <div className="dept-block-role">{dept.role}</div>}
                     <div className="dept-block-divider" />
                     <div className="dept-block-body">
-                      {deptInfo?.head ? (
+                      {deptInfo?.head_name || deptInfo?.head ? (
                         <div className="dept-block-head">
                           <span className="dept-block-head-label">Глава:</span>
-                          <span className="dept-block-head-name">{deptInfo.head}</span>
+                          <span className="dept-block-head-name">{deptInfo?.head_name || deptInfo?.head}</span>
                         </div>
                       ) : (
                         <div className="dept-block-head dim">Глава не назначен</div>
                       )}
-                      {deptInfo?.workers && deptInfo.workers.length > 0 && (
+                      {deptInfo?.workers_names && deptInfo.workers_names.length > 0 && (
                         <div className="dept-block-workers">
-                          <span className="dept-block-workers-label">Сотрудники ({deptInfo.workers.length}):</span>
-                          <span className="dept-block-workers-list">{deptInfo.workers.join(', ')}</span>
+                          <span className="dept-block-workers-label">Сотрудники ({deptInfo.workers_names.length}):</span>
+                          <span className="dept-block-workers-list">{deptInfo.workers_names.map(w => w.name || w.id).join(', ')}</span>
                         </div>
                       )}
                     </div>
@@ -933,11 +938,15 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
                   <div className="project-departments">
                     <span className="project-departments-label">Отделы:</span>
                     <div className="project-departments-list">
-                      {project.departments.map(dept => (
-                        <span key={dept.id} className={`project-department-badge ${dept.is_main ? 'main' : ''}`}>
-                          {dept.id}{dept.is_main && ' ★'}
-                        </span>
-                      ))}
+                      {project.departments.map(dept => {
+                        const deptInfo = departments.find(d => d.id === dept.id)
+                        const deptName = dept.name || deptInfo?.name || dept.id
+                        return (
+                          <span key={dept.id} className={`project-department-badge ${dept.is_main ? 'main' : ''}`}>
+                            {deptName}{dept.is_main && ' ★'}
+                          </span>
+                        )
+                      })}
                     </div>
                   </div>
                 )}

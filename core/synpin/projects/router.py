@@ -6,105 +6,29 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Depends, Query
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
-from ..paths import get_data_dir, get_otdels_dir, get_agents_dir
+from ..paths import get_data_dir
+from ..agents.names import read_otdel, read_otdel_name, read_agent_name
 from .models import ProjectStatus
 from .config import ProjectConfig
 from .service import ProjectService
 
 
+# Re-exports for backward compatibility — older callers may still import these
+# private names from this module. Keep them as thin wrappers around the canonical
+# implementations in agents/names.py.
+_read_otdel = read_otdel
+_read_otdel_name = read_otdel_name
+_read_agent_name = read_agent_name
+
+
 # ── Department / agent name enrichment ────────────────────────────────────
 
-def _read_otdel(otdelid: str) -> dict | None:
-    """Read data/otdels/{id}/otdel.yaml into a flat dict.
-
-    Handles simple scalars plus a YAML inline list under `workers` (the
-    only nested field needed for project payloads). Cheap one-shot parse.
-    """
-    try:
-        path = get_otdels_dir() / otdelid / "otdel.yaml"
-        if not path.exists():
-            return None
-        text = path.read_text(encoding="utf-8")
-        out: dict = {}
-        workers: list[str] = []
-        in_workers = False
-        for raw in text.splitlines():
-            line = raw.rstrip()
-            stripped = line.strip()
-            if not stripped or stripped.startswith("#"):
-                continue
-            if not in_workers and ":" in stripped:
-                key, _, value = stripped.partition(":")
-                key = key.strip()
-                value = value.strip()
-                if key == "workers":
-                    in_workers = True
-                    # Flow-style list on the same line: workers: [a, b]
-                    if value.startswith("[") and value.endswith("]"):
-                        workers = [
-                            w.strip().strip("'\"")
-                            for w in value[1:-1].split(",")
-                            if w.strip()
-                        ]
-                        out["workers"] = workers
-                        in_workers = False
-                    continue
-                if value.startswith(("'", '"')) and value.endswith(("'", '"')) and len(value) >= 2:
-                    value = value[1:-1]
-                out[key] = value
-            elif in_workers and stripped.startswith("-"):
-                item = stripped.lstrip("-").strip()
-                if item.startswith(("'", '"')) and item.endswith(("'", '"')) and len(item) >= 2:
-                    item = item[1:-1]
-                if item:
-                    workers.append(item)
-        if workers or "workers" not in out:
-            out["workers"] = workers
-        # Strip the sentinel if no items accumulated
-        if isinstance(out.get("workers"), str):
-            out["workers"] = []
-        return out
-    except Exception:
-        return None
-
-
-def _read_otdel_name(otdelid: str) -> str | None:
-    """Read department (otdel) name from data/otdels/{id}/otdel.yaml."""
-    try:
-        otdel_file = get_otdels_dir() / otdelid / "otdel.yaml"
-        if not otdel_file.exists():
-            return None
-        for line in otdel_file.read_text(encoding="utf-8").splitlines():
-            stripped = line.strip()
-            if stripped.startswith("name:"):
-                value = stripped[len("name:"):].strip()
-                if value.startswith(("'", '"')) and value.endswith(("'", '"')) and len(value) >= 2:
-                    value = value[1:-1]
-                return value or None
-        return None
-    except Exception:
-        return None
-
-
-def _read_agent_name(agentid: str) -> str | None:
-    """Read agent name from data/agents/{id}/agent.yaml."""
-    try:
-        agent_file = get_agents_dir() / agentid / "agent.yaml"
-        if not agent_file.exists():
-            return None
-        for line in agent_file.read_text(encoding="utf-8").splitlines():
-            stripped = line.strip()
-            if stripped.startswith("name:"):
-                value = stripped[len("name:"):].strip()
-                if value.startswith(("'", '"')) and value.endswith(("'", '"')) and len(value) >= 2:
-                    value = value[1:-1]
-                return value or None
-        return None
-    except Exception:
-        return None
+# Implementation moved to synpin/agents/names.py (single source of truth).
+# This module re-imports the helpers above for backward compatibility with
+# any callers that imported them as private names.
 
 
 def _enrich_project(payload: dict) -> dict:
@@ -123,28 +47,28 @@ def _enrich_project(payload: dict) -> dict:
     for dept in (d for d in departments if isinstance(d, dict)):
         did = dept.get("id", "")
         if "name" not in dept:
-            n = _read_otdel_name(did)
+            n = read_otdel_name(did)
             if n is not None:
                 dept["name"] = n
 
-        otdel_yaml = _read_otdel(did) if did else None
+        otdel_yaml = read_otdel(did) if did else None
         if otdel_yaml:
             if "head_name" not in dept and otdel_yaml.get("head"):
-                hn = _read_agent_name(otdel_yaml["head"])
+                hn = read_agent_name(otdel_yaml["head"])
                 if hn is not None:
                     dept["head_name"] = hn
             if "workers_names" not in dept and otdel_yaml.get("workers"):
                 workers = otdel_yaml["workers"]
                 if isinstance(workers, list):
                     dept["workers_names"] = [
-                        {"id": w, "name": _read_agent_name(w)} if _read_agent_name(w)
+                        {"id": w, "name": read_agent_name(w)} if read_agent_name(w)
                         else {"id": w}
                         for w in workers
                     ]
 
     main_id = payload.get("main_department", "")
     if main_id and "main_department_name" not in payload:
-        mn = _read_otdel_name(main_id)
+        mn = read_otdel_name(main_id)
         if mn is not None:
             payload["main_department_name"] = mn
     return payload
@@ -190,6 +114,12 @@ class UpdateDepartmentRoleRequest(BaseModel):
 class SetMainDepartmentRequest(BaseModel):
     """Request to set main department."""
     dept_id: str
+
+
+class UpdateProjectStatusRequest(BaseModel):
+    """Request to update project status (caller-validated via otdel_id)."""
+    status: str
+    otdel_id: str | None = None  # If set, require this otdel to be the project's main department.
 
 
 class AddGoalRequest(BaseModel):
@@ -258,10 +188,16 @@ def get_service() -> ProjectService:
 
 
 @router.get("")
-async def list_projects():
-    """Get all projects."""
+async def list_projects(dept_id: str | None = Query(default=None, description="Filter by department ID — only projects that include this department")):
+    """Get all projects, or projects for a specific department if dept_id is given."""
     service = get_service()
     projects = service.get_all_projects()
+
+    if dept_id:
+        # A project includes dept_id if its departments[] entry has matching id
+        # (we don't restrict on is_main — both main and supporting depts see it).
+        projects = [p for p in projects if any(d.id == dept_id for d in p.departments)]
+
     return {
         "projects": [_enrich_project(p.model_dump()) for p in projects]
     }
@@ -396,14 +332,59 @@ async def update_department_role(project_id: str, dept_id: str, request: UpdateD
 async def set_main_department(project_id: str, request: SetMainDepartmentRequest):
     """Set the main department of a project."""
     service = get_service()
-    
+
     project = service.set_main_department(project_id, request.dept_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    
+
     await _broadcast("project:updated", {"project_id": project_id})
-    
+
     return {"project": _enrich_project(project.model_dump())}
+
+
+@router.put("/{project_id}/status")
+async def update_project_status(project_id: str, request: UpdateProjectStatusRequest):
+    """Update project status.
+
+    Two paths:
+      1. Primary agent (no otdel_id) → full access, no further checks.
+      2. Department head (otdel_id supplied) → allowed ONLY when that otdel
+         is the project's main department. Used by the head-UI / head-tool
+         to act on a project they are responsible for.
+
+    Status must be a valid ProjectStatus value (active / paused /
+    completed / archived).
+    """
+    service = get_service()
+    project = service.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Permission check: if otdel_id is provided, this is a non-primary caller.
+    if request.otdel_id:
+        main_dept = project.get_head_department()
+        if not main_dept or main_dept.id != request.otdel_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Only the project's main department head can change status",
+            )
+
+    try:
+        new_status = ProjectStatus(request.status)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status: {request.status}. Must be one of: "
+                   f"{', '.join(s.value for s in ProjectStatus)}",
+        )
+
+    updated = service.update_project(project_id, status=new_status.value)
+    if not updated:
+        raise HTTPException(status_code=500, detail="Failed to update status")
+
+    await _broadcast("project:updated", {"project_id": project_id, "status": new_status.value})
+
+    return {"project": _enrich_project(updated.model_dump())}
 
 
 # ── Goals endpoints ─────────────────────────────────────────────────────────

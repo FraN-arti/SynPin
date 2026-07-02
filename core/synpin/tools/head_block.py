@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..chat.ws_manager import ws_manager
 from ._registry import register_tool
 from .base import ToolResult, make_success, make_error
 

@@ -12,10 +12,8 @@ Search is instant (4500x faster than LLM-based search) and free.
 """
 
 import logging
-import re
 import sqlite3
 import threading
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from ..time import now as _now

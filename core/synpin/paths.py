@@ -62,7 +62,6 @@ Set `SYNPIN_FORCE_PROD=1` to skip the fallback entirely.
 from __future__ import annotations
 
 import os
-import shutil
 import threading
 from pathlib import Path
 from typing import Optional

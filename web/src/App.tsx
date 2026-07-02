@@ -84,7 +84,7 @@ interface Message {
   images?: string[]  // base64 data URLs of attached images
 }
 
-// ─── Tool Timeline (collapsible action flow) ────────────────
+// ─── Tool badges (minimal inline, same as otdel chat) ────────
 
 interface ToolTimelineProps {
   tools: ToolCall[]
@@ -93,28 +93,16 @@ interface ToolTimelineProps {
 }
 
 function ToolTimeline({ tools, toolNames }: ToolTimelineProps) {
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-
   return (
-    <div className="tool-timeline">
+    <div className="tool-badges-row">
       {tools.map((tc) => (
-        <div
+        <span
           key={tc.id}
-          className={`tool-chip ${tc.status} ${expandedId === tc.id ? 'expanded' : ''}`}
-          onClick={() => setExpandedId(expandedId === tc.id ? null : tc.id)}
+          className={`tool-mini-badge ${tc.status}`}
+          title={`${tc.name}: ${tc.result || tc.error || ''}`}
         >
-          <span className="tool-chip-icon">
-            {tc.status === 'running' && <span className="tool-spinner" />}
-            {tc.status === 'completed' && <span className="tool-check">✓</span>}
-            {tc.status === 'error' && <span className="tool-error-icon">✕</span>}
-          </span>
-          <span className="tool-chip-name">{toolNames[tc.name] || tc.name}</span>
-          <div className="tool-chip-detail">
-            {tc.status === 'running' && 'Выполняется...'}
-            {tc.status === 'completed' && 'Готово'}
-            {tc.status === 'error' && (tc.error || 'Ошибка')}
-          </div>
-        </div>
+          {tc.status === 'running' ? '⏳' : tc.status === 'completed' ? '✓' : '✗'} {toolNames[tc.name] || tc.name}
+        </span>
       ))}
     </div>
   )

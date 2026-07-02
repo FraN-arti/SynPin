@@ -20,13 +20,12 @@ Endpoints:
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from ._base import BaseRequest
 
 from ..memory import MemoryManager
-from ..memory.store import USER_CHAR_LIMIT
 # ── Shared USER Path ──────────────────────────────────────────────────────────
 _shared_user_path = None
 def _get_shared_user_path() -> Path:
@@ -151,7 +150,6 @@ async def add_user_entry(req: AddRequest):
         if not path.exists():
             path.write_text(req.content.strip() + "\n", encoding="utf-8")
             return {"success": True, "message": "Entry added.", "entries": [req.content.strip()]}
-        import re
         content = path.read_text(encoding="utf-8")
         entries = [e.strip() for e in content.split("\n§\n") if e.strip()]
         if req.content.strip() in entries:

@@ -12,13 +12,21 @@ export function useGlobalTooltip(): ReactNode {
   const titleRef = useRef<string>('')
   const targetRef = useRef<Element | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mousePosRef = useRef({ x: 0, y: 0 })
 
-  const showTooltip = useCallback((text: string, x: number, y: number) => {
+  const showTooltip = useCallback((text: string) => {
     const el = tooltipRef.current
     if (!el) return
     el.textContent = text
-    el.style.left = `${x + 12}px`
-    el.style.top = `${y + 12}px`
+    const { x: mx, y: my } = mousePosRef.current
+    const tw = el.offsetWidth || 200
+    const th = el.offsetHeight || 40
+    let x = mx + 12
+    let y = my + 12
+    if (x + tw > window.innerWidth - 8) x = mx - tw - 12
+    if (y + th > window.innerHeight - 8) y = my - th - 12
+    el.style.left = `${x}px`
+    el.style.top = `${y}px`
     el.style.visibility = 'visible'
     el.style.opacity = '1'
   }, [])
@@ -45,7 +53,7 @@ export function useGlobalTooltip(): ReactNode {
 
       if (timerRef.current) clearTimeout(timerRef.current)
       timerRef.current = setTimeout(() => {
-        showTooltip(text, e.clientX, e.clientY)
+        showTooltip(text)
       }, 300)
     }
 
@@ -68,6 +76,7 @@ export function useGlobalTooltip(): ReactNode {
     }
 
     const onMouseMove = (e: MouseEvent) => {
+      mousePosRef.current = { x: e.clientX, y: e.clientY }
       const el = tooltipRef.current
       if (!el || el.style.visibility === 'hidden') return
       const tw = el.offsetWidth

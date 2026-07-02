@@ -88,7 +88,6 @@ async def head_reline(params: dict[str, Any]) -> ToolResult:
 
         # Record in approval history
         from ..connections.config import add_history_record
-        from ..connections.models import ApprovalStatus
 
         record = add_history_record(
             task_id=task_id,

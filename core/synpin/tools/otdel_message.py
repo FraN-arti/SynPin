@@ -9,9 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import uuid
-from datetime import datetime
 from typing import Any
 
 from .base import ToolResult, make_success, make_error
@@ -145,13 +143,14 @@ async def _process_head(otdel_id: str, message: str):
         system_prompt = _build_otdel_system_prompt(otdel, head_agent, True)
         context_messages = _build_head_context(history, head_slug)
         messages = [ChatMessage(role=m["role"], content=m["content"]) for m in context_messages]
-        messages.append(ChatMessage(role="user", content=message))
+        # Label the trigger message so the head knows who sent it
+        messages.append(ChatMessage(role="user", content=f"[🤖 Главный ассистент]: {message}"))
 
         model = head_agent.get("model", "")
         provider_name = head_agent.get("provider")
         provider_name, model = resolve_model(provider_name, model)
 
-        head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_decide", "head_block", "kanban_task"]
+        head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_rework", "head_checklist", "head_decide", "head_block", "kanban_task"]
         tool_names = list(head_agent.get("tools", [])) + head_protocol_tools
 
         # Stream response

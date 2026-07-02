@@ -7,7 +7,6 @@ import asyncio
 import re
 import logging
 import uuid
-from datetime import datetime
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -678,9 +677,13 @@ BUILTINS = {"memory_read", "memory_write", "image_analyze", "summarize", "sessio
 
 # Head-only tools — available to department heads
 # (main agent also gets these via include_head=True)
-HEAD_TOOLS = {"head_delegate", "head_evaluate", "head_retry", "head_decide", "head_block", "kanban_task",
+HEAD_TOOLS = {"head_delegate", "head_evaluate", "head_retry", "head_rework", "head_checklist", "head_decide", "head_block", "kanban_task",
               "head_approve", "head_reline", "head_approval_status",
-              "cron_manage", "skill_manage"}
+              "cron_manage", "skill_manage",
+              # Read-only project visibility for heads
+              "project_view",
+              # Status change for heads of the main department of a project
+              "project_status_update"}
 
 # Primary-only tools — only available to the main agent (is_primary=true)
 PRIMARY_TOOLS = {"otdel_manage", "project_manage",
@@ -818,9 +821,28 @@ async def execute_tool(tool_name: str, params: dict, agent_slug: str | None = No
             params = {**params, "agent_id": agent_slug}
 
         # Inject otdel_id for head protocol tools
-        head_protocol_tools = ("head_delegate", "head_evaluate", "head_retry", "head_decide", "head_block", "kanban_task")
+        head_protocol_tools = (
+            "head_delegate", "head_evaluate", "head_retry", "head_rework",
+            "head_checklist", "head_decide", "head_block", "kanban_task",
+            # head_approval_status also needs otdel_id (it filters by
+            # from_otdel); same pattern as the other head_* tools.
+            "head_approval_status",
+            # project_view / project_status_update fall back to
+            # agent_slug resolution but accepting an explicit otdel_id
+            # saves a filesystem scan and matches the chat-router
+            # convention.
+            "project_view", "project_status_update",
+        )
         if otdel_id and tool_name in head_protocol_tools:
-            params = {**params, "otdel_id": otdel_id}
+                params = {**params, "otdel_id": otdel_id}
+
+        # Inject agent_slug for tools that resolve their own context
+        # (project_view / project_status_update look up otdel_id from
+        # agent_slug themselves, since the head doesn't pass it).
+        context_tools = ("project_view", "project_status_update",
+                        "file_read", "file_write", "search_files")
+        if agent_slug and tool_name in context_tools:
+                params = {**params, "agent_slug": agent_slug}
 
         # Inject agent model info for model-dependent tools (fallback to agent's own model)
         model_tools = ("summarize", "image_analyze")

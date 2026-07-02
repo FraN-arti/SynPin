@@ -5,6 +5,7 @@ The model handles validation, serialization, and business logic.
 """
 from __future__ import annotations
 
+import logging
 from ..time import now as _now
 
 import re
@@ -15,6 +16,8 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
+
+logger = logging.getLogger(__name__)
 
 
 # ── Enums ────────────────────────────────────────────────────────────────────
@@ -322,7 +325,7 @@ def load_all_tasks(tasks_dir: Path) -> list[Task]:
         try:
             tasks.append(load_task(filepath))
         except Exception as e:
-            print(f"Warning: Failed to load {filepath.name}: {e}")
+            logger.warning("Failed to load %s: %s", filepath.name, e)
     return tasks
 
 

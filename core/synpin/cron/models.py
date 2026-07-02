@@ -1,9 +1,8 @@
 """Cron job models for SynPin."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Optional
+from typing import Optional
 from pydantic import BaseModel, Field
 from ..time import now as _now
 

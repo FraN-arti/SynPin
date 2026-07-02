@@ -1,11 +1,14 @@
 """Kanban REST API — CRUD for tasks on the global board."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import Field
+
+logger = logging.getLogger(__name__)
 
 from ..kanban.service import KanbanService
 from ..kanban.models import Priority, TaskStatus
@@ -215,7 +218,6 @@ def create_task(req: CreateTaskRequest) -> dict:
                 if otdel_id == req.department:
                     head_slug = o.get("head", "")
                     if head_slug:
-                        from ..kanban.models import HeadAssignment
                         task.assigned_head = head_slug
                         svc.save_task(task)
                     break

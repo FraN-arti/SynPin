@@ -12,10 +12,7 @@ import asyncio
 import re
 import logging
 import uuid
-from datetime import datetime
-from pathlib import Path
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from .providers import ProviderRegistry
@@ -42,7 +39,6 @@ from .otdel_helpers import (
     _build_otdel_system_prompt,
     _build_head_context,
     _build_worker_context,
-    _get_agent_name,
 )
 
 
@@ -96,7 +92,7 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
         raise HTTPException(500, "Chat provider not configured")
     
     # Load otdel data
-    from ..agents.manager import get_otdel, get_agent, load_otdels
+    from ..agents.manager import get_otdel, get_agent
     otdel = get_otdel(otdel_id)
     if not otdel:
         raise HTTPException(404, f"Otdel not found: {otdel_id}")
@@ -227,7 +223,7 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
 
             # Determine tools for this agent
             if is_head:
-                head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_decide", "head_block", "kanban_task"]
+                head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_rework", "head_checklist", "head_decide", "head_block", "kanban_task"]
                 tool_names = list(agent.get("tools", [])) + head_protocol_tools
             else:
                 tool_names = agent.get("tools", [])
@@ -412,7 +408,7 @@ async def send_otdel_chat_message(otdel_id: str, req: OtdelChatSend):
                     system_prompt=system_prompt,
                     agent_name=head_name,
                     agent_slug=head_slug,
-                    tool_names=["head_delegate", "head_evaluate", "head_retry", "head_decide", "kanban_task"],
+                    tool_names=["head_delegate", "head_evaluate", "head_retry", "head_rework", "head_checklist", "head_decide", "kanban_task"],
                     otdel_id=otdel_id,
                 ):
                     if '"type": "chunk"' in chunk:

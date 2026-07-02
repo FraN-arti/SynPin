@@ -7,10 +7,8 @@ Returns list of {title, url, snippet} dicts.
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 from pathlib import Path
-from typing import Any
 
 import httpx
 import yaml

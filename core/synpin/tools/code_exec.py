@@ -200,7 +200,7 @@ async def code_exec(params: dict) -> ToolResult:
             # Execute in the sandbox
             exec(compiled, sandbox)
             return stdout_capture.getvalue(), None
-        except Exception as e:
+        except Exception:
             tb = traceback.format_exc()
             return stdout_capture.getvalue(), tb
         finally:

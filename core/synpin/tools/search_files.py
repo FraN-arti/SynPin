@@ -53,7 +53,7 @@ async def search_files(params: dict) -> ToolResult:
 
     # Determine search directory
     search_path_str = params.get("path", str(_get_search_root()))
-    search_path = validate_path(search_path_str)
+    search_path = validate_path(search_path_str, agent_slug=params.get("agent_slug"))
     if search_path is None:
         roots = get_allowed_roots()
         return make_error(
@@ -138,7 +138,6 @@ async def _search_by_content(search_path: Path, pattern: str, limit: int) -> Too
 
 async def _fallback_content_search(search_path: Path, pattern: str, limit: int) -> ToolResult:
     """Fallback content search using Python when ripgrep is unavailable."""
-    import re
 
     try:
         regex = re.compile(pattern, re.IGNORECASE)

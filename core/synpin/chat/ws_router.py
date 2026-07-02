@@ -12,7 +12,6 @@ from .router import get_all_tool_names
 import logging
 import uuid
 from dataclasses import dataclass, field
-from typing import Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from .ws_manager import ws_manager
@@ -29,23 +28,25 @@ WORKER_TIMEOUT_S = 60  # seconds to wait for worker response
 
 # ─── Head Protocol State ───────────────────────────────────────────────
 
+
 @dataclass
 class HeadState:
     """Per-otdel state for Head protocol tools."""
+
     otdel_id: str
     head_slug: str
     worker_slugs: list[str]
-    
+
     # Delegation state
     active_delegation_id: str | None = None
     expected_workers: set[str] = field(default_factory=set)
     responded_workers: dict[str, dict] = field(default_factory=dict)  # slug -> response
     worker_attempts: dict[str, int] = field(default_factory=dict)  # slug -> attempt count
     delegation_history: list[dict] = field(default_factory=list)
-    
+
     # Current delegation params
     current_delegation: dict | None = None
-    
+
     def reset_delegation(self):
         self.active_delegation_id = None
         self.expected_workers.clear()
@@ -72,13 +73,102 @@ def clear_head_state(otdel_id: str):
     _head_states.pop(otdel_id, None)
 
 
+def compute_phase(state: HeadState | None) -> dict:
+    """Return the current delegation phase and a snapshot of who's waiting.
+
+    Phases:
+      - DELEGATED     : task dispatched, no answers yet (or expected is empty)
+      - PARTIAL       : some workers answered, others still missing
+      - ALL_RESPONDED : every expected worker has produced a response
+
+    Computed from expected/responded SETS — never from worker_attempts
+    (which tracks retry-budget, not delegation state).
+
+    Returns dict with keys:
+      phase, delegation_id, expected, missing, received, ready_to_decide,
+      summary.
+    """
+    if state is None:
+        return {
+            "phase": "DELEGATED",
+            "delegation_id": None,
+            "expected": [],
+            "missing": [],
+            "received": [],
+            "ready_to_decide": False,
+            "summary": "no_state",
+        }
+
+    delegation_id = state.active_delegation_id
+    if not delegation_id:
+        return {
+            "phase": "DELEGATED",
+            "delegation_id": None,
+            "expected": [],
+            "missing": [],
+            "received": [],
+            "ready_to_decide": False,
+            "summary": "no_active_delegation",
+        }
+
+    expected_set = set(state.expected_workers)
+    responded_set = set(state.responded_workers.keys())
+    missing = sorted(expected_set - responded_set)
+    expected_sorted = sorted(expected_set)
+
+    received_list = []
+    for slug in expected_sorted:
+        if slug in responded_set:
+            resp = state.responded_workers[slug]
+            if isinstance(resp, dict):
+                content = resp.get("content", "") or ""
+            else:
+                content = str(resp)
+            received_list.append(
+                {
+                    "slug": slug,
+                    "has_content": bool(content.strip()),
+                }
+            )
+
+    if not expected_set:
+        phase = "DELEGATED"
+    elif not missing:
+        phase = "ALL_RESPONDED"
+    elif not responded_set:
+        phase = "DELEGATED"
+    else:
+        phase = "PARTIAL"
+
+    ready_to_decide = phase == "ALL_RESPONDED"
+
+    if phase == "DELEGATED":
+        summary = f"отправлено задание, ждём первых ответов от {', '.join(expected_sorted) or '—'}"
+    elif phase == "PARTIAL":
+        summary = f"получены ответы от {len(received_list)}/{len(expected_sorted)}, ждём {', '.join(missing)}"
+    else:
+        summary = f"все {len(expected_sorted)} работников ответили, можно принимать решение"
+
+    return {
+        "phase": phase,
+        "delegation_id": delegation_id,
+        "expected": expected_sorted,
+        "missing": missing,
+        "received": received_list,
+        "ready_to_decide": ready_to_decide,
+        "summary": summary,
+    }
+
+
 def _task_done_callback(task, user_id: str, msg_type: str):
     """Log errors from fire-and-forget tasks (asyncio.create_task swallows them)."""
     if task.cancelled():
         return
     exc = task.exception()
     if exc:
-        logger.error("[ws_task] %s for %s FAILED: %s: %s", msg_type, user_id, type(exc).__name__, exc)
+        logger.error(
+            "[ws_task] %s for %s FAILED: %s: %s", msg_type, user_id, type(exc).__name__, exc
+        )
     else:
         logger.debug("[ws_task] %s for %s completed OK", msg_type, user_id)
 
@@ -92,6 +182,7 @@ async def websocket_endpoint(ws: WebSocket):
     # Run session reset check on first connect (primary trigger)
     try:
         from .session_reset import check_and_reset_on_connect
+
         check_and_reset_on_connect()
     except Exception as e:
         logger.debug("Session reset on connect failed (non-critical): %s", e)
@@ -102,10 +193,13 @@ async def websocket_endpoint(ws: WebSocket):
             try:
                 msg = json.loads(raw)
             except json.JSONDecodeError:
-                await ws_manager.send(user_id, {
-                    "type": "error",
-                    "message": "Invalid JSON",
-                })
+                await ws_manager.send(
+                    user_id,
+                    {
+                        "type": "error",
+                        "message": "Invalid JSON",
+                    },
+                )
                 continue
 
             msg_type = msg.get("type", "")
@@ -117,15 +211,22 @@ async def websocket_endpoint(ws: WebSocket):
             # Route to appropriate handler
             if msg_type == "chat:send":
                 task = asyncio.create_task(_handle_chat_send(user_id, msg))
-                task.add_done_callback(lambda t, _uid=user_id: _task_done_callback(t, _uid, "chat:send"))
+                task.add_done_callback(
+                    lambda t, _uid=user_id: _task_done_callback(t, _uid, "chat:send")
+                )
             elif msg_type == "otdel:send":
                 task = asyncio.create_task(_handle_otdel_send(user_id, msg))
-                task.add_done_callback(lambda t, _uid=user_id: _task_done_callback(t, _uid, "otdel:send"))
+                task.add_done_callback(
+                    lambda t, _uid=user_id: _task_done_callback(t, _uid, "otdel:send")
+                )
             else:
-                await ws_manager.send(user_id, {
-                    "type": "error",
-                    "message": f"Unknown message type: {msg_type}",
-                })
+                await ws_manager.send(
+                    user_id,
+                    {
+                        "type": "error",
+                        "message": f"Unknown message type: {msg_type}",
+                    },
+                )
 
     except WebSocketDisconnect:
         ws_manager.disconnect(user_id)
@@ -143,20 +244,24 @@ async def _auto_analyze_images(images: list[str]) -> str:
 
     async def _analyze_one(idx: int, img_url: str) -> str:
         try:
-            result = await image_analyze({
-                "image_url": img_url,
-                "prompt": "Подробно опиши что изображено на картинке. Цвета, объекты, текст, стиль.",
-            })
+            result = await image_analyze(
+                {
+                    "image_url": img_url,
+                    "prompt": "Подробно опиши что изображено на картинке. Цвета, объекты, текст, стиль.",
+                }
+            )
             if result.get("success"):
-                return f"[Изображение {idx+1}]: {result['output']}"
+                return f"[Изображение {idx + 1}]: {result['output']}"
             else:
-                return f"[Изображение {idx+1}]: не удалось — {result.get('error', 'unknown')}"
+                return f"[Изображение {idx + 1}]: не удалось — {result.get('error', 'unknown')}"
         except Exception as e:
             logger.warning("[auto_analyze] Failed to analyze image %d: %s", idx, e)
-            return f"[Изображение {idx+1}]: ошибка — {e}"
+            return f"[Изображение {idx + 1}]: ошибка — {e}"
 
     try:
-        results = await asyncio.gather(*[_analyze_one(i, url) for i, url in enumerate((images or [])[:3])])
+        results = await asyncio.gather(
+            *[_analyze_one(i, url) for i, url in enumerate((images or [])[:3])]
+        )
     except Exception as e:
         logger.warning("[auto_analyze] Error: %s", e)
         return ""
@@ -173,10 +278,13 @@ async def _auto_analyze_images(images: list[str]) -> str:
 
 async def _handle_chat_send(user_id: str, msg: dict):
     """Handle private chat message — stream LLM response via WS."""
-    from .router import registry, _build_system_prompt_with_memory, _load_chat_history, _save_chat_history
+    from .router import (
+        registry,
+        _build_system_prompt_with_memory,
+        _load_chat_history,
+        _save_chat_history,
+    )
     from .providers.base import ChatMessage
-    import uuid
-    from datetime import datetime
 
     if registry is None:
         await ws_manager.send(user_id, {"type": "error", "message": "Chat provider not configured"})
@@ -189,11 +297,14 @@ async def _handle_chat_send(user_id: str, msg: dict):
     images = msg.get("images")  # list[str] of base64 data URLs
 
     if not agent_slug or not message:
-        await ws_manager.send(user_id, {"type": "error", "message": "Missing agent_slug or message"})
+        await ws_manager.send(
+            user_id, {"type": "error", "message": "Missing agent_slug or message"}
+        )
         return
 
     # Build system prompt with memory + session context
     from types import SimpleNamespace
+
     req = SimpleNamespace(agent_slug=agent_slug, system_prompt=system_prompt, channel_id=channel_id)
     full_system_prompt = _build_system_prompt_with_memory(req)
 
@@ -211,6 +322,7 @@ async def _handle_chat_send(user_id: str, msg: dict):
 
     # Compaction: trim old messages if context exceeds limit (internal agents only)
     from .router import compact_messages
+
     compacted_history, compaction_notice = await compact_messages(
         history,
         system_prompt=full_system_prompt,
@@ -219,13 +331,16 @@ async def _handle_chat_send(user_id: str, msg: dict):
     if compaction_notice:
         logger.info("WS chat compaction for %s: %s", agent_slug, compaction_notice)
         # Notify client about compaction
-        await ws_manager.send(user_id, {
-            "type": "chat:compacting",
-            "agent_slug": agent_slug,
-            "notice": compaction_notice,
-            "before": len(history),
-            "after": len(compacted_history),
-        })
+        await ws_manager.send(
+            user_id,
+            {
+                "type": "chat:compacting",
+                "agent_slug": agent_slug,
+                "notice": compaction_notice,
+                "before": len(history),
+                "after": len(compacted_history),
+            },
+        )
 
     # Build messages — only pass images from the LAST user message
     # (old images are already analyzed by auto_analyze, no need to send raw base64)
@@ -242,6 +357,7 @@ async def _handle_chat_send(user_id: str, msg: dict):
 
     # Get provider/model
     from ..agents.manager import get_agent
+
     agent_data = get_agent(agent_slug)
     provider_name = agent_data.get("provider") if agent_data else None
     model = agent_data.get("model", "") if agent_data else ""
@@ -252,6 +368,7 @@ async def _handle_chat_send(user_id: str, msg: dict):
 
     # Resolve model with fallback to provider's default
     from .router import resolve_model
+
     provider_name, model = resolve_model(provider_name, model)
 
     # Stream response via WS
@@ -260,6 +377,7 @@ async def _handle_chat_send(user_id: str, msg: dict):
     usage = None  # Token usage from done message
     try:
         from .router import stream_response
+
         async for chunk in stream_response(
             provider_name=provider_name,
             messages=messages,
@@ -279,18 +397,23 @@ async def _handle_chat_send(user_id: str, msg: dict):
                 if msg_type == "chunk":
                     content = payload.get("content", "")
                     full_response += content
-                    await ws_manager.send(user_id, {
-                        "type": "chat:chunk",
-                        "agent_slug": agent_slug,
-                        "content": content,
-                    })
+                    await ws_manager.send(
+                        user_id,
+                        {
+                            "type": "chat:chunk",
+                            "agent_slug": agent_slug,
+                            "content": content,
+                        },
+                    )
                 elif msg_type == "tool_start":
                     # Track tool call
-                    tool_calls.append({
-                        "name": payload.get("tool", ""),
-                        "params": payload.get("params", {}),
-                        "status": "running",
-                    })
+                    tool_calls.append(
+                        {
+                            "name": payload.get("tool", ""),
+                            "params": payload.get("params", {}),
+                            "status": "running",
+                        }
+                    )
                     # Forward
                     ws_type = f"chat:{msg_type}"
                     ws_msg = {"type": ws_type, "agent_slug": agent_slug}
@@ -327,15 +450,22 @@ async def _handle_chat_send(user_id: str, msg: dict):
 
     # If streaming completed but no response was captured, notify client
     if not full_response:
-        await ws_manager.send(user_id, {
-            "type": "chat:error",
-            "agent_slug": agent_slug,
-            "message": "Agent did not produce a response. Check server logs.",
-        })
+        await ws_manager.send(
+            user_id,
+            {
+                "type": "chat:error",
+                "agent_slug": agent_slug,
+                "message": "Agent did not produce a response. Check server logs.",
+            },
+        )
 
     # Save assistant response to history
     if full_response:
-        assistant_entry = {"role": "assistant", "content": full_response, "timestamp": _now().isoformat()}
+        assistant_entry = {
+            "role": "assistant",
+            "content": full_response,
+            "timestamp": _now().isoformat(),
+        }
         if model:
             assistant_entry["model"] = model
         if provider_name:
@@ -369,13 +499,15 @@ async def _handle_chat_send(user_id: str, msg: dict):
 async def _handle_otdel_send(user_id: str, msg: dict):
     """Handle otdel chat message — process agents and push responses via WS."""
     from .otdel_helpers import (
-        _load_history, _save_history, _parse_mentions,
-        _build_otdel_system_prompt, _build_head_context, _build_worker_context,
+        _load_history,
+        _save_history,
+        _parse_mentions,
+        _build_otdel_system_prompt,
+        _build_head_context,
+        _build_worker_context,
     )
     from .providers.base import ChatMessage
     from ..agents.manager import get_otdel, get_agent
-    import uuid
-    from datetime import datetime
 
     otdel_id = msg.get("otdel_id", "")
     message = msg.get("message", "")
@@ -406,19 +538,25 @@ async def _handle_otdel_send(user_id: str, msg: dict):
     history.append(user_msg)
     save_stats = _save_history(otdel_id, history)
     if save_stats.get("was_compacted"):
-        await ws_manager.send(user_id, {
-            "type": "otdel:compacting",
-            "otdel_id": otdel_id,
-            "before": save_stats["before"],
-            "after": save_stats["after"],
-        })
+        await ws_manager.send(
+            user_id,
+            {
+                "type": "otdel:compacting",
+                "otdel_id": otdel_id,
+                "before": save_stats["before"],
+                "after": save_stats["after"],
+            },
+        )
 
     # Push user message to client
-    await ws_manager.send(user_id, {
-        "type": "otdel:message",
-        "otdel_id": otdel_id,
-        "message": user_msg,
-    })
+    await ws_manager.send(
+        user_id,
+        {
+            "type": "otdel:message",
+            "otdel_id": otdel_id,
+            "message": user_msg,
+        },
+    )
 
     # Parse @mentions
     user_mentions = _parse_mentions(message)
@@ -474,18 +612,22 @@ async def _handle_otdel_send(user_id: str, msg: dict):
 
         if is_head:
             context_messages = _build_head_context(history, agent_slug_val)
-            head_processed = True
         else:
             context_messages = _build_worker_context(history, agent_slug_val, head_slug, head_name)
 
-        messages = [ChatMessage(role=m["role"], content=m["content"], images=m.get("images")) for m in context_messages]
-        messages.append(ChatMessage(role="user", content=trigger_message))
+        messages = [
+            ChatMessage(role=m["role"], content=m["content"], images=m.get("images"))
+            for m in context_messages
+        ]
+        # Label trigger so the agent knows who sent it
+        messages.append(ChatMessage(role="user", content=f"[👤 Пользователь]: {trigger_message}"))
 
         model = agent.get("model", "")
         provider_name = agent.get("provider")
 
         # Resolve model with fallback to provider's default
         from .router import resolve_model
+
         provider_name, model = resolve_model(provider_name, model)
 
         # Determine tools for this agent
@@ -503,13 +645,16 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         tools_called = []  # Track tool calls made during streaming
 
         # Notify client that this agent is thinking
-        await ws_manager.send(user_id, {
-            "type": "otdel:thinking",
-            "otdel_id": otdel_id,
-            "agent_slug": agent_slug_val,
-            "agent_name": agent_name_val,
-            "is_head": is_head,
-        })
+        await ws_manager.send(
+            user_id,
+            {
+                "type": "otdel:thinking",
+                "otdel_id": otdel_id,
+                "agent_slug": agent_slug_val,
+                "agent_name": agent_name_val,
+                "is_head": is_head,
+            },
+        )
 
         # Debug: log available tools for head
         if is_head:
@@ -517,6 +662,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
 
         try:
             from .router import stream_response as base_stream
+
             async for chunk in base_stream(
                 provider_name=provider_name,
                 messages=messages,
@@ -538,36 +684,44 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                         if content:
                             full_response += content
                             # Push chunk via WS
-                            await ws_manager.send(user_id, {
-                                "type": "otdel:chunk",
-                                "otdel_id": otdel_id,
-                                "message_id": agent_msg_id,
-                                "content": content,
-                                "sender": agent_slug_val,
-                                "sender_name": agent_name_val,
-                                "is_head": is_head,
-                                "model": model,
-                                "provider": provider_name,
-                            })
+                            await ws_manager.send(
+                                user_id,
+                                {
+                                    "type": "otdel:chunk",
+                                    "otdel_id": otdel_id,
+                                    "message_id": agent_msg_id,
+                                    "content": content,
+                                    "sender": agent_slug_val,
+                                    "sender_name": agent_name_val,
+                                    "is_head": is_head,
+                                    "model": model,
+                                    "provider": provider_name,
+                                },
+                            )
                     elif msg_type == "tool_start":
                         # Forward tool event via WS
-                        await ws_manager.send(user_id, {
-                            "type": f"otdel:{msg_type}",
-                            "otdel_id": otdel_id,
-                            "message_id": agent_msg_id,
-                            "tool": payload.get("tool"),
-                            "params": payload.get("params"),
-                            "result": payload.get("result"),
-                            "success": payload.get("success"),
-                            "error": payload.get("error"),
-                            "index": payload.get("index"),
-                        })
+                        await ws_manager.send(
+                            user_id,
+                            {
+                                "type": f"otdel:{msg_type}",
+                                "otdel_id": otdel_id,
+                                "message_id": agent_msg_id,
+                                "tool": payload.get("tool"),
+                                "params": payload.get("params"),
+                                "result": payload.get("result"),
+                                "success": payload.get("success"),
+                                "error": payload.get("error"),
+                                "index": payload.get("index"),
+                            },
+                        )
                         # Track tool calls for placeholder generation
-                        tools_called.append({
-                            "name": payload.get("tool", ""),
-                            "params": payload.get("params", {}),
-                            "status": "running",
-                        })
+                        tools_called.append(
+                            {
+                                "name": payload.get("tool", ""),
+                                "params": payload.get("params", {}),
+                                "status": "running",
+                            }
+                        )
                     elif msg_type == "tool_end":
                         # Update tool call status
                         tool_name = payload.get("tool", "")
@@ -577,17 +731,20 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                                 tc["result"] = payload.get("result", "")
                                 break
                         # Forward tool event via WS
-                        await ws_manager.send(user_id, {
-                            "type": f"otdel:{msg_type}",
-                            "otdel_id": otdel_id,
-                            "message_id": agent_msg_id,
-                            "tool": payload.get("tool"),
-                            "params": payload.get("params"),
-                            "result": payload.get("result"),
-                            "success": payload.get("success"),
-                            "error": payload.get("error"),
-                            "index": payload.get("index"),
-                        })
+                        await ws_manager.send(
+                            user_id,
+                            {
+                                "type": f"otdel:{msg_type}",
+                                "otdel_id": otdel_id,
+                                "message_id": agent_msg_id,
+                                "tool": payload.get("tool"),
+                                "params": payload.get("params"),
+                                "result": payload.get("result"),
+                                "success": payload.get("success"),
+                                "error": payload.get("error"),
+                                "index": payload.get("index"),
+                            },
+                        )
                     elif msg_type == "done":
                         usage = payload.get("usage")
                         streaming = False
@@ -597,26 +754,30 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 except Exception:
                     pass
         except Exception as e:
-            logger.error("LLM call failed for agent %s in otdel %s: %s", agent_slug_val, otdel_id, e)
+            logger.error(
+                "LLM call failed for agent %s in otdel %s: %s", agent_slug_val, otdel_id, e
+            )
             full_response = f"⚠️ Ошибка: {e}"
             streaming = False
 
         # Save final message to history
         # Strip leaked text-based tool calls from response (e.g. <tool_call>...</tool_call>)
         full_response = re.sub(
-            r'<tool_call>.*?</tool_call>', '', full_response, flags=re.DOTALL
+            r"<tool_call>.*?</tool_call>", "", full_response, flags=re.DOTALL
         ).strip()
         # Also strip ```tool_call...``` blocks
-        full_response = re.sub(
-            r'```tool_call.*?```', '', full_response, flags=re.DOTALL
-        ).strip()
+        full_response = re.sub(r"```tool_call.*?```", "", full_response, flags=re.DOTALL).strip()
         # If empty response but tools were called, generate a placeholder
         if not full_response and tools_called:
             # Debug: log what tools were called
             tool_names_called = [tc["name"] for tc in tools_called]
-            logger.info("Otdel %s HEAD called tools: %s (head_delegate present: %s)", 
-                       otdel_id, tool_names_called, "head_delegate" in tool_names_called)
-            
+            logger.info(
+                "Otdel %s HEAD called tools: %s (head_delegate present: %s)",
+                otdel_id,
+                tool_names_called,
+                "head_delegate" in tool_names_called,
+            )
+
             # Build placeholder from tool calls
             delegate_targets = []
             for tc in tools_called:
@@ -634,17 +795,20 @@ async def _handle_otdel_send(user_id: str, msg: dict):
             else:
                 full_response = "📋 Обрабатываю задачу..."
             # Send placeholder as chunk so frontend can display it
-            await ws_manager.send(user_id, {
-                "type": "otdel:chunk",
-                "otdel_id": otdel_id,
-                "message_id": agent_msg_id,
-                "content": full_response,
-                "sender": agent_slug_val,
-                "sender_name": agent_name_val,
-                "is_head": is_head,
-                "model": model,
-                "provider": provider_name,
-            })
+            await ws_manager.send(
+                user_id,
+                {
+                    "type": "otdel:chunk",
+                    "otdel_id": otdel_id,
+                    "message_id": agent_msg_id,
+                    "content": full_response,
+                    "sender": agent_slug_val,
+                    "sender_name": agent_name_val,
+                    "is_head": is_head,
+                    "model": model,
+                    "provider": provider_name,
+                },
+            )
 
         if full_response:
             agent_msg = {
@@ -668,12 +832,15 @@ async def _handle_otdel_send(user_id: str, msg: dict):
             history.append(agent_msg)
             save_stats = _save_history(otdel_id, history)
             if save_stats.get("was_compacted"):
-                await ws_manager.send(user_id, {
-                    "type": "otdel:compacting",
-                    "otdel_id": otdel_id,
-                    "before": save_stats["before"],
-                    "after": save_stats["after"],
-                })
+                await ws_manager.send(
+                    user_id,
+                    {
+                        "type": "otdel:compacting",
+                        "otdel_id": otdel_id,
+                        "before": save_stats["before"],
+                        "after": save_stats["after"],
+                    },
+                )
 
             # Send done event (include usage for footer display)
             done_msg = {
@@ -713,7 +880,12 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                                         break
                                 trigger = task_text or full_response.strip()
                                 agent_queue.append((agent, False, trigger))
-                                logger.info("Otdel %s head_delegate: queueing %s (task=%s)", otdel_id, agent.get("name"), task_text[:60])
+                                logger.info(
+                                    "Otdel %s head_delegate: queueing %s (task=%s)",
+                                    otdel_id,
+                                    agent.get("name"),
+                                    task_text[:60],
+                                )
                     if expected_workers:
                         head_delegating = True
             # Note: agent response already sent via otdel:chunk + otdel:done above
@@ -725,20 +897,29 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 is_error = full_response.startswith("⚠️ Ошибка:") or not full_response.strip()
                 worker_attempts = head_state.worker_attempts if head_state else {}
                 current_attempt = worker_attempts.get(agent_slug_val, 0)
-                
+
                 if is_error and current_attempt < MAX_WORKER_RETRY:
                     # Retry: increment attempt and re-queue worker
                     worker_attempts[agent_slug_val] = current_attempt + 1
                     retry_task = f"[RETRY #{current_attempt + 1}] {trigger_message}"
                     agent_queue.append((agent, False, retry_task))
-                    logger.warning("Otdel %s worker %s failed, retrying (attempt %d/%d)", 
-                                 otdel_id, agent_slug_val, current_attempt + 1, MAX_WORKER_RETRY)
+                    logger.warning(
+                        "Otdel %s worker %s failed, retrying (attempt %d/%d)",
+                        otdel_id,
+                        agent_slug_val,
+                        current_attempt + 1,
+                        MAX_WORKER_RETRY,
+                    )
                     # Don't add to responded_workers yet - will be added on final response
                 else:
                     # Success or max retries exceeded
                     if is_error and current_attempt >= MAX_WORKER_RETRY:
-                        logger.error("Otdel %s worker %s failed after %d retries, escalating to head", 
-                                   otdel_id, agent_slug_val, MAX_WORKER_RETRY)
+                        logger.error(
+                            "Otdel %s worker %s failed after %d retries, escalating to head",
+                            otdel_id,
+                            agent_slug_val,
+                            MAX_WORKER_RETRY,
+                        )
                         # Head will be notified in follow-up
                     responded_workers.add(agent_slug_val)
                     workers_responded += 1
@@ -755,7 +936,9 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         else:
             # Some workers haven't responded — still follow up so head can
             # either wait, delegate to others, or finalize
-            logger.info("Otdel %s follow-up: %d workers still pending, asking head", otdel_id, len(missing))
+            logger.info(
+                "Otdel %s follow-up: %d workers still pending, asking head", otdel_id, len(missing)
+            )
             should_followup = True
     elif head_processed and workers_responded > 0 and not head_delegating:
         should_followup = True
@@ -787,9 +970,14 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                     "Если задача полностью выполнена — сформируй итог для пользователя."
                 )
         else:
-            acknowledge_trigger = "Работники отдела ответили. Посмотри их ответы и прокомментируй, если нужно."
+            acknowledge_trigger = (
+                "Работники отдела ответили. Посмотри их ответы и прокомментируй, если нужно."
+            )
 
-        messages = [ChatMessage(role=m["role"], content=m["content"], images=m.get("images")) for m in context_messages]
+        messages = [
+            ChatMessage(role=m["role"], content=m["content"], images=m.get("images"))
+            for m in context_messages
+        ]
         messages.append(ChatMessage(role="user", content=acknowledge_trigger))
 
         system_prompt = _build_otdel_system_prompt(otdel, head_agent, True)
@@ -798,6 +986,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
 
         # Resolve model with fallback to provider's default
         from .router import resolve_model
+
         provider_name, model = resolve_model(provider_name, model)
 
         # Head gets all tools including head protocol
@@ -809,6 +998,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
 
         try:
             from .router import stream_response as base_stream
+
             async for chunk in base_stream(
                 provider_name=provider_name,
                 messages=messages,
@@ -829,28 +1019,34 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                         content = payload.get("content", "")
                         if content:
                             full_response += content
-                            await ws_manager.send(user_id, {
-                                "type": "otdel:chunk",
-                                "otdel_id": otdel_id,
-                                "message_id": followup_msg_id,
-                                "content": content,
-                                "sender": head_slug,
-                                "sender_name": head_name,
-                                "is_head": True,
-                            })
+                            await ws_manager.send(
+                                user_id,
+                                {
+                                    "type": "otdel:chunk",
+                                    "otdel_id": otdel_id,
+                                    "message_id": followup_msg_id,
+                                    "content": content,
+                                    "sender": head_slug,
+                                    "sender_name": head_name,
+                                    "is_head": True,
+                                },
+                            )
                     elif msg_type in ("tool_start", "tool_end"):
                         # Forward tool events via WS
-                        await ws_manager.send(user_id, {
-                            "type": f"otdel:{msg_type}",
-                            "otdel_id": otdel_id,
-                            "message_id": followup_msg_id,
-                            "tool": payload.get("tool"),
-                            "params": payload.get("params"),
-                            "result": payload.get("result"),
-                            "success": payload.get("success"),
-                            "error": payload.get("error"),
-                            "index": payload.get("index"),
-                        })
+                        await ws_manager.send(
+                            user_id,
+                            {
+                                "type": f"otdel:{msg_type}",
+                                "otdel_id": otdel_id,
+                                "message_id": followup_msg_id,
+                                "tool": payload.get("tool"),
+                                "params": payload.get("params"),
+                                "result": payload.get("result"),
+                                "success": payload.get("success"),
+                                "error": payload.get("error"),
+                                "index": payload.get("index"),
+                            },
+                        )
                     elif msg_type == "error":
                         full_response = f"⚠️ Ошибка: {payload.get('message', 'Unknown error')}"
                 except Exception:
@@ -861,11 +1057,9 @@ async def _handle_otdel_send(user_id: str, msg: dict):
 
         # Strip leaked text-based tool calls from follow-up response too
         full_response = re.sub(
-            r'<tool_call>.*?</tool_call>', '', full_response, flags=re.DOTALL
+            r"<tool_call>.*?</tool_call>", "", full_response, flags=re.DOTALL
         ).strip()
-        full_response = re.sub(
-            r'```tool_call.*?```', '', full_response, flags=re.DOTALL
-        ).strip()
+        full_response = re.sub(r"```tool_call.*?```", "", full_response, flags=re.DOTALL).strip()
 
         if full_response:
             agent_msg = {
@@ -882,19 +1076,25 @@ async def _handle_otdel_send(user_id: str, msg: dict):
             history.append(agent_msg)
             save_stats = _save_history(otdel_id, history)
             if save_stats.get("was_compacted"):
-                await ws_manager.send(user_id, {
-                    "type": "otdel:compacting",
-                    "otdel_id": otdel_id,
-                    "before": save_stats["before"],
-                    "after": save_stats["after"],
-                })
+                await ws_manager.send(
+                    user_id,
+                    {
+                        "type": "otdel:compacting",
+                        "otdel_id": otdel_id,
+                        "before": save_stats["before"],
+                        "after": save_stats["after"],
+                    },
+                )
 
-            await ws_manager.send(user_id, {
-                "type": "otdel:done",
-                "otdel_id": otdel_id,
-                "message_id": followup_msg_id,
-                "message": agent_msg,
-            })
+            await ws_manager.send(
+                user_id,
+                {
+                    "type": "otdel:done",
+                    "otdel_id": otdel_id,
+                    "message_id": followup_msg_id,
+                    "message": agent_msg,
+                },
+            )
 
             # Check if head_delegate was called again in follow-up
             # If so, need to process the new workers
@@ -906,8 +1106,11 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                         agent = get_agent(slug)
                         if agent:
                             agent_queue.append((agent, False, ""))
-                            logger.info("Otdel %s follow-up delegation: queueing %s", otdel_id, agent.get("name"))
-
+                            logger.info(
+                                "Otdel %s follow-up delegation: queueing %s",
+                                otdel_id,
+                                agent.get("name"),
+                            )
 
     # ── Second pass: process workers queued by follow-up delegations ──
     while agent_queue and processed_count < max_iterations:
@@ -927,14 +1130,18 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         else:
             context_messages = _build_worker_context(history, agent_slug_val, head_slug, head_name)
 
-        messages = [ChatMessage(role=m["role"], content=m["content"], images=m.get("images")) for m in context_messages]
-        messages.append(ChatMessage(role="user", content=trigger_message))
+        messages = [
+            ChatMessage(role=m["role"], content=m["content"], images=m.get("images"))
+            for m in context_messages
+        ]
+        messages.append(ChatMessage(role="user", content=f"[👤 Пользователь]: {trigger_message}"))
 
         model = agent.get("model", "")
         provider_name = agent.get("provider")
 
         # Resolve model with fallback to provider's default
         from .router import resolve_model
+
         provider_name, model = resolve_model(provider_name, model)
 
         if is_head:
@@ -947,6 +1154,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
 
         try:
             from .router import stream_response as base_stream
+
             async for chunk in base_stream(
                 provider_name=provider_name,
                 messages=messages,
@@ -966,19 +1174,33 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                         content = payload.get("content", "")
                         if content:
                             full_response += content
-                            await ws_manager.send(user_id, {
-                                "type": "otdel:chunk", "otdel_id": otdel_id,
-                                "message_id": agent_msg_id, "content": content,
-                                "sender": agent_slug_val, "sender_name": agent_name_val, "is_head": is_head,
-                            })
+                            await ws_manager.send(
+                                user_id,
+                                {
+                                    "type": "otdel:chunk",
+                                    "otdel_id": otdel_id,
+                                    "message_id": agent_msg_id,
+                                    "content": content,
+                                    "sender": agent_slug_val,
+                                    "sender_name": agent_name_val,
+                                    "is_head": is_head,
+                                },
+                            )
                     elif msg_type in ("tool_start", "tool_end"):
-                        await ws_manager.send(user_id, {
-                            "type": f"otdel:{msg_type}", "otdel_id": otdel_id,
-                            "message_id": agent_msg_id, "tool": payload.get("tool"),
-                            "params": payload.get("params"), "result": payload.get("result"),
-                            "success": payload.get("success"), "error": payload.get("error"),
-                            "index": payload.get("index"),
-                        })
+                        await ws_manager.send(
+                            user_id,
+                            {
+                                "type": f"otdel:{msg_type}",
+                                "otdel_id": otdel_id,
+                                "message_id": agent_msg_id,
+                                "tool": payload.get("tool"),
+                                "params": payload.get("params"),
+                                "result": payload.get("result"),
+                                "success": payload.get("success"),
+                                "error": payload.get("error"),
+                                "index": payload.get("index"),
+                            },
+                        )
                     elif msg_type == "error":
                         full_response = f"⚠️ Ошибка: {payload.get('message', 'Unknown error')}"
                 except Exception:
@@ -986,23 +1208,34 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         except Exception as e:
             full_response = f"⚠️ Ошибка: {e}"
 
-        full_response = re.sub(r'<tool_call>.*?</tool_call>', '', full_response, flags=re.DOTALL).strip()
+        full_response = re.sub(
+            r"<tool_call>.*?</tool_call>", "", full_response, flags=re.DOTALL
+        ).strip()
 
         if full_response:
             agent_msg = {
-                "id": agent_msg_id, "role": "assistant",
-                "sender": agent_slug_val, "sender_name": agent_name_val,
-                "content": full_response, "is_head": is_head,
+                "id": agent_msg_id,
+                "role": "assistant",
+                "sender": agent_slug_val,
+                "sender_name": agent_name_val,
+                "content": full_response,
+                "is_head": is_head,
                 "timestamp": _now().isoformat(),
-                "model": model, "provider": provider_name,
+                "model": model,
+                "provider": provider_name,
             }
             history = _load_history(otdel_id)
             history.append(agent_msg)
             _save_history(otdel_id, history)
-            await ws_manager.send(user_id, {
-                "type": "otdel:done", "otdel_id": otdel_id,
-                "message_id": agent_msg_id, "message": agent_msg,
-            })
+            await ws_manager.send(
+                user_id,
+                {
+                    "type": "otdel:done",
+                    "otdel_id": otdel_id,
+                    "message_id": agent_msg_id,
+                    "message": agent_msg,
+                },
+            )
 
         processed_slugs.add(agent_slug_val)
         if not is_head:
@@ -1011,7 +1244,10 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         processed_count += 1
 
     # Signal done
-    await ws_manager.send(user_id, {
-        "type": "otdel:done",
-        "otdel_id": otdel_id,
-    })
+    await ws_manager.send(
+        user_id,
+        {
+            "type": "otdel:done",
+            "otdel_id": otdel_id,
+        },
+    )

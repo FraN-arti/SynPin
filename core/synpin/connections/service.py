@@ -1,7 +1,6 @@
 """Service — business logic for connections, approval, and graph building."""
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -394,7 +393,7 @@ def _has_active_approval(connection_id: str) -> bool:
 
 def save_positions(positions: dict[str, dict[str, float]], viewport: dict[str, float] | None = None) -> None:
     """Save canvas node positions."""
-    from .models import CanvasData, NodePosition
+    from .models import NodePosition
 
     nodes = {}
     for slug, pos in positions.items():

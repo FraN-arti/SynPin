@@ -168,7 +168,7 @@ async def _update(params: dict[str, Any]) -> ToolResult:
     return make_success({
         "id": project.get("id", ""),
         "name": project.get("name", ""),
-        "message": f"Project updated",
+        "message": "Project updated",
     })
 
 

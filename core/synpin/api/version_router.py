@@ -19,7 +19,6 @@ This endpoint exists for:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import platform
 import re
@@ -256,7 +255,6 @@ async def _update_check_loop() -> None:
     """Background task: poll GitHub every CHECK_INTERVAL_S seconds
     and broadcast when an update becomes available.
     """
-    from datetime import datetime, timezone
 
     # Run once at startup so users don't have to wait 6 hours for
     # the first check.

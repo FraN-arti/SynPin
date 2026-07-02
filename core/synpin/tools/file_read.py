@@ -5,7 +5,6 @@ Restricted to reading files under allowed directories (configurable).
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 
 from .base import ToolResult, make_success, make_error
 from ._registry import register_tool
@@ -38,7 +37,7 @@ async def file_read(params: dict) -> ToolResult:
     if not path_str:
         return make_error("Missing required parameter: path")
 
-    resolved = validate_path(path_str)
+    resolved = validate_path(path_str, agent_slug=params.get("agent_slug"))
     if resolved is None:
         roots = get_allowed_roots()
         return make_error(

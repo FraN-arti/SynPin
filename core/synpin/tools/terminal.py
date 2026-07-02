@@ -21,20 +21,35 @@ def _get_work_root() -> Path:
 # Maximum execution time in seconds
 _TIMEOUT = 30
 
+# Known Git Bash locations on Windows (ordered by priority).
+# shutil.which("bash") covers PATH, but the SynPin server process may not
+# have Git\usr\bin on PATH even when Git is installed.
+_WIN_BASH_CANDIDATES = [
+    r"C:\Program Files\Git\usr\bin\bash.exe",
+    r"C:\Program Files (x86)\Git\usr\bin\bash.exe",
+    r"C:\Program Files\Git\bin\bash.exe",
+    r"C:\Program Files (x86)\Git\bin\bash.exe",
+]
+
+
+def _find_bash() -> str | None:
+    """Locate bash executable — PATH first, then common Windows install paths."""
+    import shutil
+    found = shutil.which("bash") or shutil.which("sh")
+    if found:
+        return found
+    if os.name == "nt":
+        for candidate in _WIN_BASH_CANDIDATES:
+            if os.path.isfile(candidate):
+                return candidate
+    return None
+
 
 @register_tool(
     name="terminal",
     description="Выполнение shell-команд (bash). Используй для запуска git, npm, python, ls, cat и любых других команд.",
     category="code",
     scope="all",
-    dangerous=True,
-)
-
-@register_tool(
-    name='terminal',
-    description='Выполнение shell-команд (bash). Используй для запуска git, npm, python, ls, cat и любых других команд.',
-    category='code',
-    scope='all',
     dangerous=True,
 )
 async def terminal(params: dict) -> ToolResult:
@@ -50,12 +65,11 @@ async def terminal(params: dict) -> ToolResult:
         return make_error("Missing required parameter: command")
 
     try:
-        # Determine shell: prefer bash (Git Bash on Windows), fallback to cmd
-        import shutil
-        shell_cmd = shutil.which("bash") or shutil.which("sh")
+        shell_cmd = _find_bash()
         if shell_cmd:
-            # Use bash with -c flag
-            cmd_list = [shell_cmd, "-c", command]
+            # --login ensures /usr/bin is on PATH (ls, cat, grep, etc.)
+            # Without it, Git Bash on Windows only has builtins like pwd/echo.
+            cmd_list = [shell_cmd, "--login", "-c", command]
         else:
             # Windows fallback: use cmd.exe
             cmd_list = ["cmd", "/c", command]

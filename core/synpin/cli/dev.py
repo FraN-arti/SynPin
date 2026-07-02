@@ -462,7 +462,6 @@ def _stdin_listener(core_port: int, stop: threading.Event, started: threading.Ev
     """
     import sys as _sys
     import subprocess as _sp
-    import urllib.request as _url
     import threading as _th
 
     started.set()
@@ -475,7 +474,7 @@ def _stdin_listener(core_port: int, stop: threading.Event, started: threading.Ev
             cmd = line.strip().lower()
 
             if cmd == "d":
-                url = f"http://localhost:2099/start/"
+                url = "http://localhost:2099/start/"
                 console.print(f"[info]Opening dev wizard: {url}[/info]")
                 if os.name == "nt":
                     _sp.Popen(["start", url], shell=True)
@@ -529,8 +528,8 @@ def run_dev_server() -> None:
     console.print(f"  [dim]Core:  http://{CORE_HOST}:{core_port}/api[/dim]")
     console.print(f"  [dim]Web:   http://localhost:{web_port}[/dim]")
     console.print(f"  [dim]Docs: http://{CORE_HOST}:{core_port}/docs[/dim]")
-    console.print(f"  [dim]Stop: Ctrl+C[/dim]")
-    console.print(f"  [dim]press d + enter to open dev wizard[/dim]")
+    console.print("  [dim]Stop: Ctrl+C[/dim]")
+    console.print("  [dim]press d + enter to open dev wizard[/dim]")
     console.print()
 
     processes: list[subprocess.Popen] = []

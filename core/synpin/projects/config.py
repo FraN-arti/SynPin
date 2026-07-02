@@ -3,9 +3,12 @@ Project config — load/save projects from YAML files.
 """
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from ..time import now as _now
+
+logger = logging.getLogger(__name__)
 from .models import (
     Project,
     load_project,
@@ -47,7 +50,7 @@ class ProjectConfig:
         try:
             return load_project(yaml_file)
         except Exception as e:
-            print(f"Warning: Failed to load project {project_id}: {e}")
+            logger.warning("Failed to load project %s: %s", project_id, e)
             return None
     
     def load_all_projects(self) -> list[Project]:
@@ -89,7 +92,6 @@ class ProjectConfig:
     def append_togle(self, project_id: str, entry: str) -> None:
         """Append entry to TOGLE.md."""
         current = self.read_togle(project_id)
-        from datetime import datetime
         timestamp = _now().strftime("%Y-%m-%d %H:%M")
         new_entry = f"\n\n## [{timestamp}]\n{entry}"
         self.write_togle(project_id, current + new_entry)

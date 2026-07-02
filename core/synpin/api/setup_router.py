@@ -10,7 +10,6 @@ auto-navigate to the wizard on first run.
 """
 
 import logging
-from pathlib import Path
 
 import yaml
 from fastapi import APIRouter, HTTPException

@@ -1,12 +1,18 @@
 /**
  * Departments (Otdels) settings section.
  * Extracted from SettingsPage.tsx (lines 2323-2510).
+ *
+ * Hosts a single "Протокол отделов" block (retry limit). The retry
+ * behaviour is GLOBAL — every otdel shares the same knob — so it lives
+ * here, not in OtdelSettingsPanel.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { API_BASE } from '../../config'
 import { DropdownMenu } from '../DropdownMenu'
 import { LoadingSpinner } from '../LoadingSpinner'
+import { SettingsCard } from '../SettingsCard'
+import { Toggle } from './Toggle'
 
 interface Otdel {
   otdelid: string
@@ -167,6 +173,7 @@ export function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChang
 
   return (
     <div className="settings-sections">
+      <ProtocolBlock />
       <div className="section-header-row">
         <span className="section-count">{otdels.length} отделов</span>
         <button className="settings-btn-primary" onClick={openCreate}>+ Создать отдел</button>
@@ -200,5 +207,118 @@ export function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChang
 
       {isModalOpen && renderModal()}
     </div>
+  )
+}
+
+// ── Protocol Block (retry limit) ─────────────────────────────────────────────
+//
+// Lives at the TOP of the section so the user sees it before any otdel
+// noise. Keeps the section header anchored to "Отделы" while signalling
+// that head-protocol knobs are global across the install.
+
+function ProtocolBlock() {
+  const [enabled, setEnabled] = useState<boolean | null>(null)
+  const [max, setMax] = useState<number | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/protocol/settings`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      setEnabled(Boolean(data.retry_limit_enabled))
+      setMax(typeof data.max_retries === 'number' ? data.max_retries : 3)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  // Fire-and-forget on change (mirrors KanbanSection's pattern). Value
+  // is the source of truth; the persist call returns whatever the server
+  // echoes back so we stay in sync with last-write-wins ordering and
+  // any field-level clamping the backend applies.
+  const persist = useCallback((patch: Record<string, unknown>) => {
+    return fetch(`${API_BASE}/api/protocol/settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    }).then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      return r.json()
+    }).catch(e => setError(e instanceof Error ? e.message : String(e)))
+  }, [])
+
+  const onToggle = (next: boolean) => {
+    const prev = enabled
+    setEnabled(next)
+    void persist({ retry_limit_enabled: next }).then(data => {
+      if (!data) return
+      // Server is the authority — reflect whatever it returned.
+      setEnabled(Boolean(data.retry_limit_enabled))
+      setMax(typeof data.max_retries === 'number' ? data.max_retries : 3)
+    }).catch(() => setEnabled(prev))
+  }
+
+  const onMaxChange = (raw: number) => {
+    if (Number.isNaN(raw)) return
+    const next = Math.max(1, Math.min(10, Math.floor(raw)))
+    setMax(next)
+    void persist({ max_retries: next })
+  }
+
+  const loading = enabled === null || max === null
+
+  return (
+    <SettingsCard title="Протокол отделов">
+      <p className="settings-hint">
+        Глобальные правила работы глав отделов. Применяются ко всем отделам сразу.
+      </p>
+      <div className="settings-divider-thin" />
+      {loading ? (
+        <LoadingSpinner text="Загрузка..." />
+      ) : (
+        <>
+          <Toggle
+            label="Включить лимит ретраев"
+            checked={enabled!}
+            onChange={(v) => onToggle(v)}
+          />
+          <p className="settings-hint" style={{ marginLeft: 24, marginTop: -8 }}>
+            {enabled
+              ? 'Глава обязана принять решение после исчерпания попыток.'
+              : 'Лимит выключен. Решение остановиться принимает глава сама.'}
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
+            <label
+              htmlFor="protocol-max-retries"
+              style={{ color: 'var(--text-secondary)', fontSize: 13, whiteSpace: 'nowrap' }}
+            >
+              Максимум попыток ретрая
+            </label>
+            <input
+              id="protocol-max-retries"
+              type="number"
+              min={1}
+              max={10}
+              className="settings-input"
+              value={max!}
+              onChange={(e) => onMaxChange(Number(e.target.value))}
+              disabled={!enabled}
+              style={{ width: 60, padding: '4px 6px', fontSize: 13 }}
+            />
+            <span style={{ color: 'var(--gray-500)', fontSize: 12 }}>
+              (максимум: 10)
+            </span>
+          </div>
+          {error && (
+            <div style={{ color: 'var(--red, #f87171)', fontSize: 12, marginTop: 8 }}>
+              {error}
+            </div>
+          )}
+        </>
+      )}
+    </SettingsCard>
   )
 }

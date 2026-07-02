@@ -2261,7 +2261,42 @@
   40% { transform: scale(1); opacity: 1; }
 }
 
-/* Tool calls in otdel messages */
+/* Tool calls in otdel messages — minimal inline badges */
+.otdel-msg-tools-mini {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tool-mini-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  color: var(--text-dim);
+  font-family: monospace;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.tool-mini-badge.completed {
+  border-color: #22c55e40;
+  color: #22c55e;
+}
+
+.tool-mini-badge.error {
+  border-color: #ef444440;
+  color: #ef4444;
+}
+
+.tool-mini-badge.running {
+  border-color: var(--orange);
+  color: var(--orange);
+}
+
+/* Legacy tool tiles (kept for reference, unused) */
 .otdel-msg-tools {
   margin-top: 8px;
   display: flex;

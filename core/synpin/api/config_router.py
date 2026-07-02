@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/config", tags=["config"])
 # Use get_config_dir() to stay consistent with the rest of the app
 # (respects SYNPIN_DEV=1 → dev config, else ~/.synpin/config)
 
-from ..paths import get_config_dir as _get_config_dir, get_data_dir as _get_data_dir
+from ..paths import get_config_dir as _get_config_dir
 
 CONFIG_DIR: Optional[Path] = _get_config_dir()
 if CONFIG_DIR is None:

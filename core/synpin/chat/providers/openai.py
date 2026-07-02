@@ -146,7 +146,7 @@ class OpenAIProvider(BaseProvider):
                         resp.raise_for_status()
                         data = resp.json()
                         break
-                    except (httpx.ConnectError, httpx.ReadTimeout) as e:
+                    except (httpx.ConnectError, httpx.ReadTimeout):
                         if attempt < 2:
                             import asyncio
                             await asyncio.sleep(1.0 * (attempt + 1))

@@ -1,55 +1,68 @@
 """Head Protocol: Strategic decision - continue/stop/takeover/escalate."""
+
 from __future__ import annotations
 
 from typing import Any
 
-from ..chat.ws_router import get_head_state
+from ..chat.ws_router import compute_phase, get_head_state
 from ._registry import register_tool
-from .base import ToolResult, make_success, make_error
-
+from .base import ToolResult, make_error
 
 
 @register_tool(
-    name='head_decide',
-    description='Принять стратегическое решение по делегации: продолжить, остановить, взять на себя или эскалировать пользователю.',
-    category='head_protocol',
-    scope='head',
+    name="head_decide",
+    description="Принять стратегическое решение по делегации: продолжить, остановить, взять на себя или эскалировать пользователю.",
+    category="head_protocol",
+    scope="head",
     dangerous=False,
 )
 async def head_decide(params: dict[str, Any]) -> ToolResult:
     """
     Make a strategic decision about the delegation.
-    
+
     Params:
         otdel_id: str (injected)
         delegation_id: str (optional, uses active)
         situation: "continue" | "stop" | "takeover" | "escalate"
         reasoning: str - why this decision
         context: dict - additional context
-    
+
     Returns:
         {action: str, reasoning: str, next_prompt: str}
     """
     otdel_id = params.get("otdel_id")
     if not otdel_id:
         return make_error("otdel_id required")
-    
+
     state = get_head_state(otdel_id)
     if not state:
         return make_error(f"No HeadState for otdel {otdel_id}")
-    
+
     delegation_id = params.get("delegation_id") or state.active_delegation_id
     if not delegation_id or delegation_id != state.active_delegation_id:
         return make_error(f"No active delegation matching {delegation_id}")
-    
+
     situation = params.get("situation")
     valid_situations = ("continue", "stop", "takeover", "escalate")
     if situation not in valid_situations:
         return make_error(f"Invalid situation. Must be one of: {', '.join(valid_situations)}")
-    
+
+    # Gating: a strategic decision is meaningless before all expected
+    # workers have responded — the head would be deciding on incomplete
+    # information. Exception: if a worker is genuinely stuck / silent,
+    # the head should reach for head_block, not head_decide (head_block
+    # is designed for in-flight escalations without data).
+    phase_info = compute_phase(state)
+    if phase_info["phase"] != "ALL_RESPONDED":
+        return make_error(
+            f"Cannot decide yet: phase={phase_info['phase']}, "
+            f"missing={', '.join(phase_info['missing']) or '—'}. "
+            f"Wait for all workers, or use head_block for in-flight escalations."
+        )
+
     reasoning = params.get("reasoning", "")
     context = params.get("context", {})
-    
+
     # Build next prompt based on decision
     if situation == "continue":
         action = "continue_delegation"
@@ -65,15 +78,17 @@ async def head_decide(params: dict[str, Any]) -> ToolResult:
     elif situation == "escalate":
         action = "escalate_to_user"
         next_prompt = "Escalate to user. Report the situation and ask for guidance."
-    
+
     # Record decision in history
-    state.delegation_history.append({
-        "delegation_id": delegation_id,
-        "decision": situation,
-        "reasoning": reasoning,
-        "context": context,
-    })
-    
+    state.delegation_history.append(
+        {
+            "delegation_id": delegation_id,
+            "decision": situation,
+            "reasoning": reasoning,
+            "context": context,
+        }
+    )
+
     return {
         "success": True,
         "output": f"Decision: {situation} — {reasoning}",

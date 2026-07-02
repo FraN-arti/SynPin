@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-from urllib.parse import unquote
 
 from .base import ToolResult, make_success, make_error
 from ._registry import register_tool
@@ -143,7 +142,7 @@ async def _call_vision_provider(
     api_key = provider_config.get("api_key", "")
 
     if not base_url:
-        raise ValueError(f"Provider has no base_url configured")
+        raise ValueError("Provider has no base_url configured")
 
     # Build multimodal messages (OpenAI format)
     content_parts = [

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import socket
 import platform
-from datetime import datetime, timezone as _tz
+from datetime import datetime
 
 
 def _load_timezone() -> str | None:

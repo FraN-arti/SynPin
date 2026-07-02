@@ -5,15 +5,12 @@ All changes auto-save and broadcast via WebSocket for live sync.
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
-from pydantic import Field
 from ._base import BaseRequest
 from ..kanban.models import TaskStatus
 
 from ..kanban.config import (
     ColumnConfig,
     LabelConfig,
-    WidgetConfig,
-    BoardSettings,
     generate_id,
     load_columns,
     save_columns,
@@ -184,7 +181,6 @@ def delete_column(column_id: str) -> dict:
     # Clean task references — move orphans to first enabled column
     try:
         from .models import load_all_tasks, save_task, TaskStatus
-        from .service import KanbanService
         tasks = load_all_tasks()
         first_col = cols[0] if cols else None
         if first_col and tasks:

@@ -10,7 +10,7 @@ Usage:
     registry.load()
 
     # Call a tool
-    result = await registry.call("terminal", {"command": "echo hello"})
+    result = await registry.call("terminal", {"command": "ls"})
 
     # Or use a handler directly
     from synpin.tools.terminal import terminal
@@ -34,9 +34,10 @@ from .code_exec import code_exec
 from .memory_read import memory_read
 from .memory_write import memory_write
 from .head_delegate import head_delegate
-from .head_await import head_await
 from .head_evaluate import head_evaluate
 from .head_retry import head_retry
+from .head_rework import head_rework
+from .head_checklist import head_checklist
 from .head_decide import head_decide
 from .head_block import head_block
 from .head_approve import head_approve, head_approval_status
@@ -56,6 +57,8 @@ from .get_system_info import get_system_info
 from .skills_list import skills_list
 from .skill_view import skill_view
 from .skill_manage import skill_manage
+from .project_view import project_view
+from .project_status_update import project_status_update
 
 # Registry dict mapping tool names to handler functions (loaded lazily)
 _tool_handlers: dict[str, ToolHandler] | None = None
@@ -79,9 +82,10 @@ def get_tool_registry() -> dict[str, ToolHandler]:
             "memory_read": memory_read,
             "memory_write": memory_write,
             "head_delegate": head_delegate,
-            "head_await": head_await,
             "head_evaluate": head_evaluate,
             "head_retry": head_retry,
+            "head_rework": head_rework,
+            "head_checklist": head_checklist,
             "head_decide": head_decide,
             "head_block": head_block,
             "head_approve": head_approve,
@@ -105,6 +109,8 @@ def get_tool_registry() -> dict[str, ToolHandler]:
             "skills_list": skills_list,
             "skill_view": skill_view,
             "skill_manage": skill_manage,
+            "project_view": project_view,
+            "project_status_update": project_status_update,
         }
     return _tool_handlers
 
@@ -127,7 +133,6 @@ __all__ = [
     "memory_read",
     "memory_write",
     "head_delegate",
-    "head_await",
     "head_evaluate",
     "head_retry",
     "head_block",
@@ -151,4 +156,6 @@ __all__ = [
     "skills_list",
     "skill_view",
     "skill_manage",
+    "project_view",
+    "project_status_update",
 ]

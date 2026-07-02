@@ -2,8 +2,6 @@
 import re
 import json
 import httpx
-from pathlib import Path
-from colorsys import rgb_to_hls, hls_to_rgb
 from fastapi import APIRouter, HTTPException
 from ._base import BaseRequest
 
@@ -104,7 +102,6 @@ def _oklch_to_hex(L: float, C: float, H: float) -> str:
 
 def _oklab_to_hex(L: float, a: float, b: float) -> str:
     """Convert OKLab to hex via linear sRGB."""
-    import math
     l_ = L + 0.3963377774 * a + 0.2158037573 * b
     m_ = L - 0.1055613458 * a - 0.0638541728 * b
     s_ = L - 0.0894841775 * a - 1.2914855480 * b

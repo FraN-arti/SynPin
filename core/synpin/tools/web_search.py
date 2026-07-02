@@ -5,11 +5,9 @@ Provider is selected from settings.yaml → models.web_search.
 """
 from __future__ import annotations
 
-import asyncio
-import json
 import re
 from html import unescape as html_unescape
-from urllib.parse import quote_plus, unquote
+from urllib.parse import unquote
 
 from .base import ToolResult, make_success, make_error
 from ._registry import register_tool
@@ -55,7 +53,7 @@ async def web_search(params: dict) -> ToolResult:
                 output_lines.append(f"Snippet: {r.get('snippet', '')}")
                 output_lines.append("")
             return make_success("\n".join(output_lines))
-    except Exception as e:
+    except Exception:
         pass  # Fall through to legacy DDG
 
     # Fallback: legacy DuckDuckGo methods

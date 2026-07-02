@@ -16,7 +16,6 @@ import asyncio
 import logging
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Any
 
 logger = logging.getLogger("synpin.connections.auto_approval")
 

@@ -1,16 +1,18 @@
 """Cron API — manage scheduled tasks."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+logger = logging.getLogger(__name__)
+
 from ..cron.jobs import (
     create_job, get_job, list_jobs, update_job, delete_job,
-    CronLimitExceeded, get_agent_limit, count_active_for_creator,
-    DEFAULT_AGENT_LIMIT,
+    CronLimitExceeded, get_agent_limit, DEFAULT_AGENT_LIMIT,
 )
 from ..cron.models import JobStatus
 

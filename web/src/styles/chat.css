@@ -123,6 +123,15 @@
 
 /* === Tool Timeline (horizontal chips, animated) === */
 
+/* Tool badges — minimal inline (same as otdel chat) */
+.tool-badges-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+/* Legacy ToolTimeline styles below (unused, kept for reference) */
 .tool-timeline {
   display: flex;
   flex-wrap: wrap;
@@ -825,7 +834,8 @@
   font-size: 12px;
   line-height: 1.4;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), 0 0 1px rgba(255, 255, 255, 0.06);
-  white-space: nowrap;
   max-width: 320px;
+  overflow-wrap: break-word;
+  word-break: break-word;
   z-index: 99999;
 }

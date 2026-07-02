@@ -6,6 +6,7 @@ Each project is stored as a YAML file in data/projects/{project_id}/project.yaml
 """
 from __future__ import annotations
 
+import logging
 from ..time import now as _now
 
 import re
@@ -13,9 +14,10 @@ import yaml
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
+
+logger = logging.getLogger(__name__)
 
 
 # ── Enums ────────────────────────────────────────────────────────────────────
@@ -281,6 +283,6 @@ def load_all_projects(projects_dir: Path) -> list[Project]:
             try:
                 projects.append(load_project(yaml_file))
             except Exception as e:
-                print(f"Warning: Failed to load {project_dir.name}: {e}")
+                logger.warning("Failed to load %s: %s", project_dir.name, e)
     
     return projects

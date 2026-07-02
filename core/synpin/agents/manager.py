@@ -874,11 +874,81 @@ def _count_agents_in_otdel(otdel: dict) -> int:
     return count
 
 
+def _enrich_otdel(otdel: dict) -> dict:
+    """Add name, head_name, workers_names, and projects[] to an otdel dict (runtime-only)."""
+    from .names import read_otdel_name, read_agent_name, read_otdel
+
+    otdel_id = otdel.get("id", "") or otdel.get("otdelid", "")
+
+    # Department name (canonical: read_otdel_name)
+    if otdel_id and "name" not in otdel:
+        n = read_otdel_name(otdel_id)
+        if n:
+            otdel["name"] = n
+
+    # Head agent name
+    head_id = otdel.get("head", "")
+    if head_id and "head_name" not in otdel:
+        hn = read_agent_name(head_id)
+        if hn:
+            otdel["head_name"] = hn
+
+    # Worker names — read full otdel YAML so workers[] is available regardless
+    # of whether the caller passed them in.
+    if "workers_names" not in otdel:
+        full = read_otdel(otdel_id) if otdel_id else None
+        workers = (full or {}).get("workers") or otdel.get("workers") or []
+        if isinstance(workers, list) and workers:
+            enriched = []
+            for w in workers:
+                wname = read_agent_name(w)
+                enriched.append({"id": w, "name": wname} if wname else {"id": w})
+            otdel["workers_names"] = enriched
+
+    # Projects this department participates in. Imported lazily to avoid
+    # circular import (projects → agents for names.py).
+    if otdel_id and "projects" not in otdel:
+        try:
+            from ..projects.config import ProjectConfig
+            from ..paths import get_data_dir
+            svc_cfg = ProjectConfig(get_data_dir())
+            otdel["projects"] = _projects_for_department(svc_cfg, otdel_id)
+        except Exception:
+            otdel["projects"] = []
+    return otdel
+
+
+def _projects_for_department(cfg: "ProjectConfig", dept_id: str) -> list[dict]:
+    """Return [{id, name, status, role, is_main}, ...] for projects this dept is in.
+
+    Computed at runtime by scanning all project.yaml files. Cheap enough
+    for typical SynPin usage (<100 projects).
+    """
+    result: list[dict] = []
+    try:
+        for project in cfg.load_all_projects():
+            for d in project.departments:
+                if d.id == dept_id:
+                    result.append({
+                        "id": project.id,
+                        "name": project.name,
+                        "status": project.status.value if hasattr(project.status, "value") else str(project.status),
+                        "priority": project.priority,
+                        "role": d.role,
+                        "is_main": d.is_main,
+                    })
+                    break
+    except Exception:
+        pass
+    return result
+
+
 def get_otdels_with_agents() -> list[dict[str, Any]]:
-    """Load otdels with agent counts resolved."""
+    """Load otdels with agent counts and names resolved."""
     otdels = load_otdels()
     for otdel in otdels:
         otdel["agent_count"] = _count_agents_in_otdel(otdel)
+        _enrich_otdel(otdel)
     return otdels
 
 
@@ -888,6 +958,7 @@ def get_otdel(otdel_id: str) -> dict[str, Any] | None:
     for otdel in otdels:
         if otdel.get("otdelid") == otdel_id:
             otdel["agent_count"] = _count_agents_in_otdel(otdel)
+            _enrich_otdel(otdel)
             return otdel
     return None
 

@@ -20,7 +20,6 @@ server restarts. This prevents re-archiving on reconnect.
 """
 import json
 import logging
-import os
 import shutil
 import threading
 import time
@@ -281,4 +280,4 @@ def start_session_reset_daemon(interval: int = 60):
         name="session-reset",
     )
     t.start()
-    print(f"  [sessions] Auto-reset daemon started (checking every {interval}s)")
+    logger.info("[sessions] Auto-reset daemon started (checking every %ss)", interval)

@@ -1,6 +1,6 @@
 """Base provider interface for LLM chat."""
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator
+from typing import AsyncIterator
 from dataclasses import dataclass, field
 
 

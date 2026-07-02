@@ -16,7 +16,7 @@ import logging
 import uuid
 import asyncio
 from pathlib import Path
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from ._base import BaseRequest
 

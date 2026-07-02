@@ -5,6 +5,7 @@ Hot-reloaded via ConfigWatcher. WebSocket broadcast on every change.
 """
 from __future__ import annotations
 
+import logging
 import os
 import random
 import string
@@ -12,6 +13,8 @@ from pathlib import Path
 
 import yaml
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from ..paths import get_config_dir as _main_config_dir
 from .models import TaskStatus
@@ -156,7 +159,7 @@ def _load_yaml(name: str) -> dict | list | None:
         try:
             return yaml.safe_load(path.read_text(encoding="utf-8"))
         except Exception as e:
-            print(f"[kanban] Config load error ({name}): {e}")
+            logger.warning("[kanban] Config load error (%s): %s", name, e)
     return None
 
 

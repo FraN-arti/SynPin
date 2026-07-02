@@ -5,11 +5,9 @@ Broadcasts WebSocket events on every task change for live board updates.
 """
 from __future__ import annotations
 
-import asyncio
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 from ..time import now as _now
 from ..paths import get_tasks_dir

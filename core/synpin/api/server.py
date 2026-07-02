@@ -283,6 +283,10 @@ app.include_router(setup_router)
 from .widgets_router import router as widgets_router
 app.include_router(widgets_router)
 
+# Head protocol settings (retry-limit knob shared by all otdels)
+from .protocol_router import router as protocol_router
+app.include_router(protocol_router)
+
 @app.get("/api/health")
 def health():
     return {"status": "ok", "version": __version__}
@@ -307,9 +311,7 @@ def reload_config():
 from ..config.watcher import ConfigWatcher
 from ..paths import (
     get_config_dir,
-    get_agents_dir,
     get_otdels_dir,
-    get_data_dir,
 )
 
 _config_watcher = ConfigWatcher(interval=5)

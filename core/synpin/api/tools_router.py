@@ -26,7 +26,6 @@ from ..chat.router import (
     PRIMARY_TOOLS,
     BUILTINS,
     DANGEROUS_TOOLS,
-    get_native_tool_defs,
     _ensure_defs_built_first,
 )
 

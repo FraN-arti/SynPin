@@ -5,7 +5,6 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 
 from ._base import BaseRequest
 from ..connections import service as svc

@@ -40,7 +40,6 @@ def cmd_start(args):
     (useful when something fails to start).
     """
     import uvicorn
-    from rich.logging import RichHandler
 
     host = os.environ.get("SYNPIN_HOST", "0.0.0.0")
     port = int(os.environ.get("SYNPIN_PORT", "2088"))
@@ -83,8 +82,8 @@ def cmd_start(args):
                     shutil.rmtree(repo_dir)
                     sentinel.unlink()
                     console.print(
-                        f"[success]Source repo removed.[/success] "
-                        f"[dim](set SYNPIN_KEEP_REPO=1 before install to skip this)[/dim]"
+                        "[success]Source repo removed.[/success] "
+                        "[dim](set SYNPIN_KEEP_REPO=1 before install to skip this)[/dim]"
                     )
             except Exception as e:
                 console.print(
@@ -223,7 +222,7 @@ def cmd_status(args):
         urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=2)
         console.print(f"[success]✅  SynPin is running on port {port}[/success]")
     except Exception:
-        console.print(f"[error]❌  SynPin is not running[/error]")
+        console.print("[error]❌  SynPin is not running[/error]")
 
 
 def cmd_version(args):
@@ -250,7 +249,7 @@ def cmd_config(args):
 def cmd_setup(args):
     """Initial setup wizard."""
     from rich.panel import Panel
-    from rich.prompt import Prompt, Confirm
+    from rich.prompt import Prompt
 
     config_dir = SYNPIN_HOME
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -291,7 +290,6 @@ def cmd_update(args):
     3. reinstall only the changed parts (pip install -e core,
        npm install in web, or nothing if neither changed).
     """
-    import shutil
 
     # The repo the user is running from. We get this from the
     # location of the synpin-core package install (editable mode
@@ -472,7 +470,7 @@ def cmd_doctor(args):
     # Frontend port
     try:
         import urllib.request
-        urllib.request.urlopen(f"http://127.0.0.1:2099", timeout=2)
+        urllib.request.urlopen("http://127.0.0.1:2099", timeout=2)
         table.add_row("Frontend", "[success]✅ OK[/success]", "Port 2099")
     except Exception:
         table.add_row("Frontend", "[warning]⚠️  OFF[/warning]", "Port 2099 not responding")

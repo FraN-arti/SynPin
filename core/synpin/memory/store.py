@@ -15,12 +15,10 @@ Design inspired by Hermes memory_tool.py:
 - Atomic writes via temp file + rename
 """
 
-import json
 import logging
 import os
 import re
 import tempfile
-import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional

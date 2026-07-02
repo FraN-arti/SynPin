@@ -2199,16 +2199,37 @@
   border-radius: 50%;
   background: var(--orange);
   opacity: 0.4;
-  animation: otdel-typing-bounce 1.4s ease-in-out infinite;
+  /* Two animations running in parallel:
+     - otdel-typing-bounce: vertical hop + opacity (the original "live" feel)
+     - otdel-dot-color-shift: background-color cycle (2.5s) through
+       orange → amber → purple → orange. Staggered per-dot so the
+       three dots form a running wave (0s / 0.83s / 1.67s = thirds of
+       the cycle), instead of all three flashing in sync.
+       We animate background-color (not color) because the spans are
+       empty circles — `color` would have nothing to tint. */
+  animation:
+    otdel-typing-bounce 1.4s ease-in-out infinite,
+    otdel-dot-color-shift 2.5s ease-in-out infinite;
 }
 
-.otdel-typing-dots span:nth-child(1) { animation-delay: 0s; }
-.otdel-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
-.otdel-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+.otdel-typing-dots span:nth-child(1) { animation-delay: 0s, 0s; }
+.otdel-typing-dots span:nth-child(2) { animation-delay: 0.2s, -0.83s; }
+.otdel-typing-dots span:nth-child(3) { animation-delay: 0.4s, -1.67s; }
 
 @keyframes otdel-typing-bounce {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
   30% { transform: translateY(-6px); opacity: 1; }
+}
+
+/* Color cycle — same stops as glowPulse (orange → amber → purple → orange)
+   so the dots feel like they're part of the same animated surface.
+   Hue goes via background-color (not color) because the spans are
+   empty circles. */
+@keyframes otdel-dot-color-shift {
+  0%   { background-color: #f97316; }  /* orange */
+  33%  { background-color: #f59e0b; }  /* amber */
+  66%  { background-color: #a855f7; }  /* purple */
+  100% { background-color: #f97316; }  /* orange */
 }
 
 /* ── Streaming animation ─────────────────────────────────────────────── */
@@ -2250,11 +2271,18 @@
   height: 4px;
   border-radius: 50%;
   background: var(--orange);
-  animation: otdel-streaming-bounce 1.4s infinite ease-in-out both;
+  /* Same dual animation as the typing dots — vertical bounce plus a
+     background-color cycle. Staggered per-dot (-0s, -0.83s, -1.67s)
+     so the three dots form a running wave along the bubble border's
+     color cycle. */
+  animation:
+    otdel-streaming-bounce 1.4s infinite ease-in-out both,
+    otdel-dot-color-shift 2.5s ease-in-out infinite;
 }
 
-.otdel-msg-streaming-dots span:nth-child(1) { animation-delay: -0.32s; }
-.otdel-msg-streaming-dots span:nth-child(2) { animation-delay: -0.16s; }
+.otdel-msg-streaming-dots span:nth-child(1) { animation-delay: -0.32s, 0s; }
+.otdel-msg-streaming-dots span:nth-child(2) { animation-delay: -0.16s, -0.83s; }
+.otdel-msg-streaming-dots span:nth-child(3) { animation-delay: 0s, -1.67s; }
 
 @keyframes otdel-streaming-bounce {
   0%, 80%, 100% { transform: scale(0); opacity: 0.5; }

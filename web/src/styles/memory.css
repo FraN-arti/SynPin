@@ -2198,7 +2198,6 @@
   height: 6px;
   border-radius: 50%;
   background: var(--orange);
-  opacity: 0.4;
   /* Two animations running in parallel:
      - otdel-typing-bounce: vertical hop + opacity (the original "live" feel)
      - otdel-dot-color-shift: background-color cycle (2.5s) through
@@ -2206,7 +2205,10 @@
        three dots form a running wave (0s / 0.83s / 1.67s = thirds of
        the cycle), instead of all three flashing in sync.
        We animate background-color (not color) because the spans are
-       empty circles — `color` would have nothing to tint. */
+       empty circles — `color` would have nothing to tint.
+     No baseline opacity here: the bounce keyframe drives opacity from
+     0.6 → 1 → 0.6 (bumped from 0.4 so the color cycle is visible
+     even at the dimmer end of the hop). */
   animation:
     otdel-typing-bounce 1.4s ease-in-out infinite,
     otdel-dot-color-shift 2.5s ease-in-out infinite;
@@ -2217,7 +2219,7 @@
 .otdel-typing-dots span:nth-child(3) { animation-delay: 0.4s, -1.67s; }
 
 @keyframes otdel-typing-bounce {
-  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.6; }
   30% { transform: translateY(-6px); opacity: 1; }
 }
 

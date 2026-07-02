@@ -162,26 +162,22 @@
 .markdown-body pre .hljs-operator { color: #56b6c2; }
 
 /* === Custom color spans (parsed by lib/markdown.ts extension) === */
-/* Syntax: @@gold важно @@, @@sea-breeze новое @@, @@orange вним @@
-   The slug after @@ becomes the suffix of md-color-{slug}. Unknown
+/* Syntax: @@gold важно @@, @@sea-breeze новое @@
+   The slug after @@ becomes the suffix of md-color-{slug}. Color-only,
+   no background — runs inline with the surrounding text the same way
+   **bold** and *italic* do, not as a "pill" like inline code. Unknown
    slugs keep a transparent foreground so the typo is visible without
-   hiding the rest of the message. */
+   hiding the rest of the message.
+   Orange is intentionally NOT exposed here: it already styles inline
+   code and blockquotes in this file, and a third orange accent would
+   just confuse LLM output ("which orange do I want?"). */
 .md-color {
-  border-radius: 3px;
-  padding: 0 2px;
-  /* Default: no color change (helps spot typos/typos) */
   color: inherit;
 }
 .md-color-gold {
   color: #facc15;          /* warm gold */
-  background: rgba(250, 204, 21, 0.08);
 }
 .md-color-sea,
 .md-color-sea-breeze {
   color: #5eead4;          /* turquoise — "sea breeze" */
-  background: rgba(94, 234, 212, 0.08);
-}
-.md-color-orange {
-  color: var(--orange);
-  background: rgba(249, 115, 22, 0.08);
 }

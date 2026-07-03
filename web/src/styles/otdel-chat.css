@@ -1,0 +1,921 @@
+/* SynPin — split from memory.css. Otdel chat — worker status, delegation cards, compact list, modals. */
+
+.otdel-chat-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+  background: transparent;
+  overflow: hidden;
+  /* No entrance animation — the previous fadeIn 0.3s caused a visible
+     "throb" at the end (viewport height micro-jump as layout settled
+     after streamed content arrived). Instant mount is cleaner. */
+}
+.otdel-chat-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--glass-bg-heavy);
+  flex-shrink: 0;
+}
+/* Back button styles moved to .nav-back-btn — kept for reference */
+/* ─── Worker Status Bar ─────────────────────────────────────── */
+.otdel-worker-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  overflow-x: auto;
+  flex-shrink: 0;
+  max-height: 200px;
+  opacity: 1;
+  transition: max-height 0.3s ease, opacity 0.2s ease, padding 0.3s ease;
+}
+.otdel-worker-status-bar.collapsed {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+  border-bottom-color: transparent;
+}
+.otdel-workers-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: -12px auto 0;
+  padding: 3px 14px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 8px);
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+.otdel-workers-toggle:hover {
+  color: var(--orange);
+  border-color: var(--orange);
+  background: var(--orange-muted);
+}
+.otdel-workers-toggle .toggle-arrow {
+  display: inline-block;
+  transition: transform 0.2s ease;
+  font-size: 10px;
+}
+.otdel-workers-toggle .toggle-arrow.open {
+  transform: rotate(180deg);
+}
+.otdel-worker-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius, 8px);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+.otdel-worker-chip.thinking {
+  border-color: var(--orange);
+  background: var(--orange-muted);
+  color: var(--white);
+}
+.otdel-worker-chip.done {
+  border-color: var(--green, #22c55e);
+  background: rgba(34, 197, 94, 0.06);
+  color: var(--green, #22c55e);
+}
+.otdel-worker-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  flex-shrink: 0;
+}
+.otdel-worker-dot.thinking {
+  background: var(--orange);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.otdel-worker-dot.done {
+  background: var(--green, #22c55e);
+}
+.otdel-worker-name {
+  font-weight: 500;
+}
+.otdel-worker-status-text {
+  font-size: 11px;
+  opacity: 0.7;
+}
+/* Worker status bar animations */
+.otdel-worker-chip.done .otdel-worker-status-text {
+  animation: check-fade-in 0.3s ease-out;
+}
+/* Head coordinator chip */
+.otdel-worker-chip.head-chip {
+  background: rgba(255, 215, 0, 0.15);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+}
+.otdel-worker-dot.head-dot {
+  background: #ffd700 !important;
+}
+/* ─── Delegation Cards — compact chips ──────────────────────── */
+.otdel-delegations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--glass-border);
+  animation: fadeIn 0.2s ease;
+}
+.otdel-delegation-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+  animation: delegation-slide-in 0.3s ease-out;
+}
+.otdel-delegation-chip.done {
+  border-color: rgba(34, 197, 94, 0.3);
+  color: rgba(34, 197, 94, 0.8);
+}
+.otdel-delegation-chip.pending {
+  border-color: rgba(249, 115, 22, 0.3);
+  color: rgba(249, 115, 22, 0.8);
+}
+.otdel-delegation-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.otdel-delegation-dot.done {
+  background: #22c55e;
+}
+.otdel-delegation-dot.pending {
+  background: #f97316;
+  animation: pulse 1.5s infinite;
+}
+.otdel-delegation-name {
+  font-weight: 500;
+  white-space: nowrap;
+}
+.otdel-delegation-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--glass-border);
+  border-top-color: var(--orange);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+.otdel-header-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+.otdel-header-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.otdel-header-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--white);
+}
+.otdel-header-desc {
+  display: block;
+  font-size: 12px;
+  color: var(--text-dim);
+  opacity: 0.7;
+  margin-top: 1px;
+}
+.otdel-settings-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.otdel-settings-btn:hover {
+  background: var(--gray-700);
+  color: var(--white);
+}
+.otdel-settings-icon {
+  font-size: 14px;
+}
+.otdel-messages-area {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+.otdel-messages-container {
+  max-width: 100%;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.otdel-empty-chat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  color: var(--text-secondary);
+}
+.otdel-empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+.otdel-empty-chat p {
+  margin: 0;
+  font-size: 15px;
+}
+.otdel-empty-hint {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 8px;
+}
+.otdel-bottom-input {
+  padding: 12px 16px;
+  border-top: 1px solid var(--glass-border);
+}
+.otdel-bottom-input .input-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 640px;
+  margin: 0 auto;
+  width: 100%;
+}
+.otdel-bottom-input .chat-textarea {
+  flex: 1;
+  min-height: 42px;
+  max-height: 150px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--white);
+  font-family: inherit;
+  font-size: 14px;
+  resize: none;
+  line-height: 1.5;
+  outline: none;
+  scrollbar-width: none;
+}
+.otdel-bottom-input .chat-textarea::placeholder {
+  color: var(--text-dim);
+}
+.otdel-bottom-input .chat-textarea:focus {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 1px var(--orange);
+}
+.otdel-bottom-input .send-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  background: var(--orange);
+  color: var(--white);
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.otdel-bottom-input .send-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.otdel-bottom-input .send-btn:not(:disabled):hover {
+  opacity: 0.85;
+}
+.otdel-bottom-input .send-btn.stop-mode {
+  background: #ef4444;
+  animation: stopPulse 1.5s ease infinite;
+}
+.otdel-bottom-input .send-btn.stop-mode:hover {
+  background: #dc2626;
+}
+/* ═══════════════════════════════════════════════════════════════
+   Otdel Settings Panel (slide-out from left)
+   ═══════════════════════════════════════════════════════════════ */
+.otdel-settings-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 200;
+  animation: fadeIn 0.2s ease;
+}
+.otdel-settings-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.95);
+  width: 460px;
+  max-width: 90vw;
+  max-height: 85vh;
+  overflow: hidden;
+  background: var(--black);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  z-index: 201;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.otdel-settings-panel.open {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+.otdel-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--glass-border);
+  flex-shrink: 0;
+}
+.otdel-settings-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--white);
+}
+.otdel-settings-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 22px;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: all 0.15s;
+}
+.otdel-settings-close:hover {
+  color: var(--white);
+  background: var(--glass-bg);
+}
+.otdel-settings-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.otdel-settings-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--glass-bg-heavy);
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  margin-bottom: 4px;
+}
+.otdel-settings-preview-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.otdel-settings-preview-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--white);
+}
+.otdel-mentor-hint {
+  display: block;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+.otdel-workers-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.otdel-workers-count {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.otdel-workers-empty {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-style: italic;
+}
+.otdel-workers-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.otdel-settings-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--glass-border);
+  flex-shrink: 0;
+  background: var(--black);
+}
+/* ── Workers list (grouped by department) ──────────────────────── */
+.otdel-workers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.otdel-workers-dept {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.otdel-workers-dept-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.otdel-workers-dept-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.otdel-workers-dept-name {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+}
+.otdel-workers-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.otdel-worker-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.otdel-worker-chip:hover {
+  border-color: var(--gray-600);
+  color: var(--white);
+}
+.otdel-worker-chip.active {
+  background: var(--orange-muted);
+  border-color: var(--orange);
+  color: var(--white);
+}
+.otdel-worker-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gray-600);
+  flex-shrink: 0;
+}
+.otdel-worker-chip.active .otdel-worker-chip-dot {
+  background: var(--orange);
+}
+/* ── Compaction Settings ─────────────────────────────────────── */
+.otdel-compaction-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.otdel-compaction-banner,
+.compaction-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  margin: 8px 0;
+  background: var(--glass-bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  animation: fadeIn 0.3s ease;
+}
+.otdel-compaction-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  margin: 4px 0;
+  background: var(--glass-bg);
+  border-radius: var(--radius);
+  border: 1px dashed var(--gray-600);
+}
+.otdel-compaction-marker span {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+/* ── Otdel Chat Messages (left/right layout) ──────────────────── */
+.otdel-msg-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+  max-width: 75%;
+  animation: msg-enter 0.25s ease-out forwards;
+}
+.otdel-msg-row.left {
+  margin-right: auto;
+}
+.otdel-msg-row.right {
+  margin-left: auto;
+  flex-direction: row-reverse;
+}
+.otdel-msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.otdel-msg-avatar.left {
+  background: var(--glass-bg);
+}
+.otdel-msg-avatar.right {
+  background: var(--orange-muted);
+}
+.otdel-msg-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.otdel-msg-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.otdel-msg-name.left {
+  text-align: left;
+}
+.otdel-msg-name.right {
+  text-align: right;
+}
+.otdel-msg-name.head {
+  color: var(--orange);
+}
+.otdel-msg-bubble {
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+.otdel-msg-bubble.left {
+  background: var(--glass-bg);
+  border-top-left-radius: 0;
+}
+.otdel-msg-bubble.right {
+  background: var(--orange-muted);
+  border-top-right-radius: 0;
+}
+/* ── Typing Indicator (otdel) ──────────────────────────────────────────── */
+.otdel-typing-dots {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 0;
+}
+/* Inline streaming dots — used inside an empty streaming bubble.
+   No padding, no background, no border — just the three dots. */
+.otdel-streaming-dots-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+}
+.otdel-streaming-dots-inline .typing-dot {
+  width: 8px;
+  height: 8px;
+}
+.otdel-typing-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--orange);
+  /* Two animations running in parallel:
+     - otdel-typing-bounce: vertical hop + opacity (the original "live" feel)
+     - otdel-dot-color-shift: background-color cycle (2.5s) through
+       orange → amber → purple → orange. Staggered per-dot so the
+       three dots form a running wave (0s / 0.83s / 1.67s = thirds of
+       the cycle), instead of all three flashing in sync.
+       We animate background-color (not color) because the spans are
+       empty circles — `color` would have nothing to tint.
+     No baseline opacity here: the bounce keyframe drives opacity from
+     0.6 → 1 → 0.6 (bumped from 0.4 so the color cycle is visible
+     even at the dimmer end of the hop). */
+  animation:
+    otdel-typing-bounce 1.4s ease-in-out infinite,
+    otdel-dot-color-shift 2.5s ease-in-out infinite;
+}
+.otdel-typing-dots span:nth-child(1) { animation-delay: 0s, 0s; }
+.otdel-typing-dots span:nth-child(2) { animation-delay: 0.2s, -0.83s; }
+.otdel-typing-dots span:nth-child(3) { animation-delay: 0.4s, -1.67s; }
+/* Color cycle — same stops as glowPulse (orange → amber → purple → orange)
+   so the dots feel like they're part of the same animated surface.
+   Hue goes via background-color (not color) because the spans are
+   empty circles. */
+/* ── Streaming animation ─────────────────────────────────────────────── */
+/* Avatar pulse */
+.otdel-msg-row.streaming .otdel-msg-avatar {
+  animation: otdel-avatar-pulse 1.5s ease-in-out infinite;
+}
+/* Streaming bubble — animated border glow.
+   Same effect as the global .animated-border helper in chat.css
+   (orange→amber→purple cycle via glowPulse). Kept as a separate
+   selector scoped to .otdel-msg-row.streaming so we don't have to
+   add the .animated-border className on every bubble. The styling
+   itself is identical: any future change to the streaming border
+   look only needs to happen here OR in chat.css's .animated-border
+   (keep both in sync). */
+.otdel-msg-row.streaming .otdel-msg-bubble {
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  box-shadow:
+    0 0 8px rgba(249, 115, 22, 0.15),
+    0 0 20px rgba(249, 115, 22, 0.05);
+  animation: glowPulse 2.5s ease-in-out infinite;
+}
+/* Tool calls in otdel messages — minimal inline badges */
+.otdel-msg-tools-mini {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.tool-mini-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--glass-bg);
+  color: var(--text-dim);
+  font-family: monospace;
+  cursor: default;
+  white-space: nowrap;
+}
+.tool-mini-badge.completed {
+  border-color: #22c55e40;
+  color: #22c55e;
+}
+.tool-mini-badge.error {
+  border-color: #ef444440;
+  color: #ef4444;
+}
+.tool-mini-badge.running {
+  border-color: var(--orange);
+  color: var(--orange);
+}
+/* Legacy tool tiles (kept for reference, unused) */
+.otdel-msg-tools {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.otdel-tool-call {
+  background: var(--glass-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.otdel-tool-call.running {
+  border-color: var(--orange);
+  background: rgba(249, 115, 22, 0.08);
+}
+.otdel-tool-call.completed {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.08);
+}
+.otdel-tool-call.error {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+.otdel-tool-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-weight: 600;
+  color: var(--text);
+}
+.otdel-tool-icon {
+  font-size: 13px;
+}
+.otdel-tool-name {
+  font-family: monospace;
+  color: var(--orange);
+}
+.otdel-tool-toggle {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-dim);
+  transition: transform 0.15s ease;
+}
+/* Tool content — single container, animated */
+.otdel-tool-content {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height 0.25s ease, opacity 0.2s ease, padding 0.2s ease;
+  padding: 0;
+}
+.otdel-tool-call.expanded .otdel-tool-content {
+  max-height: 300px;
+  opacity: 1;
+  padding: 8px 0 0;
+  transition: max-height 0.3s ease, opacity 0.2s ease 0.1s, padding 0.2s ease;
+}
+.otdel-tool-content pre {
+  margin: 0;
+  padding: 8px;
+  background: var(--glass-bg-heavy);
+  border-radius: 4px;
+  font-size: 11px;
+  overflow-x: auto;
+  max-height: 200px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.otdel-tool-content pre.error {
+  color: #ef4444;
+}
+.otdel-tool-content pre:not(.error) {
+  color: #22c55e;
+}
+.otdel-tool-content span {
+  color: var(--text-dim);
+  font-style: italic;
+  font-size: 12px;
+}
+/* Tool result list (kanban_task list) */
+.tool-result-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tool-result-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.tool-result-item .task-id {
+  color: var(--orange);
+  font-family: monospace;
+  font-weight: 600;
+}
+.tool-result-item .task-title {
+  color: var(--text);
+  flex: 1;
+}
+.tool-result-item .task-status {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--glass-bg);
+}
+.tool-result-item .task-status.todo { color: #f59e0b; }
+.tool-result-item .task-status.in_progress { color: #3b82f6; }
+.tool-result-item .task-status.done { color: #22c55e; }
+.tool-result-item .task-status.blocked { color: #ef4444; }
+/* Terminal result */
+.tool-result-terminal {
+  font-family: monospace;
+}
+.tool-result-terminal .terminal-cmd {
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+.tool-result-terminal pre {
+  margin: 0;
+  color: #22c55e;
+}
+/* ── Kanban Board ─────────────────────────────────────────────────────── */
+.priority-inline {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.priority-separator {
+  color: var(--text-dim);
+  opacity: 0.3;
+  margin: 0 8px;
+  font-size: 14px;
+}
+.priority-inline-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: var(--radius, 6px);
+  transition: all 0.15s;
+}
+.priority-inline-btn:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+.priority-inline-btn.active {
+  color: var(--text);
+  font-weight: 600;
+  background: var(--bg-hover);
+}
+.priority-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.priority-inline-btn.active .priority-dot {
+  box-shadow: 0 0 6px currentColor;
+}
+/* ── Department Searchable Dropdown ─────────────────────────────────────── */
+.status-reference-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 16px;
+}
+.status-ref-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+.status-ref-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 90px;
+  justify-content: center;
+}
+.status-ref-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}

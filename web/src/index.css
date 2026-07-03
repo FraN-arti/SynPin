@@ -1,16 +1,23 @@
 /*
- * SynPin CSS — modular split from original index.css (7567 lines → 7 modules).
- * Each module covers a specific UI domain.
- * Import order matters for cascade specificity.
+ * SynPin CSS — modular split.
+ * Each module covers a specific UI domain. Import order matters for cascade specificity.
+ * memory.css (5377 lines, mixed domains) was split into 9 focused modules.
  */
 
-@import "./styles/base.css";        /* Base, themes, CSS variables */
-@import "./styles/layout.css";      /* Logo, sidebar, main area, input */
-@import "./styles/chat.css";        /* Messages, tools, timeline, animations */
-@import "./styles/attachments.css"; /* Image attachments, drag-drop, attach btn */
-@import "./styles/markdown.css";    /* Markdown rendered content */
-@import "./styles/settings.css";    /* Settings page, providers, modals */
-@import "./styles/memory.css";      /* Memory section */
-@import "./styles/connections.css"; /* Connections canvas */
-@import "./styles/projects.css";     /* Projects page, tooltips */
-@import "./styles/misc.css";        /* Number input, misc overrides */
+@import "./styles/base.css";          /* Base, themes, CSS variables */
+@import "./styles/layout.css";        /* Logo, sidebar, main area, input */
+@import "./styles/chat.css";          /* Messages, tools, timeline, animations */
+@import "./styles/attachments.css";   /* Image attachments, drag-drop, attach btn */
+@import "./styles/markdown.css";      /* Markdown rendered content */
+@import "./styles/animations.css";    /* Shared keyframe animations */
+@import "./styles/memory-page.css";   /* Memory page UI (compaction, stats, system info) */
+@import "./styles/departments.css";   /* Departments section + sidebar departments */
+@import "./styles/sidebar-widgets.css"; /* Sidebar widget zone, drag overlay, pin, main layout */
+@import "./styles/otdel-chat.css";    /* Otdel chat (worker status, delegation cards) */
+@import "./styles/kanban.css";        /* Kanban board (columns, cards, drag, undo) */
+@import "./styles/projects-page.css"; /* Projects page + project cards + metrics */
+@import "./styles/deadlines.css";     /* Deadlines page */
+@import "./styles/settings.css";      /* Settings page, providers, modals */
+@import "./styles/connections.css";   /* Connections canvas */
+@import "./styles/projects.css";      /* Projects (legacy/compatibility) */
+@import "./styles/misc.css";          /* Misc + Phase 2 leftover (settings, tags) */

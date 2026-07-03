@@ -1,0 +1,75 @@
+/* SynPin — split from memory.css. Departments section + Sidebar Departments. */
+
+.department-card {
+  margin-bottom: 8px;
+}
+.department-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.department-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.department-color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.department-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+  display: block;
+}
+.department-meta {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.department-desc {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 8px;
+  line-height: 1.4;
+}
+.department-actions {
+  display: flex;
+  gap: 6px;
+}
+.department-create-card {
+  border: 1px solid var(--border);
+}
+.department-create-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 16px 0;
+}
+.department-color-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.department-color-picker {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: none;
+  padding: 0;
+}
+.department-color-value {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-family: monospace;
+}
+.department-create-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}

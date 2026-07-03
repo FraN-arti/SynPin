@@ -1,0 +1,323 @@
+/* SynPin — split from memory.css. Deadlines page. */
+
+.deadlines-page {
+  padding: 24px;
+  width: 100%;
+  overflow-y: auto;
+  height: 100%;
+}
+.deadlines-header {
+  margin-bottom: 20px;
+}
+.deadlines-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+/* Metrics */
+.deadlines-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 140px);
+  gap: 12px;
+  margin-bottom: 24px;
+  justify-content: center;
+}
+.deadline-metric-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 8px);
+  padding: 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.deadline-metric-card:hover {
+  border-color: var(--orange);
+}
+.deadline-metric-card.active {
+  border-color: var(--orange);
+  background: var(--orange-muted);
+}
+.deadline-metric-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+}
+.deadline-metric-value.danger { color: var(--red, #ef4444); }
+.deadline-metric-value.accent { color: var(--orange); }
+.deadline-metric-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+/* Task list */
+.deadlines-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.deadline-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.deadline-group-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--orange);
+  margin: 0 0 6px;
+  padding-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--glass-border);
+}
+.deadline-group-title.danger { color: var(--red, #ef4444); }
+.deadline-group-title.accent { color: var(--orange); }
+.deadline-task-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 8px 12px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 8px);
+  font-size: 13px;
+  transition: border-color 0.15s;
+}
+.deadline-task-row:hover {
+  border-color: var(--orange);
+}
+.deadline-task-row.overdue {
+  border-left: 3px solid var(--red, #ef4444);
+}
+.deadline-task-row.today {
+  border-left: 3px solid var(--orange);
+}
+.deadline-task-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--glass-border);
+  flex-shrink: 0;
+  margin: 0 10px;
+}
+.deadline-task-id {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: monospace;
+  flex-shrink: 0;
+  min-width: 60px;
+}
+.deadline-task-title {
+  flex: 1;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.deadline-task-dept {
+  font-size: 11px;
+  flex-shrink: 0;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.deadline-task-status {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+.deadline-task-priority {
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.deadline-task-date {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  min-width: 70px;
+  text-align: center;
+}
+.deadline-task-date.overdue {
+  color: var(--red, #ef4444);
+}
+.deadline-task-date.today {
+  color: var(--orange);
+}
+.deadlines-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.deadlines-empty-icon {
+  font-size: 32px;
+}
+@media (max-width: 768px) {
+.deadlines-metrics { grid-template-columns: repeat(2, 1fr); }
+.deadline-task-row { flex-wrap: wrap; }
+
+}
+/* ── Chart Toggle ─────────────────────────────────────────────────────────── */
+.deadlines-chart-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 12px;
+  margin: 8px 0;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 8px);
+  color: var(--text-dim);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.deadlines-chart-toggle:hover {
+  color: var(--orange);
+  border-color: var(--orange);
+}
+/* ── Chart Section (collapsible) ──────────────────────────────────────────── */
+.deadlines-chart-section {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease, opacity 0.3s ease;
+}
+.deadlines-chart-section.open {
+  max-height: 2000px;
+  opacity: 1;
+}
+.deadlines-chart-content {
+  padding: 16px 0;
+}
+.deadlines-chart-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--orange);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0 0 16px;
+}
+/* ── Calendar ─────────────────────────────────────────────────────────────── */
+.deadlines-calendar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.deadline-calendar-month {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 8px);
+  padding: 16px;
+}
+.deadline-calendar-month-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 12px;
+  text-align: center;
+}
+.deadline-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.deadline-calendar-day-name {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 4px 0;
+  text-transform: uppercase;
+}
+.deadline-calendar-day {
+  position: relative;
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: default;
+  transition: background 0.15s;
+}
+.deadline-calendar-day.empty {
+  cursor: default;
+}
+.deadline-calendar-day.today {
+  background: var(--orange-muted);
+  color: var(--orange);
+  font-weight: 700;
+}
+.deadline-calendar-day.has-tasks {
+  background: rgba(59, 130, 246, 0.1);
+  cursor: pointer;
+}
+.deadline-calendar-day.has-tasks:hover {
+  background: rgba(59, 130, 246, 0.2);
+}
+.deadline-calendar-day.overdue {
+  background: rgba(239, 68, 68, 0.1);
+}
+.deadline-calendar-day-num {
+  font-size: 12px;
+  line-height: 1;
+}
+.deadline-calendar-badge {
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--orange);
+  margin-top: 2px;
+}
+/* ── Calendar Tooltip ──────────────────────────────────────────────────────── */
+.deadline-calendar-tooltip {
+  background: rgba(10, 10, 20, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 6px 10px;
+  pointer-events: none;
+  max-width: 300px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+.deadline-calendar-tooltip-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+.deadline-calendar-tooltip-id {
+  font-size: 10px;
+  font-family: monospace;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.deadline-calendar-tooltip-title {
+  font-size: 12px;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* ── Smooth filter transitions ────────────────────────────────────────────── */
+.deadlines-list {
+  transition: opacity 0.2s ease;
+}
+.deadlines-list.filtering {
+  opacity: 0.5;
+}
+/* ── Recharts hover fix ───────────────────────────────────────────────────── */

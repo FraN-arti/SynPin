@@ -1,0 +1,577 @@
+/* SynPin — split from memory.css. Projects page + project cards + metrics. */
+
+.projects-page {
+  padding: 24px;
+  width: 100%;
+  overflow-y: auto;
+  height: 100%;
+}
+.projects-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.projects-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+.projects-create-btn {
+  background: var(--orange);
+  color: white;
+  border: none;
+  border-radius: var(--radius, 8px);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.projects-create-btn:hover {
+  opacity: 0.9;
+}
+/* Metrics */
+.projects-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 140px);
+  gap: 12px;
+  margin-bottom: 24px;
+  justify-content: center;
+}
+.project-metric-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 8px);
+  padding: 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.project-metric-card:hover {
+  border-color: var(--orange);
+}
+.project-metric-card.active {
+  border-color: var(--orange);
+  background: var(--orange-muted);
+}
+.metric-value {
+  font-size: 24px;
+  font-weight: 700;
+  display: block;
+  color: var(--text) !important;
+}
+.metric-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+/* Ensure metric cards have proper text colors */
+.project-metric-card,
+.project-metric-card * {
+  color: var(--text);
+}
+.project-metric-card .metric-label {
+  color: var(--text-muted);
+}
+/* Department styles — single source of truth in projects.css */
+/* Projects list */
+.projects-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.projects-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+.projects-empty-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+.projects-empty p {
+  margin: 0;
+  font-size: 14px;
+}
+.projects-empty-hint {
+  margin-top: 8px !important;
+  font-size: 12px !important;
+  opacity: 0.7;
+}
+/* Project card */
+.project-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 8px);
+  padding: 16px;
+  transition: border-color 0.15s;
+}
+.project-card:hover {
+  border-color: var(--orange);
+}
+.project-card.completed {
+  opacity: 0.7;
+}
+.project-card.archived {
+  opacity: 0.5;
+}
+.project-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+.project-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.project-card-title h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.project-status-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.project-priority-badge {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.project-card-description {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 12px;
+  line-height: 1.4;
+}
+/* Progress */
+.project-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.project-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--glass-border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.project-progress-fill {
+  height: 100%;
+  background: var(--orange);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.project-progress-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+/* Departments */
+.project-departments {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.project-departments-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.project-departments-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.project-department-badge {
+  font-size: 11px;
+  background: var(--glass-bg-heavy);
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+}
+.project-department-badge.main {
+  background: var(--orange-muted);
+  color: var(--orange);
+  font-weight: 600;
+}
+/* Deadline */
+.project-deadline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+.project-deadline .overdue {
+  color: var(--red, #ef4444);
+  font-weight: 600;
+}
+.project-deadline .today {
+  color: var(--orange);
+  font-weight: 600;
+}
+.project-deadline .warning {
+  color: var(--yellow, #eab308);
+  font-weight: 600;
+}
+/* Goals */
+.project-goals {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+}
+.project-goals-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+.project-goals-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.project-goal-badge {
+  font-size: 11px;
+  background: var(--glass-bg-heavy);
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+}
+.project-goal-badge.completed {
+  background: var(--green-muted, rgba(34, 197, 94, 0.1));
+  color: var(--green, #22c55e);
+}
+.project-goal-badge.in_progress {
+  background: var(--orange-muted);
+  color: var(--orange);
+}
+.project-goals-more {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+/* Modal */
+.projects-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.projects-modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 12px);
+  padding: 24px;
+  width: 400px;
+  max-width: 90vw;
+}
+.projects-modal-large {
+  width: 560px;
+}
+.projects-form-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.projects-form-warning {
+  font-size: 11px;
+  color: var(--orange);
+  margin-top: 4px;
+}
+.projects-dept-list {
+  /* New compact styles are defined earlier */
+}
+.projects-modal h2 {
+  margin: 0 0 20px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+.projects-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.projects-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.projects-form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.projects-form-group input,
+.projects-form-group textarea,
+.projects-form-group select {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 6px);
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text);
+  font-family: inherit;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+.projects-form-group input:focus,
+.projects-form-group textarea:focus,
+.projects-form-group select:focus {
+  border-color: var(--orange);
+  outline: none;
+}
+.projects-form-group textarea {
+  resize: vertical;
+}
+/* Fix text color for select options in dark themes */
+.projects-form-group select option {
+  background: var(--bg-card);
+  color: var(--text);
+}
+/* Ensure placeholder text is visible */
+.projects-form-group input::placeholder,
+.projects-form-group textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+.projects-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+.projects-btn-cancel {
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 6px);
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.projects-btn-cancel:hover {
+  border-color: var(--text-muted);
+  color: var(--text);
+}
+.projects-btn-create {
+  background: var(--orange);
+  border: none;
+  border-radius: var(--radius, 6px);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.projects-btn-create:hover:not(:disabled) {
+  opacity: 0.9;
+}
+.projects-btn-create:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+/* Loading */
+.projects-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px;
+  color: var(--text-muted);
+}
+/* Project Detail View */
+.projects-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.projects-back-btn {
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 6px);
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.projects-back-btn:hover {
+  border-color: var(--orange);
+  color: var(--text);
+}
+.project-detail-section {
+  margin-bottom: 24px;
+}
+.project-detail-section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 12px;
+}
+.project-detail-section p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.project-goals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.project-goal-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 6px);
+}
+.project-goal-item.completed {
+  opacity: 0.7;
+}
+.project-goal-icon {
+  font-size: 14px;
+}
+.project-goal-item.completed .project-goal-icon {
+  color: var(--green, #22c55e);
+}
+.project-goal-item.in_progress .project-goal-icon {
+  color: var(--orange);
+}
+.project-goal-title {
+  font-size: 13px;
+  color: var(--text);
+}
+.project-department-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 6px);
+}
+.project-department-item.main {
+  background: var(--orange-muted);
+  border-color: var(--orange);
+}
+.project-department-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.project-department-role {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.project-department-main {
+  font-size: 11px;
+  color: var(--orange);
+  margin-left: auto;
+}
+.project-empty-tasks {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 24px;
+}
+.project-tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.project-task-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 6px);
+  font-size: 13px;
+}
+.project-task-id {
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 60px;
+}
+.project-task-title {
+  flex: 1;
+  color: var(--text);
+}
+.project-task-dept {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.project-task-status {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.project-archive-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.project-archive-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 6px);
+}
+.project-archive-icon {
+  font-size: 14px;
+}
+.project-archive-title {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text);
+}
+.project-archive-date {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.project-card {
+  cursor: pointer;
+}
+/* TOGLE.md Editor */

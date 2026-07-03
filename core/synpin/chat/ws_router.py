@@ -622,8 +622,20 @@ async def _handle_otdel_send(user_id: str, msg: dict):
             ChatMessage(role=m["role"], content=m["content"], images=m.get("images"))
             for m in context_messages
         ]
-        # Label trigger so the agent knows who sent it
-        messages.append(ChatMessage(role="user", content=f"[👤 Пользователь]: {trigger_message}"))
+        # Worker trigger: distinguish "Head delegated a task" from "user wrote
+        # directly". Without this prefix the worker's LLM treats the trigger
+        # as a generic user message (role=user, no sender label) and answers
+        # as if Artur talked to it directly — losing the head→worker
+        # delegation context. Mirrors the same fix in
+        # otdel_chat_router.py so both code paths (HTTP + WS) agree.
+        # Head trigger: keep the bare user-role — head context already labels
+        # previous worker responses with their sender name, so the head
+        # already knows who it is talking to.
+        if is_head:
+            trigger_content = trigger_message
+        else:
+            trigger_content = f"[📋 Задание от {head_name}]: {trigger_message}"
+        messages.append(ChatMessage(role="user", content=trigger_content))
 
         model = agent.get("model", "")
         provider_name = agent.get("provider")
@@ -1122,7 +1134,17 @@ async def _handle_otdel_send(user_id: str, msg: dict):
             ChatMessage(role=m["role"], content=m["content"], images=m.get("images"))
             for m in context_messages
         ]
-        messages.append(ChatMessage(role="user", content=f"[👤 Пользователь]: {trigger_message}"))
+        # Same trigger-wrap as the main loop above. Empty trigger (follow-up
+        # delegation with no task text) skips the wrap so we don't emit a
+        # span with an empty body — workers use the head's own recent text
+        # from history in that case.
+        if is_head:
+            trigger_content = trigger_message
+        elif trigger_message:
+            trigger_content = f"[📋 Задание от {head_name}]: {trigger_message}"
+        else:
+            trigger_content = trigger_message
+        messages.append(ChatMessage(role="user", content=trigger_content))
 
         model = agent.get("model", "")
         provider_name = agent.get("provider")

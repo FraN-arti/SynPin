@@ -2,13 +2,12 @@ import { lazy, Suspense } from 'react'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import './index.css'
 import synpinLogo from './images/synpin.png'
-import { MarkdownRenderer } from './components/MarkdownRenderer'
-import { EmojiPicker } from './components/EmojiPicker'
 import { Sidebar, type AgentConfig } from './components/Sidebar'
 import type { Message } from './components/chatTypes'
+import { ChatView } from './components/ChatView'
+import { ChatInput } from './components/ChatInput'
 import { ChatSkeleton } from './components/ChatSkeleton'
 import { PageTransition } from './components/PageTransition'
-import { ToolTimeline, TOOL_DISPLAY_NAMES } from './components/ToolTimeline'
 import { useChatSubmit } from './hooks/useChatSubmit'
 import { useChatHistory } from './hooks/useChatHistory'
 
@@ -51,7 +50,7 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useGlobalTooltip } from './hooks/useGlobalTooltip'
 import { useChatScroll } from './hooks/useChatScroll'
-import { ImageAttachment, fileToAttachment, extractImagesFromPaste, type ImageAttachment as ImageAttachmentType } from './components/ImageAttachment'
+import type { ImageAttachment as ImageAttachmentType } from './components/ImageAttachment'
 
 import { API_BASE } from './config'
 
@@ -365,7 +364,7 @@ function App() {
     return off
   }, [wsOn])
 
-  const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const attachRef = useRef<{ openPicker: () => void }>(null)
   const activeAgentRef = useRef<AgentConfig | null>(null)
@@ -524,13 +523,6 @@ function App() {
   useChatHistory({ activeAgent, viewType: view.type, setMessages, setIsTyping })
   // Auto-scroll handled by useChatScroll hook (sentinel pattern)
 
-  const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(e.target.value)
-    const el = e.target
-    el.style.height = 'auto'
-    el.style.height = Math.min(el.scrollHeight, 150) + 'px'
-  }
-
   // ── Compaction indicator ─────────────────────────────────────────
   useEffect(() => {
     const unsubCompacting = wsOn('chat:compacting', (msg) => {
@@ -549,183 +541,6 @@ function App() {
     setInput, setAttachments, setMessages, setIsTyping, setCompactionNotice,
         wsSend, wsOn,
   })
-
-  const formatTime = (date: Date | string) => {
-      const d = typeof date === 'string' ? new Date(date) : date
-      return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-    }
-
-  const renderMeta = (msg: Message) => {
-    if (msg.role === 'user') {
-      return <span className="message-time">{formatTime(msg.timestamp)}</span>
-    }
-    // Assistant: time — agent_name · model · tokens
-    const totalTokens = (msg.prompt_tokens || 0) + (msg.completion_tokens || 0)
-    return (
-      <>
-        <span className="message-time">{formatTime(msg.timestamp)}</span>
-        <span className="meta-sep"> — </span>
-        {msg.agent_name && (
-          <>
-            <span className="meta-badge gold">{msg.agent_name}</span>
-            <span className="meta-dot"> · </span>
-          </>
-        )}
-        {msg.model && msg.model !== msg.agent_name && (
-          <span className="meta-badge">{msg.model}</span>
-        )}
-        {totalTokens > 0 && (
-          <>
-            <span className="meta-dot"> · </span>
-            <span className="meta-badge dim">{totalTokens.toLocaleString('ru-RU')}т</span>
-          </>
-        )}
-      </>
-    )
-  }
-
-  const handleEmojiSelect = (emoji: string) => {
-    const el = textareaRef.current
-    if (!el) return
-    const start = el.selectionStart
-    const end = el.selectionEnd
-    const newValue = input.slice(0, start) + emoji + input.slice(end)
-    setInput(newValue)
-    // Restore cursor position after emoji
-    requestAnimationFrame(() => {
-      el.focus()
-      el.selectionStart = el.selectionEnd = start + emoji.length
-    })
-  }
-
-  // ── Image attachments ─────────────────────────────────────────
-  const handleAddImages = useCallback(async (files: File[]) => {
-    const newAttachments = await Promise.all(files.map(fileToAttachment))
-    setAttachments(prev => [...prev, ...newAttachments])
-  }, [])
-
-  const handleRemoveImage = useCallback((id: string) => {
-    setAttachments(prev => prev.filter(a => a.id !== id))
-  }, [])
-
-  const handlePaste = useCallback((e: React.ClipboardEvent) => {
-    const images = extractImagesFromPaste(e)
-    if (images.length > 0) {
-      e.preventDefault()
-      handleAddImages(images)
-    }
-  }, [handleAddImages])
-
-  // Drag-n-drop state
-  const [dragOver, setDragOver] = useState(false)
-  const dragCounterRef = useRef(0)
-
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    dragCounterRef.current++
-    // Check for files — types may be DOMStringList in some browsers
-    const types = Array.from(e.dataTransfer.types)
-    if (types.includes('Files') || types.includes('text/plain')) {
-      setDragOver(true)
-    }
-  }, [])
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    dragCounterRef.current--
-    if (dragCounterRef.current === 0) setDragOver(false)
-  }, [])
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-  }, [])
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    dragCounterRef.current = 0
-    setDragOver(false)
-    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))
-    if (files.length > 0) handleAddImages(files)
-  }, [handleAddImages])
-
-  // Refresh agents list (called after tool/agent changes in Settings)
-  const refreshAgents = useCallback(async () => {
-    try {
-      const agentsRes = await fetch(`${API_BASE}/api/agents`)
-      const agentsData = await agentsRes.json()
-      const synpinAgents = (agentsData.agents || []).map((a: AgentConfig) => ({ ...a, is_external: false }))
-      const extRes = await fetch(`${API_BASE}/api/external-agents`)
-      const extData = await extRes.json()
-      const extAgents = (extData.agents || []).filter((a: AgentConfig) => a.enabled)
-      const allAgents = [...synpinAgents, ...extAgents]
-      setAvailableAgents(allAgents)
-      // Also refresh primary slug
-      try {
-        const primaryRes = await fetch(`${API_BASE}/api/config/primary-agent`)
-        const primaryData = await primaryRes.json()
-        setPrimarySlug(primaryData.slug || '')
-      } catch {}
-      const current = activeAgentRef.current
-      if (current) {
-        const fresh = allAgents.find(a => a.slug === current.slug)
-        if (fresh) setActiveAgent(fresh)
-      }
-    } catch (e) {
-      console.error('[agents] refresh error:', e)
-    }
-  }, [])
-
-  const renderInput = () => (
-    <form onSubmit={handleSubmit} className="input-container">
-      <ImageAttachment
-        ref={attachRef}
-        images={attachments}
-        onAdd={handleAddImages}
-        onRemove={handleRemoveImage}
-        disabled={isTyping}
-      />
-      <div className="input-form">
-        <button
-          type="button"
-          className="attach-btn"
-          onClick={() => attachRef.current?.openPicker()}
-          disabled={isTyping}
-          title="Прикрепить изображение"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-          </svg>
-        </button>
-        <EmojiPicker onSelect={handleEmojiSelect} />
-        <textarea
-          ref={textareaRef}
-          value={input}
-          onChange={handleInput}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          placeholder={attachments.length > 0 ? 'Опиши что на картинке...' : 'Спроси что-нибудь...'}
-          className="input-field"
-          rows={1}
-        />
-        <button
-          type="submit"
-          disabled={!isTyping && !input.trim() && attachments.length === 0}
-          className={`input-submit ${isTyping ? 'stop-mode' : ''}`}
-          title={isTyping ? 'Остановить' : 'Отправить'}
-        >
-          {isTyping ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <rect x="6" y="6" width="12" height="12" rx="2" />
-            </svg>
-          ) : (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M5 12h14M12 5l7 7-7 7" />
-            </svg>
-          )}
-        </button>
-      </div>
-    </form>
-  )
 
   return (
     <div className="app-container">
@@ -804,7 +619,7 @@ function App() {
           } else if (view.type === 'connections') {
             body = <ConnectionsCanvas wsOn={wsOn} />
           } else if (view.type === 'settings') {
-            body = <SettingsPage onAgentsChange={refreshAgents} onDepartmentsChange={refreshDepartments} wsOn={wsOn} />
+            body = <SettingsPage onDepartmentsChange={refreshDepartments} wsOn={wsOn} />
           } else if (view.type === 'otdel') {
             const otdel = sidebarDepartments.find(d => d.id === view.id)
             if (otdel) {
@@ -845,99 +660,39 @@ function App() {
               <div className="empty-state">
                 <img src={synpinLogo} alt="SynPin" className="empty-logo-img" />
                 <h1 className="empty-title">Чем могу помочь?</h1>
-                {renderInput()}
-              </div>
+                                <ChatInput
+                                  input={input}
+                                  attachments={attachments}
+                                  isTyping={isTyping}
+                                  setInput={setInput}
+                                  setAttachments={setAttachments}
+                                  onSubmit={handleSubmit}
+                                  onKeyDown={handleKeyDown}
+                                  textareaRef={textareaRef}
+                                  attachRef={attachRef}
+                                />
+                              </div>
             )
           } else {
-            body = (
-              <div
-                className="chat-view-wrapper"
-                onDragEnter={handleDragEnter}
-                onDragLeave={handleDragLeave}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                style={{ position: 'relative', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}
-              >
-                <div className={`chat-drop-overlay ${dragOver ? 'active' : ''}`}>
-                  <div className="chat-drop-overlay-inner">
-                    <div className="chat-drop-overlay-icon">↓</div>
-                    <div className="chat-drop-overlay-text">Перетащите изображение</div>
-                    <div className="chat-drop-overlay-hint">PNG, JPEG, WebP, GIF — до 10 МБ</div>
-                  </div>
-                </div>
-                <div className="messages-area">
-                  <div className="messages-container" ref={messagesContainerRef}>
-                    {messages.map((msg) => {
-                      const isLastAssistant = msg.role === 'assistant' && msg.id === messages[messages.length - 1]?.id && isTyping
-                      return (
-                        <div key={msg.id} className={`message-row ${msg.role}`}>
-                          <div className={`message-avatar ${msg.role} ${isLastAssistant && msg.content ? 'streaming' : ''}`}>
-                            {msg.role === 'assistant' ? (
-                              <img src={synpinLogo} alt="S" className="avatar-logo" />
-                            ) : 'U'}
-                          </div>
-                          {/* Tool timeline — collapsible action flow */}
-                          {msg.tools && msg.tools.length > 0 && (
-                            <ToolTimeline
-                              tools={msg.tools}
-                              isLive={isLastAssistant && isTyping}
-                              toolNames={TOOL_DISPLAY_NAMES}
-                            />
-                          )}
-                          <div className={`message-wrapper ${isLastAssistant && msg.content ? 'streaming' : ''}`}>
-                            <div className="message-bubble">
-                              {msg.images && msg.images.length > 0 && (
-                                <div className="message-images">
-                                  {msg.images.map((src, i) => (
-                                    <img key={i} src={src} alt={`Изображение ${i + 1}`} className="message-image" />
-                                  ))}
-                                </div>
-                              )}
-                              {msg.thinking && (
-                                <div className={`thinking-block ${expandedThinking.has(msg.id) || (isLastAssistant && isTyping) ? 'expanded' : ''}`}>
-                                  <button
-                                    className="thinking-toggle"
-                                    onClick={() => setExpandedThinking(prev => {
-                                      const next = new Set(prev)
-                                      if (next.has(msg.id)) next.delete(msg.id)
-                                      else next.add(msg.id)
-                                      return next
-                                    })}
-                                  >
-                                    <span className="thinking-icon">💭</span>
-                                    <span>Рассуждение</span>
-                                    <span className="thinking-chevron">›</span>
-                                  </button>
-                                  <div className="thinking-content">
-                                    <MarkdownRenderer content={msg.thinking} />
-                                  </div>
-                                </div>
-                              )}
-                              <MarkdownRenderer content={msg.content} isStreaming={isLastAssistant} />
-                            </div>
-                          </div>
-                          <div className={`message-footer ${msg.role} ${msg.role === 'user' || revealedMeta.has(msg.id) ? 'visible' : ''}`}>
-                            {msg.role === 'user' || revealedMeta.has(msg.id) ? renderMeta(msg) : null}
-                          </div>
-                        </div>
-                      )
-                    })}
-                    <div ref={chatEndRef} />
-                  </div>
-                </div>
-
-                {compactionNotice && (
-                  <div className="compaction-banner">
-                    <span className="compaction-icon">🗜️</span>
-                    <span className="compaction-text">{compactionNotice}</span>
-                  </div>
-                )}
-
-                <div className="bottom-input">
-                  {renderInput()}
-                </div>
-              </div>
-            )
+            body = <ChatView
+              messages={messages}
+              isTyping={isTyping}
+              revealedMeta={revealedMeta}
+              expandedThinking={expandedThinking}
+              compactionNotice={compactionNotice}
+              messagesContainerRef={messagesContainerRef}
+              chatEndRef={chatEndRef}
+              textareaRef={textareaRef}
+              attachRef={attachRef}
+              input={input}
+              attachments={attachments}
+              setInput={setInput}
+              setAttachments={setAttachments}
+              setExpandedThinking={setExpandedThinking}
+              onSubmit={handleSubmit}
+              onKeyDown={handleKeyDown}
+              synpinLogo={synpinLogo}
+            />
           }
           return <PageTransition pageKey={pageKey}><Suspense fallback={<PageFallback />}>{body}</Suspense></PageTransition>
         })()}

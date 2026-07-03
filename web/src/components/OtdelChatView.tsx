@@ -687,11 +687,6 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
                           ))}
                         </div>
                       )}
-                    {isStreaming && (
-                      <div className="otdel-msg-streaming-dots">
-                        <span></span><span></span><span></span>
-                      </div>
-                    )}
                   </div>
                 </div>
               )

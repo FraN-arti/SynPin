@@ -397,9 +397,10 @@
   animation: none;
 }
 
+/* Smaller bars for inline (toolbar, button) use. */
 .typing-dots.inline .typing-dot {
-  width: 6px;
-  height: 6px;
+  width: 2px;
+  height: 10px;
 }
 
 .message-avatar.user {
@@ -470,10 +471,29 @@
 }
 
 .message-row.assistant .message-bubble {
+  /* Glass background for assistant replies. `has-content` class is
+     added by ChatView when there's actual markdown content (not just
+     the typing indicator) — this lets us drop the glass background
+     during the empty-content phase so the bars-on-glass effect goes
+     away. Without this, the three bars (or dots) sit inside a glass
+     pill that reads as a "floating card" rather than an inline
+     indicator. */
   background: var(--glass-bg);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   color: var(--white);
+}
+.message-row.assistant .message-bubble:not(.has-content) {
+  /* Streaming but no text yet — no background, no padding, no border.
+     The bars then sit directly in the message row with no surrounding
+     pill. The .typing-dots.bubble variant already does this for the
+     bars themselves; this rule removes the *parent* bubble's chrome
+     so the bars don't look like they're inside a bubble. */
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 0;
+  border-radius: 0;
 }
 
 /* ─── Thinking Block (collapsible reasoning) ─────────────────── */
@@ -564,11 +584,17 @@
 
 /* === Typing Indicator === */
 .typing-dots {
+  /* Container for the three vertical bars. Background/border-radius/
+     padding define the "pill" shape that wraps the thinking
+     indicator — same dimensions as the old dot pill so swapping dots
+     for bars doesn't change the surrounding layout. gap: 4px is the
+     right spacing for 3px-wide bars with 2px corner radius. */
   background: var(--glass-bg);
   border-radius: var(--radius);
   padding: 12px 16px;
   display: flex;
-  gap: 6px;
+  align-items: center;
+  gap: 4px;
   animation: bubbleFadeIn 0.4s ease 0.3s both;
 }
 
@@ -649,31 +675,52 @@
 }
 
 .typing-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  /* Vertical bar — width 3px, height 14px. Taller than the dots it
+     replaced (8px) so it reads as a deliberate "thinking" indicator
+     rather than a typographic flourish. Rounded ends (border-radius
+     2px) soften the corners without making it look like a punctuation
+     mark.
+     Animation runs two things in parallel:
+     - typing-bar-scale: each bar pulses height (1.0 → 0.4 → 1.0) like
+       an audio level meter. Different phase per bar (-0s / -0.18s /
+       -0.36s over a 1.1s cycle) so the three form a running wave left
+       to right instead of all pulsing in sync.
+     - typing-dot-color-cycle: same orange → amber → purple → orange
+       stops as the original dots, 2.5s. Synced with glowPulse on the
+       message-wrapper.streaming border so the indicators pulse in
+       lockstep with the streaming frame.
+     transform-origin: bottom so bars "grow from the baseline" rather
+     than scaling around their center — matches the audio-meter
+     mental model. */
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
   background: var(--orange);
-  /* Two animations running in parallel:
-     - bounce: vertical hop + opacity (1.4s) — the original "live" feel
-     - typing-dot-color-cycle: background-color through orange → amber →
-       purple → orange (2.5s), same stops and duration as glowPulse on
-       the bubble border. The dots cycle in lockstep with the frame.
-     Stagger the color cycle per-dot so the three dots form a running
-     wave along the border's color phase (-0s / -0.83s / -1.67s =
-     thirds of the 2.5s cycle), instead of all three flashing in sync.
-     No baseline opacity here: the bounce keyframe drives opacity from
-     0.6 → 1 → 0.6 so the color cycle stays visible at every phase. */
+  transform-origin: bottom center;
   animation:
-    bounce 1.4s ease-in-out infinite,
+    typing-bar-scale 1.1s ease-in-out infinite,
     typing-dot-color-cycle 2.5s ease-in-out infinite;
 }
 
+.typing-dot:nth-child(1) {
+  /* Already at 0s; nothing to override. */
+}
+
 .typing-dot:nth-child(2) {
-  animation-delay: 0.2s, -0.83s;
+  animation-delay: -0.18s, -0.83s;
 }
 
 .typing-dot:nth-child(3) {
-  animation-delay: 0.4s, -1.67s;
+  animation-delay: -0.36s, -1.67s;
+}
+
+@keyframes typing-bar-scale {
+  0%, 100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.4);
+  }
 }
 
 /* Color cycle — same stops as glowPulse (orange → amber → purple → orange)
@@ -745,11 +792,6 @@
 @keyframes bubbleFadeIn {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes bounce {
-  0%, 60%, 100% { transform: translateY(0); }
-  30% { transform: translateY(-6px); }
 }
 
 /* === Scrollbar === */

@@ -43,6 +43,7 @@
   overflow-x: auto;
   font-size: 13px;
   line-height: 1.5;
+  position: relative;       /* anchor for .md-copy-btn (top-right corner) */
 }
 
 .markdown-body pre code {
@@ -179,4 +180,39 @@
 }
 .md-color-orange {
   color: var(--orange);
+}
+
+/* === Copy button on code blocks === */
+/* Added by MarkdownRenderer's useEffect. Sits in the top-right corner of
+   every <pre> so it doesn't shift the code when it appears. Hover lifts
+   the bg, .--success swaps to a green tint while the "Copied!" toast
+   is showing. position:absolute so it doesn't reflow the code below. */
+.md-copy-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-family: inherit;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.markdown-body pre:hover .md-copy-btn,
+.md-copy-btn:focus {
+  opacity: 1;
+}
+.md-copy-btn:hover {
+  color: var(--white);
+  background: var(--glass-bg-heavy);
+}
+.md-copy-btn--success {
+  color: #4ade80;            /* green-400 */
+  border-color: #4ade80;
+  opacity: 1;
 }

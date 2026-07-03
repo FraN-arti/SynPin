@@ -247,7 +247,7 @@ export function ChatView(props: ChatViewProps) {
                   />
                 )}
                 <div className={`message-wrapper ${isLastAssistant && msg.content ? 'streaming' : ''}`}>
-                  <div className="message-bubble">
+                  <div className={`message-bubble ${msg.content || msg.thinking || (msg.images && msg.images.length > 0) ? 'has-content' : ''}`}>
                     {msg.images && msg.images.length > 0 && (
                       <div className="message-images">
                         {msg.images.map((src, i) => (

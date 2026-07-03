@@ -641,32 +641,27 @@
   padding: 4px 0;
 }
 .otdel-streaming-dots-inline .typing-dot {
-  width: 8px;
-  height: 8px;
+  width: 2px;
+  height: 10px;
 }
 .otdel-typing-dots span {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+  /* Vertical bar — matches .typing-dot in chat.css. The dot->bar
+     migration is coordinated across main chat and otdel chat so both
+     thinking indicators look identical. Reuses the global
+     typing-bar-scale and typing-dot-color-cycle keyframes defined in
+     chat.css. */
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
   background: var(--orange);
-  /* Two animations running in parallel:
-     - otdel-typing-bounce: vertical hop + opacity (the original "live" feel)
-     - otdel-dot-color-shift: background-color cycle (2.5s) through
-       orange → amber → purple → orange. Staggered per-dot so the
-       three dots form a running wave (0s / 0.83s / 1.67s = thirds of
-       the cycle), instead of all three flashing in sync.
-       We animate background-color (not color) because the spans are
-       empty circles — `color` would have nothing to tint.
-     No baseline opacity here: the bounce keyframe drives opacity from
-     0.6 → 1 → 0.6 (bumped from 0.4 so the color cycle is visible
-     even at the dimmer end of the hop). */
+  transform-origin: bottom center;
   animation:
-    otdel-typing-bounce 1.4s ease-in-out infinite,
-    otdel-dot-color-shift 2.5s ease-in-out infinite;
+    typing-bar-scale 1.1s ease-in-out infinite,
+    typing-dot-color-cycle 2.5s ease-in-out infinite;
 }
 .otdel-typing-dots span:nth-child(1) { animation-delay: 0s, 0s; }
-.otdel-typing-dots span:nth-child(2) { animation-delay: 0.2s, -0.83s; }
-.otdel-typing-dots span:nth-child(3) { animation-delay: 0.4s, -1.67s; }
+.otdel-typing-dots span:nth-child(2) { animation-delay: -0.18s, -0.83s; }
+.otdel-typing-dots span:nth-child(3) { animation-delay: -0.36s, -1.67s; }
 /* Color cycle — same stops as glowPulse (orange → amber → purple → orange)
    so the dots feel like they're part of the same animated surface.
    Hue goes via background-color (not color) because the spans are

@@ -1,21 +1,34 @@
+import { lazy, Suspense } from 'react'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import './index.css'
 import synpinLogo from './images/synpin.png'
 import { MarkdownRenderer } from './components/MarkdownRenderer'
 import { EmojiPicker } from './components/EmojiPicker'
-import { SettingsPage } from './components/SettingsPage'
-import { OtdelChatView } from './components/OtdelChatView'
-import { OtdelSettingsPanel } from './components/OtdelSettingsPanel'
-import { KanbanBoard } from './components/KanbanBoard'
-import { ConnectionsCanvas } from './components/ConnectionsCanvas'
-import { DeadlinesPage } from './components/DeadlinesPage'
-import { ProjectsPage } from './components/ProjectsPage'
-import { SetupWizard } from './components/SetupWizard'
+import { Sidebar, type AgentConfig } from './components/Sidebar'
+import type { Message } from './components/chatTypes'
 import { ChatSkeleton } from './components/ChatSkeleton'
 import { PageTransition } from './components/PageTransition'
 import { ToolTimeline, type ToolCall, TOOL_DISPLAY_NAMES, HIDDEN_TOOLS } from './components/ToolTimeline'
-import { Sidebar, type AgentConfig } from './components/Sidebar'
-import type { Message } from './components/chatTypes'
+
+// Tiny fallback for lazy chunks — just a centered dot. Better than
+// nothing while Settings/Kanban/Projects/etc. code is loading.
+const PageFallback = () => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: '300px', color: 'var(--text-dim)' }}>
+    <span>загрузка…</span>
+  </div>
+)
+
+// Heavy pages — lazy-loaded to keep initial bundle small.
+// Settings + Kanban + Projects alone are ~2400 lines of TSX that
+// users don't need until they navigate there.
+const SettingsPage = lazy(() => import('./components/SettingsPage').then(m => ({ default: m.SettingsPage })))
+const KanbanBoard = lazy(() => import('./components/KanbanBoard').then(m => ({ default: m.KanbanBoard })))
+const ProjectsPage = lazy(() => import('./components/ProjectsPage').then(m => ({ default: m.ProjectsPage })))
+const ConnectionsCanvas = lazy(() => import('./components/ConnectionsCanvas').then(m => ({ default: m.ConnectionsCanvas })))
+const DeadlinesPage = lazy(() => import('./components/DeadlinesPage').then(m => ({ default: m.DeadlinesPage })))
+const OtdelChatView = lazy(() => import('./components/OtdelChatView').then(m => ({ default: m.OtdelChatView })))
+const OtdelSettingsPanel = lazy(() => import('./components/OtdelSettingsPanel').then(m => ({ default: m.OtdelSettingsPanel })))
+const SetupWizard = lazy(() => import('./components/SetupWizard').then(m => ({ default: m.SetupWizard })))
 import {
   WidgetDropZone,
   useWidgetLayout,
@@ -1301,7 +1314,7 @@ function App() {
               </div>
             )
           }
-          return <PageTransition pageKey={pageKey}>{body}</PageTransition>
+          return <PageTransition pageKey={pageKey}><Suspense fallback={<PageFallback />}>{body}</Suspense></PageTransition>
         })()}
           </main>
           <WidgetDropZone

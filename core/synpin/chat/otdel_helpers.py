@@ -52,10 +52,25 @@ def _load_history(otdel_id: str) -> list[dict]:
         return []
     try:
         with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+            messages = json.load(f)
     except Exception as e:
         logger.warning("Failed to load otdel chat history for %s: %s", otdel_id, e)
         return []
+
+    # Lazy compaction: history files can grow beyond MAX_HISTORY_MESSAGES
+    # if compaction was disabled earlier, or if the file predates tighter
+    # settings. Without this, a chat.json that accumulated 400+ messages
+    # under an old config stays bloated forever — compaction only fires on
+    # save, and saves only happen on new messages. Re-save here to shrink.
+    if len(messages) > MAX_HISTORY_MESSAGES:
+        try:
+            _save_history(otdel_id, messages)
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            logger.warning("Lazy compaction failed for otdel %s: %s", otdel_id, e)
+
+    return messages
 
 
 def _save_history(otdel_id: str, messages: list[dict]) -> dict:
@@ -66,6 +81,7 @@ def _save_history(otdel_id: str, messages: list[dict]) -> dict:
     # Read global compaction settings from memory.yaml
     compaction_limit = None
     keep_recent = None
+    compaction_strategy = "truncate"
     try:
         from ..api.config_router import CONFIG_DIR, _load_yaml
 
@@ -78,13 +94,19 @@ def _save_history(otdel_id: str, messages: list[dict]) -> dict:
             # keep_recent and strategy from main compaction
             main_comp = mem_cfg.get("compaction", {})
             keep_recent = main_comp.get("keep_recent", 10)
+            compaction_strategy = main_comp.get("strategy", "truncate")
     except Exception:
         pass
 
     # Compact if needed
-    trimmed, was_compacted = _compact_history(messages, compaction_limit, keep_recent)
+    trimmed, was_compacted = _compact_history(
+        messages, compaction_limit, keep_recent, strategy=compaction_strategy,
+    )
     if was_compacted:
-        logger.info("Compacted otdel %s: %d → %d messages", otdel_id, len(messages), len(trimmed))
+        logger.info(
+            "Compacted otdel %s: %d → %d messages (strategy=%s)",
+            otdel_id, len(messages), len(trimmed), compaction_strategy,
+        )
 
     # Hard cap as final safety
     trimmed = trimmed[-MAX_HISTORY_MESSAGES:]
@@ -96,12 +118,19 @@ def _save_history(otdel_id: str, messages: list[dict]) -> dict:
 
 
 def _compact_history(
-    messages: list[dict], compaction_limit: int | None, keep_recent: int | None
+    messages: list[dict],
+    compaction_limit: int | None,
+    keep_recent: int | None,
+    strategy: str = "truncate",
 ) -> tuple[list[dict], bool]:
     """Compact history if it exceeds the limit.
 
-    Strategy: keep first message + last keep_recent messages.
-    Middle messages are replaced with a summary marker.
+    Strategy:
+      - "truncate" (default): keep first message + last keep_recent,
+        insert a marker saying N messages were removed. No LLM call.
+      - "summarize": same shape, but the marker content is an LLM
+        summary of the dropped middle section. Falls back to truncate
+        if summarization fails or model isn't configured.
 
     Returns (compacted_messages, was_compacted).
     """
@@ -115,23 +144,91 @@ def _compact_history(
     first = messages[0]
     # Keep last N messages
     recent = messages[-keep:]
-    # Count removed
-    removed_count = len(messages) - 1 - keep  # -1 for first message
+    # Middle = the slice being dropped
+    if len(messages) > 1 + keep:
+        middle = messages[1:-keep]
+    else:
+        middle = []
+    removed_count = len(middle)
 
-    # Create summary marker
+    # Build the marker content. Sync path is plain marker; summarize
+    # path calls the LLM (best-effort, fallback to truncate marker if
+    # the summarize tool fails or no summarization model is configured).
+    if strategy == "summarize" and middle:
+        marker_content = _summarize_middle_sync(middle, removed_count)
+    else:
+        marker_content = (
+            f"[Компакция: удалено {removed_count} сообщений. "
+            f"Контекст сжат для экономии токенов.]"
+        )
+
     summary = {
         "id": f"compaction-{uuid.uuid4().hex[:8]}",
         "role": "system",
         "sender": "system",
         "sender_name": "Система",
-        "content": f"[Компакция: удалено {removed_count} сообщений. Контекст сжат для экономии токенов.]",
+        "content": marker_content,
         "is_head": False,
-        "timestamp": messages[-keep - 1].get("timestamp", ""),
+        "timestamp": (
+            messages[-keep - 1].get("timestamp", "")
+            if len(messages) > keep + 1 else ""
+        ),
         "compaction": True,
     }
 
     compacted = [first, summary] + recent
     return compacted, True
+
+
+def _summarize_middle_sync(middle: list[dict], removed_count: int) -> str:
+    """Build an LLM summary of the dropped middle messages.
+
+    Called from sync _save_history. Detects a running event loop and
+    skips the LLM call (returning a truncate-style marker) when called
+    from inside an async context — asyncio.run cannot be called from
+    a running loop. Any error falls back to truncate-style marker so a
+    broken summarizer never blocks saves.
+    """
+    parts = []
+    for m in middle:
+        sender = m.get("sender_name") or m.get("sender") or "?"
+        content = (m.get("content") or "").strip()
+        if not content:
+            continue
+        # Truncate very long messages to keep input bounded
+        parts.append(f"[{sender}]: {content[:500]}")
+    text = "\n\n".join(parts)
+    if not text:
+        return f"[Компакция: удалено {removed_count} сообщений. Контекст сжат.]"
+
+    async def _do_summarize() -> str:
+        from ..tools.summarize import summarize as _summarize_tool
+        result = await _summarize_tool({"text": text, "max_length": "medium"})
+        if result.get("success"):
+            return result.get("output") or ""
+        return ""
+
+    # Detect running event loop: if present, skip LLM call (sync fallback)
+    try:
+        asyncio.get_running_loop()
+        in_loop = True
+    except RuntimeError:
+        in_loop = False
+
+    if not in_loop:
+        try:
+            summary_text = asyncio.run(_do_summarize())
+            if summary_text:
+                return (
+                    f"[Суммаризация {removed_count} предыдущих сообщений]\n"
+                    f"{summary_text}"
+                )
+        except Exception as e:
+            logger.warning(
+                "Otdel compaction summarize failed, falling back to truncate: %s", e,
+            )
+
+    return f"[Компакция: удалено {removed_count} сообщений. Контекст сжат.]"
 
 
 async def _locked_load_history(otdel_id: str) -> list[dict]:

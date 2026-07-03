@@ -464,6 +464,7 @@
 }
 
 .message-row.assistant .message-bubble {
+  background: var(--glass-bg);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   color: var(--white);
@@ -530,6 +531,7 @@
 }
 
 .message-row.user .message-bubble {
+  background: rgba(249, 115, 22, 0.08);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   color: var(--white);

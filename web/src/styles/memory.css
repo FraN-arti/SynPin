@@ -2162,10 +2162,12 @@
 }
 
 .otdel-msg-bubble.left {
+  background: var(--glass-bg);
   border-top-left-radius: 0;
 }
 
 .otdel-msg-bubble.right {
+  background: var(--orange-muted);
   border-top-right-radius: 0;
 }
 

@@ -1,0 +1,599 @@
+/* SynPin — split from settings.css. Settings page layout, sections, form fields. */
+
+/* === Settings Page === */
+.settings-page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 40px 60px;
+  width: 100%;
+  overflow-y: auto;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.settings-page.visible {
+  opacity: 1;
+}
+
+/* Unified back button — used in Settings & OtdelChatView headers */
+.nav-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--radius);
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.nav-back-btn:hover {
+  color: var(--white);
+  background: var(--glass-bg);
+}
+
+.nav-back-btn svg {
+  display: block;
+}
+
+/* Top bar with back button + section header */
+.settings-top-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.settings-section-header {
+  flex: 1;
+}
+
+.settings-section-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--white);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.settings-section-desc {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 4px 0 0 0;
+}
+
+/* Horizontal nav tabs */
+.settings-nav-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.settings-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-nav-group-items {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur, 12px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 12px));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+}
+
+.settings-nav-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--orange);
+  padding: 4px 8px;
+  opacity: 0.8;
+}
+
+.settings-nav-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: -1px;
+  border-radius: 4px 4px 0 0;
+  position: relative;
+}
+
+.settings-nav-tab:hover {
+  color: var(--text-secondary);
+  background: rgba(249, 115, 22, 0.05);
+}
+
+.settings-nav-tab.active {
+  color: var(--orange);
+  border-bottom-color: var(--orange);
+  background: rgba(249, 115, 22, 0.08);
+}
+
+.nav-tab-label {
+  white-space: nowrap;
+}
+
+/* Body */
+.settings-body {
+  flex: 1;
+  animation: tabFadeIn 0.3s ease;
+}
+
+@keyframes tabFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Layout variants */
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.settings-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.section-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.section-count {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+/* Cards */
+.settings-card {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  /* Always-on depth shadow + subtle border accent.
+     Hover intensifies the accent. */
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.02) inset,
+    0 4px 16px rgba(0, 0, 0, 0.25),
+    0 1px 3px rgba(0, 0, 0, 0.15);
+  /* Glassmorphism — slight blur of whatever is behind the card.
+     Falls back gracefully on browsers that don't support backdrop-filter. */
+  backdrop-filter: blur(8px) saturate(120%);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, backdrop-filter 0.2s ease;
+}
+
+.settings-card:hover {
+  border-color: rgba(249, 115, 22, 0.12);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.03) inset,
+    0 6px 24px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(249, 115, 22, 0.06);
+}
+
+/* Cards */
+
+.settings-card-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  position: relative;
+}
+
+.settings-card-badge {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-dim);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
+  pointer-events: auto;
+}
+
+.settings-card-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  /* Subtle gradient: orange → lighter orange, only for accents. */
+  background: linear-gradient(135deg, var(--orange) 0%, #fb923c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  margin: 0 0 14px 0;
+}
+
+/* Fields */
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.settings-field:last-child {
+  margin-bottom: 0;
+}
+
+.settings-field label {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+
+.settings-field-row {
+  margin-bottom: 8px;
+}
+
+.settings-input,
+.settings-textarea {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  color: var(--white);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.settings-input:focus,
+.settings-textarea:focus {
+  border-color: var(--glow-border);
+  box-shadow: var(--glow-orange);
+}
+
+.settings-textarea {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  resize: vertical;
+}
+
+/* Custom Dropdown */
+.custom-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.custom-dropdown.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.custom-dropdown-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card, #1a1a2e);
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  color: var(--text, #ffffff);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.custom-dropdown-trigger:hover {
+  border-color: var(--accent, #f97316);
+}
+
+.custom-dropdown-trigger.open {
+  border-color: var(--accent, #f97316);
+  box-shadow: 0 0 0 1px var(--accent, #f97316);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.dropdown-selected {
+  flex: 1;
+  text-align: left;
+}
+
+.dropdown-arrow {
+  transition: transform 0.2s ease;
+  color: var(--text-dim);
+}
+
+.custom-dropdown-trigger.open .dropdown-arrow {
+  transform: rotate(180deg);
+  color: var(--orange);
+}
+
+.custom-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-card, #1a1a2e);
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-top: none;
+  border-bottom-left-radius: var(--radius);
+  border-bottom-right-radius: var(--radius);
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: all 0.2s ease;
+  z-index: 1000;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.custom-dropdown-menu.open {
+  max-height: 240px;
+  overflow-y: auto;
+  opacity: 1;
+  transform: translateY(0);
+}
+.custom-dropdown-menu.open.has-search {
+  max-height: 280px;
+}
+
+/* Portal variant — menu is detached from trigger (rendered in document.body).
+   Needs full border (no longer visually fused with the trigger) and
+   no top:100%/left:0/right:0 from the base rule (position:fixed overrides). */
+.custom-dropdown-menu.open.portal {
+  border-top: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: var(--radius);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  /* Subtle slide-in matched to placement: bottom vs top */
+  animation: dropdownPortalIn 0.15s ease-out;
+}
+.custom-dropdown-menu.open.portal[data-placement="top"] {
+  animation-name: dropdownPortalInTop;
+}
+@keyframes dropdownPortalIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes dropdownPortalInTop {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.custom-dropdown-item-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.custom-dropdown-item-badge {
+  font-size: 9px;
+  opacity: 0.8;
+}
+
+.custom-dropdown-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  color: var(--text, #ffffff);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.custom-dropdown-item:hover:not(.disabled) {
+  background: var(--bg-hover, rgba(255,255,255,0.05));
+  color: var(--accent, #f97316);
+}
+
+.custom-dropdown-item.highlighted {
+  background: var(--bg-hover, rgba(255,255,255,0.05));
+}
+
+.custom-dropdown-item.selected {
+  color: var(--accent, #f97316);
+  font-weight: 500;
+}
+
+.custom-dropdown-item.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.dropdown-check {
+  color: var(--orange);
+}
+
+/* Dropdown search */
+.custom-dropdown-search-wrap {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-card, #1a1a2e);
+  border-bottom: 1px solid var(--border, rgba(255,255,255,0.08));
+  z-index: 1;
+}
+.custom-dropdown-search-icon {
+  color: var(--text-dim, rgba(255,255,255,0.4));
+  flex-shrink: 0;
+}
+.custom-dropdown-search {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text, #fff);
+  font-size: 13px;
+  font-family: inherit;
+  min-width: 0;
+}
+.custom-dropdown-search::placeholder {
+  color: var(--text-dim, rgba(255,255,255,0.4));
+}
+.custom-dropdown-empty {
+  padding: 10px 12px;
+  color: var(--text-dim, rgba(255,255,255,0.4));
+  font-size: 13px;
+  text-align: center;
+}
+
+/* Toggle */
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  user-select: none;
+  padding: 4px 0;
+}
+
+.settings-toggle input[type="checkbox"] {
+  appearance: none;
+  width: 30px;
+  height: 18px;
+  background: rgba(55, 55, 75, 0.6);
+  border: 1px solid var(--glass-border);
+  border-radius: 9px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.settings-toggle input[type="checkbox"]::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 14px;
+  height: 14px;
+  background: var(--gray-400);
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.settings-toggle input[type="checkbox"]:checked {
+  background: var(--orange);
+}
+
+.settings-toggle input[type="checkbox"]:checked::after {
+  left: 15px;
+  background: var(--white);
+}
+
+.settings-toggle-desc {
+  display: block;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin: -2px 0 6px 40px;
+  line-height: 1.4;
+}
+
+/* Buttons */
+.settings-btn-primary {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, var(--orange), #fb923c);
+  border: none;
+  border-radius: var(--radius);
+  color: white;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.2);
+}
+
+.settings-btn-primary:hover {
+  background: linear-gradient(135deg, var(--orange-hover), var(--orange));
+  box-shadow: 0 2px 16px rgba(249, 115, 22, 0.3);
+  transform: translateY(-1px);
+}
+
+.settings-btn-secondary {
+  padding: 6px 14px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.settings-btn-secondary:hover {
+  background: var(--bg-hover);
+  color: var(--white);
+  border-color: var(--glow-border);
+}
+
+.settings-btn-danger {
+  padding: 6px 14px;
+  background: transparent;
+  border: 1px solid #dc2626;
+  border-radius: var(--radius);
+  color: #dc2626;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.settings-btn-danger:hover {
+  background: #dc2626;
+  color: var(--white);
+}
+
+
+/* ---- settings-card-desc (from settings.css tail) ---- */
+/* === Card description (subtitle text under .settings-card-title) === */
+/*
+ *  Previously undefined — the description <p> in SettingsCard inherited
+ *  body styles and rendered bold/oversized. Mirrors .settings-section-desc
+ *  (12px, weight 400, dim color, 1.5 line-height) so secondary copy under
+ *  a card title reads as a note, not a heading. Used by every SettingsCard
+ *  that passes a `description` prop (Cron, Kanban, Agents, Tools, …).
+ */
+.settings-card-desc {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-dim, #aaa);
+  line-height: 1.5;
+  margin: 6px 0 0 0;
+}

@@ -1,0 +1,288 @@
+/* SynPin — split from settings.css. Modal dialogs (shared). */
+
+/* === Modal === */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: modalFadeIn 0.2s ease;
+}
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.modal-content {
+  background: rgba(10, 10, 20, 0.92);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5), 0 0 40px rgba(249, 115, 22, 0.05);
+  animation: modalSlideIn 0.25s ease;
+  display: flex;
+  flex-direction: column;
+}
+@keyframes modalSlideIn {
+  from { opacity: 0; transform: scale(0.95) translateY(12px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.modal-inner {
+  padding: 20px;
+}
+.modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--white);
+  margin: 0 0 16px 0;
+}
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 16px 20px;
+}
+.modal-footer {
+  position: sticky;
+  bottom: 0;
+  background: var(--glass-bg-heavy);
+  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 20px;
+  border-top: 1px solid var(--glass-border);
+}
+.modal-header {
+  position: sticky;
+  top: 0;
+  background: var(--glass-bg-heavy);
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 20px 0;
+}
+.modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--white);
+}
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 22px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+.modal-close:hover {
+  background: var(--gray-700);
+  color: var(--white);
+}
+/* Create Agent button */
+.create-agent-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+.create-agent-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--orange);
+  border: none;
+  border-radius: var(--radius);
+  color: var(--white);
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.create-agent-btn:hover {
+  background: var(--orange-hover);
+  transform: translateY(-1px);
+}
+/* Delete button in expanded overlay */
+.expanded-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-left: auto;
+}
+.expanded-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+/* Tools grid in expanded overlay */
+.tools-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tools-category {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tools-category-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.tools-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.tool-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: inherit;
+  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-heavy);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.tool-chip:hover {
+  border-color: var(--gray-600);
+  color: var(--text-secondary);
+}
+.tool-chip.dimmed {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.tool-chip.active {
+  border-color: var(--orange);
+  background: var(--orange-muted);
+  color: var(--orange);
+}
+.tool-chip.active:hover {
+  background: rgba(249, 115, 22, 0.18);
+  border-color: var(--orange-hover);
+}
+.tool-chip-name {
+  font-size: 11px;
+}
+/* Field validation error */
+.field-error {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+}
+.field-error-text {
+  display: block;
+  color: #ef4444;
+  font-size: 11px;
+  margin-top: 4px;
+}
+.btn-warn {
+  background: #ef4444 !important;
+  animation: btnShake 0.3s ease;
+}
+@keyframes btnShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+/* ── Unified Action Buttons (global) ───────────────────────────────────── */
+/* Use these classes everywhere instead of inline styles or widget-remove-btn */
+.btn-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+.btn-action:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+.btn-action-edit {
+  /* Edit (pencil) button */
+}
+.btn-action-edit:hover {
+  border-color: var(--orange);
+  color: var(--orange);
+}
+.btn-action-delete {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: var(--radius, 8px);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-action-delete:hover {
+  border-color: var(--red, #ef4444);
+  color: var(--red, #ef4444);
+  background: rgba(239, 68, 68, 0.08);
+}
+.btn-action-group {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+/* ── Unified hint/description text ─────────────────────────────────────── */
+/* Used for section descriptions, field hints, empty state secondary text */
+.settings-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin: 0;
+}
+.settings-section-desc {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+/* ── Cron section ──────────────────────────────────────────────── */
+@keyframes cron-jobs-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

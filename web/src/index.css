@@ -17,7 +17,12 @@
 @import "./styles/kanban.css";        /* Kanban board (columns, cards, drag, undo) */
 @import "./styles/projects-page.css"; /* Projects page + project cards + metrics */
 @import "./styles/deadlines.css";     /* Deadlines page */
-@import "./styles/settings.css";      /* Settings page, providers, modals */
+@import "./styles/settings-page.css"; /* Settings page layout, sections, form fields */
+@import "./styles/tweakcn.css";        /* TweakCN theme import UI */
+@import "./styles/providers.css";      /* Providers page (list, config) */
+@import "./styles/modal.css";          /* Modal dialogs (shared) */
+@import "./styles/cron.css";           /* Cron section UI */
+@import "./styles/tools.css";          /* Tools section (карточки инструментов) */
 @import "./styles/connections.css";   /* Connections canvas */
 @import "./styles/projects.css";      /* Projects (legacy/compatibility) */
 @import "./styles/misc.css";          /* Misc + Phase 2 leftover (settings, tags) */

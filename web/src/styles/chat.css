@@ -418,7 +418,13 @@
 }
 
 /* Streaming: soft pulsing glow (no flicker on glass backgrounds) */
-/* Streaming border removed — the typing dots are the only signal. */
+.message-wrapper.streaming {
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  box-shadow:
+    0 0 8px rgba(249, 115, 22, 0.15),
+    0 0 20px rgba(249, 115, 22, 0.05);
+  animation: glowPulse 2.5s ease-in-out infinite;
+}
 
 @keyframes glowPulse {
   0% {

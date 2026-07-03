@@ -611,7 +611,7 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
               const workerColor = !left && !isHead ? agentColorMap.get(msg.sender) : undefined
 
               return (
-                <div key={msg.id} className={`otdel-msg-row ${left ? 'left' : 'right'} ${isStreaming ? 'streaming' : ''}`}>
+                <div key={msg.id} className={`otdel-msg-row ${left ? 'left' : 'right'} ${isStreaming && msg.content ? 'streaming' : ''}`}>
                   <div
                     className={`otdel-msg-avatar ${left ? 'left' : 'right'}`}
                     style={isMainAgent ? { background: 'rgba(249,115,22,0.2)' } : workerColor ? { background: workerColor + '20' } : undefined}

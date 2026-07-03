@@ -1450,7 +1450,7 @@ function App() {
                       const isLastAssistant = msg.role === 'assistant' && msg.id === messages[messages.length - 1]?.id && isTyping
                       return (
                         <div key={msg.id} className={`message-row ${msg.role}`}>
-                          <div className={`message-avatar ${msg.role} ${isLastAssistant ? 'streaming' : ''}`}>
+                          <div className={`message-avatar ${msg.role} ${isLastAssistant && msg.content ? 'streaming' : ''}`}>
                             {msg.role === 'assistant' ? (
                               <img src={synpinLogo} alt="S" className="avatar-logo" />
                             ) : 'U'}
@@ -1463,7 +1463,7 @@ function App() {
                               toolNames={TOOL_DISPLAY_NAMES}
                             />
                           )}
-                          <div className="message-wrapper">
+                          <div className={`message-wrapper ${isLastAssistant && msg.content ? 'streaming' : ''}`}>
                             <div className="message-bubble">
                               {msg.images && msg.images.length > 0 && (
                                 <div className="message-images">

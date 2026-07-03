@@ -1448,14 +1448,9 @@ function App() {
                   <div className="messages-container" ref={messagesContainerRef}>
                     {messages.map((msg) => {
                       const isLastAssistant = msg.role === 'assistant' && msg.id === messages[messages.length - 1]?.id && isTyping
-                      // Same gate as otdel: pulsing border only while the
-                      // bubble is empty (typing dots phase). Once the first
-                      // chunk lands and the bubble fills with text, the
-                      // border drops — the text itself is the live signal.
-                      const showBorder = isLastAssistant && !(msg.content && msg.content.trim())
                       return (
                         <div key={msg.id} className={`message-row ${msg.role}`}>
-                          <div className={`message-avatar ${msg.role} ${showBorder ? 'streaming' : ''}`}>
+                          <div className={`message-avatar ${msg.role} ${isLastAssistant ? 'streaming' : ''}`}>
                             {msg.role === 'assistant' ? (
                               <img src={synpinLogo} alt="S" className="avatar-logo" />
                             ) : 'U'}
@@ -1468,7 +1463,7 @@ function App() {
                               toolNames={TOOL_DISPLAY_NAMES}
                             />
                           )}
-                          <div className={`message-wrapper ${showBorder ? 'streaming' : ''}`}>
+                          <div className="message-wrapper">
                             <div className="message-bubble">
                               {msg.images && msg.images.length > 0 && (
                                 <div className="message-images">

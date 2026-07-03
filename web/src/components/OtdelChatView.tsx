@@ -608,15 +608,10 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
               const isHead = msg.is_head === true
               const isMainAgent = msg.sender === 'main_agent'
               const isStreaming = msg.streaming === true
-              // Pulsing border only while the bubble is empty (typing dots phase).
-              // Once the first chunk lands and the bubble fills with text, the
-              // border drops — the text itself is the live signal from then on.
-              const showBorder = isStreaming && !(msg.content && msg.content.trim())
-
               const workerColor = !left && !isHead ? agentColorMap.get(msg.sender) : undefined
 
               return (
-                <div key={msg.id} className={`otdel-msg-row ${left ? 'left' : 'right'} ${showBorder ? 'streaming' : ''}`}>
+                <div key={msg.id} className={`otdel-msg-row ${left ? 'left' : 'right'} ${isStreaming ? 'streaming' : ''}`}>
                   <div
                     className={`otdel-msg-avatar ${left ? 'left' : 'right'}`}
                     style={isMainAgent ? { background: 'rgba(249,115,22,0.2)' } : workerColor ? { background: workerColor + '20' } : undefined}

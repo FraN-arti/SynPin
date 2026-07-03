@@ -13,6 +13,9 @@ import { ProjectsPage } from './components/ProjectsPage'
 import { SetupWizard } from './components/SetupWizard'
 import { ChatSkeleton } from './components/ChatSkeleton'
 import { PageTransition } from './components/PageTransition'
+import { ToolTimeline, type ToolCall, TOOL_DISPLAY_NAMES, HIDDEN_TOOLS } from './components/ToolTimeline'
+import { Sidebar, type AgentConfig } from './components/Sidebar'
+import type { Message } from './components/chatTypes'
 import {
   WidgetDropZone,
   useWidgetLayout,
@@ -36,77 +39,6 @@ import { useChatScroll } from './hooks/useChatScroll'
 import { ImageAttachment, fileToAttachment, extractImagesFromPaste, type ImageAttachment as ImageAttachmentType } from './components/ImageAttachment'
 
 import { API_BASE } from './config'
-
-interface AgentConfig {
-  slug: string
-  agentid: string
-  name: string
-  role: string
-  role_name: string
-  department: string
-  department_name: string
-  model: string
-  provider: string | null
-  system_prompt: string
-  description: string
-  tone: string
-  style: string
-  traits: string[]
-  tools: string[]
-  temperature: number
-  max_tokens: number
-  enabled: boolean
-  is_primary?: boolean
-  is_external?: boolean
-  type?: string
-}
-
-interface ToolCall {
-  id: string
-  name: string
-  params: Record<string, unknown>
-  status: 'running' | 'completed' | 'error'
-  result?: string
-  error?: string
-}
-
-interface Message {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  thinking?: string  // reasoning/thinking content (<think> tags or similar)
-  timestamp: Date
-  model?: string
-  agent_name?: string
-  prompt_tokens?: number
-  completion_tokens?: number
-  tools?: ToolCall[]
-  images?: string[]  // base64 data URLs of attached images
-}
-
-// ─── Tool badges (minimal inline, same as otdel chat) ────────
-
-interface ToolTimelineProps {
-  tools: ToolCall[]
-  isLive: boolean
-  toolNames: Record<string, string>
-}
-
-function ToolTimeline({ tools, toolNames }: ToolTimelineProps) {
-  return (
-    <div className="tool-badges-row">
-      {tools.map((tc) => (
-        <span
-          key={tc.id}
-          className={`tool-mini-badge ${tc.status}`}
-          title={`${tc.name}: ${tc.result || tc.error || ''}`}
-        >
-          {tc.status === 'running' ? '⏳' : tc.status === 'completed' ? '✓' : '✗'} {toolNames[tc.name] || tc.name}
-        </span>
-      ))}
-    </div>
-  )
-}
 
 function App() {
   // Unified navigation: one state variable for everything in the
@@ -428,19 +360,7 @@ function App() {
   activeAgentRef.current = activeAgent
   messagesRef.current = messages
 
-  // Tool display names for badges
-  const TOOL_DISPLAY_NAMES: Record<string, string> = {
-    terminal: 'Терминал',
-    file_read: 'Чтение файла',
-    file_write: 'Запись файла',
-    search_files: 'Поиск файлов',
-    web_search: 'Поиск в интернете',
-    code_exec: 'Python',
-    // memory tools hidden from UI — run silently
-  }
-
-  // Tools hidden from UI (run silently in background)
-    const HIDDEN_TOOLS = new Set(['memory_read', 'memory_write'])
+  // Tool display names imported from ToolTimeline module (shared with otdel chat)
 
     // Save sidebar state
     useEffect(() => {
@@ -1180,160 +1100,23 @@ function App() {
         <img src={synpinLogo} alt="SynPin" />
       </div>
 
-      {/* Sidebar — slides in/out */}
-      <aside className={`sidebar ${sidebarOpen && sidebarReady ? 'open' : ''}`}>
-        <div className="sidebar-content">
-          {/* Primary Agent — pinned above search */}
-          {primarySlug && availableAgents.find(a => a.slug === primarySlug) && (() => {
-            const primary = availableAgents.find(a => a.slug === primarySlug)!
-            return (
-              <div className="primary-agent">
-                <button
-                  className={`agent-list-item ${activeAgent?.slug === primary.slug ? 'active' : ''}`}
-                  onClick={() => {
-                    if (activeAgent?.slug !== primary.slug) {
-                      setActiveAgent(primary)
-                      setMessages([])
-                      setView({ type: 'chat' })
-                    } else if (view.type !== 'chat') {
-                      setView({ type: 'chat' })
-                    }
-                  }}
-                >
-                  <span className="agent-list-avatar" style={{ background: primary.is_external ? '#f97316' : '#6b7280' }}>
-                    {primary.is_external ? 'H' : primary.name[0]}
-                  </span>
-                  <div className="agent-list-info">
-                    <span className="agent-list-name">
-                      {primary.name}
-                      {primary.is_external && <span className="agent-badge extern">extern</span>}
-                    </span>
-                    <span className="agent-list-role">{primary.role_name || primary.type}</span>
-                  </div>
-                  <span
-                    className="star-toggle active"
-                    title="Снять с главного"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      fetch(`${API_BASE}/api/config/primary-agent`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ slug: '' }),
-                      }).then(() => setPrimarySlug(''))
-                    }}
-                  >★</span>
-                </button>
-              </div>
-            )
-          })()}
-
-          {/* Agent Search */}
-          <div className="agent-search">
-            <input
-              className="agent-search-input"
-              type="text"
-              placeholder="Поиск агента..."
-              value={agentSearch}
-              onChange={(e) => setAgentSearch(e.target.value)}
-            />
-          </div>
-
-          {/* Agent List — always visible, filtered by search, excludes primary */}
-          {(() => {
-            const filteredAgents = availableAgents
-              .filter(agent => agent.slug !== primarySlug)
-              .filter(agent => {
-                if (!agentSearch.trim()) return true
-                const q = agentSearch.toLowerCase()
-                return (
-                  agent.name.toLowerCase().includes(q) ||
-                  (agent.role_name || '').toLowerCase().includes(q) ||
-                  (agent.type || '').toLowerCase().includes(q)
-                )
-              })
-            return (
-              <div className={`agent-list ${filteredAgents.length > 3 ? 'has-overflow' : ''}`}>
-                {filteredAgents.map(agent => (
-                  <button
-                    key={agent.slug}
-                    className={`agent-list-item ${activeAgent?.slug === agent.slug ? 'active' : ''}`}
-                    onClick={() => {
-                      if (activeAgent?.slug !== agent.slug) {
-                        setActiveAgent(agent)
-                        setMessages([])
-                        setView({ type: 'chat' })
-                      } else if (view.type !== 'chat') {
-                        // Same agent but not in chat view — just switch view
-                        setView({ type: 'chat' })
-                      }
-                      setAgentSearch('')
-                    }}
-                  >
-                    <span className="agent-list-avatar" style={{ background: agent.is_external ? '#f97316' : '#6b7280' }}>
-                      {agent.is_external ? 'H' : agent.name[0]}
-                    </span>
-                    <div className="agent-list-info">
-                      <span className="agent-list-name">
-                        {agent.name}
-                        {agent.is_external && <span className="agent-badge extern">extern</span>}
-                      </span>
-                      <span className="agent-list-role">{agent.role_name || agent.type}</span>
-                    </div>
-                    {!agent.is_external && (
-                      <span
-                        className={`star-toggle ${primarySlug === agent.slug ? 'active' : ''}`}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          const newPrimary = primarySlug === agent.slug ? '' : agent.slug
-                          fetch(`${API_BASE}/api/config/primary-agent`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ slug: newPrimary }),
-                          }).then(() => {
-                            setPrimarySlug(newPrimary)
-                            // Sync is_primary in agents list
-                            setAvailableAgents(prev => prev.map(a => ({
-                              ...a,
-                              is_primary: a.slug === newPrimary,
-                            })))
-                          })
-                        }}
-                      >★</span>
-                    )}
-                  </button>
-                ))}
-                {filteredAgents.length === 0 && agentSearch.trim() && (
-                  <div className="agent-list-empty">Ничего не найдено</div>
-                )}
-              </div>
-            )
-          })()}
-
-          </div>
-
-          <div className="sidebar-footer">
-            <button className={`settings-btn ${view.type === 'projects' ? 'active' : ''}`} onClick={() => setView({ type: 'projects' })}>
-              <span>📁</span> Проекты
-            </button>
-            <button className={`settings-btn ${view.type === 'deadlines' ? 'active' : ''}`} onClick={() => setView({ type: 'deadlines' })}>
-              <span>⏰</span> Дедлайны
-            </button>
-            <button className={`settings-btn ${view.type === 'connections' ? 'active' : ''}`} onClick={() => setView({ type: 'connections' })}>
-              <span>🔗</span> Связи
-            </button>
-            <button className={`settings-btn ${view.type === 'kanban' ? 'active' : ''}`} onClick={() => setView({ type: 'kanban' })}>
-              <span>📋</span> Задачи
-            </button>
-            <button className={`settings-btn ${view.type === 'settings' ? 'active' : ''}`} onClick={() => setView({ type: 'settings' })}>
-              <span>⚙️</span> Настройки
-            </button>
-            <div className="version-bar">
-              <span className="version-label">VERSION</span>
-              <span className="version-number" title="Live version from server (auto-updates via WebSocket)">{serverVersion}</span>
-              <span className="version-status up-to-date" />
-            </div>
-          </div>
-      </aside>
+      {/* Sidebar — extracted to components/Sidebar.tsx (154 lines) */}
+              <Sidebar
+                open={sidebarOpen}
+                ready={sidebarReady}
+                agents={availableAgents}
+                primarySlug={primarySlug}
+                activeAgent={activeAgent}
+                view={view}
+                serverVersion={serverVersion}
+                setActiveAgent={setActiveAgent}
+                setMessages={setMessages}
+                setView={setView}
+                setPrimarySlug={setPrimarySlug}
+                setAvailableAgents={setAvailableAgents}
+                setAgentSearch={setAgentSearch}
+                agentSearch={agentSearch}
+              />
 
       {/* Main Area with Widget Zones */}
       <DndContext

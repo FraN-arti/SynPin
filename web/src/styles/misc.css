@@ -315,3 +315,342 @@ input[type="number"] {
   padding: 20px;
   min-height: 80px;
 }
+
+/* === Phase 2 leftover from memory.css split (cleanup pending) === */
+.settings-field-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.3;
+}
+.settings-field-hint-inline {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.3;
+  margin-left: 8px;
+}
+.settings-divider {
+  height: 1px;
+  background: var(--glass-border);
+  margin: 4px 0;
+}
+.settings-divider-thin {
+  height: 1px;
+  background: var(--glass-border);
+  margin: 12px 0;
+}
+/* Subsection title inside cards */
+.settings-subsection-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin: 0 0 10px 0;
+}
+/* Two-column row */
+.settings-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+/* ─── Stats Summary Cards ─────────────────────────────────── */
+.settings-system-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.settings-system-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+.settings-system-row:last-child {
+  border-bottom: none;
+}
+.settings-system-label {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.settings-system-value {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+/* Save indicator */
+.settings-save-indicator {
+  margin-top: 12px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.08);
+  border-radius: var(--radius);
+  text-align: center;
+  animation: fadeIn 0.2s ease;
+}
+/* Responsive: 2 cols → 1 col on narrow */
+/* ─── Departments (Отделы) ─────────────────────────────────── */
+.settings-empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-dim);
+}
+.settings-empty-state p:first-child {
+  font-size: 15px;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.settings-empty-hint {
+  font-size: 13px;
+}
+/* ─── Sidebar Departments ──────────────────────────────────── */
+.settings-nav-tab.draggable {
+  cursor: grab;
+  position: relative;
+}
+.settings-nav-tab.draggable::after {
+  content: '⋮';
+  margin-left: 4px;
+  font-size: 10px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.settings-nav-tab.draggable:hover::after {
+  opacity: 0.5;
+}
+.settings-nav-tab.draggable:active {
+  cursor: grabbing;
+}
+.settings-nav-tab.dragging {
+  opacity: 0.3;
+}
+/* ─── Drag Overlay ───────────────────────────────────────────── */
+.auto-grow-textarea {
+  width: 100%;
+  min-height: 38px;
+  max-height: 160px;
+  resize: none;
+  overflow-y: auto;
+  line-height: 1.5;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+.auto-grow-textarea:focus {
+  border-color: var(--accent, #f97316);
+}
+.auto-grow-textarea::placeholder {
+  color: var(--text-dim);
+}
+/* ── Priority Inline Selector ────────────────────────────────────── */
+.tag-picker-popup {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 100;
+  margin-top: 4px;
+  background: var(--bg-secondary, rgba(20, 20, 36, 0.95));
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+  padding: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  max-width: 100%;
+  animation: kanbanScaleIn 0.15s ease-out;
+}
+.tag-picker-empty {
+  width: 100%;
+  text-align: center;
+  padding: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.tag-block {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  border: 2px solid transparent;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.tag-block:hover {
+  transform: scale(1.05);
+}
+.tag-block.selected {
+  border-color: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent, #f97316) 40%, transparent);
+}
+.tag-check {
+  font-size: 10px;
+  font-weight: 700;
+}
+/* ── Kanban Config & Widget ──────────────────────────────────────────────── */
+.settings-card.saving {
+  opacity: 0.85;
+  transition: opacity 0.2s;
+}
+.settings-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+.settings-section-label:first-child {
+  margin-top: 0;
+}
+/* ── Settings Link Button ──────────────────────────────────────────────────── */
+.settings-link-btn {
+  background: none;
+  border: none;
+  color: var(--orange, #f97316);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+.settings-link-btn:hover {
+  background: rgba(249, 115, 22, 0.1);
+}
+/* ── Widget Column Chip ────────────────────────────────────────────────────── */
+.settings-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+  overflow: hidden;
+  width: fit-content;
+}
+.settings-stepper-btn {
+  background: var(--bg-elevated);
+  border: none;
+  color: var(--text);
+  font-size: 16px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.settings-stepper-btn:hover {
+  background: var(--orange-muted);
+  color: var(--orange);
+}
+.settings-stepper-value {
+  width: 44px;
+  height: 32px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--glass-bg);
+  border: none;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  -moz-appearance: textfield;
+  outline: none;
+}
+.settings-stepper-value:focus {
+  background: var(--bg-elevated);
+}
+.settings-stepper-value::-webkit-outer-spin-button,
+.settings-stepper-value::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* ── Column Toggle Buttons (Все/Нет) ──────────────────────────────────────── */
+.external-gateway-warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius, 8px);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.external-agents-setup.compact {
+  padding: 0 12px;
+  margin-bottom: 12px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 8px);
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease, opacity 0.25s ease, padding 0.35s ease, margin 0.35s ease;
+}
+.external-agents-setup.compact.open {
+  max-height: 300px;
+  opacity: 1;
+  padding: 12px;
+}
+.external-agents-setup.compact .setup-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.togle-editor {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 8px);
+  overflow: hidden;
+}
+.togle-textarea {
+  width: 100%;
+  min-height: 200px;
+  padding: 16px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+}
+.togle-textarea:focus {
+  outline: none;
+}
+.togle-textarea::placeholder {
+  color: var(--text-muted);
+}
+.togle-textarea:disabled {
+  opacity: 0.5;
+}
+.togle-hint {
+  padding: 8px 16px;
+  background: var(--glass-bg-heavy);
+  border-top: 1px solid var(--glass-border);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.togle-saving {
+  font-size: 11px;
+  color: var(--orange);
+  font-weight: normal;
+  margin-left: 8px;
+}

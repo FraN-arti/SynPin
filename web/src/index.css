@@ -24,5 +24,4 @@
 @import "./styles/cron.css";           /* Cron section UI */
 @import "./styles/tools.css";          /* Tools section (карточки инструментов) */
 @import "./styles/connections.css";   /* Connections canvas */
-@import "./styles/projects.css";      /* Projects (legacy/compatibility) */
 @import "./styles/misc.css";          /* Misc + Phase 2 leftover (settings, tags) */

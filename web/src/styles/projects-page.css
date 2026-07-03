@@ -575,3 +575,515 @@
   cursor: pointer;
 }
 /* TOGLE.md Editor */
+
+/* === Migrated from projects.css (legacy compat) === */
+/* These 65 rules were in projects.css but not in projects-page.css.
+   They live here now. projects.css deleted after this merge. */
+
+.custom-tooltip {
+  position: absolute;
+  z-index: 10000;
+  pointer-events: none;
+  animation: tooltipFadeIn 0.15s ease-out;
+}
+.custom-tooltip.tt-hidden {
+  visibility: hidden;
+  pointer-events: none;
+  animation: none;
+}
+/* ── MouseTooltip — follows cursor ──────────────────────────────── */
+.mouse-tooltip {
+  transition: opacity 0.12s ease;
+}
+.custom-tooltip-content {
+  background: rgba(10, 10, 20, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), 0 0 1px rgba(255, 255, 255, 0.06);
+  white-space: nowrap;
+  max-width: 320px;
+}
+/* Rich tooltip with structured rows */
+.custom-tooltip-content .tt-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--white);
+  margin-bottom: 4px;
+}
+.custom-tooltip-content .tt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.custom-tooltip-content .tt-label {
+  color: var(--text-dim);
+}
+.custom-tooltip-content .tt-value {
+  color: var(--white);
+  font-weight: 500;
+}
+.custom-tooltip-content .tt-divider {
+  height: 1px;
+  background: var(--glass-border);
+  margin: 6px 0;
+}
+.custom-tooltip-content .tt-tag {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+}
+.tt-tag-green { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+.tt-tag-orange { background: rgba(249, 115, 22, 0.15); color: var(--orange); }
+.tt-tag-yellow { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.tt-tag-red { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.tt-tag-blue { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.tt-tag-gray { background: rgba(107, 114, 128, 0.15); color: #9ca3af; }
+/* Arrow */
+.custom-tooltip-arrow {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: rgba(10, 10, 20, 0.94);
+  border: 1px solid var(--glass-border);
+  transform: rotate(45deg);
+}
+.custom-tooltip-top .custom-tooltip-arrow {
+  bottom: -5px;
+  left: 50%;
+  margin-left: -4px;
+  border-top: none;
+  border-left: none;
+}
+.custom-tooltip-bottom .custom-tooltip-arrow {
+  top: -5px;
+  left: 50%;
+  margin-left: -4px;
+  border-bottom: none;
+  border-right: none;
+}
+.custom-tooltip-left .custom-tooltip-arrow {
+  right: -5px;
+  top: 50%;
+  margin-top: -4px;
+  border-bottom: none;
+  border-left: none;
+}
+.custom-tooltip-right .custom-tooltip-arrow {
+  left: -5px;
+  top: 50%;
+  margin-top: -4px;
+  border-top: none;
+  border-right: none;
+}
+/* Center text-based tooltips */
+.custom-tooltip-top, .custom-tooltip-bottom {
+  transform: translateX(-50%);
+}
+.custom-tooltip-left, .custom-tooltip-right {
+  transform: translateY(-50%);
+}
+/* Light theme override */
+.light-theme .custom-tooltip-content {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+.light-theme .custom-tooltip-arrow {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+/* === Projects Page ================================================== */
+.projects-top-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.projects-subtitle {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 4px 0 0 0;
+}
+/* ── Metric Cards ─────────────────────────────────────────────────── */
+.project-goals-list-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.project-departments-list-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.togle-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.togle-textarea {
+  width: 100%;
+  min-height: 200px;
+  padding: 12px 16px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  color: var(--white);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.togle-textarea:focus {
+  border-color: var(--glow-border);
+  box-shadow: var(--glow-orange);
+}
+.togle-textarea::placeholder {
+  color: var(--text-dim);
+}
+.togle-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.togle-saving {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 400;
+  margin-left: 8px;
+}
+/* ── Archive List ─────────────────────────────────────────────────── */
+.projects-dept-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.projects-dept-search input {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.projects-dept-search-clear {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+.projects-dept-search-clear:hover {
+  color: var(--white);
+}
+.projects-dept-empty {
+  font-size: 12px;
+  color: var(--text-dim);
+  padding: 8px;
+  text-align: center;
+}
+/* ── Department Row (new compact design) ─────────────────────── */
+.dept-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.dept-row:hover {
+  background: var(--bg-hover, rgba(255,255,255,0.03));
+}
+.dept-row.selected {
+  background: var(--orange-muted);
+}
+.dept-check {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--glass-border);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.dept-check.checked {
+  background: var(--orange);
+  border-color: var(--orange);
+}
+.dept-name {
+  font-size: 13px;
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+}
+.dept-star {
+  color: var(--orange);
+  font-size: 11px;
+}
+.dept-options {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.dept-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.dept-radio {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--glass-border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.dept-radio.checked {
+  border-color: var(--orange);
+}
+.dept-radio-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--orange);
+  border-radius: 50%;
+}
+.dept-role-input {
+  width: 70px;
+  padding: 2px 6px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 4px;
+  color: var(--white);
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+}
+.dept-role-input:focus {
+  border-color: var(--orange);
+}
+.dept-role-input::placeholder {
+  color: var(--text-dim);
+}
+/* ── Modal Actions ────────────────────────────────────────────────── */
+.projects-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.project-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.project-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.project-action-btn:hover {
+  border-color: var(--glass-border);
+  color: var(--white);
+  background: var(--bg-hover);
+}
+.project-action-btn.danger:hover {
+  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--red);
+  background: rgba(239, 68, 68, 0.05);
+}
+/* ── Title Row + Status Badge ─────────────────────────────────────── */
+.projects-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.projects-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  background: var(--accent, #f97316);
+  color: #fff;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+.projects-description-italic {
+  display: block;
+  width: 100%;
+  font-size: 13px;
+  color: var(--text-dim);
+  font-style: italic;
+  margin: 4px 0 0 0;
+  line-height: 1.4;
+}
+.project-status-wrapper {
+  position: relative;
+}
+.project-status-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 1000;
+  background: rgba(15, 15, 25, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 4px;
+  min-width: 160px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  animation: tooltipFadeIn 0.12s ease-out;
+}
+.project-status-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s ease;
+}
+.project-status-option:hover {
+  background: var(--bg-hover);
+  color: var(--white);
+}
+.project-status-option.current {
+  color: var(--white);
+  font-weight: 500;
+}
+.project-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+/* ── Section Hints ─────────────────────────────────────────────────── */
+.project-section-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: -8px 0 12px 0;
+  line-height: 1.5;
+}
+/* ── Department Blocks Grid ────────────────────────────────────────── */
+.project-departments-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.project-dept-block {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  transition: border-color 0.15s ease;
+}
+.project-dept-block:hover {
+  border-color: var(--glass-border);
+}
+.project-dept-block.main {
+  border-color: var(--glow-border);
+}
+.dept-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.dept-block-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--white);
+}
+.dept-block-main-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--orange);
+  background: var(--orange-muted);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.dept-block-role {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+.dept-block-divider {
+  height: 1px;
+  background: var(--glass-border);
+  margin: 8px 0;
+}
+.dept-block-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dept-block-head {
+  font-size: 13px;
+}
+.dept-block-head.dim {
+  color: var(--text-dim);
+  font-style: italic;
+}
+.dept-block-head-label {
+  color: var(--text-dim);
+  margin-right: 4px;
+}
+.dept-block-head-name {
+  color: var(--white);
+  font-weight: 500;
+}
+.dept-block-workers {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.dept-block-workers-label {
+  color: var(--text-dim);
+  display: block;
+  margin-bottom: 2px;
+}
+.dept-block-workers-list {
+  color: var(--text-secondary);
+}
+/* ── Danger button variant ─────────────────────────────────────────── */

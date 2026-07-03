@@ -38,10 +38,19 @@
    column), so footer still drops below. Layout: avatar left, then
    message-wrapper right (with tool-timeline in between when present).
    The user variant reverses to keep avatar on the right edge of the
-   chat (so the bubble hugs the right margin). */
+   chat (so the bubble hugs the right margin).
+
+   align-items: flex-end — drops the bubble so its baseline sits at
+   the bottom of the avatar. The avatar is 28px tall; the streaming
+   empty bubble is a 14px-tall pill (3 vertical bars at full height,
+   plus container padding). Without this, the bubble would sit at
+   the top of the avatar row and the bars would visually appear "above"
+   the avatar. flex-end aligns the bubble's bottom with the avatar's
+   bottom, so the bars sit roughly centered against the avatar's
+   lower half. */
 .message-body {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 10px;
   max-width: 100%;
 }
@@ -434,6 +443,14 @@
   display: inline-block;
   max-width: 80%;
   border-radius: var(--radius);
+  /* Smooth fade-out of the streaming glow when .streaming is removed.
+     Without this, border-color + box-shadow vanish in a single frame
+     when chat:done arrives — the user sees the pulsing glow disappear
+     like a flash. With this transition, the orange ring fades to
+     "nothing" over 400ms. We animate border-color + box-shadow (not
+     the border shorthand — that would also change border-width and
+     reflow the bubble's box). */
+  transition: border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
 /* Streaming: soft pulsing glow (no flicker on glass backgrounds) */

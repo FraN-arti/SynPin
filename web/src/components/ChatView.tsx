@@ -244,13 +244,6 @@ export function ChatView(props: ChatViewProps) {
                       <img src={synpinLogo} alt="S" className="avatar-logo" />
                     ) : 'U'}
                   </div>
-                  {msg.tools && msg.tools.length > 0 && (
-                    <ToolTimeline
-                      tools={msg.tools}
-                      isLive={isLastAssistant && isTyping}
-                      toolNames={TOOL_DISPLAY_NAMES}
-                    />
-                  )}
                   <div className={`message-wrapper ${isLastAssistant && msg.content ? 'streaming' : ''}`}>
                     <div className={`message-bubble ${msg.content || msg.thinking || (msg.images && msg.images.length > 0) ? 'has-content' : ''}`}>
                       {msg.images && msg.images.length > 0 && (
@@ -279,6 +272,22 @@ export function ChatView(props: ChatViewProps) {
                     </div>
                   </div>
                 </div>
+                {/* Tool badges live OUTSIDE .message-body so they wrap on a
+                    full-width row instead of being squeezed into the
+                    narrow column between avatar and bubble. When avatar
+                    + bubble sit side-by-side via flex row, putting
+                    ToolTimeline between them gives it a constrained
+                    width — each badge ends up on its own line. Outside
+                    .message-body it spans the full chat width and
+                    flex-wrap lays badges out left-to-right with proper
+                    row breaks, the way ChatGPT/Claude render them. */}
+                {msg.tools && msg.tools.length > 0 && (
+                  <ToolTimeline
+                    tools={msg.tools}
+                    isLive={isLastAssistant && isTyping}
+                    toolNames={TOOL_DISPLAY_NAMES}
+                  />
+                )}
                 <div className={`message-footer ${msg.role} ${msg.role === 'user' || revealedMeta.has(msg.id) ? 'visible' : ''}`}>
                   {msg.role === 'user' || revealedMeta.has(msg.id) ? renderMeta(msg) : null}
                 </div>

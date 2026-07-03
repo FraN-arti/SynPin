@@ -150,12 +150,16 @@
 
 /* === Tool Timeline (horizontal chips, animated) === */
 
-/* Tool badges — minimal inline (same as otdel chat) */
+/* Tool badges — minimal inline (same as otdel chat).
+   Lives at full chat width (outside .message-body) so flex-wrap lays
+   badges out left-to-right with row breaks when the row gets crowded.
+   margin-top (not margin-bottom) keeps the spacing under the bubble
+   that this timeline used to have inline. */
 .tool-badges-row {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-bottom: 6px;
+  margin-top: 6px;
 }
 
 /* Legacy ToolTimeline styles below (unused, kept for reference) */

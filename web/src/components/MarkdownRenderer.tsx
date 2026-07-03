@@ -7,7 +7,7 @@
  *     vertical thinking bars from chat.css. Bars are CSS-driven
  *     (`typing-bar-scale` keyframe), no JS.
  *  2. **Copy buttons on code blocks.** After markdown renders, we walk
- *     every `<pre>` in the resulting DOM and prepend a "Copy" button
+ *     every `<pre>` in the resulting DOM and append a "Copy" button
  *     that copies the code text to clipboard with a 1.5s "Copied!"
  *     confirmation. Pure DOM enhancement — doesn't touch the markdown
  *     pipeline.
@@ -19,6 +19,12 @@
  *     second pass and re-render — overcomplicated for a UI nicety.
  *   - Mutation in useEffect runs once per content change and is the
  *     same pattern ChatGPT/Claude use for their copy buttons.
+ *
+ * Hook-order note: ALL hooks (useMemo, useEffect, useRef) run before
+ * any conditional return. Don't early-return before useEffect — React
+ * will throw "Rendered more hooks than during the previous render"
+ * when content goes from empty to non-empty (empty path = 0 effects,
+ * non-empty path = 1 effect).
  */
 
 import { useEffect, useMemo, useRef } from 'react'
@@ -37,23 +43,9 @@ export function MarkdownRenderer({ content, isStreaming }: MarkdownRendererProps
 
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Empty content → typing dots (now vertical bars, see chat.css).
-  if (!content) {
-    return (
-      <span className="typing-dots bubble">
-        <span className="typing-dot" />
-        <span className="typing-dot" />
-        <span className="typing-dot" />
-      </span>
-    )
-  }
-
-  // During streaming, render raw text to avoid broken HTML from incomplete markdown.
-  if (isStreaming) {
-    return <span className="raw-text">{content}</span>
-  }
-
-  // Wire up copy buttons on every <pre> after render.
+  // Wire up copy buttons on every <pre> after render. Runs even when
+  // content is empty (no-op since the empty branch returns early
+  // below — but the hook call itself is unconditional).
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -105,6 +97,22 @@ export function MarkdownRenderer({ content, isStreaming }: MarkdownRendererProps
       pre.appendChild(btn)
     })
   }, [html])
+
+  // Empty content → typing dots (now vertical bars, see chat.css).
+  if (!content) {
+    return (
+      <span className="typing-dots bubble">
+        <span className="typing-dot" />
+        <span className="typing-dot" />
+        <span className="typing-dot" />
+      </span>
+    )
+  }
+
+  // During streaming, render raw text to avoid broken HTML from incomplete markdown.
+  if (isStreaming) {
+    return <span className="raw-text">{content}</span>
+  }
 
   return (
     <div

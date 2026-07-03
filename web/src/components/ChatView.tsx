@@ -234,43 +234,49 @@ export function ChatView(props: ChatViewProps) {
             const isLastAssistant = msg.role === 'assistant' && msg.id === messages[messages.length - 1]?.id && isTyping
             return (
               <div key={msg.id} className={`message-row ${msg.role}`}>
-                <div className={`message-avatar ${msg.role} ${isLastAssistant && msg.content ? 'streaming' : ''}`}>
-                  {msg.role === 'assistant' ? (
-                    <img src={synpinLogo} alt="S" className="avatar-logo" />
-                  ) : 'U'}
-                </div>
-                {msg.tools && msg.tools.length > 0 && (
-                  <ToolTimeline
-                    tools={msg.tools}
-                    isLive={isLastAssistant && isTyping}
-                    toolNames={TOOL_DISPLAY_NAMES}
-                  />
-                )}
-                <div className={`message-wrapper ${isLastAssistant && msg.content ? 'streaming' : ''}`}>
-                  <div className={`message-bubble ${msg.content || msg.thinking || (msg.images && msg.images.length > 0) ? 'has-content' : ''}`}>
-                    {msg.images && msg.images.length > 0 && (
-                      <div className="message-images">
-                        {msg.images.map((src, i) => (
-                          <img key={i} src={src} alt={`Изображение ${i + 1}`} className="message-image" />
-                        ))}
-                      </div>
-                    )}
-                    {msg.thinking && (
-                      <div className={`thinking-block ${expandedThinking.has(msg.id) || (isLastAssistant && isTyping) ? 'expanded' : ''}`}>
-                        <button
-                          className="thinking-toggle"
-                          onClick={() => toggleThinking(msg.id)}
-                        >
-                          <span className="thinking-icon">💭</span>
-                          <span>Рассуждение</span>
-                          <span className="thinking-chevron">›</span>
-                        </button>
-                        <div className="thinking-content">
-                          <MarkdownRenderer content={msg.thinking} />
+                {/* Avatar + bubble laid out side-by-side. Avatar on the
+                    left, message-wrapper on the right. The message-row
+                    itself stays flex-direction:column so the footer can
+                    still drop below the bubble. */}
+                <div className={`message-body ${msg.role}`}>
+                  <div className={`message-avatar ${msg.role} ${isLastAssistant && msg.content ? 'streaming' : ''}`}>
+                    {msg.role === 'assistant' ? (
+                      <img src={synpinLogo} alt="S" className="avatar-logo" />
+                    ) : 'U'}
+                  </div>
+                  {msg.tools && msg.tools.length > 0 && (
+                    <ToolTimeline
+                      tools={msg.tools}
+                      isLive={isLastAssistant && isTyping}
+                      toolNames={TOOL_DISPLAY_NAMES}
+                    />
+                  )}
+                  <div className={`message-wrapper ${isLastAssistant && msg.content ? 'streaming' : ''}`}>
+                    <div className={`message-bubble ${msg.content || msg.thinking || (msg.images && msg.images.length > 0) ? 'has-content' : ''}`}>
+                      {msg.images && msg.images.length > 0 && (
+                        <div className="message-images">
+                          {msg.images.map((src, i) => (
+                            <img key={i} src={src} alt={`Изображение ${i + 1}`} className="message-image" />
+                          ))}
                         </div>
-                      </div>
-                    )}
-                    <MarkdownRenderer content={msg.content} isStreaming={isLastAssistant} />
+                      )}
+                      {msg.thinking && (
+                        <div className={`thinking-block ${expandedThinking.has(msg.id) || (isLastAssistant && isTyping) ? 'expanded' : ''}`}>
+                          <button
+                            className="thinking-toggle"
+                            onClick={() => toggleThinking(msg.id)}
+                          >
+                            <span className="thinking-icon">💭</span>
+                            <span>Рассуждение</span>
+                            <span className="thinking-chevron">›</span>
+                          </button>
+                          <div className="thinking-content">
+                            <MarkdownRenderer content={msg.thinking} />
+                          </div>
+                        </div>
+                      )}
+                      <MarkdownRenderer content={msg.content} isStreaming={isLastAssistant} />
+                    </div>
                   </div>
                 </div>
                 <div className={`message-footer ${msg.role} ${msg.role === 'user' || revealedMeta.has(msg.id) ? 'visible' : ''}`}>

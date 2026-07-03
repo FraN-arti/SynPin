@@ -34,6 +34,24 @@
   align-items: flex-end;
 }
 
+/* Horizontal avatar + bubble row. Sits inside .message-row (which is
+   column), so footer still drops below. Layout: avatar left, then
+   message-wrapper right (with tool-timeline in between when present).
+   The user variant reverses to keep avatar on the right edge of the
+   chat (so the bubble hugs the right margin). */
+.message-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 100%;
+}
+.message-body.user {
+  flex-direction: row-reverse;
+}
+.message-body.assistant {
+  flex-direction: row;
+}
+
 .message-avatar {
   width: 28px;
   height: 28px;

@@ -608,7 +608,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
     # Gated to multi-step tasks only (not single delegation responses), and
     # to head_delegating=True (user asked head to manage the flow).
     multi_step = bool(
-        re.search(r"\b(раунд|этап|итерац|потом|сначала|затем)\b", message, re.IGNORECASE)
+        re.search(r"\b(раунд[а-я]*|этап[а-я]*|итерац[а-я]*|потом|затем|сначала)\b", message, re.IGNORECASE)
     )
     needs_head_continuation = False
     last_delegation_id_at_worker_response = None

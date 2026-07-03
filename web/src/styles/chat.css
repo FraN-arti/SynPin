@@ -654,16 +654,39 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--gray-500);
-  animation: bounce 1.4s infinite;
+  background: var(--orange);
+  /* Two animations running in parallel:
+     - bounce: vertical hop + opacity (1.4s) — the original "live" feel
+     - typing-dot-color-cycle: background-color through orange → amber →
+       purple → orange (2.5s), same stops and duration as glowPulse on
+       the bubble border. The dots cycle in lockstep with the frame.
+     Stagger the color cycle per-dot so the three dots form a running
+     wave along the border's color phase (-0s / -0.83s / -1.67s =
+     thirds of the 2.5s cycle), instead of all three flashing in sync.
+     No baseline opacity here: the bounce keyframe drives opacity from
+     0.6 → 1 → 0.6 so the color cycle stays visible at every phase. */
+  animation:
+    bounce 1.4s ease-in-out infinite,
+    typing-dot-color-cycle 2.5s ease-in-out infinite;
 }
 
 .typing-dot:nth-child(2) {
-  animation-delay: 0.2s;
+  animation-delay: 0.2s, -0.83s;
 }
 
 .typing-dot:nth-child(3) {
-  animation-delay: 0.4s;
+  animation-delay: 0.4s, -1.67s;
+}
+
+/* Color cycle — same stops as glowPulse (orange → amber → purple → orange)
+   so the dots feel like they're part of the same animated surface as
+   the bubble border. Mirrors otdel-dot-color-shift in memory.css (kept
+   separate to avoid cross-file keyframe dependency on load order). */
+@keyframes typing-dot-color-cycle {
+  0%   { background-color: #f97316; }  /* orange */
+  33%  { background-color: #f59e0b; }  /* amber */
+  66%  { background-color: #a855f7; }  /* purple */
+  100% { background-color: #f97316; }  /* orange */
 }
 
 /* === Bottom Input (with messages) === */

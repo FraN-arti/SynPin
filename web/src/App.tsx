@@ -8,8 +8,9 @@ import { Sidebar, type AgentConfig } from './components/Sidebar'
 import type { Message } from './components/chatTypes'
 import { ChatSkeleton } from './components/ChatSkeleton'
 import { PageTransition } from './components/PageTransition'
-import { ToolTimeline, type ToolCall, TOOL_DISPLAY_NAMES } from './components/ToolTimeline'
+import { ToolTimeline, TOOL_DISPLAY_NAMES } from './components/ToolTimeline'
 import { useChatSubmit } from './hooks/useChatSubmit'
+import { useChatHistory } from './hooks/useChatHistory'
 
 // Tiny fallback for lazy chunks — just a centered dot. Better than
 // nothing while Settings/Kanban/Projects/etc. code is loading.
@@ -519,100 +520,8 @@ function App() {
   }, [])
 
   // Load chat history when active agent changes OR when returning to chat view
-  useEffect(() => {
-    if (!activeAgent || view.type !== 'chat') return  // skip if not in chat view
-
-    // Reset messages to null to show loading skeleton
-    setMessages(null)
-    let cancelled = false
-
-    const loadHistory = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web&limit=20`)
-        if (!res.ok) {
-          setMessages([])
-          return
-        }
-        const data = await res.json()
-        const msgs = data.messages || []
-
-        // Check if last message is user without assistant response (background task ongoing)
-        const lastMsg = msgs[msgs.length - 1]
-        const hasPendingTask = lastMsg?.role === 'user'
-
-        if (msgs.length > 0) {
-          let restored: Message[] = msgs.map((m: { role: string; content: string; timestamp?: string; model?: string; agent_name?: string; prompt_tokens?: number; completion_tokens?: number; tools?: ToolCall[] }, i: number) => ({
-            id: `restored-${i}`,
-            role: m.role as 'user' | 'assistant',
-            content: m.content,
-            timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
-            model: m.model,
-            agent_name: m.agent_name,
-            prompt_tokens: m.prompt_tokens,
-            completion_tokens: m.completion_tokens,
-            tools: m.tools,
-          }))
-
-          // Check if restored messages already end with empty assistant (from SSE)
-          const lastRestored = restored[restored.length - 1]
-          const alreadyHasPlaceholder = lastRestored?.role === 'assistant' && !lastRestored.content
-
-          // Add placeholder if background task is ongoing AND no placeholder exists
-          if (hasPendingTask && !alreadyHasPlaceholder) {
-            restored.push({
-              id: `placeholder-${Date.now()}`,
-              role: 'assistant',
-              content: '',
-              timestamp: new Date(),
-              tools: [],
-            })
-            setIsTyping(true)
-
-            // Safety refetch: catch responses that arrived between history load and WS connect
-            // One-shot, 5s delay, no polling loop
-            setTimeout(async () => {
-              if (cancelled) return
-              try {
-                const retryRes = await fetch(`${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web&limit=20`)
-                if (!retryRes.ok) return
-                const retryData = await retryRes.json()
-                const retryMsgs = retryData.messages || []
-                const lastRetryMsg = retryMsgs[retryMsgs.length - 1]
-                if (lastRetryMsg?.role === 'assistant') {
-                  // Response arrived — fill the placeholder
-                  setMessages(prev => {
-                    const list = prev ?? []
-                    const placeholderId = list.map(m => m.id).reverse().find(id => {
-                      const msg = list.find(m => m.id === id)
-                      return msg?.role === 'assistant' && !msg.content
-                    })
-                    if (placeholderId) {
-                      setIsTyping(false)
-                      return list.map(m => m.id === placeholderId
-                        ? { ...m, content: lastRetryMsg.content, model: lastRetryMsg.model, agent_name: lastRetryMsg.agent_name, prompt_tokens: lastRetryMsg.prompt_tokens, completion_tokens: lastRetryMsg.completion_tokens, tools: lastRetryMsg.tools }
-                        : m
-                      )
-                    }
-                    return list
-                  })
-                }
-              } catch { /* silent */ }
-            }, 5000)
-          }
-
-          setMessages(restored)
-        } else {
-          setMessages([])
-        }
-      } catch (e) {
-        console.error('[history] load error:', e)
-        setMessages([])
-      }
-    }
-    loadHistory()
-    return () => { cancelled = true }
-  }, [activeAgent, view])
-
+  // Load chat history on agent switch — extracted to hooks/useChatHistory.ts
+  useChatHistory({ activeAgent, viewType: view.type, setMessages, setIsTyping })
   // Auto-scroll handled by useChatScroll hook (sentinel pattern)
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {

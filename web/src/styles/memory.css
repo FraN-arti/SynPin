@@ -2193,6 +2193,20 @@
   padding: 4px 0;
 }
 
+/* Inline streaming dots — used inside an empty streaming bubble.
+   No padding, no background, no border — just the three dots. */
+.otdel-streaming-dots-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.otdel-streaming-dots-inline .typing-dot {
+  width: 8px;
+  height: 8px;
+}
+
 .otdel-typing-dots span {
   width: 6px;
   height: 6px;

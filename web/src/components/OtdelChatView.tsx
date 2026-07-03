@@ -624,26 +624,37 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
                     {isMainAgent ? '🤖' : left ? '👤' : '🏢'}
                   </div>
                   <div className="otdel-msg-body">
-                    <div
-                      className={`otdel-msg-bubble ${left ? 'left' : 'right'} ${isHead ? 'head' : ''} ${isMainAgent ? 'main-agent' : ''}`}
-                      style={isMainAgent ? {
-                        borderColor: 'var(--orange)',
-                        background: 'rgba(249,115,22,0.08)',
-                        boxShadow: '0 4px 20px rgba(249,115,22,0.2)',
-                      } : workerColor ? {
-                        borderColor: workerColor,
-                        background: workerColor + '12',
-                      } : undefined}
-                    >
-                      {msg.images && msg.images.length > 0 && (
-                        <div className="message-images">
-                          {msg.images.map((src, i) => (
-                            <img key={i} src={src} alt={`Изображение ${i + 1}`} className="message-image" />
-                          ))}
-                        </div>
-                      )}
-                      <MarkdownRenderer content={msg.content} isStreaming={isStreaming} />
+                    {hasContent ? (
+                      <div
+                        className={`otdel-msg-bubble ${left ? 'left' : 'right'} ${isHead ? 'head' : ''} ${isMainAgent ? 'main-agent' : ''}`}
+                        style={isMainAgent ? {
+                          borderColor: 'var(--orange)',
+                          background: 'rgba(249,115,22,0.08)',
+                          boxShadow: '0 4px 20px rgba(249,115,22,0.2)',
+                        } : workerColor ? {
+                          borderColor: workerColor,
+                          background: workerColor + '12',
+                        } : undefined}
+                      >
+                        {msg.images && msg.images.length > 0 && (
+                          <div className="message-images">
+                            {msg.images.map((src, i) => (
+                              <img key={i} src={src} alt={`Изображение ${i + 1}`} className="message-image" />
+                            ))}
+                          </div>
+                        )}
+                        <MarkdownRenderer content={msg.content} isStreaming={isStreaming} />
                       </div>
+                    ) : (
+                      // Empty streaming bubble → render the dots inline (no
+                      // surrounding bubble box). Mirrors the look of the
+                      // standalone typing indicator without an extra wrapper.
+                      <span className="otdel-streaming-dots-inline">
+                        <span className="typing-dot" />
+                        <span className="typing-dot" />
+                        <span className="typing-dot" />
+                      </span>
+                    )}
                       {/* Message meta info — time · agent · model */}
                       {isMainAgent && !isStreaming && (
                         <div className="otdel-msg-meta">

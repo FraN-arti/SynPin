@@ -600,6 +600,18 @@ async def _handle_otdel_send(user_id: str, msg: dict):
     responded_workers = set()
     head_delegating = False
     processed_slugs = set()
+    # Continuation trigger: when a multi-step task is in flight (user message
+    # contains раунд/этап/итерац/потом/сначала), and a worker just responded
+    # to a head_delegate call, and the head did NOT itself queue another
+    # delegation in the same turn — schedule one more head turn with a
+    # reminder so the multi-step chain doesn't stall waiting for the user.
+    # Gated to multi-step tasks only (not single delegation responses), and
+    # to head_delegating=True (user asked head to manage the flow).
+    multi_step = bool(
+        re.search(r"\b(раунд|этап|итерац|потом|сначала|затем)\b", message, re.IGNORECASE)
+    )
+    needs_head_continuation = False
+    last_delegation_id_at_worker_response = None
 
     while agent_queue and processed_count < max_iterations:
         agent, is_head, trigger_message = agent_queue.pop(0)
@@ -924,6 +936,23 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                     "is_error": is_error,
                 }
 
+                # Multi-step continuation: if the original user message
+                # contained a multi-step marker (раунд/этап/итерац/...) and
+                # the head had delegated this task (head_delegating=True),
+                # AND the head did NOT itself queue another delegation in
+                # this same turn — mark that the follow-up should remind
+                # the head to call head_delegate for the next step. Without
+                # this the head often answers in prose ('Раунд 1: ...
+                # Стартуем') and stalls waiting for the user to nudge it.
+                if multi_step and head_delegating:
+                    # Snapshot which delegation ID was active when this
+                    # worker responded. The head's own follow-up will check
+                    # whether the ID advanced (= head re-delegated itself
+                    # in the same turn) to decide if a reminder is needed.
+                    last_delegation_id_at_worker_response = (
+                        head_state.active_delegation_id
+                    )
+
         processed_count += 1
 
     # ── Head follow-up (gather pattern) ──────────────────────────────
@@ -961,6 +990,28 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                     "НЕ ПИШИ что все ответили — это неправда."
                 )
             else:
+                # Multi-step nudge: if the user's task was explicitly
+                # multi-step (раунд/этап/итерац/...) and the head did
+                # NOT re-delegate in this turn, append an explicit
+                # reminder to call head_delegate for the next step.
+                # The check uses active_delegation_id — if the head
+                # itself called head_delegate, this ID advances; if
+                # it stayed put, the head answered in prose and we
+                # need to push it to act.
+                nudge = ""
+                if (
+                    multi_step
+                    and last_delegation_id_at_worker_response
+                    and head_state.active_delegation_id
+                    == last_delegation_id_at_worker_response
+                ):
+                    nudge = (
+                        "\n\nПодсказка: исходная задача была многоэтапной, "
+                        "и в этом turn'е ты ещё не вызвал head_delegate "
+                        "для следующего этапа. Сейчас самое время — "
+                        "вызови head_delegate с конкретным task для "
+                        "следующего этапа. Не пиши план прозой."
+                    )
                 acknowledge_trigger = (
                     "Все работники отдела ответили. "
                     "Проанализируй их ответы.\n"
@@ -968,6 +1019,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                     "отправить на доработку, передать результат следующему этапу) — ПРОДОЛЖАЙ, "
                     "вызывай head_delegate или другие инструменты.\n"
                     "Если задача полностью выполнена — сформируй итог для пользователя."
+                    + nudge
                 )
         else:
             acknowledge_trigger = (

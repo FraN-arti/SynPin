@@ -31,7 +31,7 @@
 
 /* User: right-aligned */
 .message-row.user {
-  align-items: flex-end;
+  align-items: center;
 }
 
 /* Horizontal avatar + bubble row. Sits inside .message-row (which is
@@ -40,17 +40,16 @@
    The user variant reverses to keep avatar on the right edge of the
    chat (so the bubble hugs the right margin).
 
-   align-items: flex-end — drops the bubble so its baseline sits at
-   the bottom of the avatar. The avatar is 28px tall; the streaming
-   empty bubble is a 14px-tall pill (3 vertical bars at full height,
-   plus container padding). Without this, the bubble would sit at
-   the top of the avatar row and the bars would visually appear "above"
-   the avatar. flex-end aligns the bubble's bottom with the avatar's
-   bottom, so the bars sit roughly centered against the avatar's
-   lower half. */
+   align-items: center — vertical centers the bubble against the
+   28px-tall avatar. flex-end pinned the bubble to the avatar's
+   bottom edge, which dropped the bars visually below the avatar
+   glyph (Artur reported they sat too low). center lifts the bars
+   ~14px so they overlap the avatar vertically rather than hanging
+   beneath it. The 14px bubble pill fits cleanly within the avatar's
+   height plus a few px of slack. */
 .message-body {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 10px;
   max-width: 100%;
 }
@@ -861,7 +860,7 @@
 .emoji-picker-container {
   position: relative;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   padding-bottom: 6px;
 }
 

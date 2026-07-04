@@ -283,6 +283,10 @@ app.include_router(setup_router)
 from .widgets_router import router as widgets_router
 app.include_router(widgets_router)
 
+# Events (in-app toast stack, settings, read state)
+from ..events.api import router as events_router
+app.include_router(events_router)
+
 # Head protocol settings (retry-limit knob shared by all otdels)
 from .protocol_router import router as protocol_router
 app.include_router(protocol_router)

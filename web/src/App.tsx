@@ -31,6 +31,8 @@ const OtdelChatView = lazy(() => import('./components/OtdelChatView').then(m => 
 const OtdelSettingsPanel = lazy(() => import('./components/OtdelSettingsPanel').then(m => ({ default: m.OtdelSettingsPanel })))
 const SetupWizard = lazy(() => import('./components/SetupWizard').then(m => ({ default: m.SetupWizard })))
 const DepartmentsPage = lazy(() => import('./components/DepartmentsPage').then(m => ({ default: m.DepartmentsPage })))
+import { Events } from './components/Events'
+import { useEvents } from './hooks/useEvents'
 import {
   WidgetDropZone,
   useWidgetLayout,
@@ -148,6 +150,9 @@ function App() {
 
   // Widget layout (left/right zones on main page) — needs wsOn
   const { layout, removeWidget, handleDragEnd } = useWidgetLayout(wsOn)
+
+  // Events bus — toast stack + in-app settings
+  const events = useEvents({ wsOn })
 
   // Global tooltip — intercepts all title attributes, shows mouse-following tooltip
   const globalTooltip = useGlobalTooltip()
@@ -712,6 +717,14 @@ function App() {
             activeOtdelId={view.type === 'otdel' ? view.id : null}
             wsOn={wsOn}
           />
+          {/* In-app event toasts — bottom-right stack */}
+          {events.settings.enabled && (
+            <Events
+              toasts={events.toasts}
+              onDismiss={events.dismiss}
+              autoFadeSeconds={events.settings.auto_fade_seconds}
+            />
+          )}
         </div>
         <DragOverlay>
           {activeDragId ? (

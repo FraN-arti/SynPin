@@ -24,6 +24,7 @@ import { AgentsSection } from './settings/AgentsSection'
 import { ProvidersSection, AddFromCatalogModal, AddProviderModal, EditCustomProviderModal } from './settings/ProvidersSection'
 import { ChannelsSection, AddChannelModal } from './settings/ChannelsSection'
 import { DepartmentsSection } from './settings/DepartmentsSection'
+import { EventsSection } from './settings/EventsSection'
 import { SkillsSection } from './settings/SkillsSection'
 import { ConnectionsSection } from './settings/ConnectionsSection'
 import { KanbanSection } from './settings/KanbanSection'
@@ -217,6 +218,7 @@ export function SettingsPage({ onAgentsChange, onDepartmentsChange, wsOn }: Sett
           {activeTab === 'projects' && <ProjectsSection />}
           {activeTab === 'deadlines' && <DeadlinesSection />}
           {activeTab === 'widgets' && <WidgetsSection wsOn={wsOn} />}
+          {activeTab === 'events' && <EventsSection />}
         </PageTransition>
       </div>
     </>

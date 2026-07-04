@@ -14,6 +14,7 @@
 @import "./styles/departments.css";   /* Departments section + sidebar departments */
 @import "./styles/departments-page.css"; /* DepartmentsPage (full-screen grid of tiles) */
 @import "./styles/sidebar-widgets.css"; /* Sidebar widget zone, drag overlay, pin, main layout */
+@import "./styles/events.css";          /* Events toast stack */
 @import "./styles/otdel-chat.css";    /* Otdel chat (worker status, delegation cards) */
 @import "./styles/kanban.css";        /* Kanban board (columns, cards, drag, undo) */
 @import "./styles/projects-page.css"; /* Projects page + project cards + metrics */

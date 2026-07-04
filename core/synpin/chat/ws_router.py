@@ -462,6 +462,26 @@ async def _handle_chat_send(user_id: str, msg: dict):
             },
         )
 
+    # EventBus hook: surface a toast when the *primary* (main) agent
+    # finishes a reply. Skips otdel chat (they have their own panel,
+    # a toast would be noise).
+    if is_primary and full_response:
+        try:
+            from ..events import publish_event
+            preview = full_response.strip().replace("\n", " ")
+            if len(preview) > 140:
+                preview = preview[:137] + "..."
+            agent_name = agent_data.get("name", agent_slug) if agent_data else agent_slug
+            publish_event(
+                title=f"{agent_name} ответил",
+                body=preview,
+                level="info",
+                source="main_agent",
+                source_ref=agent_slug,
+            )
+        except Exception as ev_err:
+            logger.debug("EventBus publish failed (non-fatal): %s", ev_err)
+
     # Save assistant response to history
     if full_response:
         assistant_entry = {

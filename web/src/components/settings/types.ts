@@ -5,7 +5,7 @@
 
 // ── Tab definitions ────────────────────────────────────────────────
 
-export type Tab = 'general' | 'agents' | 'providers' | 'memory' | 'channels' | 'departments' | 'skills' | 'connections' | 'kanban' | 'deadlines' | 'projects' | 'widgets' | 'cron' | 'tools'
+export type Tab = 'general' | 'agents' | 'providers' | 'memory' | 'channels' | 'departments' | 'skills' | 'connections' | 'kanban' | 'deadlines' | 'projects' | 'widgets' | 'cron' | 'tools' | 'events'
 
 export interface TabDef {
   id: Tab
@@ -20,6 +20,7 @@ export const SYSTEM_TABS: TabDef[] = [
   { id: 'tools', label: 'Инструменты' },
   { id: 'skills', label: 'Скиллы' },
   { id: 'cron', label: 'Крон' },
+  { id: 'events', label: 'События' },
 ]
 
 export const SPACE_TABS: TabDef[] = [
@@ -44,6 +45,7 @@ export const SECTION_INFO: Record<Tab, { title: string; description: string }> =
   widgets: { title: 'Виджеты', description: 'Управление виджетами на главной панели' },
   cron: { title: 'Крон-задачи', description: 'Расписание, лимиты и проактивность' },
   tools: { title: 'Инструменты', description: 'Управление инструментами агентов: включение и области доступа' },
+  events: { title: 'События', description: 'In-app уведомления и каналы доставки' },
 }
 
 // Tabs that can be dragged to widget zones

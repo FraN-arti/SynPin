@@ -112,6 +112,10 @@
   margin-bottom: 12px;
   flex-wrap: wrap;
 }
+.events-setting-row--divider {
+  padding-top: 12px;
+  border-top: 1px solid var(--glass-border);
+}
 .events-setting-row:last-child {
   margin-bottom: 0;
 }
@@ -120,6 +124,22 @@
   font-size: 13px;
   color: var(--text);
   font-weight: 500;
+}
+.events-setting-label-block {
+  flex: 1 1 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.events-setting-label-block label {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+}
+.events-setting-sublabel {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.35;
 }
 .events-setting-input {
   flex: 0 0 80px;

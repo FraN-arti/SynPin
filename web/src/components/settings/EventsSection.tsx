@@ -1,11 +1,11 @@
 /**
  * EventsSection — settings tab for the EventBus.
  *
- * For MVP: in-app channel only (toggle + auto-fade timeout + clear-all).
+ * For MVP: in-app channel only (toggle + auto-fade timeout + max visible).
  * Future: a list of configured delivery channels (Telegram, desktop, email).
  *
  * Layout follows the same row pattern as CronSection's `.cron-limit-row`:
- * label | control | hint — so each setting sits on one horizontal line,
+ * label | control — so each setting sits on one horizontal line,
  * matching the rest of the settings UI.
  */
 
@@ -55,11 +55,6 @@ export function EventsSection() {
     if (data?.in_app) setSettings({ ...DEFAULT_SETTINGS, ...data.in_app })
   }
 
-  const handleClear = async () => {
-    if (!confirm('Очистить все события? Это действие нельзя отменить.')) return
-    await fetch(`${API_BASE}/api/events/clear`, { method: 'POST' }).catch(() => {})
-  }
-
   if (!settings) {
     return <div className="settings-sections">Загрузка…</div>
   }
@@ -80,10 +75,13 @@ export function EventsSection() {
           />
         </div>
 
-        <div className="events-setting-row">
-          <label className="events-setting-label" htmlFor="fade-seconds">
-            Автоисчезание через (секунд)
-          </label>
+        <div className="events-setting-row events-setting-row--divider">
+          <div className="events-setting-label-block">
+            <label htmlFor="fade-seconds">Автоисчезание</label>
+            <span className="events-setting-sublabel">
+              Через сколько секунд тост уйдёт сам, если его не закрыть вручную
+            </span>
+          </div>
           <input
             id="fade-seconds"
             type="number"
@@ -95,13 +93,15 @@ export function EventsSection() {
               auto_fade_seconds: parseIntClamped(e.target.value, 1, 60, DEFAULT_SETTINGS.auto_fade_seconds),
             })}
           />
-          <span className="events-setting-hint">от 1 до 60</span>
         </div>
 
-        <div className="events-setting-row">
-          <label className="events-setting-label" htmlFor="max-visible">
-            Максимум одновременно видимых тостов
-          </label>
+        <div className="events-setting-row events-setting-row--divider">
+          <div className="events-setting-label-block">
+            <label htmlFor="max-visible">Максимум тостов</label>
+            <span className="events-setting-sublabel">
+              Сколько одновременно видно в углу. Старые уходят, новые встают в стек
+            </span>
+          </div>
           <input
             id="max-visible"
             type="number"
@@ -113,7 +113,6 @@ export function EventsSection() {
               max_visible: parseIntClamped(e.target.value, 1, 20, DEFAULT_SETTINGS.max_visible),
             })}
           />
-          <span className="events-setting-hint">от 1 до 20</span>
         </div>
       </SettingsCard>
 
@@ -122,18 +121,6 @@ export function EventsSection() {
           В будущем здесь появятся каналы: Telegram, Desktop, Email и другие.
           Сейчас доступен только in-app.
         </p>
-      </SettingsCard>
-
-      <SettingsCard title="Действия">
-        <p className="settings-card-desc">
-          Очистить историю событий. Непрочитанные счётчики обнулятся,
-          в стеке тостов ничего не останется.
-        </p>
-        <div className="provider-actions">
-          <button className="settings-btn-danger" onClick={handleClear}>
-            Очистить все события
-          </button>
-        </div>
       </SettingsCard>
     </div>
   )

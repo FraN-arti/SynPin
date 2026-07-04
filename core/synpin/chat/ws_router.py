@@ -480,7 +480,7 @@ async def _handle_chat_send(user_id: str, msg: dict):
                 source_ref=agent_slug,
             )
         except Exception as ev_err:
-            logger.debug("EventBus publish failed (non-fatal): %s", ev_err)
+            logger.warning("EventBus publish failed: %s", ev_err)
 
     # Save assistant response to history
     if full_response:

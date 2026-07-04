@@ -1,0 +1,80 @@
+# .gitattributes — line endings, binary detection, linguist hints for SynPin.
+#
+# Why this file exists
+# ---------------------
+# SynPin targets Windows (dev) and is meant to be cross-platform-friendly.
+# Without normalization, Git on Windows quietly converts text files to
+# CRLF on checkout and warns "LF will be replaced by CRLF" on every
+# commit. With this file, line endings are deterministic regardless of
+# the developer's OS or core.autocrlf setting.
+
+# Default: detect text vs binary, store as LF in the repo, allow
+# checkout-time conversion per platform.
+* text=auto eol=lf
+
+# Shell scripts must stay LF on every platform — bash on Windows
+# (MSYS / git-bash) refuses to run scripts with CRLF line endings.
+*.sh   text eol=lf
+*.bash text eol=lf
+*.zsh  text eol=lf
+
+# PowerShell and Windows batch files expect CRLF on Windows; running
+# them with LF sometimes surfaces subtle bugs in `Invoke-Expression`
+# and `cmd /c`. Pin them.
+*.ps1  text eol=crlf
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+# The Python backend is pure LF. The SynPin installer (`install.sh`)
+# also requires LF, and on Windows the recommended dev environment is
+# git-bash which respects .gitattributes automatically.
+*.py   text eol=lf
+*.toml text eol=lf
+*.cfg  text eol=lf
+
+# TypeScript / JS / JSX / TSX — same as Python, LF in repo, CRLF
+# on Windows checkout. (TypeScript/Node tooling tolerates both, but
+# LF keeps diffs and ESLint configs consistent across the team.)
+*.ts   text eol=lf
+*.tsx  text eol=lf
+*.js   text eol=lf
+*.jsx  text eol=lf
+*.mjs  text eol=lf
+*.cjs  text eol=lf
+*.json text eol=lf
+*.css  text eol=lf
+*.html text eol=lf
+
+# Markdown — LF. Editors (Obsidian, VS Code, etc.) handle both, but
+# LF keeps the source clean for rendering pipelines.
+*.md   text eol=lf
+
+# YAML, ENV examples — LF. `.env` itself is gitignored, but `.env.example`
+# is tracked and benefits from a stable line ending.
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.env.example text eol=lf
+
+# Binary — never normalize, never attempt to diff. Without these Git
+# would still try to text-diff images on merge conflicts, producing
+# unusable output.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.svg  binary
+*.pdf  binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+*.eot  binary
+
+# Linguist hints — improve GitHub's language statistics and the
+# repository's main-language badge. Without this, vendored libraries
+# (heavy on d3 / react / typescript) skew the percentages.
+core/synpin/tools/** linguist-vendored
+web/src/vendor/** linguist-vendored
+*.min.js  linguist-vendored
+*.min.css linguist-vendored

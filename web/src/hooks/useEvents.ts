@@ -134,6 +134,13 @@ export function useEvents({
   // ── Mutations ───────────────────────────────────────────────────
   const dismiss = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id))
+    // Drop the id from the local-seen set so a re-broadcast of the same
+    // event (e.g. after WS reconnect) can still surface as a toast.
+    // Without this, localIds grows unbounded and silently suppresses
+    // legitimate retries — which is exactly why F5 used to "fix" things:
+    // F5 remounts the hook, the Set is reset, and the missed event
+    // finally shows.
+    localIds.current.delete(id)
     fetch(`${API_BASE}/api/events/${id}/read`, { method: 'POST' }).catch(() => {})
   }, [])
 

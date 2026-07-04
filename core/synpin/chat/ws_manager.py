@@ -1,4 +1,10 @@
-"""WebSocket Connection Manager — single WS per client, multiplexed messaging."""
+"""WebSocket Connection Manager — single WS per client, multiplexed messaging.
+
+One user may have several open WS connections (e.g. multiple browser tabs,
+strict-mode dev hot-reload). We keep a set of sockets per user_id, and
+disconnect removes only the socket that closed, never the whole user.
+"""
+import asyncio
 import json
 import logging
 from fastapi import WebSocket
@@ -8,25 +14,26 @@ logger = logging.getLogger(__name__)
 
 class ConnectionManager:
     """Manages active WebSocket connections.
-    
-    One connection per user_id. Messages are multiplexed by 'type' field.
+
+    One user can hold multiple concurrent WS connections (multi-tab,
+    dev HMR, etc). Messages are multiplexed by 'type' field.
     """
 
     def __init__(self):
-        self._connections: dict[str, WebSocket] = {}
+        self._connections: dict[str, set[WebSocket]] = {}
+        self._lock = asyncio.Lock()
 
     async def connect(self, ws: WebSocket, user_id: str = "default") -> None:
         """Accept a new WebSocket connection."""
         await ws.accept()
-        # Close any existing connection for this user
-        old = self._connections.get(user_id)
-        if old:
-            try:
-                await old.close(code=4001, reason="replaced by new connection")
-            except Exception:
-                pass
-        self._connections[user_id] = ws
-        logger.info("WS connected: %s (total: %d)", user_id, len(self._connections))
+        async with self._lock:
+            bucket = self._connections.setdefault(user_id, set())
+            bucket.add(ws)
+            total = sum(len(b) for b in self._connections.values())
+        logger.info(
+            "WS connected: %s (user sockets=%d, total=%d)",
+            user_id, len(self._connections[user_id]), total,
+        )
 
         # Check if session reset was missed while offline
         try:
@@ -38,36 +45,44 @@ class ConnectionManager:
         except Exception as e:
             logger.debug("[ws] Session reset check skipped: %s", e)
 
-    def disconnect(self, user_id: str):
-        """Remove a WebSocket connection."""
-        self._connections.pop(user_id, None)
-        logger.info("WS disconnected: %s (total: %d)", user_id, len(self._connections))
+    def disconnect(self, ws: WebSocket, user_id: str = "default") -> None:
+        """Remove a specific WS connection (the one that just closed)."""
+        bucket = self._connections.get(user_id)
+        if not bucket:
+            return
+        bucket.discard(ws)
+        if not bucket:
+            del self._connections[user_id]
+        total = sum(len(b) for b in self._connections.values())
+        logger.info(
+            "WS disconnected: %s (user sockets=%d, total=%d)",
+            user_id, len(self._connections.get(user_id, set())), total,
+        )
 
     async def send(self, user_id: str, message: dict):
-        """Send a JSON message to a connected client."""
-        ws = self._connections.get(user_id)
-        if not ws:
-            return
-        try:
-            await ws.send_text(json.dumps(message, ensure_ascii=False))
-        except Exception as e:
-            logger.warning("WS send failed for %s: %s", user_id, e)
-            self.disconnect(user_id)
-
-    async def broadcast(self, message: dict):
-        """Send a JSON message to ALL connected clients."""
-        disconnected = []
-        for user_id, ws in self._connections.items():
+        """Send a JSON message to all sockets of a given user."""
+        for ws in list(self._connections.get(user_id, set())):
             try:
                 await ws.send_text(json.dumps(message, ensure_ascii=False))
-            except Exception:
-                disconnected.append(user_id)
-        for uid in disconnected:
-            self.disconnect(uid)
+            except Exception as e:
+                logger.warning("WS send failed for %s: %s", user_id, e)
+                self.disconnect(ws, user_id)
+
+    async def broadcast(self, message: dict):
+        """Send a JSON message to ALL connected clients, on every open socket."""
+        dead: list[tuple[str, WebSocket]] = []
+        for user_id, bucket in list(self._connections.items()):
+            for ws in list(bucket):
+                try:
+                    await ws.send_text(json.dumps(message, ensure_ascii=False))
+                except Exception:
+                    dead.append((user_id, ws))
+        for user_id, ws in dead:
+            self.disconnect(ws, user_id)
 
     @property
     def active_count(self) -> int:
-        return len(self._connections)
+        return sum(len(b) for b in self._connections.values())
 
 
 # Singleton

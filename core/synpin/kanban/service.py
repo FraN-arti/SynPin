@@ -5,6 +5,7 @@ Broadcasts WebSocket events on every task change for live board updates.
 """
 from __future__ import annotations
 
+import logging
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -21,6 +22,8 @@ from .models import (
     load_task,
     save_task,
 )
+
+logger = logging.getLogger(__name__)
 
 # ── WebSocket broadcast helper ───────────────────────────────────────────────
 
@@ -270,6 +273,19 @@ class KanbanService:
             detail=reason,
         )
         self.save_task(task)
+        # Critical signal: the Council explicitly handed the task to the
+        # human. Best-effort toast; never raise.
+        try:
+            from ..events import publish_event
+            publish_event(
+                title=f"⚠️ Требуется ваше решение: {task.title}",
+                body=reason[:200] or "Совет директоров передал задачу вам.",
+                level="error",
+                source="system",
+                source_ref=task_id,
+            )
+        except Exception as pub_err:
+            logger.warning("publish_event failed for escalate_to_human %s: %s", task_id, pub_err)
         return task
 
     # ── Results ───────────────────────────────────────────────────────

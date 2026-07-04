@@ -544,8 +544,6 @@ async def _handle_otdel_send(user_id: str, msg: dict):
         await ws_manager.send(user_id, {"type": "error", "message": f"Otdel not found: {otdel_id}"})
         return
 
-    log = logging.getLogger("synpin.otdel")
-
     # Save user message
     history = _load_history(otdel_id)
     user_msg = {
@@ -629,7 +627,6 @@ async def _handle_otdel_send(user_id: str, msg: dict):
     multi_step = bool(
         re.search(r"\b(раунд[а-я]*|этап[а-я]*|итерац[а-я]*|потом|затем|сначала)\b", message, re.IGNORECASE)
     )
-    needs_head_continuation = False
     last_delegation_id_at_worker_response = None
 
     while agent_queue and processed_count < max_iterations:
@@ -793,9 +790,7 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                         )
                     elif msg_type == "done":
                         usage = payload.get("usage")
-                        streaming = False
                     elif msg_type == "error":
-                        streaming = False
                         full_response = f"⚠️ Ошибка: {payload.get('message', 'Unknown error')}"
                 except Exception:
                     pass
@@ -804,7 +799,19 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 "LLM call failed for agent %s in otdel %s: %s", agent_slug_val, otdel_id, e
             )
             full_response = f"⚠️ Ошибка: {e}"
-            streaming = False
+            # Best-effort toast so the user notices even with the otdel
+            # tab closed.
+            try:
+                from ..events import publish_event
+                publish_event(
+                    title=f"{agent_slug_val} не ответил в отделе «{otdel_id}»",
+                    body=str(e)[:200],
+                    level="error",
+                    source="agent",
+                    source_ref=agent_slug_val,
+                )
+            except Exception as pub_err:
+                logger.warning("publish_event failed for LLM error in otdel %s: %s", otdel_id, pub_err)
 
         # Save final message to history
         # Strip leaked text-based tool calls from response (e.g. <tool_call>...</tool_call>)
@@ -1332,3 +1339,19 @@ async def _handle_otdel_send(user_id: str, msg: dict):
             "otdel_id": otdel_id,
         },
     )
+    # In-app toast so the user notices even when the otdel tab is not
+    # open. Use a short preview of the head's last response as body.
+    try:
+        from ..events import publish_event
+        body_preview = (full_response or "").strip().replace("\n", " ")[:140]
+        if not body_preview:
+            body_preview = "Отдел завершил работу."
+        publish_event(
+            title=f"Отдел «{otdel_id}» завершил задачу",
+            body=body_preview,
+            level="success",
+            source="otdel",
+            source_ref=otdel_id,
+        )
+    except Exception as pub_err:
+        logger.warning("publish_event failed for otdel:done %s: %s", otdel_id, pub_err)

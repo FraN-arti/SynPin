@@ -33,7 +33,7 @@ class Event:
     title: str
     body: str
     level: str  # 'info' | 'success' | 'warning' | 'error'
-    source: str  # 'main_agent' | 'otdel' | 'cron' | 'system'
+    source: str  # 'main_agent' | 'agent' | 'otdel' | 'cron' | 'system'
     source_ref: str | None
     created_at: float
     read_at: float | None = None
@@ -129,12 +129,19 @@ class EventBus:
 
     # ── WS fan-out ───────────────────────────────────────────────────
     def _broadcast_new(self, ev: Event) -> None:
-        self._broadcast({"type": "event:new", "data": asdict(ev)})
+        # Protocol fix (2026-07-04): frontend reads ev.id flat, so we flatten
+        # the payload instead of wrapping in {"data": ...}. Matches the shape
+        # that REST _serialize() returns, so handlers stay uniform.
+        payload = asdict(ev)
+        payload["type"] = "event:new"
+        self._broadcast(payload)
 
     def _broadcast_read(self, ev: Event) -> None:
+        # Same fix: flat shape (id + read_at on top level, with type tag).
         self._broadcast({
             "type": "event:read",
-            "data": {"id": ev.id, "read_at": ev.read_at},
+            "id": ev.id,
+            "read_at": ev.read_at,
         })
 
     def _broadcast(self, event: dict[str, Any]) -> None:

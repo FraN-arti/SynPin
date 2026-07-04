@@ -72,6 +72,19 @@ async def _execute_job(job: Any) -> None:
             job.last_result = LastResult.ERROR
             job.last_result_message = str(e)[:200]
             _save_job(job)
+            # Surface the failure as an in-app toast so the user notices
+            # without opening Cron Manager. Best-effort: never raise.
+            try:
+                from ..events import publish_event
+                publish_event(
+                    title=f"Cron-задача «{job.name}» упала",
+                    body=str(e)[:200],
+                    level="error",
+                    source="cron",
+                    source_ref=job.id,
+                )
+            except Exception as pub_err:
+                logger.warning("publish_event failed for cron job %s: %s", job.id, pub_err)
         except Exception as save_err:
             logger.error("Failed to record cron error for %s: %s", job.id, save_err)
 

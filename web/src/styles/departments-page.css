@@ -1,0 +1,178 @@
+/* SynPin — DepartmentsPage. Grid of department tiles with accent color stripe. */
+
+.departments-page {
+  padding: 24px;
+  width: 100%;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.departments-top-bar {
+  margin-bottom: 24px;
+}
+
+.departments-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.departments-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.departments-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  letter-spacing: -0.2px;
+}
+
+.departments-count-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: var(--bg-elevated);
+  padding: 2px 8px;
+  border-radius: 10px;
+  letter-spacing: 0.5px;
+}
+
+.departments-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* Empty state */
+.departments-empty {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--text-muted);
+}
+
+.departments-empty-icon {
+  font-size: 56px;
+  display: block;
+  margin-bottom: 16px;
+  opacity: 0.4;
+}
+
+.departments-empty p {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.departments-empty-hint {
+  font-size: 12px !important;
+  opacity: 0.7;
+}
+
+/* Grid layout — auto-fit cards, min 240px wide */
+.departments-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+/* Department tile — bento card with left accent stripe */
+.department-tile {
+  position: relative;
+  display: flex;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius, 8px);
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+  min-height: 120px;
+}
+
+.department-tile:hover {
+  border-color: var(--orange);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+
+.department-tile:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
+}
+
+.department-tile-accent {
+  width: 4px;
+  flex-shrink: 0;
+}
+
+.department-tile-body {
+  flex: 1;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.department-tile-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.department-tile-header .department-color-dot {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+}
+
+.department-tile-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.department-tile-description {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.department-tile-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--glass-border);
+}
+
+.department-tile-count {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.department-tile-cta {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--orange);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.department-tile:hover .department-tile-cta {
+  opacity: 1;
+}

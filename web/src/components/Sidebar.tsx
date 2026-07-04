@@ -19,6 +19,7 @@ export type View =
   | { type: 'connections' }
   | { type: 'deadlines' }
   | { type: 'projects' }
+  | { type: 'departments' }
   | { type: 'setup' }
 
 export interface AgentConfig {
@@ -190,6 +191,9 @@ export function Sidebar({
         </button>
         <button className={`settings-btn ${view.type === 'kanban' ? 'active' : ''}`} onClick={() => setView({ type: 'kanban' })}>
           <span>📋</span> Задачи
+        </button>
+        <button className={`settings-btn ${view.type === 'departments' ? 'active' : ''}`} onClick={() => setView({ type: 'departments' })}>
+          <span>🏢</span> Отделы
         </button>
         <button className={`settings-btn ${view.type === 'settings' ? 'active' : ''}`} onClick={() => setView({ type: 'settings' })}>
           <span>⚙️</span> Настройки

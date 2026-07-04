@@ -30,6 +30,7 @@ const DeadlinesPage = lazy(() => import('./components/DeadlinesPage').then(m => 
 const OtdelChatView = lazy(() => import('./components/OtdelChatView').then(m => ({ default: m.OtdelChatView })))
 const OtdelSettingsPanel = lazy(() => import('./components/OtdelSettingsPanel').then(m => ({ default: m.OtdelSettingsPanel })))
 const SetupWizard = lazy(() => import('./components/SetupWizard').then(m => ({ default: m.SetupWizard })))
+const DepartmentsPage = lazy(() => import('./components/DepartmentsPage').then(m => ({ default: m.DepartmentsPage })))
 import {
   WidgetDropZone,
   useWidgetLayout,
@@ -67,6 +68,7 @@ function App() {
     | { type: 'connections' }
     | { type: 'deadlines' }
     | { type: 'projects' }
+    | { type: 'departments' }
     | { type: 'setup' }
   // ── Virgin detection ──────────────────────────────────────────────
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null)
@@ -600,6 +602,7 @@ function App() {
           else if (view.type === 'connections') pageKey = 'connections'
           else if (view.type === 'deadlines') pageKey = 'deadlines'
           else if (view.type === 'projects') pageKey = 'projects'
+          else if (view.type === 'departments') pageKey = 'departments'
           else if (view.type === 'setup') pageKey = 'setup'
           else if (view.type === 'settings') pageKey = 'settings'
           else if (view.type === 'otdel') pageKey = `otdel-${view.id}`
@@ -614,6 +617,8 @@ function App() {
             body = <DeadlinesPage wsOn={wsOn} />
           } else if (view.type === 'projects') {
             body = <ProjectsPage wsOn={wsOn} />
+          } else if (view.type === 'departments') {
+            body = <DepartmentsPage wsOn={wsOn} onOpenOtdel={(id) => setView({ type: 'otdel', id })} />
           } else if (view.type === 'setup') {
             body = <SetupWizard onComplete={() => { window.location.reload() }} />
           } else if (view.type === 'connections') {

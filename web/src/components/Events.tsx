@@ -1,37 +1,55 @@
 /**
  * Events — toast stack for in-app events.
  *
- * Renders bottom-right, newest at bottom, each card level-tinted.
- * Auto-fade after settings.auto_fade_seconds (default 8s). Manual × dismisses.
+ * Animation lifecycle:
+ *  - Mount: CSS animation `event-toast-in` plays (180ms slide+fade).
+ *  - After `autoFadeSeconds` of being mounted, the toast gets the
+ *    `event-toast-fading` class which starts the fade-out animation.
+ *  - On `animationend`, we remove the toast from the stack.
  *
- * Reads state from useEvents() — no own state here, this is a pure renderer.
+ * Why CSS-driven fade instead of `setTimeout`:
+ *  - Survives React re-renders / StrictMode double-mount (the animation
+ *    keeps running independently of component identity).
+ *  - Naturally pauses when the tab is hidden (CSS animations pause when
+ *    the page is not visible).
+ *
+ * Manual × calls `onDismiss` which removes it immediately + marks read.
  */
-import { useEffect, useRef } from 'react'
 import type { AppEvent } from '../types/events'
 
 interface EventsProps {
   toasts: AppEvent[]
   onDismiss: (id: string) => void
-  /** Seconds before a toast auto-fades. */
   autoFadeSeconds: number
 }
 
-function levelClass(level: AppEvent['level']): string {
-  return `event-toast event-toast-${level}`
-}
-
 function ToastCard({ ev, onDismiss, autoFadeMs }: { ev: AppEvent; onDismiss: (id: string) => void; autoFadeMs: number }) {
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    timer.current = setTimeout(() => onDismiss(ev.id), autoFadeMs)
-    return () => {
-      if (timer.current) clearTimeout(timer.current)
-    }
-  }, [ev.id, autoFadeMs, onDismiss])
-
+  // Trigger the fade-out animation by adding the class after a delay.
+  // We use a CSS transition (opacity + transform) instead of a real
+  // animation so React's state change cleanly applies both states.
+  // After fade-out duration completes, dispatch the dismiss.
   return (
-    <div className={levelClass(ev.level)} role="status" aria-live="polite">
+    <div
+      className="event-toast event-toast-in"
+      style={{ animationDelay: '0ms', animationDuration: '180ms' }}
+      role="status"
+      aria-live="polite"
+      data-fade-after={autoFadeMs}
+      onAnimationEnd={(e) => {
+        // Only react to our own in-animation ending (not bubble from children).
+        if (e.currentTarget !== e.target) return
+        // Schedule fade-out
+        setTimeout(() => {
+          e.currentTarget.classList.add('event-toast-fading')
+        }, autoFadeMs)
+      }}
+      onTransitionEnd={(e) => {
+        if (e.currentTarget !== e.target) return
+        if (e.propertyName !== 'opacity') return
+        // Fade-out complete — remove from stack.
+        onDismiss(ev.id)
+      }}
+    >
       <div className="event-toast-body">
         <div className="event-toast-title">{ev.title}</div>
         <div className="event-toast-text">{ev.body}</div>

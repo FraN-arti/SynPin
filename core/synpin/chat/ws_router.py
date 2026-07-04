@@ -462,10 +462,9 @@ async def _handle_chat_send(user_id: str, msg: dict):
             },
         )
 
-    # EventBus hook: surface a toast when the *primary* (main) agent
-    # finishes a reply. Skips otdel chat (they have their own panel,
-    # a toast would be noise).
-    if is_primary and full_response:
+    # EventBus hook: surface a toast when *any* agent finishes a reply.
+    # The frontend filters by source/agent — backend just announces the event.
+    if full_response:
         try:
             from ..events import publish_event
             preview = full_response.strip().replace("\n", " ")
@@ -476,7 +475,7 @@ async def _handle_chat_send(user_id: str, msg: dict):
                 title=f"{agent_name} ответил",
                 body=preview,
                 level="info",
-                source="main_agent",
+                source="agent" if not is_primary else "main_agent",
                 source_ref=agent_slug,
             )
         except Exception as ev_err:

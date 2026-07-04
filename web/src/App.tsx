@@ -151,8 +151,20 @@ function App() {
   // Widget layout (left/right zones on main page) — needs wsOn
   const { layout, removeWidget, handleDragEnd } = useWidgetLayout(wsOn)
 
-  // Events bus — toast stack + in-app settings
-  const events = useEvents({ wsOn })
+  // Events bus — toast stack + in-app settings.
+  // Filter: don't toast for the agent whose chat is currently open
+  // (the user is already watching their reply stream in).
+  const events = useEvents({
+    wsOn,
+    isEventRelevant: (ev) => {
+      const openSlug = view.type === 'chat'
+        ? activeAgent?.slug
+        : view.type === 'otdel'
+          ? view.id
+          : null
+      return ev.source_ref !== openSlug
+    },
+  })
 
   // Global tooltip — intercepts all title attributes, shows mouse-following tooltip
   const globalTooltip = useGlobalTooltip()

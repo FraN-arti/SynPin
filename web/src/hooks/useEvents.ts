@@ -1,15 +1,19 @@
 /**
  * useEvents — subscribe to the EventBus stream and manage local toast state.
  *
- * Responsibilities:
- *  - WS subscribe: append `event:new` payloads to the toast stack, trim to
- *    `settings.max_visible`. Apply `event:read` removals.
- *  - REST: load current in-app settings, send dismiss / mark-all / clear.
- *  - Sync across tabs: a dismiss in tab A removes the toast in tab B via
- *    the broadcasted `event:read` event.
+ * Sources of toasts:
+ *  1. REST `/api/events?limit=20` on mount — surfaces events that fired
+ *     before the WS handshake finished.
+ *  2. WS `event:new` frames — live updates while the app is open.
+ *  3. WS `event:read` frames — removes toasts dismissed in another tab.
  *
- * Mounted once in App.tsx; the rendered `<Events />` consumes the same
- * hook instance via a small context to avoid duplicate subscriptions.
+ * Auto-fade: NOT handled here. `Events.tsx` uses a CSS `animation`
+ * with `animation-fill-mode: forwards` and removes the toast on
+ * `animationend` — survives re-renders, doesn't depend on JS timers.
+ *
+ * Source-aware filtering (set via `isEventRelevant`): if the user is
+ * currently in the chat of the agent that just replied, skip the toast
+ * (the message is already on-screen in the active panel).
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { API_BASE } from '../config'
@@ -22,34 +26,45 @@ const DEFAULT_SETTINGS: InAppSettings = {
 }
 
 interface UseEventsOptions {
-  /** WS subscribe helper from useWebSocket(): (type, handler) => unsubscribe */
   wsOn?: (type: string, handler: (data: any) => void) => () => void
+  /**
+   * Returns true if the toast should be shown given current app state.
+   * Default: show everything. Pass a filter to suppress toasts for the
+   * agent whose chat is currently open.
+   */
+  isEventRelevant?: (ev: AppEvent) => boolean
 }
 
 export interface UseEventsResult {
   toasts: AppEvent[]
   unreadCount: number
   settings: InAppSettings
-  /** Persist new settings (partial: pass any subset). Returns the new effective settings. */
   updateSettings: (patch: Partial<InAppSettings>) => Promise<InAppSettings>
-  /** Dismiss a single toast → marks it read on the backend. */
   dismiss: (id: string) => void
-  /** Mark all unread events as read. */
   markAllRead: () => Promise<void>
-  /** Wipe all events on the backend (settings action). */
   clear: () => Promise<void>
 }
 
-export function useEvents({ wsOn }: UseEventsOptions = {}): UseEventsResult {
+export function useEvents({
+  wsOn,
+  isEventRelevant,
+}: UseEventsOptions = {}): UseEventsResult {
   const [toasts, setToasts] = useState<AppEvent[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [settings, setSettings] = useState<InAppSettings>(DEFAULT_SETTINGS)
 
-  // Track which IDs we've already pushed into the toast stack to avoid
-  // double-add on React StrictMode double-invocation of effects.
+  // IDs we've already shown — protects against REST + WS showing the same event.
   const seenIds = useRef<Set<string>>(new Set())
 
-  // ── Load settings + initial unread count on mount ───────────────
+  // Filter fn ref — keeps handler closure fresh without re-subscribing WS.
+  const filterRef = useRef(isEventRelevant)
+  useEffect(() => { filterRef.current = isEventRelevant }, [isEventRelevant])
+
+  // Settings ref — used by handler before settings state propagates.
+  const settingsRef = useRef(settings)
+  useEffect(() => { settingsRef.current = settings }, [settings])
+
+  // ── Mount: load settings + surface unread ───────────────────────
   useEffect(() => {
     let alive = true
     fetch(`${API_BASE}/api/events/settings`)
@@ -57,31 +72,24 @@ export function useEvents({ wsOn }: UseEventsOptions = {}): UseEventsResult {
       .then((data: { in_app: InAppSettings }) => {
         if (alive && data?.in_app) setSettings(data.in_app)
       })
-      .catch(() => { /* keep defaults */ })
+      .catch(() => {})
 
     fetch(`${API_BASE}/api/events?limit=20`)
       .then(r => r.json())
       .then((data: { unread_count: number; items: AppEvent[] }) => {
         if (!alive) return
         setUnreadCount(data.unread_count ?? 0)
-        // On mount/reconnect: surface unread events as toasts so the user
-        // sees anything that happened while the app wasn't open or before
-        // the WS connected. Trim to max_visible — older ones stay in the
-        // unread count and can be opened from a future "history" panel.
         const unread = (data.items || []).filter((e: AppEvent) => !e.read_at)
-        // Newest first; show the most recent max_visible. Slice from the
-        // end (since the API returns newest first).
+        // Newest first from API; show the most recent max_visible.
         const visible = unread.slice(0, settingsRef.current.max_visible)
-        for (const e of visible.reverse()) {
-          if (!seenIds.current.has(e.id)) {
-            seenIds.current.add(e.id)
-            setToasts(prev => [...prev, e])
-          }
+        for (const ev of visible.reverse()) {
+          pushToast(ev)
         }
       })
-      .catch(() => { /* ignore */ })
+      .catch(() => {})
 
     return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ── WS subscriptions ────────────────────────────────────────────
@@ -89,14 +97,7 @@ export function useEvents({ wsOn }: UseEventsOptions = {}): UseEventsResult {
     if (!wsOn) return
     const offNew = wsOn('event:new', (ev: AppEvent) => {
       if (!ev || !ev.id) return
-      if (seenIds.current.has(ev.id)) return
-      seenIds.current.add(ev.id)
-
-      setToasts(prev => {
-        // Trim to max_visible — drop oldest
-        const next = [...prev, ev]
-        return next.slice(-settingsRef.current.max_visible)
-      })
+      pushToast(ev)
       setUnreadCount(c => c + 1)
     })
 
@@ -107,25 +108,27 @@ export function useEvents({ wsOn }: UseEventsOptions = {}): UseEventsResult {
     })
 
     return () => { offNew(); offRead() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wsOn])
 
-  // Keep settings accessible from the WS handler closure (avoids stale closure
-  // when settings change after the subscription is set up).
-  const settingsRef = useRef(settings)
-  useEffect(() => { settingsRef.current = settings }, [settings])
+  function pushToast(ev: AppEvent) {
+    if (seenIds.current.has(ev.id)) return
+    if (filterRef.current && !filterRef.current(ev)) return
+    seenIds.current.add(ev.id)
+    setToasts(prev => {
+      const next = [...prev, ev]
+      return next.slice(-settingsRef.current.max_visible)
+    })
+  }
 
   // ── Mutations ───────────────────────────────────────────────────
   const dismiss = useCallback((id: string) => {
-    // Optimistically remove from local toast stack
     setToasts(prev => prev.filter(t => t.id !== id))
-    // Tell the backend (and other tabs)
     fetch(`${API_BASE}/api/events/${id}/read`, { method: 'POST' }).catch(() => {})
   }, [])
 
   const markAllRead = useCallback(async () => {
     await fetch(`${API_BASE}/api/events/read-all`, { method: 'POST' }).catch(() => {})
-    // The server broadcasts event:read for each, so our WS subscription
-    // will clear the toast stack. Just zero the count locally too.
     setUnreadCount(0)
   }, [])
 

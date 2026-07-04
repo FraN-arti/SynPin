@@ -140,13 +140,10 @@ class EventBus:
     def _broadcast(self, event: dict[str, Any]) -> None:
         """Send to WS via the existing thread-safe broadcaster.
 
-        Imports inside the function to avoid a hard dependency at
-        module import time (ws_broadcast pulls in the chat loop).
+        Uses the same `..ws_broadcast` import pattern as every other
+        module (api/widgets_router.py, agents/manager.py, etc).
         """
-        try:
-            from .ws_broadcast import broadcast
-        except ImportError:
-            from core.synpin.ws_broadcast import broadcast  # type: ignore
+        from ..ws_broadcast import broadcast
         broadcast(event)
 
 

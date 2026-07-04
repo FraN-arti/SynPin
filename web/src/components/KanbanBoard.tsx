@@ -675,7 +675,7 @@ export function KanbanBoard({ wsOn }: KanbanBoardProps) {
         <h2 className="kanban-title">Глобальный Канбан</h2>
         <div className="kanban-header-right">
           {/* Task 9: task count badge as pill */}
-          <span className="kanban-task-count-badge">{totalTasks}</span>
+          <span className="count-badge">{totalTasks}</span>
           <button className="kanban-create-btn" onClick={() => setShowCreateModal(true)}>
             + Создать задачу
           </button>

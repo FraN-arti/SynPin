@@ -88,7 +88,7 @@ export function DepartmentsPage({ onOpenOtdel, wsOn }: DepartmentsPageProps) {
       <div className="departments-top-bar">
         <div className="departments-title-row">
           <h1 className="departments-title">Отделы</h1>
-          <span className="departments-count-badge">{departments.length}</span>
+          <span className="count-badge">{departments.length}</span>
         </div>
         <p className="departments-subtitle">
           Многоагентные отделы. Клик по карточке откроет чат отдела.
@@ -96,10 +96,10 @@ export function DepartmentsPage({ onOpenOtdel, wsOn }: DepartmentsPageProps) {
       </div>
 
       {departments.length === 0 ? (
-        <div className="departments-empty">
-          <span className="departments-empty-icon">🏢</span>
+        <div className="empty-state">
+          <span className="empty-state-icon">🏢</span>
           <p>Отделов пока нет.</p>
-          <p className="departments-empty-hint">
+          <p className="empty-state-hint">
             Создайте отделы в Настройки → Отделы, чтобы они появились здесь.
           </p>
         </div>

@@ -839,7 +839,7 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
         <div className="projects-header projects-header--list">
           <div className="projects-title-row">
             <h1 className="projects-title">Проекты</h1>
-            <span className="projects-count-badge">{projectCount}</span>
+            <span className="count-badge">{projectCount}</span>
           </div>
           <p className="projects-subtitle">Управление проектами: создание, настройка отделов и целей, отслеживание прогресса</p>
         </div>
@@ -871,10 +871,10 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
       {/* Projects list */}
       <div className="projects-list">
         {filteredProjects.length === 0 ? (
-          <div className="projects-empty">
-            <span className="projects-empty-icon">📁</span>
+          <div className="empty-state">
+            <span className="empty-state-icon">📁</span>
             <p>Проектов пока нет</p>
-            <p className="projects-empty-hint">Создайте первый проект, чтобы начать</p>
+            <p className="empty-state-hint">Создайте первый проект, чтобы начать</p>
           </div>
         ) : (
           filteredProjects.map(project => (

@@ -233,8 +233,8 @@ export function DeadlinesPage({ wsOn }: DeadlinesPageProps) {
       {/* Task list */}
       <div className={`deadlines-list ${filter}`}>
         {filtered.length === 0 ? (
-          <div className="deadlines-empty">
-            <span className="deadlines-empty-icon">🎉</span>
+          <div className="empty-state">
+            <span className="empty-state-icon">🎉</span>
             <span>Нет задач с дедлайном{filter !== 'all' ? ' в этом фильтре' : ''}</span>
           </div>
         ) : (

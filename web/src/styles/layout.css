@@ -345,17 +345,60 @@
   width: 100%;
 }
 
-/* === Empty State === */
+/* === Count Badge ===
+ * Universal count pill for page-level counters (e.g. "Departments 1",
+ * "Projects 0"). Migrated from per-page copies in projects-page.css,
+ * departments-page.css, kanban.css. Sidebar uses a separate
+ * .sidebar-department-count because the visual context (dark sidebar)
+ * is different.
+ */
+.count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  background: var(--accent, #f97316);
+  color: #fff;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* === Empty State ===
+ * Universal empty-state for page-level placeholders. Migrated from
+ * per-page copies in projects-page.css, departments-page.css,
+ * deadlines.css. The icon size (48px) and text style are the
+ * canonical "we have nothing here yet" look.
+ *
+ * NOTE: the chat empty-state in App.tsx (line 691) reuses this class
+ * for its full-height container, so flex: 1 stays. Page-level
+ * placeholders rely on the parent container's height instead.
+ */
 .empty-state {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px;
-  /* No entrance animation: same reason as .messages-area / .bottom-input
-     — translateY(12px→0) caused a viewport-width "throb" when scrollbar
-     appeared/resolved at animation end. */
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text);
+  font-size: 14px;
+  gap: 12px;
+}
+.empty-state-icon {
+  font-size: 48px;
+  opacity: 0.7;
+  line-height: 1;
+}
+.empty-state-hint {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  max-width: 320px;
 }
 
 .empty-logo-img {

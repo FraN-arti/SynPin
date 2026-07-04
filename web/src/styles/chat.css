@@ -49,8 +49,6 @@
 .message-avatar {
   width: 28px;
   height: 28px;
-  max-width: 100px;
-  max-height: 100px;
   border-radius: var(--radius);
   display: flex;
   align-items: center;
@@ -58,31 +56,40 @@
   font-weight: 700;
   font-size: 12px;
   flex-shrink: 0;
-  margin-bottom: 6px;
   overflow: hidden;
+  /* No margin-bottom — the .message-header-row below provides the
+     spacing between the header (avatar + dots) and the next sibling
+     (ToolTimeline or message-wrapper). The previous margin-bottom: 6px
+     leaked spacing when an inline element was rendered between the
+     avatar and the bubble, and didn't account for ToolTimeline in
+     the flow at all. */
 }
 
-/* Inline row that holds the typing-dots indicator next to the avatar.
-   Sits in .message-row as a column-flex child after .message-avatar
-   and (optional) ToolTimeline. position: relative + negative
-   margin-top pulls it up so the row overlaps the avatar vertically —
-   avatar ends at y=28 + 6px margin-bottom = y=34; this row sits at
-   y=12..32 so its bars (14px tall, vertically centered inside) end
-   up at the avatar's centerline. The negative margin doesn't reflow
-   the rest of the message-row because we only consume the avatar's
-   own margin-bottom slack (34 - 22 = 12px below where we place
-   this row, vs the row's own ~20px height — net displacement +0px
-   for everything below). */
-.message-avatar-row {
-  margin-top: -22px;
-  margin-bottom: 0;
-  padding-left: 38px;       /* avatar (28) + gap (10) = past the avatar */
-  height: 14px;             /* match .typing-dot height so the row is one bar tall */
+/* Inline row containing the avatar + (optional) typing-dots. Lives as
+   a flex-column child of .message-row. Inside this row it's a flex-row
+   so avatar and dots sit side-by-side, vertically centered. No
+   negative margins, no absolute positioning — pure flex flow. */
+.message-header-row {
   display: flex;
   align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
 }
-.message-avatar-row .typing-dots.bubble {
-  padding: 0;                /* the row itself provides the vertical space */
+.message-header-row.user {
+  justify-content: flex-end;
+}
+.message-header-row.assistant {
+  justify-content: flex-start;
+}
+
+/* Inside the header-row, the typing-dots indicator just renders inline.
+   No padding/background — the header-row provides the visual
+   container. */
+.message-header-row .typing-dots.bubble {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  animation: none;
 }
 
 .message-avatar.assistant {
@@ -532,15 +539,9 @@
 }
 .message-row.assistant .message-bubble:not(.has-content) {
   /* Streaming placeholder — empty bubble awaiting the first token.
-     No background, no border-radius, no padding, no min-height
-     (the bubble is essentially invisible until content arrives).
-     Previously this rule had margin-top: -22px to overlap the avatar
-     so the typing-dots inside the bubble would visually align with
-     it; that's no longer needed because ChatView now renders the
-     typing-dots OUTSIDE the bubble as a sibling of message-wrapper
-     (see the empty-content branch in JSX). The bubble just collapses
-     here — its sole purpose is to mark "streaming is happening"
-     for the .streaming border-color transition on .message-wrapper. */
+     Empty content means the dots are rendered inline in the header
+     row above; this bubble exists only to receive the .streaming
+     border-color transition on .message-wrapper. Collapse it. */
   background: transparent;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;

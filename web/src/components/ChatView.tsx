@@ -246,40 +246,39 @@ export function ChatView(props: ChatViewProps) {
                     flex-start, and required fighting the wrapper width
                     for every change. Column-flow is simpler and matches
                     the visual intent. */}
-                <div className={`message-avatar ${msg.role} ${isLastAssistant && msg.content ? 'streaming' : ''}`}>
-                  {msg.role === 'assistant' ? (
-                    <img src={synpinLogo} alt="S" className="avatar-logo" />
-                  ) : 'U'}
+                <div className={`message-header-row ${msg.role}`}>
+                  <div className={`message-avatar ${msg.role} ${isLastAssistant && msg.content ? 'streaming' : ''}`}>
+                    {msg.role === 'assistant' ? (
+                      <img src={synpinLogo} alt="S" className="avatar-logo" />
+                    ) : 'U'}
+                  </div>
+                  {/* Streaming indicator — three vertical bars rendered
+                      inline with the avatar (NOT inside the bubble, NOT
+                      in a separate flex container with negative margin).
+                      The header-row above is flex direction:row with
+                      align-items:center so the dots sit naturally next
+                      to the avatar at its vertical midpoint. Renders
+                      only for assistant messages during the empty-
+                      content streaming phase. When the first token
+                      arrives, this whole element disappears and the
+                      bubble takes over. */}
+                  {msg.role === 'assistant' && !msg.content && !msg.thinking && (!msg.images || msg.images.length === 0) && (
+                    <span className="typing-dots bubble">
+                      <span className="typing-dot" />
+                      <span className="typing-dot" />
+                      <span className="typing-dot" />
+                    </span>
+                  )}
                 </div>
-                {/* Tool badges live outside the bubble so they wrap on a
-                    full-width row instead of being squeezed inside the
-                    bubble. Sibling of message-wrapper inside message-row,
-                    so they stack vertically under the avatar and
-                    above the bubble. flex-wrap lays badges out
-                    left-to-right with proper row breaks. */}
+                {/* Tool badges live in their own row below the avatar
+                    header so they get full chat width. flex-wrap lays
+                    badges out left-to-right with proper row breaks. */}
                 {msg.tools && msg.tools.length > 0 && (
                   <ToolTimeline
                     tools={msg.tools}
                     isLive={isLastAssistant && isTyping}
                     toolNames={TOOL_DISPLAY_NAMES}
                   />
-                )}
-                {/* Inline avatar row: avatar on the left, the typing-
-                    dots indicator on the right. Rendered as a flex
-                    row so the bars sit horizontally next to the
-                    avatar, vertically centered against it. When the
-                    bubble has content / thinking / images, this row
-                    collapses (dots: none + height 0). Rendered ONLY
-                    for assistant messages — user messages never have
-                    a streaming phase (user sends one shot, no dots). */}
-                {msg.role === 'assistant' && !msg.content && !msg.thinking && (!msg.images || msg.images.length === 0) && (
-                  <div className="message-avatar-row">
-                    <span className="typing-dots bubble">
-                      <span className="typing-dot" />
-                      <span className="typing-dot" />
-                      <span className="typing-dot" />
-                    </span>
-                  </div>
                 )}
                 <div className={`message-wrapper ${isLastAssistant && msg.content ? 'streaming' : ''}`}>
                   <div className={`message-bubble ${msg.content || msg.thinking || (msg.images && msg.images.length > 0) ? 'has-content' : ''}`}>

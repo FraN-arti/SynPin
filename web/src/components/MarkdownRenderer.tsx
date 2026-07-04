@@ -1,16 +1,21 @@
 /**
  * MarkdownRenderer — renders assistant chat messages as HTML.
  *
- * Two responsibilities beyond raw markdown:
- *  1. **Empty content → typing indicator.** When `content` is empty
- *     (assistant placeholder bubble, no text yet) we render the three
- *     vertical thinking bars from chat.css. Bars are CSS-driven
- *     (`typing-bar-scale` keyframe), no JS.
- *  2. **Copy buttons on code blocks.** After markdown renders, we walk
- *     every `<pre>` in the resulting DOM and append a "Copy" button
- *     that copies the code text to clipboard with a 1.5s "Copied!"
- *     confirmation. Pure DOM enhancement — doesn't touch the markdown
- *     pipeline.
+ * Single responsibility: turn a markdown string into HTML (with
+ * copy buttons on code blocks). Returns null when content is empty.
+ *
+ * The "empty content → typing indicator" case used to live here as
+ * an early return rendering <span className="typing-dots bubble">,
+ * but that double-rendered the indicator when ChatView also rendered
+ * dots in its message-header-row. The empty case is now handled
+ * exclusively by ChatView (inline next to the avatar); this component
+ * returns null and trusts its caller to surface whatever the user
+ * should see during streaming-empty.
+ *
+ * Copy buttons on code blocks: after markdown renders, we walk every
+ * `<pre>` in the resulting DOM and append a "Copy" button that copies
+ * the code text to clipboard with a 1.5s "Copied!" confirmation.
+ * Pure DOM enhancement — doesn't touch the markdown pipeline.
  *
  * Why useEffect + DOM mutation instead of a marked extension:
  *   - The renderer's `code` callback in lib/markdown.ts outputs HTML
@@ -43,9 +48,9 @@ export function MarkdownRenderer({ content, isStreaming }: MarkdownRendererProps
 
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Wire up copy buttons on every <pre> after render. Runs even when
-  // content is empty (no-op since the empty branch returns early
-  // below — but the hook call itself is unconditional).
+  // Wire up copy buttons on every <pre> after render. The hook runs
+  // unconditionally so React doesn't complain about hook-order
+  // changes between empty and non-empty renders.
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -98,15 +103,13 @@ export function MarkdownRenderer({ content, isStreaming }: MarkdownRendererProps
     })
   }, [html])
 
-  // Empty content → typing dots (now vertical bars, see chat.css).
+  // Empty content → nothing here. ChatView renders the typing-dots
+  // indicator inline in the message-header-row. Returning null means
+  // MarkdownRenderer is invisible when there's nothing to render —
+  // which is exactly what we want, because otherwise it would emit
+  // its own duplicate dots inside the bubble.
   if (!content) {
-    return (
-      <span className="typing-dots bubble">
-        <span className="typing-dot" />
-        <span className="typing-dot" />
-        <span className="typing-dot" />
-      </span>
-    )
+    return null
   }
 
   // During streaming, render raw text to avoid broken HTML from incomplete markdown.

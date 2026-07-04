@@ -212,7 +212,14 @@ export function AddFromCatalogModal({ provider, editProvider, onClose, onSaved }
   const key = providerKey(provider)
   const isNoAuth = provider.authMethod === 'no-auth'
   const isEdit = !!editProvider
-  const [apiKey, setApiKey] = useState(isEdit ? '••••••••' : '')
+  // Always start with empty input. The '••••••••' sentinel pattern was
+  // dangerous: any keystroke (even just clicking into the field) would
+  // replace the sentinel and cause Save to send the new value as the
+  // api_key, potentially overwriting the existing real key. Backend
+  // accepts an empty/missing api_key as "do not change" (see
+  // core/synpin/api/providers_router.py — api_key updates only when
+  // req.api_key is non-null and non-empty), so a blank input is safe.
+  const [apiKey, setApiKey] = useState('')
   const [modelsInput, setModelsInput] = useState(
     isEdit ? editProvider!.models.join(', ') : (provider.defaultModels || []).join(', ')
   )
@@ -262,7 +269,7 @@ export function AddFromCatalogModal({ provider, editProvider, onClose, onSaved }
     }
 
     try {
-      if (isNoAuth || !apiKey.trim() || apiKey === '••••••••') {
+      if (isNoAuth || !apiKey.trim()) {
         const result = await tryTest(false)
         setTestResult(result.status === 'ok' ? 'ok' : 'error')
         setTestMessage(result.message || '')
@@ -291,7 +298,7 @@ export function AddFromCatalogModal({ provider, editProvider, onClose, onSaved }
       const body: Record<string, unknown> = {
         ...(isEdit ? {} : { name: key }),
         type: provider.type, base_url: provider.baseUrl,
-        api_key: isNoAuth ? '' : (apiKey === '••••••••' ? '' : apiKey),
+        api_key: isNoAuth ? '' : apiKey,
         models: parseModels(),
       }
       const res = await fetch(
@@ -321,7 +328,7 @@ export function AddFromCatalogModal({ provider, editProvider, onClose, onSaved }
         {!isNoAuth && (
           <div className="settings-field">
             <label>API Key <span className="field-hint">{isEdit ? '(оставьте пустым, чтобы не менять)' : '(необязательно — если не знаешь, оставь пустым)'}</span></label>
-            <input type="password" className="settings-input" placeholder={provider.apiKeyHint || 'sk-...'} value={apiKey} onChange={e => setApiKey(e.target.value)} />
+            <input type="password" className="settings-input" placeholder={isEdit ? 'оставьте пустым, чтобы не менять' : (provider.apiKeyHint || 'sk-...')} value={apiKey} onChange={e => setApiKey(e.target.value)} />
           </div>
         )}
         {isNoAuth && <div className="catalog-modal-info"><span>🔓 Этот провайдер работает без API ключа</span></div>}

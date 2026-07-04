@@ -836,7 +836,7 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
     <div className="projects-page">
       {/* Header */}
       <div className="projects-top-bar">
-        <div className="projects-header">
+        <div className="projects-header projects-header--list">
           <div className="projects-title-row">
             <h1 className="projects-title">Проекты</h1>
             <span className="projects-count-badge">{projectCount}</span>

@@ -34,13 +34,18 @@
 }
 
 .departments-count-badge {
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  background: var(--accent, #f97316);
+  color: #fff;
+  border-radius: 12px;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--text-dim);
-  background: var(--bg-elevated);
-  padding: 2px 8px;
-  border-radius: 10px;
-  letter-spacing: 0.5px;
+  line-height: 1;
 }
 
 .departments-subtitle {

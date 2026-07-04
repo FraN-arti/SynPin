@@ -12,6 +12,13 @@
   align-items: center;
   margin-bottom: 20px;
 }
+.projects-header--list {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
 .projects-title {
   font-size: 18px;
   font-weight: 700;
@@ -309,7 +316,11 @@
   margin-top: 4px;
 }
 .projects-dept-list {
-  /* New compact styles are defined earlier */
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
 }
 .projects-modal h2 {
   margin: 0 0 20px;

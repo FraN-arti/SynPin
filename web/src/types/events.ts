@@ -4,7 +4,7 @@
  * otdel completed, cron fired, etc). Frontend shows them as toasts.
  */
 export type EventLevel = 'info' | 'success' | 'warning' | 'error'
-export type EventSource = 'main_agent' | 'otdel' | 'cron' | 'system'
+export type EventSource = 'main_agent' | 'agent' | 'otdel' | 'cron' | 'system'
 
 export interface AppEvent {
   id: string

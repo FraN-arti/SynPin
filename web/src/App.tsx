@@ -152,17 +152,20 @@ function App() {
   const { layout, removeWidget, handleDragEnd } = useWidgetLayout(wsOn)
 
   // Events bus — toast stack + in-app settings.
-  // Filter: don't toast for the agent whose chat is currently open
-  // (the user is already watching their reply stream in).
+  // Click on a toast opens the source agent/otdel chat.
   const events = useEvents({
     wsOn,
-    isEventRelevant: (ev) => {
-      const openSlug = view.type === 'chat'
-        ? activeAgent?.slug
-        : view.type === 'otdel'
-          ? view.id
-          : null
-      return ev.source_ref !== openSlug
+    onToastClick: (ev) => {
+      if (ev.source === 'main_agent' || ev.source === 'agent') {
+        const agent = availableAgents.find(a => a.slug === ev.source_ref)
+        if (agent) {
+          setActiveAgent(agent)
+          setMessages([])
+          setView({ type: 'chat' })
+        }
+      } else if (ev.source === 'otdel') {
+        setView({ type: 'otdel', id: ev.source_ref ?? '' })
+      }
     },
   })
 
@@ -735,6 +738,18 @@ function App() {
               toasts={events.toasts}
               onDismiss={events.dismiss}
               autoFadeSeconds={events.settings.auto_fade_seconds}
+              onToastClick={(ev) => {
+                if (ev.source === 'main_agent' || ev.source === 'agent') {
+                  const agent = availableAgents.find(a => a.slug === ev.source_ref)
+                  if (agent) {
+                    setActiveAgent(agent)
+                    setMessages([])
+                    setView({ type: 'chat' })
+                  }
+                } else if (ev.source === 'otdel') {
+                  setView({ type: 'otdel', id: ev.source_ref ?? '' })
+                }
+              }}
             />
           )}
         </div>

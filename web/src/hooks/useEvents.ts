@@ -28,11 +28,10 @@ const DEFAULT_SETTINGS: InAppSettings = {
 interface UseEventsOptions {
   wsOn?: (type: string, handler: (data: any) => void) => () => void
   /**
-   * Returns true if the toast should be shown given current app state.
-   * Default: show everything. Pass a filter to suppress toasts for the
-   * agent whose chat is currently open.
+   * Called when the user clicks a toast (not the close button). Receives
+   * the underlying AppEvent so the caller can navigate to its source.
    */
-  isEventRelevant?: (ev: AppEvent) => boolean
+  onToastClick?: (ev: AppEvent) => void
 }
 
 export interface UseEventsResult {
@@ -47,7 +46,7 @@ export interface UseEventsResult {
 
 export function useEvents({
   wsOn,
-  isEventRelevant,
+  onToastClick,
 }: UseEventsOptions = {}): UseEventsResult {
   const [toasts, setToasts] = useState<AppEvent[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -56,9 +55,9 @@ export function useEvents({
   // IDs we've already shown — protects against REST + WS showing the same event.
   const seenIds = useRef<Set<string>>(new Set())
 
-  // Filter fn ref — keeps handler closure fresh without re-subscribing WS.
-  const filterRef = useRef(isEventRelevant)
-  useEffect(() => { filterRef.current = isEventRelevant }, [isEventRelevant])
+  // Click handler ref — keeps handler closure fresh without re-subscribing WS.
+  const clickRef = useRef(onToastClick)
+  useEffect(() => { clickRef.current = onToastClick }, [onToastClick])
 
   // Settings ref — used by handler before settings state propagates.
   const settingsRef = useRef(settings)
@@ -113,7 +112,6 @@ export function useEvents({
 
   function pushToast(ev: AppEvent) {
     if (seenIds.current.has(ev.id)) return
-    if (filterRef.current && !filterRef.current(ev)) return
     seenIds.current.add(ev.id)
     setToasts(prev => {
       const next = [...prev, ev]

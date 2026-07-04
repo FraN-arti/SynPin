@@ -23,7 +23,7 @@ interface EventsProps {
   autoFadeSeconds: number
 }
 
-function ToastCard({ ev, onDismiss, autoFadeMs }: { ev: AppEvent; onDismiss: (id: string) => void; autoFadeMs: number }) {
+function ToastCard({ ev, onDismiss, autoFadeMs, onClick }: { ev: AppEvent; onDismiss: (id: string) => void; autoFadeMs: number; onClick?: (ev: AppEvent) => void }) {
   // Trigger the fade-out animation by adding the class after a delay.
   // We use a CSS transition (opacity + transform) instead of a real
   // animation so React's state change cleanly applies both states.
@@ -35,6 +35,7 @@ function ToastCard({ ev, onDismiss, autoFadeMs }: { ev: AppEvent; onDismiss: (id
       role="status"
       aria-live="polite"
       data-fade-after={autoFadeMs}
+      onClick={() => onClick?.(ev)}
       onAnimationEnd={(e) => {
         // Only react to our own in-animation ending (not bubble from children).
         if (e.currentTarget !== e.target) return
@@ -58,7 +59,7 @@ function ToastCard({ ev, onDismiss, autoFadeMs }: { ev: AppEvent; onDismiss: (id
         type="button"
         className="event-toast-close"
         aria-label="Закрыть"
-        onClick={() => onDismiss(ev.id)}
+        onClick={(e) => { e.stopPropagation(); onDismiss(ev.id) }}
       >
         ×
       </button>
@@ -66,14 +67,14 @@ function ToastCard({ ev, onDismiss, autoFadeMs }: { ev: AppEvent; onDismiss: (id
   )
 }
 
-export function Events({ toasts, onDismiss, autoFadeSeconds }: EventsProps) {
+export function Events({ toasts, onDismiss, autoFadeSeconds, onToastClick }: EventsProps & { onToastClick?: (ev: AppEvent) => void }) {
   if (toasts.length === 0) return null
   const autoFadeMs = Math.max(1000, autoFadeSeconds * 1000)
 
   return (
     <div className="event-stack" aria-label="Уведомления">
       {toasts.map(ev => (
-        <ToastCard key={ev.id} ev={ev} onDismiss={onDismiss} autoFadeMs={autoFadeMs} />
+        <ToastCard key={ev.id} ev={ev} onDismiss={onDismiss} autoFadeMs={autoFadeMs} onClick={onToastClick} />
       ))}
     </div>
   )

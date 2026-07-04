@@ -113,12 +113,7 @@ export function GeneralSection() {
     }, 400)
   }, [])
 
-  const updateServer = useCallback((key: string, value: unknown) => {
-    setSettings(prev => prev ? { ...prev, server: { ...prev.server, [key]: value } } : prev)
-    saveSettings({ server: { [key]: value } } as unknown as Partial<SettingsData>)
-  }, [saveSettings])
-
-  const updateUI = useCallback((path: string, value: string | boolean | number) => {
+const updateUI = useCallback((path: string, value: string | boolean | number) => {
     setSettings(prev => {
       if (!prev) return prev
       const ui = { ...prev.ui }
@@ -218,8 +213,7 @@ export function GeneralSection() {
 
   return (
     <div className="general-settings">
-      {/* Обзор системы */}
-      <SettingsCard title="Обзор системы">
+            <SettingsCard title="Обзор системы">
         <div className="stats-summary">
           <div className="stats-card">
             <span className="stats-card-value">{overview?.agents ?? '—'}</span>
@@ -244,8 +238,7 @@ export function GeneralSection() {
         </div>
       </SettingsCard>
 
-      {/* Информация о системе */}
-      {systemInfo && (
+            {systemInfo && (
         <SettingsCard title="Информация о системе">
           <div className="stats-summary">
             <div className="stats-card">
@@ -421,9 +414,7 @@ export function GeneralSection() {
             </div>
           ))}
         </SettingsCard>
-      </div>
 
-      {/* Лента активности */}
       <SettingsCard title="Лента активности" badge="скоро" disabled>
         <div className="settings-row-2">
           <div className="settings-field">

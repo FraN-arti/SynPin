@@ -31,7 +31,19 @@
 
 /* User: right-aligned */
 .message-row.user {
-  align-items: center;
+  align-items: flex-end;
+}
+/* .message-wrapper is display:inline-block so it shrinks to content.
+   align-items on the parent doesn't reach it (inline-block doesn't
+   participate in cross-axis alignment of a column flex). Override
+   with align-self: flex-end so the user bubble hugs the right edge
+   of its column, instead of inheriting an inline-block default that
+   sits where its text happens to wrap. Same for .message-avatar.user
+   so the U avatar lines up to the right of the bubble. */
+.message-row.user .message-wrapper,
+.message-row.user .message-avatar,
+.message-row.user .tool-badges-row {
+  align-self: flex-end;
 }
 
 .message-avatar {

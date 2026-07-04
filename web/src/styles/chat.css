@@ -34,32 +34,6 @@
   align-items: center;
 }
 
-/* Horizontal avatar + bubble row. Sits inside .message-row (which is
-   column), so footer still drops below. Layout: avatar left, then
-   message-wrapper right (with tool-timeline in between when present).
-   The user variant reverses to keep avatar on the right edge of the
-   chat (so the bubble hugs the right margin).
-
-   align-items: center — vertical centers the bubble against the
-   28px-tall avatar. flex-end pinned the bubble to the avatar's
-   bottom edge, which dropped the bars visually below the avatar
-   glyph (Artur reported they sat too low). center lifts the bars
-   ~14px so they overlap the avatar vertically rather than hanging
-   beneath it. The 14px bubble pill fits cleanly within the avatar's
-   height plus a few px of slack. */
-.message-body {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 100%;
-}
-.message-body.user {
-  flex-direction: row-reverse;
-}
-.message-body.assistant {
-  flex-direction: row;
-}
-
 .message-avatar {
   width: 28px;
   height: 28px;
@@ -522,16 +496,27 @@
   color: var(--white);
 }
 .message-row.assistant .message-bubble:not(.has-content) {
-  /* Streaming but no text yet — no background, no padding, no border.
-     The bars then sit directly in the message row with no surrounding
-     pill. The .typing-dots.bubble variant already does this for the
-     bars themselves; this rule removes the *parent* bubble's chrome
-     so the bars don't look like they're inside a bubble. */
+  /* Streaming but no text yet — no background, no border-radius, no
+     padding. We keep the bubble as a column-flow child of .message-row
+     but tell it to sit at the bottom of the avatar column instead of
+     the top. align-self: flex-end aligns this single flex-child
+     against the cross-axis end of its parent (.message-row is a column,
+     so cross axis = horizontal; align-self pushes the bubble to the
+     right edge of the assistant column).
+
+     To get the bars to align with the avatar visually, we use
+     margin-top: -22px — the avatar is 28px tall with a 6px bottom
+     margin (so the avatar's effective column ends at y=34px). The
+     bubble without this offset would start at y=34, putting the 14px
+     bars at y=34..48, well below the avatar. Negative margin pulls the
+     bubble up by 22px so the bars sit at y=12..26 — overlapping the
+     avatar's lower half, roughly center-aligned. */
   background: transparent;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   padding: 0;
   border-radius: 0;
+  margin-top: -22px;
 }
 
 /* ─── Thinking Block (collapsible reasoning) ─────────────────── */

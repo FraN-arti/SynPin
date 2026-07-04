@@ -152,15 +152,21 @@ function App() {
   const { layout, removeWidget, handleDragEnd } = useWidgetLayout(wsOn)
 
   // Events bus — toast stack + in-app settings.
-  // Click on a toast opens the source agent/otdel chat.
+  // Click on a toast opens the source agent/otdel chat. If the source is
+  // already the active agent (and we're in their chat), keep the loaded
+  // history — don't wipe with setMessages([]).
   const events = useEvents({
     wsOn,
     onToastClick: (ev) => {
       if (ev.source === 'main_agent' || ev.source === 'agent') {
         const agent = availableAgents.find(a => a.slug === ev.source_ref)
         if (agent) {
-          setActiveAgent(agent)
-          setMessages([])
+          const isSameAgent = activeAgent?.slug === agent.slug
+            && view.type === 'chat'
+          if (!isSameAgent) {
+            setActiveAgent(agent)
+            setMessages([])
+          }
           setView({ type: 'chat' })
         }
       } else if (ev.source === 'otdel') {
@@ -742,8 +748,12 @@ function App() {
                 if (ev.source === 'main_agent' || ev.source === 'agent') {
                   const agent = availableAgents.find(a => a.slug === ev.source_ref)
                   if (agent) {
-                    setActiveAgent(agent)
-                    setMessages([])
+                    const isSameAgent = activeAgent?.slug === agent.slug
+                      && view.type === 'chat'
+                    if (!isSameAgent) {
+                      setActiveAgent(agent)
+                      setMessages([])
+                    }
                     setView({ type: 'chat' })
                   }
                 } else if (ev.source === 'otdel') {

@@ -7,13 +7,15 @@
  *  2. WS `event:new` frames — live updates while the app is open.
  *  3. WS `event:read` frames — removes toasts dismissed in another tab.
  *
- * Auto-fade: NOT handled here. `Events.tsx` uses a CSS `animation`
- * with `animation-fill-mode: forwards` and removes the toast on
- * `animationend` — survives re-renders, doesn't depend on JS timers.
+ * Auto-fade: NOT handled here. `Events.tsx` uses a CSS transition
+ * triggered by an animation-end listener — survives re-renders and
+ * StrictMode, doesn't depend on JS timers.
  *
- * Source-aware filtering (set via `isEventRelevant`): if the user is
- * currently in the chat of the agent that just replied, skip the toast
- * (the message is already on-screen in the active panel).
+ * No client-side dedup: every event has a unique uuid from the
+ * server, and the server's `publish_event` is the only producer. A
+ * seenIds cache would actually break reconnect scenarios where the
+ * WS is briefly offline while an event is broadcast — that event
+ * would then be marked "seen" via REST but never shown as a toast.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { API_BASE } from '../config'
@@ -52,9 +54,6 @@ export function useEvents({
   const [unreadCount, setUnreadCount] = useState(0)
   const [settings, setSettings] = useState<InAppSettings>(DEFAULT_SETTINGS)
 
-  // IDs we've already shown — protects against REST + WS showing the same event.
-  const seenIds = useRef<Set<string>>(new Set())
-
   // Click handler ref — keeps handler closure fresh without re-subscribing WS.
   const clickRef = useRef(onToastClick)
   useEffect(() => { clickRef.current = onToastClick }, [onToastClick])
@@ -62,6 +61,12 @@ export function useEvents({
   // Settings ref — used by handler before settings state propagates.
   const settingsRef = useRef(settings)
   useEffect(() => { settingsRef.current = settings }, [settings])
+
+  // Track if the WS subscription is currently active — used by pushToast.
+  const subscribedRef = useRef(false)
+  // Track event IDs that have already been added to the toast stack
+  // in the current session (prevents React StrictMode double-add).
+  const localIds = useRef<Set<string>>(new Set())
 
   // ── Mount: load settings + surface unread ───────────────────────
   useEffect(() => {
@@ -94,6 +99,7 @@ export function useEvents({
   // ── WS subscriptions ────────────────────────────────────────────
   useEffect(() => {
     if (!wsOn) return
+    subscribedRef.current = true
     const offNew = wsOn('event:new', (ev: AppEvent) => {
       if (!ev || !ev.id) return
       pushToast(ev)
@@ -106,13 +112,19 @@ export function useEvents({
       setUnreadCount(c => Math.max(0, c - 1))
     })
 
-    return () => { offNew(); offRead() }
+    return () => {
+      subscribedRef.current = false
+      offNew()
+      offRead()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wsOn])
 
   function pushToast(ev: AppEvent) {
-    if (seenIds.current.has(ev.id)) return
-    seenIds.current.add(ev.id)
+    // Cheap dedup against double-pushing the same event in one session
+    // (e.g. REST load + WS re-broadcast in the same render cycle).
+    if (localIds.current.has(ev.id)) return
+    localIds.current.add(ev.id)
     setToasts(prev => {
       const next = [...prev, ev]
       return next.slice(-settingsRef.current.max_visible)
@@ -134,6 +146,7 @@ export function useEvents({
     await fetch(`${API_BASE}/api/events/clear`, { method: 'POST' }).catch(() => {})
     setToasts([])
     setUnreadCount(0)
+    localIds.current.clear()
   }, [])
 
   const updateSettings = useCallback(async (patch: Partial<InAppSettings>): Promise<InAppSettings> => {

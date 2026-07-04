@@ -3,6 +3,10 @@
  *
  * For MVP: in-app channel only (toggle + auto-fade timeout + clear-all).
  * Future: a list of configured delivery channels (Telegram, desktop, email).
+ *
+ * Layout follows the same row pattern as CronSection's `.cron-limit-row`:
+ * label | control | hint — so each setting sits on one horizontal line,
+ * matching the rest of the settings UI.
  */
 
 import { useEffect, useState } from 'react'
@@ -16,33 +20,39 @@ interface InAppSettings {
   max_visible: number
 }
 
+const DEFAULT_SETTINGS: InAppSettings = {
+  enabled: true,
+  auto_fade_seconds: 8,
+  max_visible: 4,
+}
+
+function parseIntClamped(raw: string, min: number, max: number, fallback: number): number {
+  const v = parseInt(raw, 10)
+  if (Number.isNaN(v)) return fallback
+  return Math.max(min, Math.min(max, v))
+}
+
 export function EventsSection() {
   const [settings, setSettings] = useState<InAppSettings | null>(null)
-  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     fetch(`${API_BASE}/api/events/settings`)
       .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data?.in_app) setSettings(data.in_app) })
+      .then(data => {
+        if (data?.in_app) setSettings({ ...DEFAULT_SETTINGS, ...data.in_app })
+      })
       .catch(() => {})
   }, [])
 
-  const update = async (patch: Partial<InAppSettings>): Promise<InAppSettings | null> => {
-    setSaving(true)
-    try {
-      const res = await fetch(`${API_BASE}/api/events/settings`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
-      })
-      if (!res.ok) return null
-      const data = await res.json()
-      const next = data?.in_app as InAppSettings
-      setSettings(next)
-      return next
-    } finally {
-      setSaving(false)
-    }
+  const update = async (patch: Partial<InAppSettings>) => {
+    const res = await fetch(`${API_BASE}/api/events/settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    if (data?.in_app) setSettings({ ...DEFAULT_SETTINGS, ...data.in_app })
   }
 
   const handleClear = async () => {
@@ -57,55 +67,68 @@ export function EventsSection() {
   return (
     <div className="settings-sections">
       <SettingsCard title="In-app уведомления">
-        <div className="settings-field">
+        <p className="settings-card-desc">
+          Тосты в правом нижнем углу когда что-то происходит в SynPin.
+          Сейчас триггер срабатывает на ответ любого агента.
+        </p>
+
+        <div className="settings-field-row">
           <Toggle
-            label="Показывать уведомления в приложении"
+            label="Показывать уведомления"
             checked={settings.enabled}
             onChange={(v) => update({ enabled: v })}
           />
         </div>
-        <div className="settings-field">
-          <label htmlFor="fade-seconds">Автоисчезание через (секунд)</label>
+
+        <div className="events-setting-row">
+          <label className="events-setting-label" htmlFor="fade-seconds">
+            Автоисчезание через (секунд)
+          </label>
           <input
             id="fade-seconds"
             type="number"
             min={1}
             max={60}
-            className="settings-input"
+            className="events-setting-input"
             value={settings.auto_fade_seconds}
-            disabled={saving}
-            onChange={(e) => {
-              const v = parseInt(e.target.value, 10)
-              if (!Number.isNaN(v)) update({ auto_fade_seconds: v })
-            }}
+            onChange={(e) => update({
+              auto_fade_seconds: parseIntClamped(e.target.value, 1, 60, DEFAULT_SETTINGS.auto_fade_seconds),
+            })}
           />
+          <span className="events-setting-hint">от 1 до 60</span>
         </div>
-        <div className="settings-field">
-          <label htmlFor="max-visible">Максимум одновременно видимых тостов</label>
+
+        <div className="events-setting-row">
+          <label className="events-setting-label" htmlFor="max-visible">
+            Максимум одновременно видимых тостов
+          </label>
           <input
             id="max-visible"
             type="number"
             min={1}
             max={20}
-            className="settings-input"
+            className="events-setting-input"
             value={settings.max_visible}
-            disabled={saving}
-            onChange={(e) => {
-              const v = parseInt(e.target.value, 10)
-              if (!Number.isNaN(v)) update({ max_visible: v })
-            }}
+            onChange={(e) => update({
+              max_visible: parseIntClamped(e.target.value, 1, 20, DEFAULT_SETTINGS.max_visible),
+            })}
           />
+          <span className="events-setting-hint">от 1 до 20</span>
         </div>
       </SettingsCard>
 
       <SettingsCard title="Каналы доставки">
-        <p className="settings-section-desc" style={{ margin: 0 }}>
+        <p className="settings-card-desc">
           В будущем здесь появятся каналы: Telegram, Desktop, Email и другие.
           Сейчас доступен только in-app.
         </p>
       </SettingsCard>
 
       <SettingsCard title="Действия">
+        <p className="settings-card-desc">
+          Очистить историю событий. Непрочитанные счётчики обнулятся,
+          в стеке тостов ничего не останется.
+        </p>
         <div className="provider-actions">
           <button className="settings-btn-danger" onClick={handleClear}>
             Очистить все события

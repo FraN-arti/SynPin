@@ -61,9 +61,18 @@ class ConnectionManager:
 
     async def send(self, user_id: str, message: dict):
         """Send a JSON message to all sockets of a given user."""
+        payload = json.dumps(message, ensure_ascii=False)
         for ws in list(self._connections.get(user_id, set())):
+            if ws.client_state.name != "CONNECTED":
+                # FastAPI/Starlette already closed the socket (client
+                # disconnected). The next send_text would raise
+                # 'Unexpected ASGI message websocket.send, after sending
+                # websocket.close'. Drop silently — disconnect() will
+                # be called by the receive loop in the router.
+                self.disconnect(ws, user_id)
+                continue
             try:
-                await ws.send_text(json.dumps(message, ensure_ascii=False))
+                await ws.send_text(payload)
             except Exception as e:
                 logger.warning("WS send failed for %s: %s", user_id, e)
                 self.disconnect(ws, user_id)

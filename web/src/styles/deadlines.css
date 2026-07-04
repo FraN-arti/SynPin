@@ -9,6 +9,11 @@
 .deadlines-header {
   margin-bottom: 20px;
 }
+.deadlines-subtitle {
+  margin: 6px 0 0;
+  color: var(--text-dim);
+  font-size: 13px;
+}
 .deadlines-title {
   font-size: 18px;
   font-weight: 700;
@@ -30,6 +35,8 @@
   padding: 14px;
   text-align: center;
   cursor: pointer;
+  color: var(--text);  /* override <button> default color */
+  font-family: inherit;
   transition: all 0.15s;
 }
 .deadline-metric-card:hover {

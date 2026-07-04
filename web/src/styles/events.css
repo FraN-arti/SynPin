@@ -142,8 +142,8 @@
   line-height: 1.35;
 }
 .events-setting-input {
-  flex: 0 0 80px;
-  width: 80px;
+  flex: 0 0 48px;
+  width: 48px;
   padding: 6px 10px;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);

@@ -195,7 +195,12 @@ export function DeadlinesPage({ wsOn }: DeadlinesPageProps) {
     <div className="deadlines-page">
       {/* Header */}
       <div className="deadlines-header">
-        <h1 className="deadlines-title">Дедлайны</h1>
+        <div className="deadlines-title-row">
+          <h1 className="deadlines-title">Дедлайны</h1>
+        </div>
+        <p className="deadlines-subtitle">
+          Ближайшие сроки задач по всем проектам. Клик по карточке фильтрует список.
+        </p>
       </div>
 
       {/* Metric cards */}

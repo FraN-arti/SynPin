@@ -3,8 +3,9 @@
 .projects-page {
   padding: 24px;
   width: 100%;
-  overflow-y: auto;
-  height: 100%;
+  /* No overflow here — modal-overlay uses position: fixed, and an
+     overflow: auto ancestor would clip it. App.tsx handles page-level
+     scroll. */
 }
 .projects-header {
   display: flex;

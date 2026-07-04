@@ -48,8 +48,8 @@ export const SECTION_INFO: Record<Tab, { title: string; description: string }> =
   events: { title: 'События', description: 'In-app уведомления и каналы доставки' },
 }
 
-// Tabs that can be dragged to widget zones
-export const DRAGGABLE_TABS = new Set(['departments', 'kanban'])
+// (Removed DRAGGABLE_TABS — widget drag was duplicated here and in
+// WidgetsSection. Now widget-zone dragging is the only path.)
 
 // ── Data interfaces ────────────────────────────────────────────────
 

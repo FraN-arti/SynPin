@@ -100,6 +100,7 @@
 }
 .widget-drop-zone.right {
   right: 0;
+  padding-top: 60px;  /* Space for the version bar at the top of the right edge */
 }
 .widget-drop-zone > * {
   pointer-events: auto;

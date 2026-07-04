@@ -856,15 +856,14 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
           ['paused', 'Приостановлены', projects.filter(p => p.status === 'paused').length],
           ['completed', 'Завершены', projects.filter(p => p.status === 'completed').length],
         ] as const).map(([key, label, count]) => (
-          <MouseTooltip key={key} content={<div className="tt-title">{label}: {count}</div>}>
-            <button
-              className={`project-metric-card ${filter === key ? 'active' : ''}`}
-              onClick={() => setFilter(key)}
-            >
-              <span className="metric-value">{count}</span>
-              <span className="metric-label">{label}</span>
-            </button>
-          </MouseTooltip>
+          <button
+            key={key}
+            className={`project-metric-card ${filter === key ? 'active' : ''}`}
+            onClick={() => setFilter(key)}
+          >
+            <span className="metric-value">{count}</span>
+            <span className="metric-label">{label}</span>
+          </button>
         ))}
       </div>
 

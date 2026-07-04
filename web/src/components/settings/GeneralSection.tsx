@@ -272,34 +272,7 @@ export function GeneralSection() {
         </SettingsCard>
       )}
 
-      <SettingsCard title="Сервер" badge="требует перезапуск" disabled>
-        <div className="settings-row-2">
-          <div className="settings-field">
-            <label>Хост</label>
-            <input type="text" className="settings-input" value={settings.server.host} onChange={e => updateServer('host', e.target.value)} />
-          </div>
-          <div className="settings-field">
-            <label>Порт API</label>
-            <input type="number" className="settings-input" value={settings.server.port} onChange={e => updateServer('port', parseInt(e.target.value) || 2088)} />
-          </div>
-        </div>
-        <div className="settings-row-2">
-          <div className="settings-field">
-            <label>Порт Dev (Vite)</label>
-            <input type="number" className="settings-input" value={settings.server.dev_port} onChange={e => updateServer('dev_port', parseInt(e.target.value) || 2099)} />
-          </div>
-          <div className="settings-field">
-            <label>Rate Limit (req/min)</label>
-            <input type="number" className="settings-input" value={settings.server.rate_limit?.requests_per_minute ?? 60}
-              onChange={e => updateServer('rate_limit', { enabled: settings.server.rate_limit?.enabled ?? true, requests_per_minute: parseInt(e.target.value) || 60 })} />
-          </div>
-        </div>
-        <Toggle label="Rate Limiting" checked={settings.server.rate_limit?.enabled ?? true}
-          onChange={v => updateServer('rate_limit', { enabled: v, requests_per_minute: settings.server.rate_limit?.requests_per_minute ?? 60 })} />
-      </SettingsCard>
-
-      <div className="settings-row-2">
-        <SettingsCard title="Интерфейс">
+      <SettingsCard title="Интерфейс">
           <div className="settings-row-2">
             <div className="settings-field">
               <label>Тема</label>

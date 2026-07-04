@@ -16,8 +16,8 @@ import { type DropdownOption } from './DropdownMenu'
 import { useDraggable } from '@dnd-kit/core'
 import { PageTransition } from './PageTransition'
 
-// ── Section imports ────────────────────────────────────────────────
-import { SYSTEM_TABS, SPACE_TABS, SECTION_INFO, DRAGGABLE_TABS, type Tab } from './settings/types'
+// ── Section imports ───────────────────────────────────────────────
+import { SYSTEM_TABS, SPACE_TABS, SECTION_INFO, type Tab } from './settings/types'
 import type { ApiProvider } from './settings/types'
 import { GeneralSection } from './settings/GeneralSection'
 import { AgentsSection } from './settings/AgentsSection'
@@ -44,7 +44,9 @@ function DraggableTab({ tab, isActive, onClick }: { tab: { id: string; label: st
     data: { type: tab.id, source: 'settings-tab' },
   })
 
-  const isDraggable = DRAGGABLE_TABS.has(tab.id)
+  // (Widget drag is now handled by WidgetsSection only; settings tabs
+  // are not draggable. Removed DRAGGABLE_TABS reference.)
+  const isDraggable = false
 
   return (
     <button

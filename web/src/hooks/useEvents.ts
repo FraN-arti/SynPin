@@ -64,9 +64,20 @@ export function useEvents({ wsOn }: UseEventsOptions = {}): UseEventsResult {
       .then((data: { unread_count: number; items: AppEvent[] }) => {
         if (!alive) return
         setUnreadCount(data.unread_count ?? 0)
-        // No toasts pre-populated on mount — toasts are for things that
-        // happen *while* the user is in the app. Reconnect scenarios
-        // can be revisited later.
+        // On mount/reconnect: surface unread events as toasts so the user
+        // sees anything that happened while the app wasn't open or before
+        // the WS connected. Trim to max_visible — older ones stay in the
+        // unread count and can be opened from a future "history" panel.
+        const unread = (data.items || []).filter((e: AppEvent) => !e.read_at)
+        // Newest first; show the most recent max_visible. Slice from the
+        // end (since the API returns newest first).
+        const visible = unread.slice(0, settingsRef.current.max_visible)
+        for (const e of visible.reverse()) {
+          if (!seenIds.current.has(e.id)) {
+            seenIds.current.add(e.id)
+            setToasts(prev => [...prev, e])
+          }
+        }
       })
       .catch(() => { /* ignore */ })
 

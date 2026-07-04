@@ -62,6 +62,29 @@
   overflow: hidden;
 }
 
+/* Inline row that holds the typing-dots indicator next to the avatar.
+   Sits in .message-row as a column-flex child after .message-avatar
+   and (optional) ToolTimeline. position: relative + negative
+   margin-top pulls it up so the row overlaps the avatar vertically —
+   avatar ends at y=28 + 6px margin-bottom = y=34; this row sits at
+   y=12..32 so its bars (14px tall, vertically centered inside) end
+   up at the avatar's centerline. The negative margin doesn't reflow
+   the rest of the message-row because we only consume the avatar's
+   own margin-bottom slack (34 - 22 = 12px below where we place
+   this row, vs the row's own ~20px height — net displacement +0px
+   for everything below). */
+.message-avatar-row {
+  margin-top: -22px;
+  margin-bottom: 0;
+  padding-left: 38px;       /* avatar (28) + gap (10) = past the avatar */
+  height: 14px;             /* match .typing-dot height so the row is one bar tall */
+  display: flex;
+  align-items: center;
+}
+.message-avatar-row .typing-dots.bubble {
+  padding: 0;                /* the row itself provides the vertical space */
+}
+
 .message-avatar.assistant {
   background: var(--orange);
   color: var(--white);

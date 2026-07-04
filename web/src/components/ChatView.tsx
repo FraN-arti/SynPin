@@ -264,55 +264,49 @@ export function ChatView(props: ChatViewProps) {
                     toolNames={TOOL_DISPLAY_NAMES}
                   />
                 )}
+                {/* Inline avatar row: avatar on the left, the typing-
+                    dots indicator on the right. Rendered as a flex
+                    row so the bars sit horizontally next to the
+                    avatar, vertically centered against it. When the
+                    bubble has content / thinking / images, this row
+                    collapses (dots: none + height 0). Rendered ONLY
+                    for assistant messages — user messages never have
+                    a streaming phase (user sends one shot, no dots). */}
+                {msg.role === 'assistant' && !msg.content && !msg.thinking && (!msg.images || msg.images.length === 0) && (
+                  <div className="message-avatar-row">
+                    <span className="typing-dots bubble">
+                      <span className="typing-dot" />
+                      <span className="typing-dot" />
+                      <span className="typing-dot" />
+                    </span>
+                  </div>
+                )}
                 <div className={`message-wrapper ${isLastAssistant && msg.content ? 'streaming' : ''}`}>
-                  {/* When the assistant placeholder bubble has no content,
-                      no thinking, and no images — the only thing inside
-                      the bubble would be the typing-dots indicator. We
-                      render the dots OUTSIDE the bubble as a sibling so
-                      they sit next to the avatar instead of overlapping
-                      it. The bubble itself stays empty (and is given
-                      min-height so the message-row still reserves space
-                      for the upcoming reply).
-
-                      When there IS content / thinking / images, the
-                      bubble renders normally via MarkdownRenderer (which
-                      itself falls back to the typing-dots span when
-                      content is empty — but we never hit that branch
-                      here because the empty-content case is handled by
-                      this sibling element). */}
-                  {(!msg.content && !msg.thinking && (!msg.images || msg.images.length === 0)) ? (
-                    <div className="typing-dots bubble">
-                      <span className="typing-dot" />
-                      <span className="typing-dot" />
-                      <span className="typing-dot" />
-                    </div>
-                  ) : (
-                    <div className={`message-bubble ${msg.content || msg.thinking || (msg.images && msg.images.length > 0) ? 'has-content' : ''}`}>
-                      {msg.images && msg.images.length > 0 && (
-                        <div className="message-images">
-                          {msg.images.map((src, i) => (
-                            <img key={i} src={src} alt={`Изображение ${i + 1}`} className="message-image" />
-                          ))}
+                  <div className={`message-bubble ${msg.content || msg.thinking || (msg.images && msg.images.length > 0) ? 'has-content' : ''}`}>
+                    {msg.images && msg.images.length > 0 && (
+                      <div className="message-images">
+                        {msg.images.map((src, i) => (
+                          <img key={i} src={src} alt={`Изображение ${i + 1}`} className="message-image" />
+                        ))}
+                      </div>
+                    )}
+                    {msg.thinking && (
+                      <div className={`thinking-block ${expandedThinking.has(msg.id) || (isLastAssistant && isTyping) ? 'expanded' : ''}`}>
+                        <button
+                          className="thinking-toggle"
+                          onClick={() => toggleThinking(msg.id)}
+                        >
+                          <span className="thinking-icon">💭</span>
+                          <span>Рассуждение</span>
+                          <span className="thinking-chevron">›</span>
+                        </button>
+                        <div className="thinking-content">
+                          <MarkdownRenderer content={msg.thinking} />
                         </div>
-                      )}
-                      {msg.thinking && (
-                        <div className={`thinking-block ${expandedThinking.has(msg.id) || (isLastAssistant && isTyping) ? 'expanded' : ''}`}>
-                          <button
-                            className="thinking-toggle"
-                            onClick={() => toggleThinking(msg.id)}
-                          >
-                            <span className="thinking-icon">💭</span>
-                            <span>Рассуждение</span>
-                            <span className="thinking-chevron">›</span>
-                          </button>
-                          <div className="thinking-content">
-                            <MarkdownRenderer content={msg.thinking} />
-                          </div>
-                        </div>
-                      )}
-                      <MarkdownRenderer content={msg.content} isStreaming={isLastAssistant} />
-                    </div>
-                  )}
+                      </div>
+                    )}
+                    <MarkdownRenderer content={msg.content} isStreaming={isLastAssistant} />
+                  </div>
                 </div>
                 <div className={`message-footer ${msg.role} ${msg.role === 'user' || revealedMeta.has(msg.id) ? 'visible' : ''}`}>
                   {msg.role === 'user' || revealedMeta.has(msg.id) ? renderMeta(msg) : null}

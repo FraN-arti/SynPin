@@ -276,8 +276,23 @@ function KanbanColumnsConfig() {
     const col = columns[index]
     if (!col) return
     const newStatus = status === '' ? undefined : status
-    setColumns(prev => prev.map((c, i) => i === index ? { ...c, status: newStatus } : c))
+    // Single-status-per-column rule: if a different column already
+    // has this status, clear it there. (Allow same column to re-set
+    // its own status to no-op silently.)
+    setColumns(prev => prev.map((c, i) => {
+      if (i === index) return { ...c, status: newStatus }
+      if (newStatus && c.status === newStatus) return { ...c, status: undefined }
+      return c
+    }))
     patchColumn(col.id, { status: status === '' ? null : status } as any)
+    // Also patch any other column that lost this status
+    if (newStatus) {
+      columns.forEach((c, i) => {
+        if (i !== index && c.status === newStatus) {
+          patchColumn(c.id, { status: null } as any)
+        }
+      })
+    }
   }
 
   const STATUS_COLORS: Record<string, string> = {
@@ -292,13 +307,31 @@ function KanbanColumnsConfig() {
     done: '#4ade80',
   }
 
-  const STATUS_OPTIONS = [
-    { value: '', label: 'Не назначен' },
-    ...Object.entries(STATUS_COLORS).map(([val, color]) => ({
-      value: val,
-      label: <span style={{ color, fontWeight: 600 }}>{val.replace('_', ' ').toUpperCase()}</span>,
-    })),
-  ]
+  // Per-row status options. Statuses already taken by OTHER columns are
+  // marked disabled with a '(у …)' suffix, so the user sees the conflict
+  // before picking. Single-status rule is also enforced server-side via
+  // the API, but the UI prevents accidental duplicates.
+  const getStatusOptions = (currentIndex: number) => {
+    const usedBy: Record<string, number> = {}
+    columns.forEach((c, i) => {
+      if (c.status && i !== currentIndex) usedBy[c.status] = i
+    })
+    const colored = Object.entries(STATUS_COLORS).map(([val, color]) => {
+      const conflictIdx = usedBy[val]
+      const conflictLabel = conflictIdx !== undefined ? columns[conflictIdx]?.label : null
+      return {
+        value: val,
+        disabled: conflictIdx !== undefined,
+        label: (
+          <span style={{ color, fontWeight: 600, opacity: conflictIdx !== undefined ? 0.5 : 1 }}>
+            {val.replace('_', ' ').toUpperCase()}
+            {conflictLabel ? <span style={{ color: 'var(--text-dim)', fontWeight: 400, marginLeft: 6 }}>(у «{conflictLabel}»)</span> : null}
+          </span>
+        ),
+      }
+    })
+    return [{ value: '', label: 'Не назначен' }, ...colored]
+  }
 
   const addColumn = async () => {
     setSaving(true)
@@ -433,7 +466,7 @@ function KanbanColumnsConfig() {
           <CustomDropdown
             value={col.status || ''}
             onChange={v => updateStatus(i, v)}
-            options={STATUS_OPTIONS}
+            options={getStatusOptions(i)}
           />
           <label className="settings-toggle" style={{ margin: 0, fontSize: '12px' }}>
             <input

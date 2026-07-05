@@ -283,14 +283,14 @@
 }
 
 /* Custom Dropdown */
+/* === Custom Dropdown (legacy alias — visual parity with .picker-menu)
+   Used by DropdownMenu.tsx and MultiSelectMenu.tsx. New code should
+   prefer PickerMenu (misc.css). Same blur/shadow recipe as picker. */
+
 .custom-dropdown {
   position: relative;
   width: 100%;
 }
-
-/* === Custom Dropdown (legacy alias — visual parity with .picker-menu)
-   Used by DropdownMenu.tsx and MultiSelectMenu.tsx. New code should
-   prefer PickerMenu (misc.css). Same blur/shadow recipe as picker. */
 
 .custom-dropdown.disabled {
   opacity: 0.5;
@@ -324,161 +324,13 @@
   border-bottom-right-radius: 0;
 }
 
-.dropdown-selected {
-  flex: 1;
-  text-align: left;
-}
-
-.dropdown-arrow {
-  transition: transform 0.2s ease;
-  color: var(--text-dim);
-}
-
-.custom-dropdown-trigger.open .dropdown-arrow {
-  transform: rotate(180deg);
-  color: var(--orange);
-}
-
-.custom-dropdown-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: var(--bg-card, #1a1a2e);
-  border: 1px solid var(--border, rgba(255,255,255,0.1));
-  border-top: none;
-  border-bottom-left-radius: var(--radius);
-  border-bottom-right-radius: var(--radius);
-  max-height: 0;
-  overflow: hidden;
-  opacity: 0;
-  transform: translateY(-4px);
-  transition: all 0.2s ease;
-  z-index: 1000;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-}
-
-.custom-dropdown-menu.open {
-  max-height: 240px;
-  overflow-y: auto;
-  opacity: 1;
-  transform: translateY(0);
-}
-.custom-dropdown-menu.open.has-search {
-  max-height: 280px;
-}
-
-/* Portal variant — menu is detached from trigger (rendered in document.body).
-   Needs full border (no longer visually fused with the trigger) and
-   no top:100%/left:0/right:0 from the base rule (position:fixed overrides). */
-.custom-dropdown-menu.open.portal {
-  background: color-mix(in srgb, var(--bg-card, #1a1a2e) 92%, transparent);
-  backdrop-filter: blur(12px) saturate(140%);
-  -webkit-backdrop-filter: blur(12px) saturate(140%);
-  border-top: 1px solid var(--border, rgba(255,255,255,0.1));
-  border-radius: var(--radius);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-  /* Subtle slide-in matched to placement: bottom vs top */
-  animation: dropdownPortalIn 0.15s ease-out;
-}
-.custom-dropdown-menu.open.portal[data-placement="top"] {
-  animation-name: dropdownPortalInTop;
-}
-@keyframes dropdownPortalIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes dropdownPortalInTop {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.custom-dropdown-item-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.custom-dropdown-item-badge {
-  font-size: 9px;
-  opacity: 0.8;
-}
-
-.custom-dropdown-item {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  background: transparent;
-  border: none;
-  color: var(--text, #ffffff);
-  font-size: 14px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.1s ease;
-}
-
-.custom-dropdown-item:hover:not(.disabled) {
-  background: var(--bg-hover, rgba(255,255,255,0.05));
-  color: var(--accent, #f97316);
-}
-
-.custom-dropdown-item.highlighted {
-  background: var(--bg-hover, rgba(255,255,255,0.05));
-}
-
-.custom-dropdown-item.selected {
-  color: var(--accent, #f97316);
-  font-weight: 500;
-}
-
-.custom-dropdown-item.disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.dropdown-check {
-  color: var(--orange);
-}
-
-/* Dropdown search */
-.custom-dropdown-search-wrap {
-  position: sticky;
-  top: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  background: color-mix(in srgb, var(--bg-card, #1a1a2e) 75%, transparent);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--border, rgba(255,255,255,0.08));
-  z-index: 1;
-}
-.custom-dropdown-search-icon {
-  color: var(--text-dim, rgba(255,255,255,0.4));
-  flex-shrink: 0;
-}
-.custom-dropdown-search {
-  flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: var(--text, #fff);
-  font-size: 13px;
-  font-family: inherit;
-  min-width: 0;
-}
-.custom-dropdown-search::placeholder {
-  color: var(--text-dim, rgba(255,255,255,0.4));
-}
-.custom-dropdown-empty {
-  padding: 10px 12px;
-  color: var(--text-dim, rgba(255,255,255,0.4));
-  font-size: 13px;
-  text-align: center;
-}
+/* NOTE: As of refactor to PickerMenu shim, the dropdown MENU itself is
+   rendered by PickerMenu (.picker-menu / .picker-option / .picker-search
+   / .picker-check classes — see misc.css). The trigger button above
+   keeps the legacy .custom-dropdown-trigger class for visual consistency
+   with older settings forms that pre-date the picker system. All menu
+   styles (blur, shadow, animations, keyframes dropdownPortalIn*) are
+   now handled by .picker-menu. */
 
 /* Toggle */
 .settings-toggle {

@@ -312,6 +312,7 @@ const updateUI = useCallback((path: string, value: string | boolean | number) =>
           )}
         </SettingsCard>
 
+        <div className="settings-row-2">
         <SettingsCard title="Настройка моделей" description="Модели для специализированных задач">
           <div className="settings-field">
             <label>Визион (анализ изображений)</label>
@@ -414,6 +415,7 @@ const updateUI = useCallback((path: string, value: string | boolean | number) =>
             </div>
           ))}
         </SettingsCard>
+        </div>
 
       <SettingsCard title="Лента активности" badge="скоро" disabled>
         <div className="settings-row-2">

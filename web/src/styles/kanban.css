@@ -355,12 +355,18 @@
 .kanban-modal-close {
   background: none;
   border: none;
-  color: var(--text-muted);
-  font-size: 18px;
+  color: var(--text-secondary);
+  font-size: 22px;
   cursor: pointer;
-  padding: 4px;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  transition: all 0.15s ease;
+  line-height: 1;
 }
-.kanban-modal-close:hover { color: var(--text); }
+.kanban-modal-close:hover {
+  background: var(--gray-700);
+  color: var(--white);
+}
 .kanban-modal-title {
   font-size: 18px;
   font-weight: 600;
@@ -770,14 +776,17 @@
 }
 .kanban-config-row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 8px;
-  padding: 8px 0;
+  gap: 6px;
+  padding: 6px 0;
   border-bottom: 1px solid var(--border, rgba(255,255,255,0.06));
+  overflow-x: auto;
 }
 .kanban-config-row > input {
-  flex: 1 1 100%;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 200px;
 }
 .kanban-config-row:last-child {
   border-bottom: none;

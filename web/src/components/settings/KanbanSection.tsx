@@ -421,20 +421,19 @@ function KanbanColumnsConfig() {
             value={col.label}
             onChange={e => updateLabel(i, e.target.value)}
             placeholder="Название"
-            style={{ flex: 1, minWidth: 120 }}
+            style={{ flex: '0 1 140px', minWidth: 80 }}
           />
           <input
             className="settings-input"
             value={col.description || ''}
             onChange={e => updateDescription(i, e.target.value)}
             placeholder="Описание (для промпта агентов)"
-            style={{ flex: 1, minWidth: 120, fontSize: '12px', opacity: 0.7 }}
+            style={{ flex: '1 1 200px', minWidth: 100, fontSize: '12px', opacity: 0.7 }}
           />
           <CustomDropdown
             value={col.status || ''}
             onChange={v => updateStatus(i, v)}
             options={STATUS_OPTIONS}
-            width="120px"
           />
           <label className="settings-toggle" style={{ margin: 0, fontSize: '12px' }}>
             <input
@@ -504,14 +503,7 @@ function KanbanColumnsConfig() {
                 setAutoArchiveDays(v)
                 saveAutoArchive(v, autoDeleteColumns)
               }}
-              style={{
-                width: '50px', padding: '4px 6px',
-                background: 'var(--bg, #0d0d1a)',
-                border: '1px solid var(--border, #2a2a3a)',
-                color: 'var(--text, #e0e0e0)',
-                borderRadius: '4px',
-                fontSize: '12px',
-              }}
+              className="settings-input settings-input-narrow"
             />
             <label style={{ color: 'var(--text-secondary)', fontSize: '13px', whiteSpace: 'nowrap' }}>дней из</label>
             <MultiSelectMenu

@@ -328,8 +328,6 @@
 .custom-dropdown-trigger.open {
   border-color: var(--accent, #f97316);
   box-shadow: var(--glow-orange);
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
 }
 
 /* NOTE: As of refactor to PickerMenu shim, the dropdown MENU itself is

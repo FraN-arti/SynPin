@@ -288,6 +288,10 @@
   width: 100%;
 }
 
+/* === Custom Dropdown (legacy alias — visual parity with .picker-menu)
+   Used by DropdownMenu.tsx and MultiSelectMenu.tsx. New code should
+   prefer PickerMenu (misc.css). Same blur/shadow recipe as picker. */
+
 .custom-dropdown.disabled {
   opacity: 0.5;
   pointer-events: none;
@@ -315,7 +319,7 @@
 
 .custom-dropdown-trigger.open {
   border-color: var(--accent, #f97316);
-  box-shadow: 0 0 0 1px var(--accent, #f97316);
+  box-shadow: 0 0 0 1px var(--accent, #f97316), var(--glow-orange);
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
 }
@@ -368,6 +372,9 @@
    Needs full border (no longer visually fused with the trigger) and
    no top:100%/left:0/right:0 from the base rule (position:fixed overrides). */
 .custom-dropdown-menu.open.portal {
+  background: color-mix(in srgb, var(--bg-card, #1a1a2e) 92%, transparent);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
   border-top: 1px solid var(--border, rgba(255,255,255,0.1));
   border-radius: var(--radius);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
@@ -443,7 +450,9 @@
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  background: var(--bg-card, #1a1a2e);
+  background: color-mix(in srgb, var(--bg-card, #1a1a2e) 75%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border, rgba(255,255,255,0.08));
   z-index: 1;
 }

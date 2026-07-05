@@ -1197,6 +1197,12 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 # If so, need to process the new workers
                 hs = get_head_state(otdel_id)
                 if hs and hs.expected_workers:
+                    # Reset responded_workers for re-delegated workers —
+                    # without this, re-delegating to the same worker (who
+                    # already responded in the main loop) produces an empty
+                    # diff and the second pass never picks them up.
+                    for slug in hs.expected_workers:
+                        responded_workers.discard(slug)
                     new_workers = hs.expected_workers - responded_workers
                     if new_workers:
                         for slug in new_workers:

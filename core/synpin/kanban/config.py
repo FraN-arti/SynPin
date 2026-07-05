@@ -239,26 +239,6 @@ def load_columns() -> list[ColumnConfig]:
     data = _load_yaml("columns")
     if data and isinstance(data, list):
         cols = [ColumnConfig(**c) for c in data]
-
-        # Auto-migrate: assign TaskStatus to columns that have null status.
-        # This happens when a user creates a column via the UI without
-        # specifying a status. Every column MUST have a status for the board
-        # to display tasks (backend groups tasks by TaskStatus enum).
-        used = {c.status for c in cols if c.status}
-        changed = False
-        for col in cols:
-            if not col.status:
-                for ts in TaskStatus:
-                    if ts.value not in used:
-                        col.status = ts.value
-                        used.add(ts.value)
-                        changed = True
-                        break
-                if not col.status:
-                    col.status = TaskStatus.BACKLOG.value
-                    changed = True
-        if changed:
-            save_columns(cols)
         return cols
     cols = _default_columns()
     save_columns(cols)

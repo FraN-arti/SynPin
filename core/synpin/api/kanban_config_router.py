@@ -126,19 +126,9 @@ def add_column(col: ColumnRequest) -> dict:
     cols = load_columns()
     col_id = col.id or generate_id()
 
-    # Auto-assign TaskStatus if not provided.
-    # When a user creates a column via the UI, they don't set a status —
-    # but the board API groups tasks by TaskStatus enum, so every column
-    # MUST have one to display tasks. We pick the first unused status.
-    status = col.status
-    if not status:
-        used = {c.status for c in cols if c.status}
-        for ts in TaskStatus:
-            if ts.value not in used:
-                status = ts.value
-                break
-        if not status:
-            status = TaskStatus.BACKLOG.value
+    # New columns start with no status ("Не назначен").
+    # The user picks a status explicitly via the dropdown.
+    status = col.status or None
 
     new_col = ColumnConfig(
         id=col_id,

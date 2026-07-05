@@ -16,6 +16,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from .ws_manager import ws_manager
 from ..time import now as _now
+from ..protocol.config import get_max_iterations
 
 logger = logging.getLogger(__name__)
 
@@ -608,731 +609,770 @@ async def _handle_otdel_send(user_id: str, msg: dict):
     if not agent_queue:
         return
 
-    # Create HeadState for this otdel session
+    # ── Autopilot driver loop ──────────────────────────────────────────
+    # Wraps the main agent loop in an outer cycle. After each full pass
+    # (head -> workers -> follow-up -> second pass), checks head_state.last_head_action.
+    # "continue_delegation" -> next iteration; anything else -> done.
+    autopilot_max = get_max_iterations()
+    # Create HeadState once — persists across iterations (accumulates history)
     head_state = create_head_state(otdel_id, head_slug, worker_slugs)
-
-    # Process agents
-    processed_count = 0
-    head_processed = False
-    workers_responded = 0
-    max_iterations = 10
-    expected_workers = set()
-    responded_workers = set()
-    head_delegating = False
-    processed_slugs = set()
-    # Continuation trigger: when a multi-step task is in flight (user message
-    # contains раунд/этап/итерац/потом/сначала), and a worker just responded
-    # to a head_delegate call, and the head did NOT itself queue another
-    # delegation in the same turn — schedule one more head turn with a
-    # reminder so the multi-step chain doesn't stall waiting for the user.
-    # Gated to multi-step tasks only (not single delegation responses), and
-    # to head_delegating=True (user asked head to manage the flow).
-    multi_step = bool(
-        re.search(r"\b(раунд[а-я]*|этап[а-я]*|итерац[а-я]*|потом|затем|сначала)\b", message, re.IGNORECASE)
-    )
-    last_delegation_id_at_worker_response = None
-
-    while agent_queue and processed_count < max_iterations:
-        agent, is_head, trigger_message = agent_queue.pop(0)
-        agent_slug_val = agent.get("slug", "")
-        agent_name_val = agent.get("name", "")
-
-        system_prompt = _build_otdel_system_prompt(otdel, agent, is_head)
-        history = _load_history(otdel_id)
-
-        # Auto-analyze images from the current user message
-        if images:
-            system_prompt += await _auto_analyze_images(images)
-
-        if is_head:
-            context_messages = _build_head_context(history, agent_slug_val)
-        else:
-            context_messages = _build_worker_context(history, agent_slug_val, head_slug, head_name)
-
-        messages = [
-            ChatMessage(role=m["role"], content=m["content"], images=m.get("images"))
-            for m in context_messages
-        ]
-        # Worker trigger: distinguish "Head delegated a task" from "user wrote
-        # directly". Without this prefix the worker's LLM treats the trigger
-        # as a generic user message (role=user, no sender label) and answers
-        # as if Artur talked to it directly — losing the head→worker
-        # delegation context. Mirrors the same fix in
-        # otdel_chat_router.py so both code paths (HTTP + WS) agree.
-        # Head trigger: keep the bare user-role — head context already labels
-        # previous worker responses with their sender name, so the head
-        # already knows who it is talking to.
-        if is_head:
-            trigger_content = trigger_message
-        else:
-            trigger_content = f"[📋 Задание от {head_name}]: {trigger_message}"
-        messages.append(ChatMessage(role="user", content=trigger_content))
-
-        model = agent.get("model", "")
-        provider_name = agent.get("provider")
-
-        # Resolve model with fallback to provider's default
-        from .router import resolve_model
-
-        provider_name, model = resolve_model(provider_name, model)
-
-        # Determine tools for this agent
-        if is_head:
-            # Head gets all tools including head protocol tools
-            tool_names = get_all_tool_names(include_head=True)
-        else:
-            tool_names = get_all_tool_names()
-
-        # Stream LLM response via WebSocket chunks
-        agent_msg_id = f"a-{uuid.uuid4().hex[:8]}"
-        full_response = ""
-        usage = None  # Track token usage
-        # Track tool calls made during streaming
-        tools_called = []  # Track tool calls made during streaming
-
-        # Notify client that this agent is thinking
-        await ws_manager.send(
-            user_id,
-            {
-                "type": "otdel:thinking",
-                "otdel_id": otdel_id,
-                "agent_slug": agent_slug_val,
-                "agent_name": agent_name_val,
-                "is_head": is_head,
-            },
+    for _autopilot_iter in range(autopilot_max):
+        # ── Per-iteration state ──────────────────────────────────────────
+        processed_count = 0
+        head_processed = False
+        workers_responded = 0
+        max_iterations = 10  # inner loop cap (agents per iteration)
+        expected_workers = set()
+        responded_workers = set()
+        head_delegating = False
+        processed_slugs = set()
+        multi_step = bool(
+            re.search(r"\b(раунд[а-я]*|этап[а-я]*|итерац[а-я]*|потом|затем|сначала)\b", message, re.IGNORECASE)
         )
+        last_delegation_id_at_worker_response = None
+        agent_queue = [(head_agent, True, message)]
 
-        # Debug: log available tools for head
-        if is_head:
-            logger.info("Otdel %s HEAD tools available: %s", otdel_id, tool_names)
+        # Last-iteration warning: head must summarize on this pass
+        is_last_iteration = (_autopilot_iter == autopilot_max - 1)
+        if is_last_iteration:
+            logger.info("Otdel %s: autopilot last iteration (%d/%d)", otdel_id, _autopilot_iter + 1, autopilot_max)
 
-        try:
-            from .router import stream_response as base_stream
+        # Emit iteration start event
+        await ws_manager.send(user_id, {
+            "type": "otdel:iter_start",
+            "otdel_id": otdel_id,
+            "iteration": _autopilot_iter + 1,
+            "max_iterations": autopilot_max,
+        })
 
-            async for chunk in base_stream(
-                provider_name=provider_name,
-                messages=messages,
-                model=model,
-                temperature=agent.get("temperature", 0.7),
-                max_tokens=agent.get("max_tokens", 4096),
-                system_prompt=system_prompt,
-                agent_name=agent_name_val,
-                agent_slug=agent_slug_val,
-                tool_names=tool_names,
-                otdel_id=otdel_id,  # Pass otdel context for head protocol tools
-            ):
-                try:
-                    payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
-                    msg_type = payload.get("type", "")
+        # Reset per-iteration HeadState tracking (keep accumulated history)
+        head_state.last_head_action = None
 
-                    if msg_type == "chunk":
-                        content = payload.get("content", "")
-                        if content:
-                            full_response += content
-                            # Push chunk via WS
-                            await ws_manager.send(
-                                user_id,
-                                {
-                                    "type": "otdel:chunk",
-                                    "otdel_id": otdel_id,
-                                    "message_id": agent_msg_id,
-                                    "content": content,
-                                    "sender": agent_slug_val,
-                                    "sender_name": agent_name_val,
-                                    "is_head": is_head,
-                                    "model": model,
-                                    "provider": provider_name,
-                                },
-                            )
-                    elif msg_type == "tool_start":
-                        # Forward tool event via WS
-                        await ws_manager.send(
-                            user_id,
-                            {
-                                "type": f"otdel:{msg_type}",
-                                "otdel_id": otdel_id,
-                                "message_id": agent_msg_id,
-                                "tool": payload.get("tool"),
-                                "params": payload.get("params"),
-                                "result": payload.get("result"),
-                                "success": payload.get("success"),
-                                "error": payload.get("error"),
-                                "index": payload.get("index"),
-                            },
-                        )
-                        # Track tool calls for placeholder generation
-                        tools_called.append(
-                            {
-                                "name": payload.get("tool", ""),
-                                "params": payload.get("params", {}),
-                                "status": "running",
-                            }
-                        )
-                    elif msg_type == "tool_end":
-                        # Update tool call status
-                        tool_name = payload.get("tool", "")
-                        for tc in tools_called:
-                            if tc["name"] == tool_name and tc.get("status") == "running":
-                                tc["status"] = "completed" if payload.get("success") else "error"
-                                tc["result"] = payload.get("result", "")
-                                break
-                        # Forward tool event via WS
-                        await ws_manager.send(
-                            user_id,
-                            {
-                                "type": f"otdel:{msg_type}",
-                                "otdel_id": otdel_id,
-                                "message_id": agent_msg_id,
-                                "tool": payload.get("tool"),
-                                "params": payload.get("params"),
-                                "result": payload.get("result"),
-                                "success": payload.get("success"),
-                                "error": payload.get("error"),
-                                "index": payload.get("index"),
-                            },
-                        )
-                    elif msg_type == "done":
-                        usage = payload.get("usage")
-                    elif msg_type == "error":
-                        full_response = f"⚠️ Ошибка: {payload.get('message', 'Unknown error')}"
-                except Exception:
-                    pass
-        except Exception as e:
-            logger.error(
-                "LLM call failed for agent %s in otdel %s: %s", agent_slug_val, otdel_id, e
-            )
-            full_response = f"⚠️ Ошибка: {e}"
-            # Best-effort toast so the user notices even with the otdel
-            # tab closed.
-            try:
-                from ..events import publish_event
-                publish_event(
-                    title=f"{agent_slug_val} не ответил в отделе «{otdel_id}»",
-                    body=str(e)[:200],
-                    level="error",
-                    source="agent",
-                    source_ref=agent_slug_val,
-                )
-            except Exception as pub_err:
-                logger.warning("publish_event failed for LLM error in otdel %s: %s", otdel_id, pub_err)
+        while agent_queue and processed_count < max_iterations:
+            agent, is_head, trigger_message = agent_queue.pop(0)
+            agent_slug_val = agent.get("slug", "")
+            agent_name_val = agent.get("name", "")
 
-        # Save final message to history
-        # Strip leaked text-based tool calls from response (e.g. <tool_call>...</tool_call>)
-        full_response = re.sub(
-            r"<tool_call>.*?</tool_call>", "", full_response, flags=re.DOTALL
-        ).strip()
-        # Also strip ```tool_call...``` blocks
-        full_response = re.sub(r"```tool_call.*?```", "", full_response, flags=re.DOTALL).strip()
-        # If empty response but tools were called, generate a placeholder
-        if not full_response and tools_called:
-            # Debug: log what tools were called
-            tool_names_called = [tc["name"] for tc in tools_called]
-            logger.info(
-                "Otdel %s HEAD called tools: %s (head_delegate present: %s)",
-                otdel_id,
-                tool_names_called,
-                "head_delegate" in tool_names_called,
-            )
+            system_prompt = _build_otdel_system_prompt(otdel, agent, is_head)
+            history = _load_history(otdel_id)
 
-            # Build placeholder from tool calls
-            delegate_targets = []
-            for tc in tools_called:
-                if tc["name"] == "head_delegate":
-                    target = tc["params"].get("worker", tc["params"].get("target", ""))
-                    task = tc["params"].get("task", tc["params"].get("instruction", ""))
-                    if target:
-                        target_agent = get_agent(target) if target else None
-                        target_name = target_agent.get("name", target) if target_agent else target
-                        delegate_targets.append(target_name)
-                    if task:
-                        delegate_targets.append(f"«{task[:80]}»")
-            if delegate_targets:
-                full_response = f"📋 Делегирую: {', '.join(delegate_targets)}"
+            # Auto-analyze images from the current user message
+            if images:
+                system_prompt += await _auto_analyze_images(images)
+
+            if is_head:
+                context_messages = _build_head_context(history, agent_slug_val)
             else:
-                full_response = "📋 Обрабатываю задачу..."
-            # Send placeholder as chunk so frontend can display it
+                context_messages = _build_worker_context(history, agent_slug_val, head_slug, head_name)
+
+            messages = [
+                ChatMessage(role=m["role"], content=m["content"], images=m.get("images"))
+                for m in context_messages
+            ]
+            # Worker trigger: distinguish "Head delegated a task" from "user wrote
+            # directly". Without this prefix the worker's LLM treats the trigger
+            # as a generic user message (role=user, no sender label) and answers
+            # as if Artur talked to it directly — losing the head→worker
+            # delegation context. Mirrors the same fix in
+            # otdel_chat_router.py so both code paths (HTTP + WS) agree.
+            # Head trigger: keep the bare user-role — head context already labels
+            # previous worker responses with their sender name, so the head
+            # already knows who it is talking to.
+            if is_head:
+                trigger_content = trigger_message
+            else:
+                trigger_content = f"[📋 Задание от {head_name}]: {trigger_message}"
+            messages.append(ChatMessage(role="user", content=trigger_content))
+
+            model = agent.get("model", "")
+            provider_name = agent.get("provider")
+
+            # Resolve model with fallback to provider's default
+            from .router import resolve_model
+
+            provider_name, model = resolve_model(provider_name, model)
+
+            # Determine tools for this agent
+            if is_head:
+                # Head gets all tools including head protocol tools
+                tool_names = get_all_tool_names(include_head=True)
+            else:
+                tool_names = get_all_tool_names()
+
+            # Stream LLM response via WebSocket chunks
+            agent_msg_id = f"a-{uuid.uuid4().hex[:8]}"
+            full_response = ""
+            usage = None  # Track token usage
+            # Track tool calls made during streaming
+            tools_called = []  # Track tool calls made during streaming
+
+            # Notify client that this agent is thinking
             await ws_manager.send(
                 user_id,
                 {
-                    "type": "otdel:chunk",
+                    "type": "otdel:thinking",
                     "otdel_id": otdel_id,
-                    "message_id": agent_msg_id,
-                    "content": full_response,
-                    "sender": agent_slug_val,
-                    "sender_name": agent_name_val,
+                    "agent_slug": agent_slug_val,
+                    "agent_name": agent_name_val,
                     "is_head": is_head,
-                    "model": model,
-                    "provider": provider_name,
                 },
             )
 
-        if full_response:
-            agent_msg = {
-                "id": agent_msg_id,
-                "role": "assistant",
-                "sender": agent_slug_val,
-                "sender_name": agent_name_val,
-                "content": full_response,
-                "is_head": is_head,
-                "timestamp": _now().isoformat(),
-                "model": model,
-                "provider": provider_name,
-            }
-            # Save tool calls for badge display after reload
-            if tools_called:
-                agent_msg["tools"] = tools_called
-            # Save token usage if available
-            if usage:
-                agent_msg["prompt_tokens"] = usage.get("prompt_tokens", 0)
-                agent_msg["completion_tokens"] = usage.get("completion_tokens", 0)
-            history.append(agent_msg)
-            save_stats = _save_history(otdel_id, history)
-            if save_stats.get("was_compacted"):
+            # Debug: log available tools for head
+            if is_head:
+                logger.info("Otdel %s HEAD tools available: %s", otdel_id, tool_names)
+
+            try:
+                from .router import stream_response as base_stream
+
+                async for chunk in base_stream(
+                    provider_name=provider_name,
+                    messages=messages,
+                    model=model,
+                    temperature=agent.get("temperature", 0.7),
+                    max_tokens=agent.get("max_tokens", 4096),
+                    system_prompt=system_prompt,
+                    agent_name=agent_name_val,
+                    agent_slug=agent_slug_val,
+                    tool_names=tool_names,
+                    otdel_id=otdel_id,  # Pass otdel context for head protocol tools
+                ):
+                    try:
+                        payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
+                        msg_type = payload.get("type", "")
+
+                        if msg_type == "chunk":
+                            content = payload.get("content", "")
+                            if content:
+                                full_response += content
+                                # Push chunk via WS
+                                await ws_manager.send(
+                                    user_id,
+                                    {
+                                        "type": "otdel:chunk",
+                                        "otdel_id": otdel_id,
+                                        "message_id": agent_msg_id,
+                                        "content": content,
+                                        "sender": agent_slug_val,
+                                        "sender_name": agent_name_val,
+                                        "is_head": is_head,
+                                        "model": model,
+                                        "provider": provider_name,
+                                    },
+                                )
+                        elif msg_type == "tool_start":
+                            # Forward tool event via WS
+                            await ws_manager.send(
+                                user_id,
+                                {
+                                    "type": f"otdel:{msg_type}",
+                                    "otdel_id": otdel_id,
+                                    "message_id": agent_msg_id,
+                                    "tool": payload.get("tool"),
+                                    "params": payload.get("params"),
+                                    "result": payload.get("result"),
+                                    "success": payload.get("success"),
+                                    "error": payload.get("error"),
+                                    "index": payload.get("index"),
+                                },
+                            )
+                            # Track tool calls for placeholder generation
+                            tools_called.append(
+                                {
+                                    "name": payload.get("tool", ""),
+                                    "params": payload.get("params", {}),
+                                    "status": "running",
+                                }
+                            )
+                        elif msg_type == "tool_end":
+                            # Update tool call status
+                            tool_name = payload.get("tool", "")
+                            for tc in tools_called:
+                                if tc["name"] == tool_name and tc.get("status") == "running":
+                                    tc["status"] = "completed" if payload.get("success") else "error"
+                                    tc["result"] = payload.get("result", "")
+                                    break
+                            # Forward tool event via WS
+                            await ws_manager.send(
+                                user_id,
+                                {
+                                    "type": f"otdel:{msg_type}",
+                                    "otdel_id": otdel_id,
+                                    "message_id": agent_msg_id,
+                                    "tool": payload.get("tool"),
+                                    "params": payload.get("params"),
+                                    "result": payload.get("result"),
+                                    "success": payload.get("success"),
+                                    "error": payload.get("error"),
+                                    "index": payload.get("index"),
+                                },
+                            )
+                        elif msg_type == "done":
+                            usage = payload.get("usage")
+                        elif msg_type == "error":
+                            full_response = f"⚠️ Ошибка: {payload.get('message', 'Unknown error')}"
+                    except Exception:
+                        pass
+            except Exception as e:
+                logger.error(
+                    "LLM call failed for agent %s in otdel %s: %s", agent_slug_val, otdel_id, e
+                )
+                full_response = f"⚠️ Ошибка: {e}"
+                # Best-effort toast so the user notices even with the otdel
+                # tab closed.
+                try:
+                    from ..events import publish_event
+                    publish_event(
+                        title=f"{agent_slug_val} не ответил в отделе «{otdel_id}»",
+                        body=str(e)[:200],
+                        level="error",
+                        source="agent",
+                        source_ref=agent_slug_val,
+                    )
+                except Exception as pub_err:
+                    logger.warning("publish_event failed for LLM error in otdel %s: %s", otdel_id, pub_err)
+
+            # Save final message to history
+            # Strip leaked text-based tool calls from response (e.g. <tool_call>...</tool_call>)
+            full_response = re.sub(
+                r"<tool_call>.*?</tool_call>", "", full_response, flags=re.DOTALL
+            ).strip()
+            # Also strip ```tool_call...``` blocks
+            full_response = re.sub(r"```tool_call.*?```", "", full_response, flags=re.DOTALL).strip()
+            # If empty response but tools were called, generate a placeholder
+            if not full_response and tools_called:
+                # Debug: log what tools were called
+                tool_names_called = [tc["name"] for tc in tools_called]
+                logger.info(
+                    "Otdel %s HEAD called tools: %s (head_delegate present: %s)",
+                    otdel_id,
+                    tool_names_called,
+                    "head_delegate" in tool_names_called,
+                )
+
+                # Build placeholder from tool calls
+                delegate_targets = []
+                for tc in tools_called:
+                    if tc["name"] == "head_delegate":
+                        target = tc["params"].get("worker", tc["params"].get("target", ""))
+                        task = tc["params"].get("task", tc["params"].get("instruction", ""))
+                        if target:
+                            target_agent = get_agent(target) if target else None
+                            target_name = target_agent.get("name", target) if target_agent else target
+                            delegate_targets.append(target_name)
+                        if task:
+                            delegate_targets.append(f"«{task[:80]}»")
+                if delegate_targets:
+                    full_response = f"📋 Делегирую: {', '.join(delegate_targets)}"
+                else:
+                    full_response = "📋 Обрабатываю задачу..."
+                # Send placeholder as chunk so frontend can display it
                 await ws_manager.send(
                     user_id,
                     {
-                        "type": "otdel:compacting",
+                        "type": "otdel:chunk",
                         "otdel_id": otdel_id,
-                        "before": save_stats["before"],
-                        "after": save_stats["after"],
+                        "message_id": agent_msg_id,
+                        "content": full_response,
+                        "sender": agent_slug_val,
+                        "sender_name": agent_name_val,
+                        "is_head": is_head,
+                        "model": model,
+                        "provider": provider_name,
                     },
                 )
 
-            # Send done event (include usage for footer display)
-            done_msg = {
-                "type": "otdel:done",
-                "otdel_id": otdel_id,
-                "message_id": agent_msg_id,
-                "message": agent_msg,
-            }
-            if usage:
-                done_msg["usage"] = {
-                    "prompt_tokens": usage.get("prompt_tokens", 0),
-                    "completion_tokens": usage.get("completion_tokens", 0),
+            if full_response:
+                agent_msg = {
+                    "id": agent_msg_id,
+                    "role": "assistant",
+                    "sender": agent_slug_val,
+                    "sender_name": agent_name_val,
+                    "content": full_response,
+                    "is_head": is_head,
+                    "timestamp": _now().isoformat(),
+                    "model": model,
+                    "provider": provider_name,
                 }
-            await ws_manager.send(user_id, done_msg)
+                # Save tool calls for badge display after reload
+                if tools_called:
+                    agent_msg["tools"] = tools_called
+                # Save token usage if available
+                if usage:
+                    agent_msg["prompt_tokens"] = usage.get("prompt_tokens", 0)
+                    agent_msg["completion_tokens"] = usage.get("completion_tokens", 0)
+                history.append(agent_msg)
+                save_stats = _save_history(otdel_id, history)
+                if save_stats.get("was_compacted"):
+                    await ws_manager.send(
+                        user_id,
+                        {
+                            "type": "otdel:compacting",
+                            "otdel_id": otdel_id,
+                            "before": save_stats["before"],
+                            "after": save_stats["after"],
+                        },
+                    )
 
-            if is_head:
-                # Workers are triggered ONLY via head_delegate tool (HeadState),
-                # NOT via @mentions in text. This prevents accidental triggering
-                # when the head mentions worker names in passing.
-                # Example: "Архитектор — хороший специалист" should NOT trigger Архитектор.
+                # Send done event (include usage for footer display)
+                done_msg = {
+                    "type": "otdel:done",
+                    "otdel_id": otdel_id,
+                    "message_id": agent_msg_id,
+                    "message": agent_msg,
+                }
+                if usage:
+                    done_msg["usage"] = {
+                        "prompt_tokens": usage.get("prompt_tokens", 0),
+                        "completion_tokens": usage.get("completion_tokens", 0),
+                    }
+                await ws_manager.send(user_id, done_msg)
 
-                # Check HeadState for workers from head_delegate tool
+                if is_head:
+                    # Workers are triggered ONLY via head_delegate tool (HeadState),
+                    # NOT via @mentions in text. This prevents accidental triggering
+                    # when the head mentions worker names in passing.
+                    # Example: "Архитектор — хороший специалист" should NOT trigger Архитектор.
+
+                    # Check HeadState for workers from head_delegate tool
+                    hs = get_head_state(otdel_id)
+                    if hs and hs.expected_workers:
+                        for slug in hs.expected_workers:
+                            if slug not in processed_slugs and slug not in expected_workers:
+                                agent = get_agent(slug)
+                                if agent:
+                                    expected_workers.add(slug)
+                                    # Use delegation task from HeadState as trigger
+                                    delegation = hs.current_delegation or {}
+                                    workers_list = delegation.get("workers", [])
+                                    task_text = ""
+                                    for w in workers_list:
+                                        if w.get("slug") == slug:
+                                            task_text = w.get("task", "")
+                                            break
+                                    trigger = task_text or full_response.strip()
+                                    agent_queue.append((agent, False, trigger))
+                                    logger.info(
+                                        "Otdel %s head_delegate: queueing %s (task=%s)",
+                                        otdel_id,
+                                        agent.get("name"),
+                                        task_text[:60],
+                                    )
+                        if expected_workers:
+                            head_delegating = True
+                # Note: agent response already sent via otdel:chunk + otdel:done above
+                # No need for otdel:message here
+
+                processed_slugs.add(agent_slug_val)
+                if not is_head:
+                    # Worker finished its turn. Track the response so the head
+                    # can see it via head_checklist / head_retry / head_evaluate.
+                    # Retry is owned by the head protocol (head_retry) — used to
+                    # be a hidden auto-retry here, but it duplicated the protocol
+                    # knob and masked state from the head (responded_workers
+                    # never got populated, so head_retry kept failing on phase
+                    # gating). The head now sees the failure and decides.
+                    is_error = full_response.startswith("⚠️ Ошибка:") or not full_response.strip()
+                    head_state.responded_workers[agent_slug_val] = {
+                        "content": full_response,
+                        "model": model,
+                        "provider": provider_name,
+                        "tools": tools_called,
+                        "is_error": is_error,
+                    }
+
+                    # Multi-step continuation: if the original user message
+                    # contained a multi-step marker (раунд/этап/итерац/...) and
+                    # the head had delegated this task (head_delegating=True),
+                    # AND the head did NOT itself queue another delegation in
+                    # this same turn — mark that the follow-up should remind
+                    # the head to call head_delegate for the next step. Without
+                    # this the head often answers in prose ('Раунд 1: ...
+                    # Стартуем') and stalls waiting for the user to nudge it.
+                    if multi_step and head_delegating:
+                        # Snapshot which delegation ID was active when this
+                        # worker responded. The head's own follow-up will check
+                        # whether the ID advanced (= head re-delegated itself
+                        # in the same turn) to decide if a reminder is needed.
+                        last_delegation_id_at_worker_response = (
+                            head_state.active_delegation_id
+                        )
+
+            processed_count += 1
+
+        # ── Head follow-up (gather pattern) ──────────────────────────────
+        # ONE follow-up: workers respond → head summarizes → DONE
+        should_followup = False
+        if head_delegating and expected_workers:
+            missing = expected_workers - responded_workers
+            if not missing:
+                should_followup = True
+            else:
+                # Some workers haven't responded — still follow up so head can
+                # either wait, delegate to others, or finalize
+                logger.info(
+                    "Otdel %s follow-up: %d workers still pending, asking head", otdel_id, len(missing)
+                )
+                should_followup = True
+        elif head_processed and workers_responded > 0 and not head_delegating:
+            should_followup = True
+
+        if should_followup and processed_count < max_iterations:
+            history = _load_history(otdel_id)
+            context_messages = _build_head_context(history, head_slug, exclude_last=False)
+
+            if head_delegating:
+                missing = expected_workers - responded_workers
+                if missing:
+                    missing_names = []
+                    for s in missing:
+                        a = get_agent(s)
+                        missing_names.append(a.get("name", s) if a else s)
+                    acknowledge_trigger = (
+                        f"Некоторые работники ещё не ответили: {', '.join(missing_names)}. "
+                        "Жди их ответов в чате. "
+                        "Если нужно — отправь задачу повторно через head_delegate. "
+                        "НЕ ПИШИ что все ответили — это неправда."
+                    )
+                else:
+                    # Multi-step nudge: if the user's task was explicitly
+                    # multi-step (раунд/этап/итерац/...) and the head did
+                    # NOT re-delegate in this turn, append an explicit
+                    # reminder to call head_delegate for the next step.
+                    # The check uses active_delegation_id — if the head
+                    # itself called head_delegate, this ID advances; if
+                    # it stayed put, the head answered in prose and we
+                    # need to push it to act.
+                    nudge = ""
+                    if (
+                        multi_step
+                        and last_delegation_id_at_worker_response
+                        and head_state.active_delegation_id
+                        == last_delegation_id_at_worker_response
+                    ):
+                        nudge = (
+                            "\n\nПодсказка: исходная задача была многоэтапной, "
+                            "и в этом turn'е ты ещё не вызвал head_delegate "
+                            "для следующего этапа. Сейчас самое время — "
+                            "вызови head_delegate с конкретным task для "
+                            "следующего этапа. Не пиши план прозой."
+                        )
+                    acknowledge_trigger = (
+                        "Все работники отдела ответили. "
+                        "Проанализируй их ответы.\n"
+                        "Если задача требует дополнительных действий (делегировать другому агенту, "
+                        "отправить на доработку, передать результат следующему этапу) — ПРОДОЛЖАЙ, "
+                        "вызывай head_delegate или другие инструменты.\n"
+                        "Если задача полностью выполнена — сформируй итог для пользователя."
+                        + nudge
+                    )
+            else:
+                acknowledge_trigger = (
+                    "Работники отдела ответили. Посмотри их ответы и прокомментируй, если нужно."
+                )
+
+            messages = [
+                ChatMessage(role=m["role"], content=m["content"], images=m.get("images"))
+                for m in context_messages
+            ]
+            messages.append(ChatMessage(role="user", content=acknowledge_trigger))
+
+            system_prompt = _build_otdel_system_prompt(otdel, head_agent, True)
+            model = head_agent.get("model", "")
+            provider_name = head_agent.get("provider")
+
+            # Resolve model with fallback to provider's default
+            from .router import resolve_model
+
+            provider_name, model = resolve_model(provider_name, model)
+
+            # Head gets all tools including head protocol
+            tool_names = get_all_tool_names(include_head=True)
+
+            # Stream follow-up response
+            followup_msg_id = f"a-{uuid.uuid4().hex[:8]}"
+            full_response = ""
+
+            try:
+                from .router import stream_response as base_stream
+
+                async for chunk in base_stream(
+                    provider_name=provider_name,
+                    messages=messages,
+                    model=model,
+                    temperature=head_agent.get("temperature", 0.7),
+                    max_tokens=head_agent.get("max_tokens", 4096),
+                    system_prompt=system_prompt,
+                    agent_name=head_name,
+                    agent_slug=head_slug,
+                    tool_names=tool_names,
+                    otdel_id=otdel_id,  # Pass otdel context for head protocol tools
+                ):
+                    try:
+                        payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
+                        msg_type = payload.get("type", "")
+
+                        if msg_type == "chunk":
+                            content = payload.get("content", "")
+                            if content:
+                                full_response += content
+                                await ws_manager.send(
+                                    user_id,
+                                    {
+                                        "type": "otdel:chunk",
+                                        "otdel_id": otdel_id,
+                                        "message_id": followup_msg_id,
+                                        "content": content,
+                                        "sender": head_slug,
+                                        "sender_name": head_name,
+                                        "is_head": True,
+                                    },
+                                )
+                        elif msg_type in ("tool_start", "tool_end"):
+                            # Forward tool events via WS
+                            await ws_manager.send(
+                                user_id,
+                                {
+                                    "type": f"otdel:{msg_type}",
+                                    "otdel_id": otdel_id,
+                                    "message_id": followup_msg_id,
+                                    "tool": payload.get("tool"),
+                                    "params": payload.get("params"),
+                                    "result": payload.get("result"),
+                                    "success": payload.get("success"),
+                                    "error": payload.get("error"),
+                                    "index": payload.get("index"),
+                                },
+                            )
+                        elif msg_type == "error":
+                            full_response = f"⚠️ Ошибка: {payload.get('message', 'Unknown error')}"
+                    except Exception:
+                        pass
+            except Exception as e:
+                logger.error("Head follow-up failed in otdel %s: %s", otdel_id, e)
+                full_response = f"⚠️ Ошибка: {e}"
+
+            # Strip leaked text-based tool calls from follow-up response too
+            full_response = re.sub(
+                r"<tool_call>.*?</tool_call>", "", full_response, flags=re.DOTALL
+            ).strip()
+            full_response = re.sub(r"```tool_call.*?```", "", full_response, flags=re.DOTALL).strip()
+
+            if full_response:
+                agent_msg = {
+                    "id": followup_msg_id,
+                    "role": "assistant",
+                    "sender": head_slug,
+                    "sender_name": head_name,
+                    "content": full_response,
+                    "is_head": True,
+                    "timestamp": _now().isoformat(),
+                    "model": model,
+                    "provider": provider_name,
+                }
+                history.append(agent_msg)
+                save_stats = _save_history(otdel_id, history)
+                if save_stats.get("was_compacted"):
+                    await ws_manager.send(
+                        user_id,
+                        {
+                            "type": "otdel:compacting",
+                            "otdel_id": otdel_id,
+                            "before": save_stats["before"],
+                            "after": save_stats["after"],
+                        },
+                    )
+
+                await ws_manager.send(
+                    user_id,
+                    {
+                        "type": "otdel:done",
+                        "otdel_id": otdel_id,
+                        "message_id": followup_msg_id,
+                        "message": agent_msg,
+                    },
+                )
+
+                # Check if head_delegate was called again in follow-up
+                # If so, need to process the new workers
                 hs = get_head_state(otdel_id)
                 if hs and hs.expected_workers:
-                    for slug in hs.expected_workers:
-                        if slug not in processed_slugs and slug not in expected_workers:
+                    new_workers = hs.expected_workers - responded_workers
+                    if new_workers:
+                        for slug in new_workers:
                             agent = get_agent(slug)
                             if agent:
-                                expected_workers.add(slug)
-                                # Use delegation task from HeadState as trigger
-                                delegation = hs.current_delegation or {}
-                                workers_list = delegation.get("workers", [])
-                                task_text = ""
-                                for w in workers_list:
-                                    if w.get("slug") == slug:
-                                        task_text = w.get("task", "")
-                                        break
-                                trigger = task_text or full_response.strip()
-                                agent_queue.append((agent, False, trigger))
+                                agent_queue.append((agent, False, ""))
                                 logger.info(
-                                    "Otdel %s head_delegate: queueing %s (task=%s)",
+                                    "Otdel %s follow-up delegation: queueing %s",
                                     otdel_id,
                                     agent.get("name"),
-                                    task_text[:60],
                                 )
-                    if expected_workers:
-                        head_delegating = True
-            # Note: agent response already sent via otdel:chunk + otdel:done above
-            # No need for otdel:message here
+
+        # ── Second pass: process workers queued by follow-up delegations ──
+        while agent_queue and processed_count < max_iterations:
+            agent, is_head, trigger_message = agent_queue.pop(0)
+            agent_slug_val = agent.get("slug", "")
+            agent_name_val = agent.get("name", "")
+
+            system_prompt = _build_otdel_system_prompt(otdel, agent, is_head)
+            history = _load_history(otdel_id)
+
+            # Auto-analyze images from the current user message
+            if images:
+                system_prompt += await _auto_analyze_images(images)
+
+            if is_head:
+                context_messages = _build_head_context(history, agent_slug_val)
+            else:
+                context_messages = _build_worker_context(history, agent_slug_val, head_slug, head_name)
+
+            messages = [
+                ChatMessage(role=m["role"], content=m["content"], images=m.get("images"))
+                for m in context_messages
+            ]
+            # Same trigger-wrap as the main loop above. Empty trigger (follow-up
+            # delegation with no task text) skips the wrap so we don't emit a
+            # span with an empty body — workers use the head's own recent text
+            # from history in that case.
+            if is_head:
+                trigger_content = trigger_message
+            elif trigger_message:
+                trigger_content = f"[📋 Задание от {head_name}]: {trigger_message}"
+            else:
+                trigger_content = trigger_message
+            messages.append(ChatMessage(role="user", content=trigger_content))
+
+            model = agent.get("model", "")
+            provider_name = agent.get("provider")
+
+            # Resolve model with fallback to provider's default
+            from .router import resolve_model
+
+            provider_name, model = resolve_model(provider_name, model)
+
+            if is_head:
+                tool_names = get_all_tool_names(include_head=True)
+            else:
+                tool_names = get_all_tool_names()
+
+            agent_msg_id = f"a-{uuid.uuid4().hex[:8]}"
+            full_response = ""
+
+            try:
+                from .router import stream_response as base_stream
+
+                async for chunk in base_stream(
+                    provider_name=provider_name,
+                    messages=messages,
+                    model=model,
+                    temperature=agent.get("temperature", 0.7),
+                    max_tokens=agent.get("max_tokens", 4096),
+                    system_prompt=system_prompt,
+                    agent_name=agent_name_val,
+                    agent_slug=agent_slug_val,
+                    tool_names=tool_names,
+                    otdel_id=otdel_id,
+                ):
+                    try:
+                        payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
+                        msg_type = payload.get("type", "")
+                        if msg_type == "chunk":
+                            content = payload.get("content", "")
+                            if content:
+                                full_response += content
+                                await ws_manager.send(
+                                    user_id,
+                                    {
+                                        "type": "otdel:chunk",
+                                        "otdel_id": otdel_id,
+                                        "message_id": agent_msg_id,
+                                        "content": content,
+                                        "sender": agent_slug_val,
+                                        "sender_name": agent_name_val,
+                                        "is_head": is_head,
+                                    },
+                                )
+                        elif msg_type in ("tool_start", "tool_end"):
+                            await ws_manager.send(
+                                user_id,
+                                {
+                                    "type": f"otdel:{msg_type}",
+                                    "otdel_id": otdel_id,
+                                    "message_id": agent_msg_id,
+                                    "tool": payload.get("tool"),
+                                    "params": payload.get("params"),
+                                    "result": payload.get("result"),
+                                    "success": payload.get("success"),
+                                    "error": payload.get("error"),
+                                    "index": payload.get("index"),
+                                },
+                            )
+                        elif msg_type == "error":
+                            full_response = f"⚠️ Ошибка: {payload.get('message', 'Unknown error')}"
+                    except Exception:
+                        pass
+            except Exception as e:
+                full_response = f"⚠️ Ошибка: {e}"
+
+            full_response = re.sub(
+                r"<tool_call>.*?</tool_call>", "", full_response, flags=re.DOTALL
+            ).strip()
+
+            if full_response:
+                agent_msg = {
+                    "id": agent_msg_id,
+                    "role": "assistant",
+                    "sender": agent_slug_val,
+                    "sender_name": agent_name_val,
+                    "content": full_response,
+                    "is_head": is_head,
+                    "timestamp": _now().isoformat(),
+                    "model": model,
+                    "provider": provider_name,
+                }
+                history = _load_history(otdel_id)
+                history.append(agent_msg)
+                _save_history(otdel_id, history)
+                await ws_manager.send(
+                    user_id,
+                    {
+                        "type": "otdel:done",
+                        "otdel_id": otdel_id,
+                        "message_id": agent_msg_id,
+                        "message": agent_msg,
+                    },
+                )
 
             processed_slugs.add(agent_slug_val)
             if not is_head:
-                # Worker finished its turn. Track the response so the head
-                # can see it via head_checklist / head_retry / head_evaluate.
-                # Retry is owned by the head protocol (head_retry) — used to
-                # be a hidden auto-retry here, but it duplicated the protocol
-                # knob and masked state from the head (responded_workers
-                # never got populated, so head_retry kept failing on phase
-                # gating). The head now sees the failure and decides.
-                is_error = full_response.startswith("⚠️ Ошибка:") or not full_response.strip()
-                head_state.responded_workers[agent_slug_val] = {
-                    "content": full_response,
-                    "model": model,
-                    "provider": provider_name,
-                    "tools": tools_called,
-                    "is_error": is_error,
-                }
+                responded_workers.add(agent_slug_val)
+                workers_responded += 1
+            processed_count += 1
 
-                # Multi-step continuation: if the original user message
-                # contained a multi-step marker (раунд/этап/итерац/...) and
-                # the head had delegated this task (head_delegating=True),
-                # AND the head did NOT itself queue another delegation in
-                # this same turn — mark that the follow-up should remind
-                # the head to call head_delegate for the next step. Without
-                # this the head often answers in prose ('Раунд 1: ...
-                # Стартуем') and stalls waiting for the user to nudge it.
-                if multi_step and head_delegating:
-                    # Snapshot which delegation ID was active when this
-                    # worker responded. The head's own follow-up will check
-                    # whether the ID advanced (= head re-delegated itself
-                    # in the same turn) to decide if a reminder is needed.
-                    last_delegation_id_at_worker_response = (
-                        head_state.active_delegation_id
-                    )
+        # ── Autopilot: check if head wants another iteration ────────────
+        head_action = head_state.last_head_action
+        if head_action == "continue_delegation":
+            # Emit iteration end, loop continues
+            await ws_manager.send(user_id, {
+                "type": "otdel:iter_end",
+                "otdel_id": otdel_id,
+                "iteration": _autopilot_iter + 1,
+            })
+            continue  # next autopilot iteration
 
-        processed_count += 1
+        # stop_delegation, head_takeover, escalate_to_user, or None (backward compat)
+        break  # exit autopilot loop
 
-    # ── Head follow-up (gather pattern) ──────────────────────────────
-    # ONE follow-up: workers respond → head summarizes → DONE
-    should_followup = False
-    if head_delegating and expected_workers:
-        missing = expected_workers - responded_workers
-        if not missing:
-            should_followup = True
-        else:
-            # Some workers haven't responded — still follow up so head can
-            # either wait, delegate to others, or finalize
-            logger.info(
-                "Otdel %s follow-up: %d workers still pending, asking head", otdel_id, len(missing)
-            )
-            should_followup = True
-    elif head_processed and workers_responded > 0 and not head_delegating:
-        should_followup = True
-
-    if should_followup and processed_count < max_iterations:
-        history = _load_history(otdel_id)
-        context_messages = _build_head_context(history, head_slug, exclude_last=False)
-
-        if head_delegating:
-            missing = expected_workers - responded_workers
-            if missing:
-                missing_names = []
-                for s in missing:
-                    a = get_agent(s)
-                    missing_names.append(a.get("name", s) if a else s)
-                acknowledge_trigger = (
-                    f"Некоторые работники ещё не ответили: {', '.join(missing_names)}. "
-                    "Жди их ответов в чате. "
-                    "Если нужно — отправь задачу повторно через head_delegate. "
-                    "НЕ ПИШИ что все ответили — это неправда."
-                )
-            else:
-                # Multi-step nudge: if the user's task was explicitly
-                # multi-step (раунд/этап/итерац/...) and the head did
-                # NOT re-delegate in this turn, append an explicit
-                # reminder to call head_delegate for the next step.
-                # The check uses active_delegation_id — if the head
-                # itself called head_delegate, this ID advances; if
-                # it stayed put, the head answered in prose and we
-                # need to push it to act.
-                nudge = ""
-                if (
-                    multi_step
-                    and last_delegation_id_at_worker_response
-                    and head_state.active_delegation_id
-                    == last_delegation_id_at_worker_response
-                ):
-                    nudge = (
-                        "\n\nПодсказка: исходная задача была многоэтапной, "
-                        "и в этом turn'е ты ещё не вызвал head_delegate "
-                        "для следующего этапа. Сейчас самое время — "
-                        "вызови head_delegate с конкретным task для "
-                        "следующего этапа. Не пиши план прозой."
-                    )
-                acknowledge_trigger = (
-                    "Все работники отдела ответили. "
-                    "Проанализируй их ответы.\n"
-                    "Если задача требует дополнительных действий (делегировать другому агенту, "
-                    "отправить на доработку, передать результат следующему этапу) — ПРОДОЛЖАЙ, "
-                    "вызывай head_delegate или другие инструменты.\n"
-                    "Если задача полностью выполнена — сформируй итог для пользователя."
-                    + nudge
-                )
-        else:
-            acknowledge_trigger = (
-                "Работники отдела ответили. Посмотри их ответы и прокомментируй, если нужно."
-            )
-
-        messages = [
-            ChatMessage(role=m["role"], content=m["content"], images=m.get("images"))
-            for m in context_messages
-        ]
-        messages.append(ChatMessage(role="user", content=acknowledge_trigger))
-
-        system_prompt = _build_otdel_system_prompt(otdel, head_agent, True)
-        model = head_agent.get("model", "")
-        provider_name = head_agent.get("provider")
-
-        # Resolve model with fallback to provider's default
-        from .router import resolve_model
-
-        provider_name, model = resolve_model(provider_name, model)
-
-        # Head gets all tools including head protocol
-        tool_names = get_all_tool_names(include_head=True)
-
-        # Stream follow-up response
-        followup_msg_id = f"a-{uuid.uuid4().hex[:8]}"
-        full_response = ""
-
-        try:
-            from .router import stream_response as base_stream
-
-            async for chunk in base_stream(
-                provider_name=provider_name,
-                messages=messages,
-                model=model,
-                temperature=head_agent.get("temperature", 0.7),
-                max_tokens=head_agent.get("max_tokens", 4096),
-                system_prompt=system_prompt,
-                agent_name=head_name,
-                agent_slug=head_slug,
-                tool_names=tool_names,
-                otdel_id=otdel_id,  # Pass otdel context for head protocol tools
-            ):
-                try:
-                    payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
-                    msg_type = payload.get("type", "")
-
-                    if msg_type == "chunk":
-                        content = payload.get("content", "")
-                        if content:
-                            full_response += content
-                            await ws_manager.send(
-                                user_id,
-                                {
-                                    "type": "otdel:chunk",
-                                    "otdel_id": otdel_id,
-                                    "message_id": followup_msg_id,
-                                    "content": content,
-                                    "sender": head_slug,
-                                    "sender_name": head_name,
-                                    "is_head": True,
-                                },
-                            )
-                    elif msg_type in ("tool_start", "tool_end"):
-                        # Forward tool events via WS
-                        await ws_manager.send(
-                            user_id,
-                            {
-                                "type": f"otdel:{msg_type}",
-                                "otdel_id": otdel_id,
-                                "message_id": followup_msg_id,
-                                "tool": payload.get("tool"),
-                                "params": payload.get("params"),
-                                "result": payload.get("result"),
-                                "success": payload.get("success"),
-                                "error": payload.get("error"),
-                                "index": payload.get("index"),
-                            },
-                        )
-                    elif msg_type == "error":
-                        full_response = f"⚠️ Ошибка: {payload.get('message', 'Unknown error')}"
-                except Exception:
-                    pass
-        except Exception as e:
-            logger.error("Head follow-up failed in otdel %s: %s", otdel_id, e)
-            full_response = f"⚠️ Ошибка: {e}"
-
-        # Strip leaked text-based tool calls from follow-up response too
-        full_response = re.sub(
-            r"<tool_call>.*?</tool_call>", "", full_response, flags=re.DOTALL
-        ).strip()
-        full_response = re.sub(r"```tool_call.*?```", "", full_response, flags=re.DOTALL).strip()
-
-        if full_response:
-            agent_msg = {
-                "id": followup_msg_id,
-                "role": "assistant",
-                "sender": head_slug,
-                "sender_name": head_name,
-                "content": full_response,
-                "is_head": True,
-                "timestamp": _now().isoformat(),
-                "model": model,
-                "provider": provider_name,
-            }
-            history.append(agent_msg)
-            save_stats = _save_history(otdel_id, history)
-            if save_stats.get("was_compacted"):
-                await ws_manager.send(
-                    user_id,
-                    {
-                        "type": "otdel:compacting",
-                        "otdel_id": otdel_id,
-                        "before": save_stats["before"],
-                        "after": save_stats["after"],
-                    },
-                )
-
-            await ws_manager.send(
-                user_id,
-                {
-                    "type": "otdel:done",
-                    "otdel_id": otdel_id,
-                    "message_id": followup_msg_id,
-                    "message": agent_msg,
-                },
-            )
-
-            # Check if head_delegate was called again in follow-up
-            # If so, need to process the new workers
-            hs = get_head_state(otdel_id)
-            if hs and hs.expected_workers:
-                new_workers = hs.expected_workers - responded_workers
-                if new_workers:
-                    for slug in new_workers:
-                        agent = get_agent(slug)
-                        if agent:
-                            agent_queue.append((agent, False, ""))
-                            logger.info(
-                                "Otdel %s follow-up delegation: queueing %s",
-                                otdel_id,
-                                agent.get("name"),
-                            )
-
-    # ── Second pass: process workers queued by follow-up delegations ──
-    while agent_queue and processed_count < max_iterations:
-        agent, is_head, trigger_message = agent_queue.pop(0)
-        agent_slug_val = agent.get("slug", "")
-        agent_name_val = agent.get("name", "")
-
-        system_prompt = _build_otdel_system_prompt(otdel, agent, is_head)
-        history = _load_history(otdel_id)
-
-        # Auto-analyze images from the current user message
-        if images:
-            system_prompt += await _auto_analyze_images(images)
-
-        if is_head:
-            context_messages = _build_head_context(history, agent_slug_val)
-        else:
-            context_messages = _build_worker_context(history, agent_slug_val, head_slug, head_name)
-
-        messages = [
-            ChatMessage(role=m["role"], content=m["content"], images=m.get("images"))
-            for m in context_messages
-        ]
-        # Same trigger-wrap as the main loop above. Empty trigger (follow-up
-        # delegation with no task text) skips the wrap so we don't emit a
-        # span with an empty body — workers use the head's own recent text
-        # from history in that case.
-        if is_head:
-            trigger_content = trigger_message
-        elif trigger_message:
-            trigger_content = f"[📋 Задание от {head_name}]: {trigger_message}"
-        else:
-            trigger_content = trigger_message
-        messages.append(ChatMessage(role="user", content=trigger_content))
-
-        model = agent.get("model", "")
-        provider_name = agent.get("provider")
-
-        # Resolve model with fallback to provider's default
-        from .router import resolve_model
-
-        provider_name, model = resolve_model(provider_name, model)
-
-        if is_head:
-            tool_names = get_all_tool_names(include_head=True)
-        else:
-            tool_names = get_all_tool_names()
-
-        agent_msg_id = f"a-{uuid.uuid4().hex[:8]}"
-        full_response = ""
-
-        try:
-            from .router import stream_response as base_stream
-
-            async for chunk in base_stream(
-                provider_name=provider_name,
-                messages=messages,
-                model=model,
-                temperature=agent.get("temperature", 0.7),
-                max_tokens=agent.get("max_tokens", 4096),
-                system_prompt=system_prompt,
-                agent_name=agent_name_val,
-                agent_slug=agent_slug_val,
-                tool_names=tool_names,
-                otdel_id=otdel_id,
-            ):
-                try:
-                    payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
-                    msg_type = payload.get("type", "")
-                    if msg_type == "chunk":
-                        content = payload.get("content", "")
-                        if content:
-                            full_response += content
-                            await ws_manager.send(
-                                user_id,
-                                {
-                                    "type": "otdel:chunk",
-                                    "otdel_id": otdel_id,
-                                    "message_id": agent_msg_id,
-                                    "content": content,
-                                    "sender": agent_slug_val,
-                                    "sender_name": agent_name_val,
-                                    "is_head": is_head,
-                                },
-                            )
-                    elif msg_type in ("tool_start", "tool_end"):
-                        await ws_manager.send(
-                            user_id,
-                            {
-                                "type": f"otdel:{msg_type}",
-                                "otdel_id": otdel_id,
-                                "message_id": agent_msg_id,
-                                "tool": payload.get("tool"),
-                                "params": payload.get("params"),
-                                "result": payload.get("result"),
-                                "success": payload.get("success"),
-                                "error": payload.get("error"),
-                                "index": payload.get("index"),
-                            },
-                        )
-                    elif msg_type == "error":
-                        full_response = f"⚠️ Ошибка: {payload.get('message', 'Unknown error')}"
-                except Exception:
-                    pass
-        except Exception as e:
-            full_response = f"⚠️ Ошибка: {e}"
-
-        full_response = re.sub(
-            r"<tool_call>.*?</tool_call>", "", full_response, flags=re.DOTALL
-        ).strip()
-
-        if full_response:
-            agent_msg = {
-                "id": agent_msg_id,
-                "role": "assistant",
-                "sender": agent_slug_val,
-                "sender_name": agent_name_val,
-                "content": full_response,
-                "is_head": is_head,
-                "timestamp": _now().isoformat(),
-                "model": model,
-                "provider": provider_name,
-            }
-            history = _load_history(otdel_id)
-            history.append(agent_msg)
-            _save_history(otdel_id, history)
-            await ws_manager.send(
-                user_id,
-                {
-                    "type": "otdel:done",
-                    "otdel_id": otdel_id,
-                    "message_id": agent_msg_id,
-                    "message": agent_msg,
-                },
-            )
-
-        processed_slugs.add(agent_slug_val)
-        if not is_head:
-            responded_workers.add(agent_slug_val)
-            workers_responded += 1
-        processed_count += 1
+    else:
+        # Safety cap hit - loop exhausted all iterations
+        logger.warning("Otdel %s: autopilot safety cap hit (%d iterations)", otdel_id, autopilot_max)
+        await ws_manager.send(user_id, {
+            "type": "otdel:stuck",
+            "otdel_id": otdel_id,
+            "reason": "max_iterations",
+            "iteration": autopilot_max,
+        })
 
     # Signal done
     await ws_manager.send(

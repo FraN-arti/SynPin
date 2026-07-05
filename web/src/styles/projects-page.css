@@ -291,12 +291,15 @@
   width: 560px;
 }
 .projects-form-hint {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text-muted);
-  margin-top: 4px;
+  opacity: 0.75;
+  line-height: 1.4;
+  margin-top: 3px;
+  margin-bottom: 0;
 }
 .projects-form-warning {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--orange);
   margin-top: 4px;
 }
@@ -316,12 +319,12 @@
 .projects-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 .projects-form-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 .projects-form-group label {
   font-size: 12px;

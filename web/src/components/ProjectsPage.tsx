@@ -782,7 +782,7 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
                   <span className="projects-form-hint">Через запятую</span>
                 </div>
               </div>
-              <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
+              <div className="modal-footer">
                 <button className="projects-btn-cancel" onClick={() => setShowEditModal(false)}>Отмена</button>
                 <button
                   className="projects-btn-create"
@@ -812,7 +812,7 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
                   Задачи будут отвязаны от проекта (без удаления).
                 </p>
               </div>
-              <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
+              <div className="modal-footer">
                 <button className="projects-btn-cancel" onClick={() => setShowDeleteConfirm(false)}>Отмена</button>
                 <button
                   className="projects-btn-create danger"
@@ -1036,7 +1036,7 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
 
               <div className="projects-form-group">
                 <label>Отделы <span className="required">*</span></label>
-                <span className="projects-form-hint" style={{ marginTop: -4, marginBottom: 6, display: 'block' }}>
+                <span className="projects-form-hint">
                   Какие отделы участвуют в проекте. Выберите основной отдел — его глава будет управлять проектом.
                 </span>
                 <div className="projects-dept-search">
@@ -1117,7 +1117,7 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
               </div>
             </div>
 
-            <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
+            <div className="modal-footer">
               <button className="projects-btn-cancel" onClick={() => setShowCreateModal(false)}>
                 Отмена
               </button>

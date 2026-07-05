@@ -15,12 +15,12 @@ router = APIRouter(prefix="/api/protocol", tags=["protocol"])
 
 
 class ProtocolSettingsUpdate(BaseRequest):
-    """Partial update — both fields optional. extra='forbid' catches
+    """Partial update — all fields optional. extra='forbid' catches
     typos in field names (see api/_base.py for rationale).
     """
-
     retry_limit_enabled: bool | None = None
     max_retries: int | None = None
+    max_iterations: int | None = None
 
 
 @router.get("/settings")
@@ -37,6 +37,8 @@ def update_protocol_settings(req: ProtocolSettingsUpdate) -> dict:
         # Pydantic Field(ge=1, le=10) enforces the range. Let it raise —
         # FastAPI returns 422 with a readable error.
         settings.max_retries = req.max_retries
+    if req.max_iterations is not None:
+        settings.max_iterations = req.max_iterations
     save_settings(settings)
     return settings.model_dump()
 

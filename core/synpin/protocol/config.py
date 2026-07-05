@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 # weaken the very behaviour we just made real — keep it explicit.
 DEFAULT_MAX_RETRIES = 3
 RETRY_LIMIT_ENABLED_DEFAULT = True
+DEFAULT_MAX_ITERATIONS = 15
 
 
 # ── Model ─────────────────────────────────────────────────────────
@@ -55,6 +56,7 @@ class ProtocolSettings(BaseModel):
 
     retry_limit_enabled: bool = RETRY_LIMIT_ENABLED_DEFAULT
     max_retries: int = Field(default=DEFAULT_MAX_RETRIES, ge=1, le=10)
+    max_iterations: int = Field(default=DEFAULT_MAX_ITERATIONS, ge=1, le=50)
 
 
 # ── File location ─────────────────────────────────────────────────
@@ -113,3 +115,8 @@ def get_max_retries() -> int:
 def is_retry_limit_enabled() -> bool:
     """True when the retry cap is enforced. False = trust the LLM."""
     return load_settings().retry_limit_enabled
+
+
+def get_max_iterations() -> int:
+    """Return the autopilot driver cap (max iterations per user message)."""
+    return load_settings().max_iterations

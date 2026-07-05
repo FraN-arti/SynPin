@@ -1,16 +1,20 @@
 """Send a message from the main agent to an otdel's chat.
 
-Delegates to _handle_otdel_send for full pipeline processing
-(head → workers → follow-up → autopilot iterations).
+Waits for the head agent's response and returns it — enabling
+multi-round dialogue between the main agent and a department.
+
 Accepts either otdel_id or otdel_name — resolves automatically.
 """
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 
 from .base import ToolResult, make_success, make_error
 from ._registry import register_tool
+
+logger = logging.getLogger(__name__)
 
 
 async def _resolve_otdel_id(otdel_id: str, otdel_name: str) -> tuple[str, str]:
@@ -43,17 +47,17 @@ async def _resolve_otdel_id(otdel_id: str, otdel_name: str) -> tuple[str, str]:
 
 @register_tool(
     name='otdel_message',
-    description='Отправить сообщение в чат отдела от имени главного агента. Глава отдела получит уведомление и обработает с полным pipeline (делегирование, оценка, автопилот). Принимает otdel_id ИЛИ otdel_name. Только для главного агента.',
+    description='Отправить сообщение в чат отдела от имени главного агента и получить ответ главы. Ждёт обработки (делегирование, оценка, автопилот) и возвращает итоговый ответ. Принимает otdel_id ИЛИ otdel_name. Только для главного агента.',
     category='other',
     scope='primary',
     dangerous=False,
 )
 async def otdel_message(params: dict[str, Any]) -> ToolResult:
     """
-    Отправить сообщение в чат отдела от имени главного агента.
+    Отправить сообщение в чат отдела и получить ответ главы.
 
-    Использует полный pipeline _handle_otdel_send — глава может
-    делегировать работникам, оценивать, итерировать через автопилот.
+    Использует полный pipeline: глава может делегировать работникам,
+    оценивать, итерировать через автопилот. Возвращает итоговый ответ.
 
     Параметры:
       otdel_id (str) — ID отдела (опционально, если указан otdel_name)
@@ -75,23 +79,67 @@ async def otdel_message(params: dict[str, Any]) -> ToolResult:
         return make_error(f"Отдел «{otdel_name}» не найден. Используй otdel_manage(list) для списка отделов.")
 
     try:
-        # Use the full pipeline — _handle_otdel_send handles:
-        # - message saving, history, head processing
-        # - worker delegation (head_delegate)
-        # - follow-up and autopilot iterations
-        # - otdel:done events
+        from ..chat.otdel_helpers import _load_history
+
+        # Snapshot history length — we'll poll for new assistant messages
+        history_before = _load_history(otdel_id)
+        known_msg_ids = {m.get("id") for m in history_before}
+
+        # Run the full pipeline (awaits completion, not fire-and-forget)
         from ..chat.ws_router import _handle_otdel_send
 
         synthetic_msg = {"otdel_id": otdel_id, "message": message}
-        asyncio.create_task(_handle_otdel_send("tool:otdel_message", synthetic_msg))
+        await _handle_otdel_send("tool:otdel_message", synthetic_msg)
+
+        # Collect all new assistant messages from history
+        history_after = _load_history(otdel_id)
+        new_messages = [
+            m for m in history_after
+            if m.get("id") not in known_msg_ids and m.get("role") == "assistant"
+        ]
+
+        if not new_messages:
+            return make_success({
+                "status": "no_response",
+                "otdel_id": otdel_id,
+                "otdel_name": resolved_name,
+                "info": f"Сообщение отправлено в отдел «{resolved_name}», но глава не ответила.",
+            })
+
+        # Build a readable summary of the head's response
+        last_msg = new_messages[-1]
+        head_name = last_msg.get("sender_name", last_msg.get("sender", "глава"))
+        head_response = last_msg.get("content", "")
+
+        # If there were multiple assistant messages (workers + head),
+        # include the full chain
+        if len(new_messages) > 1:
+            parts = []
+            for m in new_messages:
+                name = m.get("sender_name", m.get("sender", "?"))
+                content = m.get("content", "")
+                parts.append(f"[{name}]: {content}")
+            full_chain = "\n\n".join(parts)
+            return make_success({
+                "status": "completed",
+                "otdel_id": otdel_id,
+                "otdel_name": resolved_name,
+                "head_name": head_name,
+                "head_response": head_response,
+                "full_chain": full_chain,
+                "iterations": len(new_messages),
+                "info": f"Отдел «{resolved_name}» обработал ({len(new_messages)} сообщений). Последний ответ от {head_name}.",
+            })
 
         return make_success({
-            "status": "sent",
+            "status": "completed",
             "otdel_id": otdel_id,
             "otdel_name": resolved_name,
-            "message": message,
-            "info": f"Сообщение отправлено в отдел «{resolved_name}». Глава отдела обработает с полным pipeline (делегирование, оценка, автопилот).",
+            "head_name": head_name,
+            "head_response": head_response,
+            "info": f"Глава отдела «{resolved_name}» ({head_name}) ответил.",
         })
 
     except Exception as e:
+        logger.error("otdel_message error for %s: %s", otdel_id, e)
         return make_error(f"otdel_message error: {e}")

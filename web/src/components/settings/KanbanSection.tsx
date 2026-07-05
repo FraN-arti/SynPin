@@ -70,7 +70,9 @@ export function KanbanSection() {
         <p style={{ color: 'var(--gray-500)', fontSize: '14px', lineHeight: '1.6', marginBottom: '16px' }}>
           Глобальная доска задач для управления работой всех отделов и агентов.
         </p>
-        {stats && (
+        {stats === null ? (
+          <LoadingSpinner text="Загрузка статистики..." minHeight={60} />
+        ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
             <div style={{ padding: '12px', background: 'var(--gray-900)', borderRadius: '8px', textAlign: 'center' }}>
               <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text)' }}>{stats.total as number}</div>
@@ -174,6 +176,7 @@ export function KanbanSection() {
 function KanbanColumnsConfig() {
   const DEFAULT_COLUMN_AUTO = '__auto__'
   const [columns, setColumns] = useState<KanbanColumnItem[]>([])
+  const [loaded, setLoaded] = useState(false)
   const [defaultColumn, setDefaultColumn] = useState<string>(DEFAULT_COLUMN_AUTO)
   const [autoArchiveDays, setAutoArchiveDays] = useState<number>(30)
   const [autoDeleteColumns, setAutoDeleteColumns] = useState<string[]>([])
@@ -200,8 +203,8 @@ function KanbanColumnsConfig() {
   useEffect(() => {
     fetch(`${API_BASE}/api/kanban/config/columns`)
       .then(r => r.json())
-      .then(data => setColumns(Array.isArray(data) ? data : data.columns || []))
-      .catch(() => {})
+      .then(data => { setColumns(Array.isArray(data) ? data : data.columns || []); setLoaded(true) })
+      .catch(() => setLoaded(true))
   }, [])
 
   useEffect(() => {
@@ -447,6 +450,9 @@ function KanbanColumnsConfig() {
   return (
     <SettingsCard title="Конфигурация колонок">
       <p className="settings-hint">Настройте колонки доски: цвета, порядок, видимость</p>
+      {!loaded ? (
+        <LoadingSpinner text="Загрузка колонок..." minHeight={60} />
+      ) : <>
       <div className="settings-divider-thin" />
       {columns.map((col, i) => (
         <div key={col.id} className={`kanban-config-row${saving && savedId === col.id ? ' saving' : ''}`}>
@@ -589,6 +595,7 @@ function KanbanColumnsConfig() {
           />
         </div>
       )}
+      </>}
     </SettingsCard>
   )
 }
@@ -597,6 +604,7 @@ function KanbanColumnsConfig() {
 
 function KanbanLabelsConfig() {
   const [labels, setLabels] = useState<KanbanLabelItem[]>([])
+  const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savedId, setSavedId] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -621,8 +629,8 @@ function KanbanLabelsConfig() {
   useEffect(() => {
     fetch(`${API_BASE}/api/kanban/config/labels`)
       .then(r => r.json())
-      .then(data => setLabels(Array.isArray(data) ? data : data.labels || []))
-      .catch(() => {})
+      .then(data => { setLabels(Array.isArray(data) ? data : data.labels || []); setLoaded(true) })
+      .catch(() => setLoaded(true))
   }, [])
 
   useEffect(() => {
@@ -721,6 +729,9 @@ function KanbanLabelsConfig() {
   return (
     <SettingsCard title="Конфигурация меток">
       <p className="settings-hint">Настройте метки (теги) для задач: цвет фона и текста</p>
+      {!loaded ? (
+        <LoadingSpinner text="Загрузка меток..." minHeight={60} />
+      ) : <>
       <div className="settings-divider-thin" />
       {labels.map((label, i) => (
         <div key={label.id} className={`kanban-config-row${saving && savedId === label.id ? ' saving' : ''}`}>
@@ -787,6 +798,7 @@ function KanbanLabelsConfig() {
           />
         </div>
       )}
+      </>}
     </SettingsCard>
   )
 }
@@ -795,13 +807,10 @@ function KanbanLabelsConfig() {
 
 function KanbanWidgetConfig() {
   const [config, setConfig] = useState<KanbanWidgetConfigData>({
-    mode: 'active',
-    max_items: 10,
-    show_columns: [],
-    show_deadline: true,
-    show_department: true,
-    compact: true,
+    mode: 'active', max_items: 10, show_columns: [],
+    show_deadline: true, show_department: true, compact: true,
   })
+  const [loaded, setLoaded] = useState(false)
   const [columns, setColumns] = useState<KanbanColumnForWidget[]>([])
   const [saving, setSaving] = useState(false)
 
@@ -810,8 +819,8 @@ function KanbanWidgetConfig() {
   useEffect(() => {
     fetch(`${API_BASE}/api/kanban/config/widget`)
       .then(r => r.json())
-      .then(setConfig)
-      .catch(() => {})
+      .then(d => { setConfig(d); setLoaded(true) })
+      .catch(() => setLoaded(true))
   }, [])
 
   useEffect(() => {
@@ -876,7 +885,9 @@ function KanbanWidgetConfig() {
   return (
     <SettingsCard title="Конфигурация виджета" className={saving ? 'saving' : undefined}>
       <p className="settings-hint">Настройте виджет канбан-доски на главной странице</p>
-
+      {!loaded ? (
+        <LoadingSpinner text="Загрузка виджета..." minHeight={60} />
+      ) : <>
       {/* ── Отображение ── */}
       <div className="settings-section-label">Отображение</div>
       <div className="settings-row-2">
@@ -973,6 +984,7 @@ function KanbanWidgetConfig() {
         checked={config.compact}
         onChange={v => updateConfig({ compact: v })}
       />
+      </>}
     </SettingsCard>
   )
 }
@@ -984,9 +996,10 @@ function BoardSettingsConfig({ refreshKey }: { refreshKey?: number }) {
     max_active_tasks: 50,
     auto_archive_days: 30,
     notifications_enabled: true,
-    archive_column: '' as string,
-    blocked_column: '' as string,
+    archive_column: '',
+    blocked_column: '',
   })
+  const [loaded, setLoaded] = useState(false)
   const loadSettings = useCallback(() => {
     fetch(`${API_BASE}/api/kanban/config/settings`)
       .then(r => r.json())
@@ -998,8 +1011,9 @@ function BoardSettingsConfig({ refreshKey }: { refreshKey?: number }) {
           archive_column: data.archive_column ?? '',
           blocked_column: data.blocked_column ?? '',
         })
+        setLoaded(true)
       })
-      .catch(() => {})
+      .catch(() => setLoaded(true))
   }, [])
 
   useEffect(() => { loadSettings() }, [loadSettings, refreshKey])
@@ -1018,7 +1032,7 @@ function BoardSettingsConfig({ refreshKey }: { refreshKey?: number }) {
     }
   }, [])
 
-  const update = (patch: Partial<typeof settings>) => {
+  const update = (patch: Record<string, unknown>) => {
     setSettings(prev => ({ ...prev, ...patch }))
     save(patch)
   }
@@ -1034,6 +1048,9 @@ function BoardSettingsConfig({ refreshKey }: { refreshKey?: number }) {
   return (
     <SettingsCard title="Настройки доски">
       <p className="settings-hint">Лимиты, архивация и уведомления глобальной доски задач</p>
+      {!loaded ? (
+        <LoadingSpinner text="Загрузка настроек..." minHeight={60} />
+      ) : <>
       <div className="settings-row-2">
         <div className="settings-field" style={{ opacity: 0.5, pointerEvents: 'none' }}>
           <label>Максимум активных задач <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>🚧 скоро</span></label>
@@ -1056,6 +1073,7 @@ function BoardSettingsConfig({ refreshKey }: { refreshKey?: number }) {
           <span className="settings-hint">Задачи старше этого срока перемещаются в архив. Колонки выбираются в блоке «Конфигурация колонок»</span>
         </div>
       </div>
+      </>}
     </SettingsCard>
   )
 }

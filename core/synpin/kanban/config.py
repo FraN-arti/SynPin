@@ -90,25 +90,84 @@ class BoardSettings(BaseModel):
 # ── Defaults ─────────────────────────────────────────────────────────────────
 
 def _default_columns() -> list[ColumnConfig]:
+    """Seed defaults: 9 columns matching the standard SynPin kanban layout.
+
+    These are used when no columns.yaml exists yet (fresh install).
+    Each column maps to a TaskStatus enum value so the backend can
+    correctly group tasks by status.
+    """
     return [
-        ColumnConfig(id=generate_id(), label="Backlog", color="#6b7280", order=0),
-        ColumnConfig(id=generate_id(), label="TODO", color="#3b82f6", order=1),
-        ColumnConfig(id=generate_id(), label="In Progress", color="#f97316", order=2),
-        ColumnConfig(id=generate_id(), label="Review", color="#f59e0b", order=3),
-        ColumnConfig(id=generate_id(), label="Revision", color="#ef4444", order=4),
-        ColumnConfig(id=generate_id(), label="Blocked", color="#dc2626", order=5),
-        ColumnConfig(id=generate_id(), label="Done", color="#22c55e", order=6),
-        ColumnConfig(id=generate_id(), label="Archive", color="#6b7280", order=7),
+        ColumnConfig(
+            id=generate_id(), label="Бэклог", status="backlog",
+            color="#9ca3af", order=0,
+            description="Идеи и заявки, которые ещё не прошли приоритизацию. Не обещаем сроки.",
+        ),
+        ColumnConfig(
+            id=generate_id(), label="К работе", status="todo",
+            color="#60a5fa", order=1,
+            description="Одобренные задачи, готовые к взятию в работу. Назначен исполнитель, понятен первый шаг.",
+        ),
+        ColumnConfig(
+            id=generate_id(), label="Готово к старту", status="ready",
+            color="#c084fc", order=2,
+            description="Все блокеры сняты, ждём только свободный слот исполнителя.",
+        ),
+        ColumnConfig(
+            id=generate_id(), label="В работе", status="in_progress",
+            color="#fb923c", order=3,
+            description="Активная работа одного агента. Не больше 1-2 задач на отдел одновременно.",
+        ),
+        ColumnConfig(
+            id=generate_id(), label="На проверке", status="review",
+            color="#fbbf24", order=4,
+            description="Результат готов, ждёт проверки главы отдела или заказчика. Ожидаемое время ревью — 1-2 дня.",
+        ),
+        ColumnConfig(
+            id=generate_id(), label="Доработка", status="revision",
+            color="#f472b6", order=5,
+            description="Проверяющий вернул на доработку. Конкретные правки в комментариях.",
+        ),
+        ColumnConfig(
+            id=generate_id(), label="Заблокировано", status="blocked",
+            color="#f87171", order=6,
+            description="Работа остановлена внешней причиной. Укажи блокер в комментариях.",
+        ),
+        ColumnConfig(
+            id=generate_id(), label="Готово", status="done",
+            color="#4ade80", order=7,
+            description="Принято и закрыто. В архив переходит автоматически через N дней.",
+        ),
+        ColumnConfig(
+            id=generate_id(), label="Архив", status="archive",
+            color="#6b7280", order=8,
+            description="Архивные задачи. Скрытые с основной доски, доступны через поиск.",
+        ),
     ]
 
 
 def _default_labels() -> list[LabelConfig]:
+    """Seed defaults: standard label set for SynPin kanban tasks."""
     return [
-        LabelConfig(id=generate_id(), name="#System", color="#1e3a5f", text_color="#93c5fd"),
-        LabelConfig(id=generate_id(), name="#Service", color="#166534", text_color="#bbf7d0"),
-        LabelConfig(id=generate_id(), name="#Bug", color="#7f1d1d", text_color="#fca5a5"),
-        LabelConfig(id=generate_id(), name="#Feature", color="#4c1d95", text_color="#c4b5fd"),
-        LabelConfig(id=generate_id(), name="#Urgent", color="#78350f", text_color="#fcd34d"),
+        LabelConfig(
+            id=generate_id(), name="#Service",
+            color="#166534", text_color="#bbf7d0",
+            description="Сервисные задачи: деплой, настройка, обслуживание инфраструктуры",
+        ),
+        LabelConfig(
+            id=generate_id(), name="#Bug",
+            color="#7f1d1d", text_color="#fca5a5",
+            description="Ошибки и баги в коде, требующие исправления",
+        ),
+        LabelConfig(
+            id=generate_id(), name="#Feature",
+            color="#4c1d95", text_color="#c4b5fd",
+            description="Новые функции и возможности платформы",
+        ),
+        LabelConfig(
+            id=generate_id(), name="#Urgent",
+            color="#78350f", text_color="#fcd34d",
+            description="Срочные задачи, требующие немедленного внимания",
+        ),
     ]
 
 

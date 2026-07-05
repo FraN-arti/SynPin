@@ -19,7 +19,7 @@ logger = logging.getLogger("synpin.memory")
 
 @register_tool(
     name='memory_write',
-    description='Запись в память агента. Используй чтобы запомнить важную информацию на будущее.',
+    description='Запись в память агента. Targets: memory (MEMORY.md — долгоживущие факты о пользователе), user (USER.md — профиль). Actions: add/replace/remove (записи в MEMORY/USER), fact (решения — ТОЛЬКО итоги обсуждений и ADR-записки, НЕ лог действий).',
     category='memory',
     scope='builtin',
     dangerous=False,

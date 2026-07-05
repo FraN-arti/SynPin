@@ -297,7 +297,9 @@
 
 .custom-dropdown {
   position: relative;
-  width: 100%;
+  /* No explicit width — let the trigger auto-size to its label. The
+     row layout (settings-row-2, kanban-config-row, etc.) decides how
+     wide the dropdown should be via flex. */
 }
 
 .custom-dropdown.disabled {

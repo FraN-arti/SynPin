@@ -785,8 +785,10 @@
 }
 .kanban-config-row > input {
   flex: 0 1 auto;
-  min-width: 0;
-  max-width: 200px;
+  min-width: 60px;
+  max-width: 320px;
+  field-sizing: content;
+  /* Fallback for older browsers — JSX sets size= attr from value.length */
 }
 .kanban-config-row:last-child {
   border-bottom: none;

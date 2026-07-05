@@ -421,14 +421,16 @@ function KanbanColumnsConfig() {
             value={col.label}
             onChange={e => updateLabel(i, e.target.value)}
             placeholder="Название"
-            style={{ flex: '0 1 140px', minWidth: 80 }}
+            size={Math.max((col.label || '').length, 8)}
+            style={{ flex: '0 1 auto', minWidth: 80 }}
           />
           <input
             className="settings-input"
             value={col.description || ''}
             onChange={e => updateDescription(i, e.target.value)}
             placeholder="Описание (для промпта агентов)"
-            style={{ flex: '1 1 200px', minWidth: 100, fontSize: '12px', opacity: 0.7 }}
+            size={Math.max((col.description || '').length, 14)}
+            style={{ flex: '1 1 auto', minWidth: 100, fontSize: '12px', opacity: 0.7 }}
           />
           <CustomDropdown
             value={col.status || ''}

@@ -1,20 +1,16 @@
 """Send a message from the main agent to an otdel's chat.
 
-Directly saves to history + broadcasts via WebSocket.
-Head agent processes in background.
-
+Delegates to _handle_otdel_send for full pipeline processing
+(head → workers → follow-up → autopilot iterations).
 Accepts either otdel_id or otdel_name — resolves automatically.
 """
 from __future__ import annotations
 
 import asyncio
-import json
-import uuid
 from typing import Any
 
 from .base import ToolResult, make_success, make_error
 from ._registry import register_tool
-from ..time import now as _now
 
 
 async def _resolve_otdel_id(otdel_id: str, otdel_name: str) -> tuple[str, str]:
@@ -45,10 +41,9 @@ async def _resolve_otdel_id(otdel_id: str, otdel_name: str) -> tuple[str, str]:
     return "", ""
 
 
-
 @register_tool(
     name='otdel_message',
-    description='Отправить сообщение в чат отдела от имени главного агента. Глава отдела получит уведомление и может ответить. Принимает otdel_id ИЛИ otdel_name. Только для главного агента.',
+    description='Отправить сообщение в чат отдела от имени главного агента. Глава отдела получит уведомление и обработает с полным pipeline (делегирование, оценка, автопилот). Принимает otdel_id ИЛИ otdel_name. Только для главного агента.',
     category='other',
     scope='primary',
     dangerous=False,
@@ -57,8 +52,8 @@ async def otdel_message(params: dict[str, Any]) -> ToolResult:
     """
     Отправить сообщение в чат отдела от имени главного агента.
 
-    Сообщение сохраняется в историю и отправляется через WebSocket.
-    Глава отдела получает уведомление и обрабатывает в фоне.
+    Использует полный pipeline _handle_otdel_send — глава может
+    делегировать работникам, оценивать, итерировать через автопилот.
 
     Параметры:
       otdel_id (str) — ID отдела (опционально, если указан otdel_name)
@@ -80,125 +75,23 @@ async def otdel_message(params: dict[str, Any]) -> ToolResult:
         return make_error(f"Отдел «{otdel_name}» не найден. Используй otdel_manage(list) для списка отделов.")
 
     try:
-        from ..chat.otdel_helpers import _load_history, _save_history
-        from ..chat.ws_manager import ws_manager
+        # Use the full pipeline — _handle_otdel_send handles:
+        # - message saving, history, head processing
+        # - worker delegation (head_delegate)
+        # - follow-up and autopilot iterations
+        # - otdel:done events
+        from ..chat.ws_router import _handle_otdel_send
 
-        # Save message to history
-        history = _load_history(otdel_id)
-        user_msg = {
-            "id": f"u-{uuid.uuid4().hex[:8]}",
-            "role": "user",
-            "sender": "main_agent",
-            "content": message,
-            "timestamp": _now().isoformat(),
-        }
-        history.append(user_msg)
-        _save_history(otdel_id, history)
-
-        # Broadcast to all connected WS clients
-        await ws_manager.broadcast({
-            "type": "otdel:message",
-            "otdel_id": otdel_id,
-            "message": user_msg,
-        })
-
-        # Trigger head agent processing in background
-        asyncio.create_task(_process_head(otdel_id, message))
+        synthetic_msg = {"otdel_id": otdel_id, "message": message}
+        asyncio.create_task(_handle_otdel_send("tool:otdel_message", synthetic_msg))
 
         return make_success({
             "status": "sent",
             "otdel_id": otdel_id,
             "otdel_name": resolved_name,
             "message": message,
-            "info": f"Сообщение отправлено в отдел «{resolved_name}». Глава отдела получит уведомление.",
+            "info": f"Сообщение отправлено в отдел «{resolved_name}». Глава отдела обработает с полным pipeline (делегирование, оценка, автопилот).",
         })
 
     except Exception as e:
         return make_error(f"otdel_message error: {e}")
-
-
-async def _process_head(otdel_id: str, message: str):
-    """Process head agent response in background."""
-    try:
-        from ..chat.otdel_helpers import (
-            _load_history, _save_history,
-            _build_otdel_system_prompt, _build_head_context,
-        )
-        from ..chat.providers.base import ChatMessage
-        from ..chat.ws_manager import ws_manager
-        from ..agents.manager import get_otdel, get_agent
-        from ..chat.router import resolve_model, stream_response
-
-        otdel = get_otdel(otdel_id)
-        if not otdel:
-            return
-
-        head_slug = otdel.get("head", "")
-        head_agent = get_agent(head_slug)
-        if not head_agent:
-            return
-
-        # Build context
-        history = _load_history(otdel_id)
-        system_prompt = _build_otdel_system_prompt(otdel, head_agent, True)
-        context_messages = _build_head_context(history, head_slug)
-        messages = [ChatMessage(role=m["role"], content=m["content"]) for m in context_messages]
-        # Label the trigger message so the head knows who sent it
-        messages.append(ChatMessage(role="user", content=f"[🤖 Главный ассистент]: {message}"))
-
-        model = head_agent.get("model", "")
-        provider_name = head_agent.get("provider")
-        provider_name, model = resolve_model(provider_name, model)
-
-        head_protocol_tools = ["head_delegate", "head_evaluate", "head_retry", "head_rework", "head_checklist", "head_decide", "head_block", "kanban_task"]
-        tool_names = list(head_agent.get("tools", [])) + head_protocol_tools
-
-        # Stream response
-        full_response = ""
-        async for chunk in stream_response(
-            provider_name=provider_name,
-            messages=messages,
-            model=model,
-            temperature=head_agent.get("temperature", 0.7),
-            max_tokens=head_agent.get("max_tokens", 4096),
-            system_prompt=system_prompt,
-            agent_name=head_agent.get("name", head_slug),
-            agent_slug=head_slug,
-            tool_names=tool_names,
-            otdel_id=otdel_id,
-        ):
-            if '"type": "chunk"' in chunk:
-                try:
-                    payload = json.loads(chunk.split("data: ", 1)[1].split("\n")[0])
-                    if payload.get("type") == "chunk":
-                        full_response += payload.get("content", "")
-                except Exception:
-                    pass
-
-        if full_response:
-            # Save response
-            agent_msg = {
-                "id": f"a-{uuid.uuid4().hex[:8]}",
-                "role": "assistant",
-                "sender": head_slug,
-                "sender_name": head_agent.get("name", head_slug),
-                "content": full_response,
-                "is_head": True,
-                "timestamp": _now().isoformat(),
-                "model": model,
-                "provider": provider_name,
-            }
-            history = _load_history(otdel_id)
-            history.append(agent_msg)
-            _save_history(otdel_id, history)
-
-            # Broadcast response
-            await ws_manager.broadcast({
-                "type": "otdel:message",
-                "otdel_id": otdel_id,
-                "message": agent_msg,
-            })
-
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).error("Head processing failed for otdel %s: %s", otdel_id, e)

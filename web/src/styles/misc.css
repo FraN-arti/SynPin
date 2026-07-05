@@ -93,7 +93,7 @@ input[type="number"] {
   font-size: 14px;
   font-family: inherit;
   cursor: pointer;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
   text-align: left;
 }
 .picker-trigger:hover {
@@ -101,7 +101,7 @@ input[type="number"] {
 }
 .picker-trigger.open {
   border-color: var(--accent, #f97316);
-  box-shadow: 0 0 0 1px var(--accent, #f97316), var(--glow-orange);
+  box-shadow: var(--glow-orange);
 }
 .picker-trigger.has-value {
   color: var(--text, #fff);

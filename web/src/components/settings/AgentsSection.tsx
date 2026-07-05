@@ -400,7 +400,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
                       { value: '', label: '— не указана —' },
                       ...roles.map(r => ({ value: r.rolesid, label: r.name })),
                     ]}
-                    width="100%"
+                   
                   />
                 </div>
                 <div className="settings-field">
@@ -412,7 +412,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
                       { value: '', label: '— не указан —' },
                       ...departments.map(d => ({ value: d.departmentsid, label: d.name })),
                     ]}
-                    width="100%"
+                   
                   />
                 </div>
               </div>
@@ -425,7 +425,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
                     { value: '', label: '— выбрать позже —' },
                     ...modelOptions.map(opt => ({ value: opt, label: opt })),
                   ]}
-                  width="100%"
+                 
                 />
               </div>
               <div className="settings-field">
@@ -601,7 +601,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
                             value={agent.role}
                             onChange={v => handleExternalRoleChange(agent, v)}
                             options={roles.map(r => ({ value: r.rolesid, label: r.name }))}
-                            width="100%"
+                           
                           />
                         </div>
                         <div className="expanded-field">
@@ -610,7 +610,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
                             value={agent.department}
                             onChange={v => handleExternalDeptChange(agent, v)}
                             options={departments.map(d => ({ value: d.departmentsid, label: d.name }))}
-                            width="100%"
+                           
                           />
                         </div>
                         {agent.models.length > 0 && (
@@ -620,7 +620,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
                               value={agent.models[0] || ''}
                               onChange={() => {}}
                               options={agent.models.map(m => ({ value: m, label: m }))}
-                              width="100%"
+                             
                               disabled
                             />
                           </div>
@@ -751,7 +751,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
                               value={agent.role}
                               onChange={v => handleAgentRoleChange(agent, v)}
                               options={roles.map(r => ({ value: r.rolesid, label: r.name }))}
-                              width="100%"
+                             
                             />
                           </div>
                           <div className="expanded-field">
@@ -760,7 +760,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
                               value={agent.department}
                               onChange={v => handleAgentDeptChange(agent, v)}
                               options={departments.map(d => ({ value: d.departmentsid, label: d.name }))}
-                              width="100%"
+                             
                             />
                           </div>
                           <div className="expanded-field">
@@ -772,7 +772,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
                                 { value: '', label: '— выбрать —' },
                                 ...modelOptions.map(opt => ({ value: opt, label: opt })),
                               ]}
-                              width="100%"
+                             
                             />
                           </div>
                           {agent.provider && <div className="expanded-field"><label>Провайдер</label><span>{agent.provider}</span></div>}

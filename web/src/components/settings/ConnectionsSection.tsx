@@ -180,7 +180,7 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
                     { value: '', label: '— выбрать отдел —' },
                     ...otdels.map(o => ({ value: o.id, label: o.name })),
                   ]}
-                  width="100%"
+                 
                   disabled={!!editing}
                 />
               </div>
@@ -193,7 +193,7 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
                     { value: '', label: '— выбрать отдел —' },
                     ...otdels.filter(o => o.id !== form.from).map(o => ({ value: o.id, label: o.name })),
                   ]}
-                  width="100%"
+                 
                   disabled={!!editing}
                 />
               </div>

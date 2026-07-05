@@ -16,7 +16,7 @@ type SmallDropdownProps = {
   onChange: (v: string) => void
 }
 const SmallDropdown = ({ value, options, onChange }: SmallDropdownProps) => (
-  <DropdownMenu value={value} options={options} onChange={onChange} width="100%" />
+  <DropdownMenu value={value} options={options} onChange={onChange} />
 )
 
 // Parse entry into structured {key, value} or return raw text

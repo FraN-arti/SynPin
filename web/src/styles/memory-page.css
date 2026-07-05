@@ -29,6 +29,7 @@
   color: var(--white);
   outline: none;
   cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .memory-agent-select:focus {
   border-color: var(--glow-border);
@@ -236,6 +237,7 @@
   color: var(--white);
   resize: vertical;
   outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .memory-edit-textarea:focus {
   border-color: var(--glow-border);
@@ -308,6 +310,7 @@
   color: var(--white);
   resize: vertical;
   outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .memory-add-input:focus {
   border-color: var(--glow-border);
@@ -437,6 +440,7 @@
   border-radius: var(--radius);
   color: var(--white);
   outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .memory-search-input:focus {
   border-color: var(--glow-border);

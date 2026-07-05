@@ -150,7 +150,7 @@ export function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChang
                 { value: '', label: 'Не назначен' },
                 ...roles.map(r => ({ value: r.rolesid, label: r.name })),
               ]}
-              width="100%"
+             
             />
           </div>
           <div className="settings-field">

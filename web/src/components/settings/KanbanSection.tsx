@@ -871,32 +871,22 @@ function KanbanWidgetConfig() {
               { value: 'my', label: 'Мои задачи' },
               { value: 'blocked', label: 'Заблокированные' },
             ]}
-            width="100%"
+           
           />
         </div>
         <div className="settings-field">
           <label>Лимит</label>
-          <div className="settings-stepper">
-            <button
-              className="settings-stepper-btn"
-              onClick={() => updateConfig({ max_items: Math.max(1, config.max_items - 1) })}
-            >−</button>
-            <input
-              type="number"
-              className="settings-stepper-value"
-              value={config.max_items}
-              min={1}
-              max={50}
-              onChange={e => {
-                const v = Math.max(1, Math.min(50, parseInt(e.target.value) || 1))
-                updateConfig({ max_items: v })
-              }}
-            />
-            <button
-              className="settings-stepper-btn"
-              onClick={() => updateConfig({ max_items: Math.min(50, config.max_items + 1) })}
-            >+</button>
-          </div>
+          <input
+            type="number"
+            className="settings-input settings-input-narrow"
+            value={config.max_items}
+            min={1}
+            max={50}
+            onChange={e => {
+              const v = Math.max(1, Math.min(50, parseInt(e.target.value) || 1))
+              updateConfig({ max_items: v })
+            }}
+          />
         </div>
       </div>
 
@@ -1027,23 +1017,13 @@ function BoardSettingsConfig({ refreshKey }: { refreshKey?: number }) {
       <div className="settings-row-2">
         <div className="settings-field">
           <label>Максимум активных задач</label>
-          <div className="settings-stepper">
-            <button
-              className="settings-stepper-btn"
-              onClick={() => update({ max_active_tasks: Math.max(1, settings.max_active_tasks - 5) })}
-            >−</button>
-            <input
-              type="number"
-              className="settings-stepper-value"
-              value={settings.max_active_tasks}
-              min={1}
-              onChange={e => update({ max_active_tasks: Math.max(1, parseInt(e.target.value) || 1) })}
-            />
-            <button
-              className="settings-stepper-btn"
-              onClick={() => update({ max_active_tasks: settings.max_active_tasks + 5 })}
-            >+</button>
-          </div>
+          <input
+            type="number"
+            className="settings-input settings-input-narrow"
+            value={settings.max_active_tasks}
+            min={1}
+            onChange={e => update({ max_active_tasks: Math.max(1, parseInt(e.target.value) || 1) })}
+          />
           <span className="settings-hint">Лимит одновременно открытых задач</span>
         </div>
         <div className="settings-field">
@@ -1052,7 +1032,6 @@ function BoardSettingsConfig({ refreshKey }: { refreshKey?: number }) {
             value={String(settings.auto_archive_days)}
             onChange={v => update({ auto_archive_days: parseInt(v) })}
             options={archiveDaysOptions.map(o => ({ value: String(o.value), label: o.label }))}
-            width="100%"
           />
           <span className="settings-hint">Задачи старше этого срока перемещаются в архив. Колонки выбираются в блоке «Конфигурация колонок»</span>
         </div>

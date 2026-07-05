@@ -190,7 +190,7 @@ export function OtdelSettingsPanel({ otdel, open, onClose, onSaved }: OtdelSetti
                   { value: '', label: 'Не назначен' },
                   ...roleAgents.map(a => ({ value: a.slug, label: a.name })),
                 ]}
-                width="100%"
+               
               />
             )}
           </div>

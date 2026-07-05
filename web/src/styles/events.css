@@ -152,7 +152,7 @@
   font-size: 14px;
   font-family: inherit;
   outline: none;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .events-setting-input:focus {
   border-color: var(--glow-border);

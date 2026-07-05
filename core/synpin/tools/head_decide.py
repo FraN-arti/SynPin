@@ -80,6 +80,7 @@ async def head_decide(params: dict[str, Any]) -> ToolResult:
         next_prompt = "Escalate to user. Report the situation and ask for guidance."
 
     # Record decision in history
+    state.last_head_action = action  # Driver loop reads this to continue/stop
     state.delegation_history.append(
         {
             "delegation_id": delegation_id,

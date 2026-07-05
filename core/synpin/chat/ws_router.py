@@ -50,6 +50,9 @@ class HeadState:
     # Current delegation params
     current_delegation: dict | None = None
 
+    # Autopilot: last action set by head_decide, read by driver loop
+    last_head_action: str | None = None
+
     def reset_delegation(self):
         self.active_delegation_id = None
         self.expected_workers.clear()

@@ -550,10 +550,12 @@ async def _handle_otdel_send(user_id: str, msg: dict):
 
     # Save user message
     history = _load_history(otdel_id)
+    # Determine sender: tool:otdel_message = main_agent, otherwise user
+    sender = "main_agent" if user_id.startswith("tool:") else "user"
     user_msg = {
         "id": f"u-{uuid.uuid4().hex[:8]}",
         "role": "user",
-        "sender": "user",
+        "sender": sender,
         "content": message,
         "timestamp": _now().isoformat(),
     }
@@ -822,8 +824,11 @@ async def _handle_otdel_send(user_id: str, msg: dict):
                 # tab closed.
                 try:
                     from ..events import publish_event
+                    from ..agents.manager import get_otdel as _get_otdel_for_err
+                    _err_otdel = _get_otdel_for_err(otdel_id)
+                    _err_name = _err_otdel.get("name", otdel_id) if _err_otdel else otdel_id
                     publish_event(
-                        title=f"{agent_slug_val} не ответил в отделе «{otdel_id}»",
+                        title=f"{agent_slug_val} не ответил в отделе «{_err_name}»",
                         body=str(e)[:200],
                         level="error",
                         source="agent",
@@ -1392,11 +1397,14 @@ async def _handle_otdel_send(user_id: str, msg: dict):
     # open. Use a short preview of the head's last response as body.
     try:
         from ..events import publish_event
+        from ..agents.manager import get_otdel as _get_otdel_for_toast
+        _toast_otdel = _get_otdel_for_toast(otdel_id)
+        _toast_name = _toast_otdel.get("name", otdel_id) if _toast_otdel else otdel_id
         body_preview = (full_response or "").strip().replace("\n", " ")[:140]
         if not body_preview:
             body_preview = "Отдел завершил работу."
         publish_event(
-            title=f"Отдел «{otdel_id}» завершил задачу",
+            title=f"Отдел «{_toast_name}» завершил задачу",
             body=body_preview,
             level="success",
             source="otdel",

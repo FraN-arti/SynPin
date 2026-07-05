@@ -155,7 +155,8 @@
   transition: border-color 0.15s ease;
 }
 .events-setting-input:focus {
-  border-color: var(--orange);
+  border-color: var(--glow-border);
+  box-shadow: var(--glow-orange);
 }
 .events-setting-hint {
   font-size: 12px;

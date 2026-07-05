@@ -31,7 +31,8 @@
   cursor: pointer;
 }
 .memory-agent-select:focus {
-  border-color: var(--orange);
+  border-color: var(--glow-border);
+  box-shadow: var(--glow-orange);
 }
 .memory-tabs {
   display: flex;
@@ -237,7 +238,8 @@
   outline: none;
 }
 .memory-edit-textarea:focus {
-  border-color: var(--orange);
+  border-color: var(--glow-border);
+  box-shadow: var(--glow-orange);
 }
 .memory-btn-edit,
 .memory-btn-delete,
@@ -308,7 +310,8 @@
   outline: none;
 }
 .memory-add-input:focus {
-  border-color: var(--orange);
+  border-color: var(--glow-border);
+  box-shadow: var(--glow-orange);
 }
 .memory-add-input::placeholder {
   color: var(--gray-600);
@@ -436,7 +439,8 @@
   outline: none;
 }
 .memory-search-input:focus {
-  border-color: var(--orange);
+  border-color: var(--glow-border);
+  box-shadow: var(--glow-orange);
 }
 .memory-search-input::placeholder {
   color: var(--gray-600);

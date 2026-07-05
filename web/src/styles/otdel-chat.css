@@ -301,8 +301,8 @@
   color: var(--text-dim);
 }
 .otdel-bottom-input .chat-textarea:focus {
-  border-color: var(--orange);
-  box-shadow: 0 0 0 1px var(--orange);
+  border-color: var(--glow-border);
+  box-shadow: var(--glow-orange);
 }
 .otdel-bottom-input .send-btn {
   flex-shrink: 0;

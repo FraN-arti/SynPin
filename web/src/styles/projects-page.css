@@ -349,7 +349,8 @@
 .projects-form-group input:focus,
 .projects-form-group textarea:focus,
 .projects-form-group select:focus {
-  border-color: var(--orange);
+  border-color: var(--glow-border);
+  box-shadow: var(--glow-orange);
   outline: none;
 }
 .projects-form-group textarea {
@@ -879,7 +880,8 @@
   outline: none;
 }
 .dept-role-input:focus {
-  border-color: var(--orange);
+  border-color: var(--glow-border);
+  box-shadow: var(--glow-orange);
 }
 .dept-role-input::placeholder {
   color: var(--text-dim);

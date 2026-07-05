@@ -557,7 +557,8 @@
 }
 .kanban-form-group input:focus,
 .kanban-form-group textarea:focus {
-  border-color: var(--accent, #f97316);
+  border-color: var(--glow-border);
+  box-shadow: var(--glow-orange);
 }
 .kanban-form-row {
   display: flex;

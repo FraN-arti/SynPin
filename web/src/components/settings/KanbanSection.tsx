@@ -8,6 +8,7 @@ import { API_BASE } from '../../config'
 import { SettingsCard } from '../SettingsCard'
 import { MultiSelectMenu } from '../MultiSelectMenu'
 import { DropdownMenu as CustomDropdown } from '../DropdownMenu'
+import { LoadingSpinner } from '../LoadingSpinner'
 import { useUndoWithProgress } from '../../hooks/useUndoWithProgress'
 import { Toggle } from './Toggle'
 
@@ -1184,8 +1185,8 @@ function KanbanBulkCleanup() {
       {/* Список задач */}
       <div className="bulk-task-list">
         {loading && tasks.length === 0 && (
-          <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
-            Загрузка...
+          <div style={{ padding: '20px 0' }}>
+            <LoadingSpinner text="Загрузка..." minHeight={60} />
           </div>
         )}
         {!loading && tasks.length === 0 && (

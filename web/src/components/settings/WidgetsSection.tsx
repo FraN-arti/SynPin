@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { API_BASE } from '../../config'
+import { LoadingSpinner } from '../LoadingSpinner'
 import { WIDGET_META, type WidgetType } from '../WidgetDropZone'
 
 interface WidgetLayout {
@@ -85,7 +86,7 @@ export function WidgetsSection({ wsOn }: { wsOn?: (type: string, handler: (data:
   }, [wsOn])
 
   if (loading) {
-    return <div className="settings-hint">Загрузка...</div>
+    return <LoadingSpinner text="Загрузка..." minHeight={80} />
   }
 
   return (

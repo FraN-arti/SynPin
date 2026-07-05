@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react'
 import { API_BASE } from '../../config'
 import { SettingsCard } from '../SettingsCard'
+import { LoadingSpinner } from '../LoadingSpinner'
 import { Toggle } from './Toggle'
 
 interface InAppSettings {
@@ -56,7 +57,7 @@ export function EventsSection() {
   }
 
   if (!settings) {
-    return <div className="settings-sections">Загрузка…</div>
+    return <LoadingSpinner text="Загрузка..." />
   }
 
   return (

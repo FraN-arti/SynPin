@@ -336,15 +336,17 @@
 .projects-form-group input,
 .projects-form-group textarea,
 .projects-form-group select {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius, 6px);
-  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
   font-size: 13px;
   color: var(--text);
   font-family: inherit;
-  transition: border-color 0.15s;
+  outline: none;
+  box-sizing: border-box;
   width: 100%;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 .projects-form-group input:focus,
 .projects-form-group textarea:focus,
@@ -787,18 +789,28 @@
 .projects-dept-search-clear:hover {
   color: var(--white);
 }
+.projects-dept-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px;
+  background: var(--bg-secondary);
+}
 .projects-dept-empty {
   font-size: 12px;
   color: var(--text-dim);
   padding: 8px;
   text-align: center;
 }
-/* ── Department Row (new compact design) ─────────────────────── */
 .dept-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 6px;
+  gap: 8px;
+  padding: 6px 8px;
   border-radius: 4px;
   cursor: pointer;
   transition: background 0.1s;

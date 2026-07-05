@@ -222,7 +222,8 @@ export function PickerMenu(props: PickerMenuProps) {
         position: 'fixed',
         top: position.top,
         left: position.left,
-        width: position.width,
+        minWidth: position.width,
+        maxWidth: `min(${position.width * 2}px, calc(100vw - ${VIEWPORT_PADDING * 2}px))`,
         zIndex: 9999,
       }}
       data-placement={position.placement}

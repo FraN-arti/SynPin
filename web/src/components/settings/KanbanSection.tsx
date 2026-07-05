@@ -724,50 +724,47 @@ function KanbanLabelsConfig() {
       <div className="settings-divider-thin" />
       {labels.map((label, i) => (
         <div key={label.id} className={`kanban-config-row${saving && savedId === label.id ? ' saving' : ''}`}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
-            <span
-              className="kanban-label-chip"
-              style={{ background: label.color, color: label.text_color }}
-            >
-              {label.name}
-            </span>
-            <input
-              className="settings-input label-name-input"
-              value={label.name.replace(/^#/, '')}
-              onChange={e => updateLabelName(i, e.target.value)}
-              placeholder="Название метки"
-              style={{ flex: 1, minWidth: 120 }}
+          <span
+            className="kanban-label-chip"
+            style={{ background: label.color, color: label.text_color }}
+          >
+            {label.name}
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ fontSize: '10px', color: 'var(--gray-500)' }}>Фон</span>
+            <ColorPicker
+              value={label.color}
+              onChange={c => updateLabelField(i, 'color', c)}
+              size="sm"
             />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ fontSize: '10px', color: 'var(--gray-500)' }}>Фон</span>
-              <ColorPicker
-                value={label.color}
-                onChange={c => updateLabelField(i, 'color', c)}
-                size="sm"
-              />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ fontSize: '10px', color: 'var(--gray-500)' }}>Текст</span>
-              <ColorPicker
-                value={label.text_color}
-                onChange={c => updateLabelField(i, 'text_color', c)}
-                size="sm"
-              />
-            </div>
-            <button
-              className="widget-remove-btn"
-              onClick={() => removeLabel(i)}
-              title="Удалить метку"
-            >×</button>
-
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ fontSize: '10px', color: 'var(--gray-500)' }}>Текст</span>
+            <ColorPicker
+              value={label.text_color}
+              onChange={c => updateLabelField(i, 'text_color', c)}
+              size="sm"
+            />
+          </div>
+          <input
+            className="settings-input label-name-input"
+            value={label.name.replace(/^#/, '')}
+            onChange={e => updateLabelName(i, e.target.value)}
+            placeholder="Название метки"
+            style={{ flex: '0 0 auto', maxWidth: 150, minWidth: 80 }}
+          />
           <input
             className="settings-input"
             value={label.description || ''}
             onChange={e => updateDescription(i, e.target.value)}
             placeholder="Описание метки..."
-            style={{ width: '100%', marginTop: '4px', fontSize: '12px' }}
+            style={{ flex: '1 1 0', minWidth: 100, fontSize: '12px' }}
           />
+          <button
+            className="widget-remove-btn"
+            onClick={() => removeLabel(i)}
+            title="Удалить метку"
+          >×</button>
         </div>
       ))}
       <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
@@ -1038,8 +1035,8 @@ function BoardSettingsConfig({ refreshKey }: { refreshKey?: number }) {
     <SettingsCard title="Настройки доски">
       <p className="settings-hint">Лимиты, архивация и уведомления глобальной доски задач</p>
       <div className="settings-row-2">
-        <div className="settings-field">
-          <label>Максимум активных задач</label>
+        <div className="settings-field" style={{ opacity: 0.5, pointerEvents: 'none' }}>
+          <label>Максимум активных задач <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>🚧 скоро</span></label>
           <input
             type="number"
             className="settings-input settings-input-narrow"

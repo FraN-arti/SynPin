@@ -11,6 +11,89 @@ import { LoadingSpinner } from '../LoadingSpinner'
 import { Toggle } from './Toggle'
 import type { SettingsData, OverviewStats } from './types'
 
+// ── Autopilot Block (max_iterations) ────────────────────────────────────────
+function AutopilotBlock() {
+  const [maxIterations, setMaxIterations] = useState<number | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/protocol/settings`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      setMaxIterations(typeof data.max_iterations === 'number' ? data.max_iterations : 15)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const persist = useCallback((patch: Record<string, unknown>) => {
+    return fetch(`${API_BASE}/api/protocol/settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    }).then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      return r.json()
+    }).catch(e => setError(e instanceof Error ? e.message : String(e)))
+  }, [])
+
+  const onMaxChange = (raw: number) => {
+    if (Number.isNaN(raw)) return
+    const next = Math.max(1, Math.min(50, Math.floor(raw)))
+    setMaxIterations(next)
+    void persist({ max_iterations: next })
+  }
+
+  const loading = maxIterations === null
+
+  return (
+    <SettingsCard title="Автопилот">
+      <p className="settings-hint">
+        Настройки автопилота — глобальный лимит итераций для всех отделов.
+      </p>
+      <div className="settings-divider-thin" />
+      {loading ? (
+        <LoadingSpinner text="Загрузка..." />
+      ) : (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label
+              htmlFor="autopilot-max-iterations"
+              style={{ color: 'var(--text-secondary)', fontSize: 13, whiteSpace: 'nowrap' }}
+            >
+              Максимум итераций
+            </label>
+            <input
+              id="autopilot-max-iterations"
+              type="number"
+              min={1}
+              max={50}
+              className="settings-input-narrow"
+              value={maxIterations!}
+              onChange={(e) => onMaxChange(Number(e.target.value))}
+              style={{ width: 80, padding: '4px 6px', fontSize: 13 }}
+            />
+            <span style={{ color: 'var(--gray-500)', fontSize: 12 }}>
+              (1–50, по умолчанию: 15)
+            </span>
+          </div>
+          <p className="settings-hint" style={{ marginTop: 6, marginLeft: 0 }}>
+            Сколько раундов делегирования может пройти отдел за одно задание
+          </p>
+          {error && (
+            <div style={{ color: 'var(--red, #f87171)', fontSize: 12, marginTop: 8 }}>
+              {error}
+            </div>
+          )}
+        </>
+      )}
+    </SettingsCard>
+  )
+}
+
 export function GeneralSection() {
   const [settings, setSettings] = useState<SettingsData | null>(null)
   const [overview, setOverview] = useState<OverviewStats | null>(null)
@@ -312,7 +395,9 @@ const updateUI = useCallback((path: string, value: string | boolean | number) =>
           )}
         </SettingsCard>
 
-        <div className="settings-row-2">
+                <AutopilotBlock />
+
+                <div className="settings-row-2">
         <SettingsCard title="Настройка моделей" description="Модели для специализированных задач">
           <div className="settings-field">
             <label>Визион (анализ изображений)</label>

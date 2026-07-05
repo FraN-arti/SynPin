@@ -117,6 +117,32 @@ export function EventsSection() {
         </div>
       </SettingsCard>
 
+      <SettingsCard title="Уведомления о задачах">
+        <p className="settings-card-desc">
+          Автоматические уведомления при изменении статуса задач.
+        </p>
+
+        <div style={{ opacity: 0.5, pointerEvents: 'none' }}>
+          <Toggle label="Уведомления о задачах" checked={false} onChange={() => {}} />
+        </div>
+        <span className="settings-hint">Создание, смена статуса, утверждение и дедлайны задач</span>
+
+        <div className="settings-divider-thin" />
+
+        <div style={{ opacity: 0.5, pointerEvents: 'none' }}>
+          <Toggle label="Уведомлять при блокировке" checked={false} onChange={() => {}} />
+        </div>
+        <span className="settings-hint">Отправка уведомлений при утверждении в blocked</span>
+
+        <div className="settings-divider-thin" />
+
+        <div style={{ opacity: 0.5, pointerEvents: 'none' }}>
+          <Toggle label="Напоминания за час до дедлайна" defaultChecked={false} onChange={() => {}} />
+          <Toggle label="Повторные напоминания" defaultChecked={false} onChange={() => {}} />
+          <Toggle label="Календарный вид дедлайнов" defaultChecked={false} onChange={() => {}} />
+        </div>
+      </SettingsCard>
+
       <SettingsCard title="Каналы доставки">
         <p className="settings-card-desc">
           В будущем здесь появятся каналы: Telegram, Desktop, Email и другие.

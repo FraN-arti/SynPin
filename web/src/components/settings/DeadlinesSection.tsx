@@ -61,17 +61,6 @@ export function DeadlinesSection() {
 
         <div className="settings-divider-thin" />
 
-        <div style={{ opacity: 0.5, pointerEvents: 'none' }}>
-          <Toggle
-            label="Уведомлять при блокировке"
-            checked={false}
-            onChange={() => {}}
-          />
-        </div>
-        <span className="settings-hint">🚧 Скоро — отправка уведомлений при утверждении в blocked</span>
-
-        <div className="settings-divider-thin" />
-
         <div className="settings-section-label">Цвета дат</div>
         <p className="settings-hint">Настройте цветовое оформление сроков на странице дедлайнов</p>
         <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
@@ -101,15 +90,6 @@ export function DeadlinesSection() {
               </label>
             )
           })}
-        </div>
-
-        <div className="settings-divider-thin" />
-
-        <div className="settings-section-label">Скоро</div>
-        <div style={{ opacity: 0.5, pointerEvents: 'none' }}>
-          <Toggle label="Напоминания за час до дедлайна" defaultChecked={false} onChange={() => {}} />
-          <Toggle label="Повторные напоминания" defaultChecked={false} onChange={() => {}} />
-          <Toggle label="Календарный вид дедлайнов" defaultChecked={false} onChange={() => {}} />
         </div>
       </SettingsCard>
     </div>

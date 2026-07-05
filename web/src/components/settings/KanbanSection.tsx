@@ -136,6 +136,14 @@ export function KanbanSection() {
             <span className="status-ref-desc">В архиве, скрыто с доски</span>
           </div>
         </div>
+        <div className="settings-divider-thin" />
+        <div className="settings-hint" style={{ fontSize: '12px', lineHeight: 1.5 }}>
+          <strong>Маппинг колонок:</strong>{' '}
+          назначьте колонке статус{' '}
+          <span style={{ color: '#6b7280', fontWeight: 600 }}>ARCHIVE</span> — архивные задачи попадут туда.{' '}
+          Назначьте статус{' '}
+          <span style={{ color: '#f87171', fontWeight: 600 }}>BLOCKED</span> — заблокированные задачи автоматически переместятся в эту колонку.
+        </div>
       </SettingsCard>
 
       {/* Board Settings */}
@@ -1050,27 +1058,6 @@ function BoardSettingsConfig({ refreshKey }: { refreshKey?: number }) {
           />
           <span className="settings-hint">Задачи старше этого срока перемещаются в архив. Колонки выбираются в блоке «Конфигурация колонок»</span>
         </div>
-      </div>
-
-      <div className="settings-divider-thin" />
-      <div className="settings-field">
-        <label>Уведомления <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>🚧 скоро</span></label>
-        <div style={{ opacity: 0.5, pointerEvents: 'none' }}>
-          <Toggle
-            label="Уведомления о задачах"
-            checked={settings.notifications_enabled}
-            onChange={() => {}}
-          />
-        </div>
-        <span className="settings-hint">Создание, смена статуса, утверждение и дедлайны задач</span>
-      </div>
-      <div className="settings-divider-thin" />
-      <div className="settings-hint" style={{ fontSize: '12px', lineHeight: 1.5 }}>
-        <strong>Маппинг колонок:</strong>{' '}
-        назначьте колонке статус{' '}
-        <span style={{ color: '#6b7280', fontWeight: 600 }}>ARCHIVE</span> — архивные задачи попадут туда.{' '}
-        Назначьте статус{' '}
-        <span style={{ color: '#f87171', fontWeight: 600 }}>BLOCKED</span> — заблокированные задачи автоматически переместятся в эту колонку.
       </div>
     </SettingsCard>
   )

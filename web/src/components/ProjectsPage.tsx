@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { API_BASE } from '../config'
 import { LoadingSpinner } from './LoadingSpinner'
 import { MouseTooltip } from './MouseTooltip'
+import { PickerMenu } from './PickerMenu'
 
 interface ProjectGoal {
   id: string
@@ -173,7 +174,6 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [projectTasks, setProjectTasks] = useState<Task[]>([])
-  const [deptSearch, setDeptSearch] = useState('')
   const [newProject, setNewProject] = useState({
     name: '',
     description: '',
@@ -280,14 +280,6 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
     return projects.filter(p => p.status === filter)
   }, [projects, filter])
 
-  const filteredDepartments = useMemo(() => {
-    if (!deptSearch.trim()) return departments
-    const q = deptSearch.toLowerCase()
-    return departments.filter(d =>
-      d.name.toLowerCase().includes(q) || d.id.toLowerCase().includes(q)
-    )
-  }, [departments, deptSearch])
-
   // Stats for detail view (from real tasks)
   const taskStats = useMemo(() => {
     const total = projectTasks.length
@@ -298,16 +290,6 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
   }, [projectTasks])
 
   // ── Handlers ───────────────────────────────────────────────────────
-
-  const toggleDepartment = (deptId: string) => {
-    setNewProject(prev => {
-      const selected = prev.selected_departments.includes(deptId)
-        ? prev.selected_departments.filter(id => id !== deptId)
-        : [...prev.selected_departments, deptId]
-      const mainDept = prev.main_department === deptId ? '' : prev.main_department
-      return { ...prev, selected_departments: selected, main_department: mainDept }
-    })
-  }
 
   const setMainDepartment = (deptId: string) => {
     setNewProject(prev => ({
@@ -334,7 +316,6 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
       name: '', description: '', main_department: '',
       selected_departments: [], department_roles: {}, goals_text: '', work_dir: '',
     })
-    setDeptSearch('')
   }
 
   const handleCreate = async () => {
@@ -1047,77 +1028,66 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
                   />
                 </div>
 
-                {/* Отделы */}
+                {/* Отделы — PickerMenu multi для выбора (с поиском), ниже — настройка ролей */}
                 <div className="modal-form-row">
                   <label className="modal-form-label">
                     Отделы <span className="modal-form-required">*</span>
                   </label>
-                  <div className="dept-search-wrap">
-                    <svg className="dept-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                      <circle cx="11" cy="11" r="8" />
-                      <path d="m21 21-4.3-4.3" />
-                    </svg>
-                    <input
-                      type="text"
-                      className="dept-search-input"
-                      value={deptSearch}
-                      onChange={e => setDeptSearch(e.target.value)}
-                      placeholder="Поиск отделов..."
-                    />
-                    {deptSearch && (
-                      <button className="dept-search-clear" onClick={() => setDeptSearch('')} aria-label="Очистить">×</button>
-                    )}
-                  </div>
-                  <div className="dept-list">
-                    {filteredDepartments.length === 0 ? (
-                      <div className="dept-empty">
-                        {deptSearch ? 'Отделы не найдены' : 'Нет доступных отделов'}
-                      </div>
-                    ) : (
-                      filteredDepartments.map(dept => {
-                        const isSelected = newProject.selected_departments.includes(dept.id)
-                        const isMain = newProject.main_department === dept.id
+                  <PickerMenu
+                    multi
+                    searchable
+                    value={newProject.selected_departments}
+                    onChange={(ids) => {
+                      setNewProject(prev => {
+                        const removed = prev.selected_departments.filter(id => !ids.includes(id))
+                        const mainKept = ids.includes(prev.main_department)
+                        return {
+                          ...prev,
+                          selected_departments: ids,
+                          main_department: mainKept ? prev.main_department : (ids[0] || ''),
+                          department_roles: Object.fromEntries(
+                            Object.entries(prev.department_roles).filter(([id]) => ids.includes(id))
+                          ) as typeof prev.department_roles,
+                          ...(removed.length ? {} : {}),
+                        }
+                      })
+                    }}
+                    options={departments.map(d => ({ id: String(d.id), label: d.name }))}
+                    placeholder="Выберите отделы..."
+                    searchPlaceholder="Поиск отдела..."
+                    emptyMessage="Нет доступных отделов"
+                    triggerClassName="dept-picker-trigger"
+                  />
+                  {newProject.selected_departments.length > 0 && (
+                    <div className="dept-config-list">
+                      {newProject.selected_departments.map(deptId => {
+                        const dept = departments.find(d => String(d.id) === deptId)
+                        if (!dept) return null
+                        const isMain = newProject.main_department === deptId
                         return (
-                          <div
-                            key={dept.id}
-                            className={`dept-row ${isSelected ? 'selected' : ''}`}
-                            onClick={() => toggleDepartment(dept.id)}
-                          >
-                            <span className={`dept-checkbox ${isSelected ? 'checked' : ''}`} aria-hidden="true">
-                              {isSelected && (
-                                <svg width="10" height="10" viewBox="0 0 10 10">
-                                  <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                              )}
-                            </span>
+                          <div key={deptId} className="dept-config-row">
+                            <button
+                              type="button"
+                              className={`dept-radio ${isMain ? 'checked' : ''}`}
+                              onClick={() => setMainDepartment(deptId)}
+                              title={isMain ? 'Основной отдел' : 'Сделать основным'}
+                            >
+                              {isMain && <span className="dept-radio-dot" />}
+                            </button>
                             <span className="dept-name">{dept.name}</span>
                             {isMain && <span className="dept-star" title="Основной отдел">★</span>}
-                            {isSelected && (
-                              <div className="dept-options" onClick={e => e.stopPropagation()}>
-                                <button
-                                  type="button"
-                                  className={`dept-radio ${isMain ? 'checked' : ''}`}
-                                  onClick={() => setMainDepartment(dept.id)}
-                                  title={isMain ? 'Основной отдел' : 'Сделать основным'}
-                                  aria-label={isMain ? 'Основной отдел' : 'Сделать основным'}
-                                >
-                                  {isMain && <span className="dept-radio-dot" />}
-                                </button>
-                                <span className="dept-radio-text">Основной</span>
-                                <input
-                                  type="text"
-                                  className="dept-role-input"
-                                  value={newProject.department_roles[dept.id] || ''}
-                                  onChange={e => updateDepartmentRole(dept.id, e.target.value)}
-                                  placeholder="Роль"
-                                />
-                              </div>
-                            )}
+                            <input
+                              type="text"
+                              className="dept-role-input"
+                              value={newProject.department_roles[deptId] || ''}
+                              onChange={e => updateDepartmentRole(deptId, e.target.value)}
+                              placeholder="Роль"
+                            />
                           </div>
                         )
-                      })
-                    )}
-                  </div>
+                      })}
+                    </div>
+                  )}
                   {newProject.selected_departments.length > 0 && !newProject.main_department && (
                     <span className="dept-warning">Выберите основной отдел</span>
                   )}

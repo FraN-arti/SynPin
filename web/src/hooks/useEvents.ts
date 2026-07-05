@@ -76,7 +76,7 @@ export function useEvents({
       .then((data: { in_app: InAppSettings }) => {
         if (alive && data?.in_app) setSettings(data.in_app)
       })
-      .catch(() => {})
+      .catch((e) => console.error('[useevents] load events failed:', e))
 
     fetch(`${API_BASE}/api/events?limit=20`)
       .then(r => r.json())
@@ -90,7 +90,7 @@ export function useEvents({
           pushToast(ev)
         }
       })
-      .catch(() => {})
+      .catch((e) => console.error('[useevents] load events failed:', e))
 
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -141,16 +141,16 @@ export function useEvents({
     // F5 remounts the hook, the Set is reset, and the missed event
     // finally shows.
     localIds.current.delete(id)
-    fetch(`${API_BASE}/api/events/${id}/read`, { method: 'POST' }).catch(() => {})
+    fetch(`${API_BASE}/api/events/${id}/read`, { method: 'POST' }).catch((e) => console.warn('[useevents] mark read failed:', e))
   }, [])
 
   const markAllRead = useCallback(async () => {
-    await fetch(`${API_BASE}/api/events/read-all`, { method: 'POST' }).catch(() => {})
+    await fetch(`${API_BASE}/api/events/read-all`, { method: 'POST' }).catch((e) => console.warn('[useevents] mark read failed:', e))
     setUnreadCount(0)
   }, [])
 
   const clear = useCallback(async () => {
-    await fetch(`${API_BASE}/api/events/clear`, { method: 'POST' }).catch(() => {})
+    await fetch(`${API_BASE}/api/events/clear`, { method: 'POST' }).catch((e) => console.warn('[useevents] mark read failed:', e))
     setToasts([])
     setUnreadCount(0)
     localIds.current.clear()

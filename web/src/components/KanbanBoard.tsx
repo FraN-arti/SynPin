@@ -970,14 +970,14 @@ function CreateTaskModal({
       .then(data =>
         setDepartments(Array.isArray(data) ? data : data.otdels || data.departments || []),
       )
-      .catch(() => {})
+      .catch((e) => console.error('[kanbanboard] save collapse state failed:', e))
   }, [])
 
   useEffect(() => {
     fetch(`${API_BASE}/api/kanban/config/labels`)
       .then(r => r.json())
       .then(data => setAvailableLabels(Array.isArray(data) ? data : data.labels || []))
-      .catch(() => {})
+      .catch((e) => console.error('[kanbanboard] save collapse state failed:', e))
   }, [])
   
   // Fetch projects
@@ -985,7 +985,7 @@ function CreateTaskModal({
     fetch(`${API_BASE}/api/projects`)
       .then(r => r.json())
       .then(data => setProjects(data.projects || []))
-      .catch(() => {})
+      .catch((e) => console.error('[kanbanboard] save collapse state failed:', e))
   }, [])
 
   // ── Filtered departments ──

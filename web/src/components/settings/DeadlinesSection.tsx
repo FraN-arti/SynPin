@@ -30,7 +30,7 @@ export function DeadlinesSection() {
           setDeadlineColors({ ...deadlineColors, ...data.deadline_colors })
         }
       })
-      .catch(() => {})
+      .catch((e) => console.error('[deadlines] load deadlines failed:', e))
   }, [])
 
   const save = useCallback(async (patch: Record<string, unknown>) => {

@@ -100,7 +100,7 @@ export function OtdelChatView({ otdel, onOpenSettings, wsSend, wsOn }: OtdelChat
     ]).then(([agentsData, deptsData]) => {
       setAgents((agentsData.agents || []).filter((a: Agent & { enabled: boolean }) => a.enabled))
       setDepartments(deptsData.departments || [])
-    }).catch(() => {})
+    }).catch((e) => console.error('[otdelchat] load chat failed:', e))
   }, [])
 
   // Map: agent slug → department color

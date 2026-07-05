@@ -53,7 +53,7 @@ export function KanbanStats({ wsOn }: KanbanStatsProps) {
     fetch(`${API_BASE}/api/kanban/stats/extended`)
       .then(r => r.json())
       .then(setStats)
-      .catch(() => {})
+      .catch((e) => console.error('[kanbanstats] load stats failed:', e))
   }, [])
 
   useEffect(() => { loadStats() }, [loadStats])

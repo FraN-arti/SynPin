@@ -310,12 +310,12 @@ function App() {
             if (fresh) setActiveAgent(fresh)
           }
         })
-        .catch(() => {})
+        .catch((e) => console.error('[app] load projects failed:', e))
       // Re-fetch primary agent slug (may have changed after create/delete)
       fetch(`${API_BASE}/api/config/primary-agent`)
         .then(r => r.ok ? r.json() : null)
         .then(data => { if (data?.slug) setPrimarySlug(data.slug) })
-        .catch(() => {})
+        .catch((e) => console.error('[app] load projects failed:', e))
     })
     return off
   }, [wsOn])

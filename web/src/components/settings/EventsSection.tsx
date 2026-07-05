@@ -42,7 +42,7 @@ export function EventsSection() {
       .then(data => {
         if (data?.in_app) setSettings({ ...DEFAULT_SETTINGS, ...data.in_app })
       })
-      .catch(() => {})
+      .catch((e) => console.error('[events] load events failed:', e))
   }, [])
 
   const update = async (patch: Partial<InAppSettings>) => {

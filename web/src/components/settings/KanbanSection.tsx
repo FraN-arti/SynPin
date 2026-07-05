@@ -60,7 +60,7 @@ export function KanbanSection() {
     fetch(`${API_BASE}/api/kanban/stats`)
       .then(r => r.json())
       .then(setStats)
-      .catch(() => {})
+      .catch((e) => console.error('[kanban] load stats failed:', e))
   }, [])
 
   return (
@@ -211,7 +211,7 @@ function KanbanColumnsConfig() {
     fetch(`${API_BASE}/api/kanban/config/widget`)
       .then(r => r.json())
       .then(data => setDefaultColumn(data?.default_column || DEFAULT_COLUMN_AUTO))
-      .catch(() => {})
+      .catch((e) => console.error('[kanban] load columns failed:', e))
   }, [])
 
   useEffect(() => {
@@ -225,7 +225,7 @@ function KanbanColumnsConfig() {
           setAutoDeleteColumns(data.auto_delete_from_columns)
         }
       })
-      .catch(() => {})
+      .catch((e) => console.error('[kanban] load settings failed:', e))
   }, [])
 
   useEffect(() => {
@@ -829,7 +829,7 @@ function KanbanWidgetConfig() {
       .then((cols: KanbanColumnForWidget[]) => {
         setColumns(cols.filter(c => c.enabled !== false))
       })
-      .catch(() => {})
+      .catch((e) => console.error('[kanban] save widget failed:', e))
   }, [])
 
   const saveWidgetConfig = useCallback((newConfig: KanbanWidgetConfigData) => {

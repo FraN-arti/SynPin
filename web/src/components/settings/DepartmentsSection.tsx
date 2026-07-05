@@ -45,7 +45,7 @@ export function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChang
 
   useEffect(() => {
     loadOtdels()
-    fetch(`${API_BASE}/api/roles`).then(r => r.json()).then(d => setRoles(d.roles || [])).catch(() => {})
+    fetch(`${API_BASE}/api/roles`).then(r => r.json()).then(d => setRoles(d.roles || [])).catch((e) => console.error('[departments] load roles failed:', e))
   }, [])
 
   const resetForm = () => setForm({ name: '', description: '', color: '#f97316', mentor_role: '', escalation: '' })

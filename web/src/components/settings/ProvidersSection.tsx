@@ -264,7 +264,7 @@ export function AddFromCatalogModal({ provider, editProvider, onClose, onSaved }
         const text = await res.text()
         try { return JSON.parse(text) } catch { return { status: 'error', message: `Сервер вернул не JSON: ${text.slice(0, 100)}` } }
       } finally {
-        await fetch(`${API_BASE}/api/providers/${encodeURIComponent(tempName)}`, { method: 'DELETE' }).catch(() => {})
+        await fetch(`${API_BASE}/api/providers/${encodeURIComponent(tempName)}`, { method: 'DELETE' }).catch((e) => console.error('[providers] save provider failed:', e))
       }
     }
 

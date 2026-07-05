@@ -66,7 +66,7 @@ export function WidgetsSection({ wsOn }: { wsOn?: (type: string, handler: (data:
     fetch(`${API_BASE}/api/widgets/layout`)
       .then(r => r.ok ? r.json() : { left: [], right: [] })
       .then(data => setLayout({ left: data.left || [], right: data.right || [] }))
-      .catch(() => {})
+      .catch((e) => console.error('[widgets] load widgets failed:', e))
       .finally(() => setLoading(false))
   }, [])
 

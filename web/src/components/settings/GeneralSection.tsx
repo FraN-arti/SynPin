@@ -28,7 +28,7 @@ export function GeneralSection() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/config/settings`).then(r => r.ok ? r.json() : null).then(data => { if (data) setSettings(data) }).catch(() => {})
+    fetch(`${API_BASE}/api/config/settings`).then(r => r.ok ? r.json() : null).then(data => { if (data) setSettings(data) }).catch((e) => console.error('[general] load settings failed:', e))
   }, [])
 
   useEffect(() => {
@@ -38,23 +38,23 @@ export function GeneralSection() {
         for (const p of data.providers) { for (const m of (p.models || [])) { models.push({ provider: p.name, model: m }) } }
         setAvailableModels(models)
       }
-    }).catch(() => {})
+    }).catch((e) => console.error('[general] save settings failed:', e))
   }, [])
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/stats/overview`).then(r => r.ok ? r.json() : null).then(data => { if (data) setOverview(data) }).catch(() => {})
+    fetch(`${API_BASE}/api/stats/overview`).then(r => r.ok ? r.json() : null).then(data => { if (data) setOverview(data) }).catch((e) => console.error('[general] load stats failed:', e))
   }, [])
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/stats/system`).then(r => r.ok ? r.json() : null).then(data => { if (data && !data.error) setSystemInfo(data) }).catch(() => {})
+    fetch(`${API_BASE}/api/stats/system`).then(r => r.ok ? r.json() : null).then(data => { if (data && !data.error) setSystemInfo(data) }).catch((e) => console.error('[general] save settings failed:', e))
   }, [])
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/themes/tweakcn/list`).then(r => r.ok ? r.json() : null).then(data => { if (data?.themes) setCustomThemes(data.themes) }).catch(() => {})
+    fetch(`${API_BASE}/api/themes/tweakcn/list`).then(r => r.ok ? r.json() : null).then(data => { if (data?.themes) setCustomThemes(data.themes) }).catch((e) => console.error('[general] save settings failed:', e))
   }, [])
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/config/web-search`).then(r => r.ok ? r.json() : null).then(data => { if (data?.providers) setWebSearchProviders(data.providers) }).catch(() => {})
+    fetch(`${API_BASE}/api/config/web-search`).then(r => r.ok ? r.json() : null).then(data => { if (data?.providers) setWebSearchProviders(data.providers) }).catch((e) => console.error('[general] save settings failed:', e))
   }, [])
 
   const tweakcnVarsRef = useRef<Record<string, string> | null>(null)

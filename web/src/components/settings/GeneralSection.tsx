@@ -59,7 +59,7 @@ function AutopilotBlock() {
         <LoadingSpinner text="Загрузка..." />
       ) : (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
             <label
               htmlFor="autopilot-max-iterations"
               style={{ color: 'var(--text-secondary)', fontSize: 13, whiteSpace: 'nowrap' }}
@@ -71,10 +71,10 @@ function AutopilotBlock() {
               type="number"
               min={1}
               max={50}
-              className="settings-input-narrow"
+              className="settings-input"
               value={maxIterations!}
               onChange={(e) => onMaxChange(Number(e.target.value))}
-              style={{ width: 80, padding: '4px 6px', fontSize: 13 }}
+              style={{ width: 60, padding: '4px 6px', fontSize: 13 }}
             />
             <span style={{ color: 'var(--gray-500)', fontSize: 12 }}>
               (1–50, по умолчанию: 15)

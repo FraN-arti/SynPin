@@ -114,10 +114,8 @@ def cmd_start(args):
     pid_file.write_text(json.dumps({"pid": os.getpid(), "port": port}))
 
     console.print()
-    console.print(f"[brand]SynPin v{version}[/brand]")
-    console.print(f"   [dim]API:  http://{host}:{port}/api[/dim]")
-    console.print(f"   [dim]Web:  http://{host}:{port}[/dim]")
-    console.print(f"   [dim]Docs: http://{host}:{port}/docs[/dim]")
+    console.print(f"[brand]  SynPin v{version}[/brand]")
+    console.print(f"  [dim]API :{port}  Web:{port}  Docs:{port}/docs[/dim]")
     console.print()
 
     # Per-logger levels. By default we want a quiet startup:

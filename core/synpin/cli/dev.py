@@ -451,7 +451,7 @@ def _check_prerequisites() -> None:
         if result.returncode != 0:
             console.print(f"[error]npm install failed:[/error]\n{result.stderr}")
             sys.exit(1)
-        console.print("[success]Web dependencies installed.[/success]")
+        console.print("[dim]Web dependencies installed.[/dim]")
 
 
 def _stdin_listener(core_port: int, stop: threading.Event, started: threading.Event) -> None:
@@ -523,13 +523,9 @@ def run_dev_server() -> None:
         pass  # Best-effort
 
     console.print()
-    console.print(f"[brand]>> SynPin v{version} — Development Mode[/brand]")
-    console.print()
-    console.print(f"  [dim]Core:  http://{CORE_HOST}:{core_port}/api[/dim]")
-    console.print(f"  [dim]Web:   http://localhost:{web_port}[/dim]")
-    console.print(f"  [dim]Docs: http://{CORE_HOST}:{core_port}/docs[/dim]")
-    console.print("  [dim]Stop: Ctrl+C[/dim]")
-    console.print("  [dim]press d + enter to open dev wizard[/dim]")
+    console.print(f"[brand]  SynPin v{version}[/brand] [dim]dev[/dim]")
+    console.print(f"  [dim]API :{core_port}  Web:{web_port}  Docs:{core_port}/docs[/dim]")
+    console.print(f"  [dim]Ctrl+C stop · d+Enter wizard[/dim]")
     console.print()
 
     processes: list[subprocess.Popen] = []
@@ -559,7 +555,7 @@ def run_dev_server() -> None:
                 proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 proc.kill()
-        console.print("[success]✅  SynPin stopped.[/success]")
+        console.print("[brand]●[/brand] [dim]SynPin stopped.[/dim]")
         sys.exit(0)
 
     signal.signal(signal.SIGINT, _shutdown)
@@ -614,7 +610,7 @@ def run_dev_server() -> None:
     listener.start()
 
     # Start Core
-    console.print("[success]Starting Core...[/success]")
+    console.print("[brand]●[/brand] [dim]Core starting...[/dim]")
     core_proc = _start_core(core_port)
     processes.append(core_proc)
     threading.Thread(target=_stream_output, args=(core_proc, "CORE", output_queue), daemon=True).start()
@@ -625,7 +621,7 @@ def run_dev_server() -> None:
         _shutdown()
 
     # Start Web
-    console.print("[info]Starting Web...[/info]")
+    console.print("[brand]●[/brand] [dim]Web starting...[/dim]")
     web_proc = _start_web(web_port, core_port)
     processes.append(web_proc)
     threading.Thread(target=_stream_output, args=(web_proc, "WEB", output_queue), daemon=True).start()
@@ -660,7 +656,7 @@ def run_dev_server() -> None:
                             if core_exit_time is None:
                                 core_exit_time = time.time()
                             if _port_alive(core_port):
-                                console.print("[success]Core reloaded — watching for changes.[/success]")
+                                console.print("[brand]●[/brand] [dim]Core reloaded — watching for changes.[/dim]")
                                 core_reloaded = True
                                 continue
                             if time.time() - core_exit_time > CORE_RELOAD_GRACE_S:
@@ -685,13 +681,13 @@ def run_dev_server() -> None:
                                     threading.Thread(target=_stream_output, args=(core_proc, "CORE", output_queue), daemon=True).start()
                                     _wait_for_backend(core_port, core_proc)
                                     if core_proc.poll() is None:
-                                        console.print("[success]Core recovered after fix.[/success]")
+                                        console.print("[brand]●[/brand] [dim]Core recovered after fix.[/dim]")
                                         core_reloaded = True
                                     else:
                                         console.print("[error]❌ Core still crashing after fix. Shutting down.[/error]")
                                         _shutdown()
                                 else:
-                                    console.print("[success]Core restarted after crash.[/success]")
+                                    console.print("[brand]●[/brand] [dim]Core restarted after crash.[/dim]")
                                     core_reloaded = True
                                     core_exit_time = None
                             except Exception as e:
@@ -714,7 +710,7 @@ def run_dev_server() -> None:
                 grace_start = time.time()
                 while time.time() - grace_start < CORE_RELOAD_GRACE_S:
                     if _port_alive(core_port):
-                        console.print("[success]Core reloaded.[/success]")
+                        console.print("[brand]●[/brand] [dim]Core reloaded.[/dim]")
                         break
                     time.sleep(0.5)
                 else:

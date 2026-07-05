@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { API_BASE } from '../../config'
 import { DropdownMenu } from '../DropdownMenu'
 import { LoadingSpinner } from '../LoadingSpinner'
+import { ColorPicker } from '../ColorPicker'
 import { SettingsCard } from '../SettingsCard'
 import { Toggle } from './Toggle'
 
@@ -136,8 +137,10 @@ export function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChang
           <div className="settings-field">
             <label>Цвет</label>
             <div className="department-color-row">
-              <input type="color" className="department-color-picker" value={form.color}
-                onChange={e => setForm(f => ({ ...f, color: e.target.value }))} />
+              <ColorPicker
+                value={form.color}
+                onChange={c => setForm(f => ({ ...f, color: c }))}
+              />
               <span className="department-color-value">{form.color}</span>
             </div>
           </div>

@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { API_BASE } from '../../config'
 import { LoadingSpinner } from '../LoadingSpinner'
 import { DropdownMenu } from '../DropdownMenu'
+import { ColorPicker } from '../ColorPicker'
 import type { AgentData, ExternalAgentData } from './types'
 
 interface RoleInfo { rolesid: string; name: string; description: string; color: string }
@@ -466,7 +467,11 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
                     <span className="roles-depts-default-dot" />
                   </button>
                   <label className="roles-depts-color clickable" style={{ background: role.color }} title="Изменить цвет">
-                    <input type="color" value={role.color} onChange={e => handleRoleColorChange(role.rolesid, e.target.value)} />
+                    <ColorPicker
+                      value={role.color}
+                      onChange={c => handleRoleColorChange(role.rolesid, c)}
+                      size="sm"
+                    />
                   </label>
                   <div className="roles-depts-info">
                     <span className="roles-depts-name" style={{ color: role.color }}>{role.name}</span>
@@ -479,7 +484,11 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
             <div className="roles-depts-add">
               <input className="settings-input roles-depts-input" placeholder="Название роли..." value={newRole.name} onChange={e => setNewRole({ ...newRole, name: e.target.value })} />
               <input className="settings-input roles-depts-input roles-depts-input-sm" placeholder="Описание..." value={newRole.description} onChange={e => setNewRole({ ...newRole, description: e.target.value })} />
-              <input type="color" className="roles-depts-color-picker" value={newRole.color} onChange={e => setNewRole({ ...newRole, color: e.target.value })} />
+              <ColorPicker
+                value={newRole.color}
+                onChange={c => setNewRole({ ...newRole, color: c })}
+                size="sm"
+              />
               <button className="roles-depts-add-btn" onClick={handleAddRole} title="Добавить роль">+</button>
             </div>
           </div>
@@ -497,7 +506,11 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
                     <span className="roles-depts-default-dot" />
                   </button>
                   <label className="roles-depts-color clickable" style={{ background: dept.color }} title="Изменить цвет">
-                    <input type="color" value={dept.color} onChange={e => handleDeptColorChange(dept.departmentsid, e.target.value)} />
+                    <ColorPicker
+                      value={dept.color}
+                      onChange={c => handleDeptColorChange(dept.departmentsid, c)}
+                      size="sm"
+                    />
                   </label>
                   <div className="roles-depts-info">
                     <span className="roles-depts-name" style={{ color: dept.color }}>{dept.name}</span>
@@ -510,7 +523,11 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
             <div className="roles-depts-add">
               <input className="settings-input roles-depts-input" placeholder="Название отдела..." value={newDept.name} onChange={e => setNewDept({ ...newDept, name: e.target.value })} />
               <input className="settings-input roles-depts-input roles-depts-input-sm" placeholder="Описание..." value={newDept.description} onChange={e => setNewDept({ ...newDept, description: e.target.value })} />
-              <input type="color" className="roles-depts-color-picker" value={newDept.color} onChange={e => setNewDept({ ...newDept, color: e.target.value })} />
+              <ColorPicker
+                value={newDept.color}
+                onChange={c => setNewDept({ ...newDept, color: c })}
+                size="sm"
+              />
               <button className="roles-depts-add-btn" onClick={handleAddDept} title="Добавить отдел">+</button>
             </div>
           </div>

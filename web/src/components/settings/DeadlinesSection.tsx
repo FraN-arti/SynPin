@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { API_BASE } from '../../config'
 import { SettingsCard } from '../SettingsCard'
+import { ColorPicker } from '../ColorPicker'
 import { Toggle } from './Toggle'
 
 export function DeadlinesSection() {
@@ -88,15 +89,13 @@ export function DeadlinesSection() {
                 border: '1px solid var(--glass-border)', borderRadius: 'var(--radius, 8px)',
                 cursor: 'pointer', transition: 'border-color 0.15s',
               }}>
-                <input
-                  type="color"
+                <ColorPicker
                   value={currentColor}
-                  onChange={e => {
-                    const next = { ...deadlineColors, [item.key]: e.target.value }
+                  onChange={c => {
+                    const next = { ...deadlineColors, [item.key]: c }
                     setDeadlineColors(next)
                     save({ deadline_colors: next })
                   }}
-                  style={{ width: 20, height: 20, border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}
                 />
                 <span style={{ fontSize: '12px', color: currentColor, fontWeight: 600 }}>{item.label}</span>
               </label>

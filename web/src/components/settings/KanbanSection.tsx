@@ -9,6 +9,7 @@ import { SettingsCard } from '../SettingsCard'
 import { MultiSelectMenu } from '../MultiSelectMenu'
 import { DropdownMenu as CustomDropdown } from '../DropdownMenu'
 import { LoadingSpinner } from '../LoadingSpinner'
+import { ColorPicker } from '../ColorPicker'
 import { useUndoWithProgress } from '../../hooks/useUndoWithProgress'
 import { Toggle } from './Toggle'
 
@@ -441,14 +442,7 @@ function KanbanColumnsConfig() {
       <div className="settings-divider-thin" />
       {columns.map((col, i) => (
         <div key={col.id} className={`kanban-config-row${saving && savedId === col.id ? ' saving' : ''}`}>
-          <label className="kanban-color-trigger" style={{ background: col.color }} title="Изменить цвет">
-            <input
-              type="color"
-              value={col.color}
-              onChange={e => { updateColor(i, e.target.value) }}
-              className="kanban-color-hidden"
-            />
-          </label>
+          <ColorPicker value={col.color} onChange={color => updateColor(i, color)} />
           <input
             className="settings-input"
             value={col.label}
@@ -738,22 +732,18 @@ function KanbanLabelsConfig() {
             />
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <span style={{ fontSize: '10px', color: 'var(--gray-500)' }}>Фон</span>
-              <input
-                type="color"
-                className="kanban-color-picker"
+              <ColorPicker
                 value={label.color}
-                onChange={e => updateLabelField(i, 'color', e.target.value)}
-                title="Цвет фона"
+                onChange={c => updateLabelField(i, 'color', c)}
+                size="sm"
               />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <span style={{ fontSize: '10px', color: 'var(--gray-500)' }}>Текст</span>
-              <input
-                type="color"
-                className="kanban-color-picker"
+              <ColorPicker
                 value={label.text_color}
-                onChange={e => updateLabelField(i, 'text_color', e.target.value)}
-                title="Цвет текста"
+                onChange={c => updateLabelField(i, 'text_color', c)}
+                size="sm"
               />
             </div>
             <button

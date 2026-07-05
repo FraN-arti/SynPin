@@ -993,136 +993,159 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
       {/* ── Create Modal ──────────────────────────────────────────── */}
       {showCreateModal && (
         <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
-          <div className="modal-content" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+          <div className="modal-content modal-content--wide" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Новый проект</h2>
-              <button className="modal-close" onClick={() => setShowCreateModal(false)}>×</button>
+              <button className="modal-close" onClick={() => setShowCreateModal(false)} aria-label="Закрыть">×</button>
             </div>
 
-            <div className="projects-form">
-              <div className="projects-form-group">
-                <label>Название <span className="required">*</span></label>
-                <input
-                  type="text"
-                  value={newProject.name}
-                  onChange={e => setNewProject({ ...newProject, name: e.target.value })}
-                  placeholder="Например: Разработка мобильного приложения"
-                  autoFocus
-                />
-                <span className="projects-form-hint">Краткое название проекта (отображается в списке)</span>
-              </div>
-
-              <div className="projects-form-group">
-                <label>Описание</label>
-                <textarea
-                  value={newProject.description}
-                  onChange={e => setNewProject({ ...newProject, description: e.target.value })}
-                  placeholder="О чём этот проект, какова его цель..."
-                  rows={2}
-                />
-                <span className="projects-form-hint">Краткое описание для понимания сути проекта</span>
-              </div>
-
-              <div className="projects-form-group">
-                <label>Рабочий каталог</label>
-                <input
-                  type="text"
-                  value={newProject.work_dir}
-                  onChange={e => setNewProject({ ...newProject, work_dir: e.target.value })}
-                  placeholder="D:\projects\my-project"
-                />
-                <span className="projects-form-hint">Путь для работы инструментов в контексте проекта</span>
-              </div>
-
-              <div className="projects-form-group">
-                <label>Отделы <span className="required">*</span></label>
-                <span className="projects-form-hint">
-                  Какие отделы участвуют в проекте. Выберите основной отдел — его глава будет управлять проектом.
-                </span>
-                <div className="projects-dept-search">
+            <div className="modal-body">
+              <div className="modal-form">
+                {/* Название */}
+                <div className="modal-form-row">
+                  <label htmlFor="np-name" className="modal-form-label">
+                    Название <span className="modal-form-required">*</span>
+                  </label>
                   <input
+                    id="np-name"
                     type="text"
-                    value={deptSearch}
-                    onChange={e => setDeptSearch(e.target.value)}
-                    placeholder="Поиск отделов..."
+                    className="modal-form-input"
+                    value={newProject.name}
+                    onChange={e => setNewProject({ ...newProject, name: e.target.value })}
+                    placeholder="Например: Разработка мобильного приложения"
+                    autoFocus
                   />
-                  {deptSearch && (
-                    <button className="projects-dept-search-clear" onClick={() => setDeptSearch('')}>×</button>
-                  )}
                 </div>
-                <div className="projects-dept-list">
-                  {filteredDepartments.length === 0 ? (
-                    <span className="projects-dept-empty">
-                      {deptSearch ? 'Отделы не найдены' : 'Нет доступных отделов'}
-                    </span>
-                  ) : (
-                    filteredDepartments.map(dept => {
-                      const isSelected = newProject.selected_departments.includes(dept.id)
-                      const isMain = newProject.main_department === dept.id
-                      return (
-                        <div
-                          key={dept.id}
-                          className={`dept-row ${isSelected ? 'selected' : ''}`}
-                          onClick={() => toggleDepartment(dept.id)}
-                        >
-                          {/* Checkbox */}
-                          <div className={`dept-check ${isSelected ? 'checked' : ''}`}>
-                            {isSelected && <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+
+                {/* Описание */}
+                <div className="modal-form-row">
+                  <label htmlFor="np-desc" className="modal-form-label">
+                    Описание
+                  </label>
+                  <textarea
+                    id="np-desc"
+                    className="modal-form-input"
+                    value={newProject.description}
+                    onChange={e => setNewProject({ ...newProject, description: e.target.value })}
+                    placeholder="О чём этот проект, какова его цель..."
+                    rows={2}
+                  />
+                </div>
+
+                {/* Рабочий каталог */}
+                <div className="modal-form-row">
+                  <label htmlFor="np-workdir" className="modal-form-label">
+                    Рабочий каталог
+                  </label>
+                  <input
+                    id="np-workdir"
+                    type="text"
+                    className="modal-form-input"
+                    value={newProject.work_dir}
+                    onChange={e => setNewProject({ ...newProject, work_dir: e.target.value })}
+                    placeholder="D:\projects\my-project"
+                  />
+                </div>
+
+                {/* Отделы */}
+                <div className="modal-form-row">
+                  <label className="modal-form-label">
+                    Отделы <span className="modal-form-required">*</span>
+                  </label>
+                  <div className="dept-search-wrap">
+                    <svg className="dept-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <circle cx="11" cy="11" r="8" />
+                      <path d="m21 21-4.3-4.3" />
+                    </svg>
+                    <input
+                      type="text"
+                      className="dept-search-input"
+                      value={deptSearch}
+                      onChange={e => setDeptSearch(e.target.value)}
+                      placeholder="Поиск отделов..."
+                    />
+                    {deptSearch && (
+                      <button className="dept-search-clear" onClick={() => setDeptSearch('')} aria-label="Очистить">×</button>
+                    )}
+                  </div>
+                  <div className="dept-list">
+                    {filteredDepartments.length === 0 ? (
+                      <div className="dept-empty">
+                        {deptSearch ? 'Отделы не найдены' : 'Нет доступных отделов'}
+                      </div>
+                    ) : (
+                      filteredDepartments.map(dept => {
+                        const isSelected = newProject.selected_departments.includes(dept.id)
+                        const isMain = newProject.main_department === dept.id
+                        return (
+                          <div
+                            key={dept.id}
+                            className={`dept-row ${isSelected ? 'selected' : ''}`}
+                            onClick={() => toggleDepartment(dept.id)}
+                          >
+                            <span className={`dept-checkbox ${isSelected ? 'checked' : ''}`} aria-hidden="true">
+                              {isSelected && (
+                                <svg width="10" height="10" viewBox="0 0 10 10">
+                                  <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              )}
+                            </span>
+                            <span className="dept-name">{dept.name}</span>
+                            {isMain && <span className="dept-star" title="Основной отдел">★</span>}
+                            {isSelected && (
+                              <div className="dept-options" onClick={e => e.stopPropagation()}>
+                                <button
+                                  type="button"
+                                  className={`dept-radio ${isMain ? 'checked' : ''}`}
+                                  onClick={() => setMainDepartment(dept.id)}
+                                  title={isMain ? 'Основной отдел' : 'Сделать основным'}
+                                  aria-label={isMain ? 'Основной отдел' : 'Сделать основным'}
+                                >
+                                  {isMain && <span className="dept-radio-dot" />}
+                                </button>
+                                <span className="dept-radio-text">Основной</span>
+                                <input
+                                  type="text"
+                                  className="dept-role-input"
+                                  value={newProject.department_roles[dept.id] || ''}
+                                  onChange={e => updateDepartmentRole(dept.id, e.target.value)}
+                                  placeholder="Роль"
+                                />
+                              </div>
+                            )}
                           </div>
-
-                          {/* Name + badge */}
-                          <span className="dept-name">{dept.name}</span>
-                          {isMain && <span className="dept-star">★</span>}
-
-                          {/* Radio + role (only when selected) */}
-                          {isSelected && (
-                            <div className="dept-options" onClick={e => e.stopPropagation()}>
-                              <label className="dept-radio-label">
-                                <div className={`dept-radio ${isMain ? 'checked' : ''}`} onClick={() => setMainDepartment(dept.id)}>
-                                  {isMain && <div className="dept-radio-dot" />}
-                                </div>
-                                <span>Основной</span>
-                              </label>
-                              <input
-                                type="text"
-                                className="dept-role-input"
-                                value={newProject.department_roles[dept.id] || ''}
-                                onChange={e => updateDepartmentRole(dept.id, e.target.value)}
-                                placeholder="Роль"
-                                onClick={e => e.stopPropagation()}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })
+                        )
+                      })
+                    )}
+                  </div>
+                  {newProject.selected_departments.length > 0 && !newProject.main_department && (
+                    <span className="dept-warning">Выберите основной отдел</span>
                   )}
                 </div>
-                {newProject.selected_departments.length > 0 && !newProject.main_department && (
-                  <span className="projects-form-warning">Выберите основной отдел</span>
-                )}
-              </div>
 
-              <div className="projects-form-group">
-                <label>Цели проекта</label>
-                <textarea
-                  value={newProject.goals_text}
-                  onChange={e => setNewProject({ ...newProject, goals_text: e.target.value })}
-                  placeholder={"Запуск бета-версии к 1 июля\nНабор 100 пользователей\nИнтеграция с Telegram"}
-                  rows={3}
-                />
-                <span className="projects-form-hint">
-                  Одна цель на строку. Описывают ключевые результаты, которых нужно достичь. Можно редактировать после создания.
-                </span>
+                {/* Цели проекта */}
+                <div className="modal-form-row">
+                  <label htmlFor="np-goals" className="modal-form-label">
+                    Цели проекта
+                  </label>
+                  <textarea
+                    id="np-goals"
+                    className="modal-form-input"
+                    value={newProject.goals_text}
+                    onChange={e => setNewProject({ ...newProject, goals_text: e.target.value })}
+                    placeholder={"Запуск бета-версии к 1 июля\nНабор 100 пользователей\nИнтеграция с Telegram"}
+                    rows={3}
+                  />
+                </div>
               </div>
             </div>
 
             <div className="modal-footer">
-              <button className="projects-btn-cancel" onClick={() => setShowCreateModal(false)}>
+              <button className="btn-secondary" onClick={() => setShowCreateModal(false)}>
                 Отмена
               </button>
               <button
-                className="projects-btn-create"
+                className="btn-primary"
                 onClick={handleCreate}
                 disabled={!newProject.name.trim() || !newProject.main_department}
               >

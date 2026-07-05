@@ -158,7 +158,8 @@
 }
 
 .connections-project-filter:focus {
-  border-color: var(--orange);
+  border-color: var(--glow-border);
+  box-shadow: var(--glow-orange);
   outline: none;
 }
 

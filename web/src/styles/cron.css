@@ -388,8 +388,7 @@
   stroke: #ef4444;
   stroke-width: 2.5;
   stroke-linecap: round;
-  /* 2*pi*10 ≈ 62.83. Animated via JS-driven strokeDashoffset. */
-  transition: stroke-dashoffset 50ms linear;
+  /* No CSS transition — driven by rAF at 60fps for smooth fill. */
 }
 .cron-hold-label {
   white-space: nowrap;
@@ -454,6 +453,11 @@
   color: var(--text, #eee);
   border-radius: 3px;
   font-size: 13px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.cron-limit-input:focus {
+  border-color: var(--glow-border);
+  box-shadow: var(--glow-orange);
 }
 .cron-save-btn {
   padding: 6px 14px;

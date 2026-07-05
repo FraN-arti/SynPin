@@ -73,7 +73,7 @@ export function KanbanSection() {
         {stats === null ? (
           <LoadingSpinner text="Загрузка статистики..." minHeight={60} />
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
+          <div className="settings-fade-in" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
             <div style={{ padding: '12px', background: 'var(--gray-900)', borderRadius: '8px', textAlign: 'center' }}>
               <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text)' }}>{stats.total as number}</div>
               <div style={{ fontSize: '11px', color: 'var(--gray-500)' }}>Всего задач</div>
@@ -452,7 +452,7 @@ function KanbanColumnsConfig() {
       <p className="settings-hint">Настройте колонки доски: цвета, порядок, видимость</p>
       {!loaded ? (
         <LoadingSpinner text="Загрузка колонок..." minHeight={60} />
-      ) : <>
+      ) : <div className="settings-fade-in">
       <div className="settings-divider-thin" />
       {columns.map((col, i) => (
         <div key={col.id} className={`kanban-config-row${saving && savedId === col.id ? ' saving' : ''}`}>
@@ -595,7 +595,7 @@ function KanbanColumnsConfig() {
           />
         </div>
       )}
-      </>}
+      </div>}
     </SettingsCard>
   )
 }
@@ -731,7 +731,7 @@ function KanbanLabelsConfig() {
       <p className="settings-hint">Настройте метки (теги) для задач: цвет фона и текста</p>
       {!loaded ? (
         <LoadingSpinner text="Загрузка меток..." minHeight={60} />
-      ) : <>
+      ) : <div className="settings-fade-in">
       <div className="settings-divider-thin" />
       {labels.map((label, i) => (
         <div key={label.id} className={`kanban-config-row${saving && savedId === label.id ? ' saving' : ''}`}>
@@ -798,7 +798,7 @@ function KanbanLabelsConfig() {
           />
         </div>
       )}
-      </>}
+      </div>}
     </SettingsCard>
   )
 }
@@ -887,7 +887,7 @@ function KanbanWidgetConfig() {
       <p className="settings-hint">Настройте виджет канбан-доски на главной странице</p>
       {!loaded ? (
         <LoadingSpinner text="Загрузка виджета..." minHeight={60} />
-      ) : <>
+      ) : <div className="settings-fade-in">
       {/* ── Отображение ── */}
       <div className="settings-section-label">Отображение</div>
       <div className="settings-row-2">
@@ -984,7 +984,7 @@ function KanbanWidgetConfig() {
         checked={config.compact}
         onChange={v => updateConfig({ compact: v })}
       />
-      </>}
+      </div>}
     </SettingsCard>
   )
 }
@@ -1050,7 +1050,7 @@ function BoardSettingsConfig({ refreshKey }: { refreshKey?: number }) {
       <p className="settings-hint">Лимиты, архивация и уведомления глобальной доски задач</p>
       {!loaded ? (
         <LoadingSpinner text="Загрузка настроек..." minHeight={60} />
-      ) : <>
+      ) : <div className="settings-fade-in">
       <div className="settings-row-2">
         <div className="settings-field" style={{ opacity: 0.5, pointerEvents: 'none' }}>
           <label>Максимум активных задач <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>🚧 скоро</span></label>
@@ -1073,7 +1073,7 @@ function BoardSettingsConfig({ refreshKey }: { refreshKey?: number }) {
           <span className="settings-hint">Задачи старше этого срока перемещаются в архив. Колонки выбираются в блоке «Конфигурация колонок»</span>
         </div>
       </div>
-      </>}
+      </div>}
     </SettingsCard>
   )
 }

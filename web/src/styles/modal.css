@@ -18,7 +18,7 @@
   to { opacity: 1; }
 }
 .modal-content {
-  background: rgba(10, 10, 20, 0.92);
+  background: rgba(10, 9, 8, 0.92);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
   border: 1px solid var(--glass-border);

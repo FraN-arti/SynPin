@@ -469,7 +469,7 @@
   transition: opacity 0.12s ease;
 }
 .custom-tooltip-content {
-  background: rgba(10, 10, 20, 0.94);
+  background: rgba(10, 9, 8, 0.94);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--glass-border);
@@ -524,7 +524,7 @@
   position: absolute;
   width: 8px;
   height: 8px;
-  background: rgba(10, 10, 20, 0.94);
+  background: rgba(10, 9, 8, 0.94);
   border: 1px solid var(--glass-border);
   transform: rotate(45deg);
 }

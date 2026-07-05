@@ -949,7 +949,7 @@
 
 /* ─── Global Mouse Tooltip (replaces native title) ──────────── */
 .global-mouse-tooltip {
-  background: rgba(10, 10, 20, 0.94);
+  background: rgba(10, 9, 8, 0.94);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--glass-border);

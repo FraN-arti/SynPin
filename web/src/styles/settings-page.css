@@ -356,7 +356,7 @@
   appearance: none;
   width: 30px;
   height: 18px;
-  background: rgba(55, 55, 75, 0.6);
+  background: rgba(50, 48, 45, 0.6);
   border: 1px solid var(--glass-border);
   border-radius: 9px;
   position: relative;

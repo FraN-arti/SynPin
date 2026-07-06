@@ -129,6 +129,21 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("[cron] Failed to start scheduler: %s", e)
 
+    # ── Trigger engine (event-driven automation: idle_head, etc.) ──
+    try:
+        from ..triggers.engine import get_engine
+        from ..triggers.actions.log import LogAction
+        from ..triggers.actions.agent_prompt import AgentPromptAction
+        trigger_eng = get_engine()
+        trigger_eng.register_action(LogAction())
+        trigger_eng.register_action(AgentPromptAction())
+        # Start engine in a background task — it spawns its own watchers
+        # and event processor; no periodic tick needed.
+        asyncio.create_task(trigger_eng.start())
+        started.append("trigger engine")
+    except Exception as e:
+        logger.warning("[triggers] Failed to start engine: %s", e)
+
     # Single compact summary instead of 12 individual lines.
     if started:
         joined = ", ".join(started)

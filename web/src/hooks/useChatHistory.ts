@@ -1,28 +1,13 @@
-/**
- * useChatHistory — loads chat history when active agent changes or
- * the user returns to the chat view.
- *
- * Behaviour:
- *  - On mount/agent-switch, fetch /api/chat/history.
- *  - If the last message is a user message with no assistant reply
- *    (a background task is in flight), insert a placeholder assistant
- *    bubble and set isTyping. After 5s, refetch once to catch any
- *    response that arrived during the gap (one-shot, no polling).
- *  - Cancellation flag is set on unmount so stale fetches don't
- *    overwrite newer state.
- */
-
 import { useEffect } from 'react'
-import type { Message } from '../components/chatTypes'
-import type { ToolCall } from '../components/ToolTimeline'
-import type { AgentConfig } from '../components/Sidebar'
 import { API_BASE } from '../config'
+import type { Message } from '../components/chatTypes'
+import type { AgentConfig } from '../components/Sidebar'
 
 export interface UseChatHistoryParams {
   activeAgent: AgentConfig | null
   viewType: string
   setMessages: (m: Message[] | null | ((prev: Message[] | null) => Message[] | null)) => void
-  setIsTyping: (v: boolean) => void
+  isStreamingRef: React.MutableRefObject<boolean>
 }
 
 interface RawMessage {
@@ -33,7 +18,7 @@ interface RawMessage {
   agent_name?: string
   prompt_tokens?: number
   completion_tokens?: number
-  tools?: ToolCall[]
+  tools?: any[]
 }
 
 function restoreMessages(rawMsgs: RawMessage[]): Message[] {
@@ -51,70 +36,26 @@ function restoreMessages(rawMsgs: RawMessage[]): Message[] {
 }
 
 export function useChatHistory({
-  activeAgent, viewType, setMessages, setIsTyping,
+  activeAgent, viewType, setMessages, isStreamingRef,
 }: UseChatHistoryParams): void {
   useEffect(() => {
     if (!activeAgent || viewType !== 'chat') return
+    // Don't reload history while SSE is actively streaming
+    if (isStreamingRef.current) return
 
-    setMessages(null)
     let cancelled = false
 
     const fetchHistory = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web&limit=20`)
+        const res = await fetch(
+          `${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web&limit=20`
+        )
         if (cancelled) return
         if (!res.ok) { setMessages([]); return }
         const data = await res.json()
         const msgs: RawMessage[] = data.messages || []
-
         if (msgs.length === 0) { setMessages([]); return }
-
-        const lastMsg = msgs[msgs.length - 1]
-        const hasPendingTask = lastMsg?.role === 'user'
-        const restored = restoreMessages(msgs)
-        const lastRestored = restored[restored.length - 1]
-        const alreadyHasPlaceholder = lastRestored?.role === 'assistant' && !lastRestored.content
-
-        if (hasPendingTask && !alreadyHasPlaceholder) {
-          restored.push({
-            id: `placeholder-${Date.now()}`,
-            role: 'assistant',
-            content: '',
-            timestamp: new Date(),
-            tools: [],
-          })
-          setIsTyping(true)
-
-          // Safety refetch: catch responses that arrived between history load and WS connect.
-          // One-shot, 5s delay, no polling loop.
-          setTimeout(async () => {
-            if (cancelled) return
-            try {
-              const retryRes = await fetch(`${API_BASE}/api/chat/history?agent_slug=${activeAgent.slug}&channel_id=web&limit=20`)
-              if (!retryRes.ok) return
-              const retryData = await retryRes.json()
-              const retryMsgs: RawMessage[] = retryData.messages || []
-              const lastRetryMsg = retryMsgs[retryMsgs.length - 1]
-              if (lastRetryMsg?.role === 'assistant') {
-                setMessages(prev => {
-                  const list = prev ?? []
-                  const placeholderId = list.map(m => m.id).reverse().find(id => {
-                    const msg = list.find(m => m.id === id)
-                    return msg?.role === 'assistant' && !msg.content
-                  })
-                  if (!placeholderId) return list
-                  setIsTyping(false)
-                  return list.map(m => m.id === placeholderId
-                    ? { ...m, content: lastRetryMsg.content, model: lastRetryMsg.model, agent_name: lastRetryMsg.agent_name, prompt_tokens: lastRetryMsg.prompt_tokens, completion_tokens: lastRetryMsg.completion_tokens, tools: lastRetryMsg.tools }
-                    : m
-                  )
-                })
-              }
-            } catch { /* silent */ }
-          }, 5000)
-        }
-
-        setMessages(restored)
+        setMessages(restoreMessages(msgs))
       } catch (e) {
         if (cancelled) return
         console.error('[history] load error:', e)
@@ -122,7 +63,8 @@ export function useChatHistory({
       }
     }
     fetchHistory()
-
     return () => { cancelled = true }
-  }, [activeAgent, viewType, setMessages, setIsTyping])
+    // KEY: compare by slug, not by object reference — agent:list_changed
+    // creates a new object with the same slug, but that shouldn't reload history
+  }, [activeAgent?.slug, viewType, setMessages, isStreamingRef])
 }

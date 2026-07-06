@@ -21,6 +21,15 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { API_BASE } from '../config'
 import type { AppEvent, InAppSettings } from '../types/events'
 
+interface ViewContext {
+  /** The slug of the active agent when in chat view */
+  activeAgentSlug: string | null
+  /** Current view type: 'chat' | 'otdel' | null */
+  viewType: 'chat' | 'otdel' | null
+  /** The otdel ID when in otdel view */
+  otdelId: string | null
+}
+
 const DEFAULT_SETTINGS: InAppSettings = {
   enabled: true,
   auto_fade_seconds: 8,
@@ -34,6 +43,8 @@ interface UseEventsOptions {
    * the underlying AppEvent so the caller can navigate to its source.
    */
   onToastClick?: (ev: AppEvent) => void
+  /** Current view context — used to suppress toasts from the active chat. */
+  viewContext?: ViewContext
 }
 
 export interface UseEventsResult {
@@ -49,6 +60,7 @@ export interface UseEventsResult {
 export function useEvents({
   wsOn,
   onToastClick,
+  viewContext,
 }: UseEventsOptions = {}): UseEventsResult {
   const [toasts, setToasts] = useState<AppEvent[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -61,6 +73,10 @@ export function useEvents({
   // Settings ref — used by handler before settings state propagates.
   const settingsRef = useRef(settings)
   useEffect(() => { settingsRef.current = settings }, [settings])
+
+  // View context ref — used by pushToast to suppress toasts from current view
+  const viewContextRef = useRef(viewContext)
+  useEffect(() => { viewContextRef.current = viewContext }, [viewContext])
 
   // Track if the WS subscription is currently active — used by pushToast.
   const subscribedRef = useRef(false)
@@ -79,17 +95,25 @@ export function useEvents({
       .catch((e) => console.error('[useevents] load events failed:', e))
 
     fetch(`${API_BASE}/api/events?limit=20`)
-      .then(r => r.json())
-      .then((data: { unread_count: number; items: AppEvent[] }) => {
-        if (!alive) return
-        setUnreadCount(data.unread_count ?? 0)
-        const unread = (data.items || []).filter((e: AppEvent) => !e.read_at)
-        // Newest first from API; show the most recent max_visible.
-        const visible = unread.slice(0, settingsRef.current.max_visible)
-        for (const ev of visible.reverse()) {
-          pushToast(ev)
-        }
-      })
+          .then(r => r.json())
+          .then((data: { unread_count: number; items: AppEvent[] }) => {
+            if (!alive) return
+            setUnreadCount(data.unread_count ?? 0)
+            // Surface only FRESH unread events as toasts (last ~30s).
+            // Older unread events are still counted (badge) but shouldn't
+            // pop on every page reload — that's just spam.
+            const cutoff = Date.now() - 30_000
+            const unread = (data.items || []).filter((e: AppEvent) => !e.read_at)
+            const visible = unread
+              .filter((e: AppEvent) => {
+                const t = e.created_at ? new Date(e.created_at).getTime() : 0
+                return t > cutoff
+              })
+              .slice(0, settingsRef.current.max_visible)
+            for (const ev of visible.reverse()) {
+              pushToast(ev)
+            }
+          })
       .catch((e) => console.error('[useevents] load events failed:', e))
 
     return () => { alive = false }
@@ -125,6 +149,17 @@ export function useEvents({
     // (e.g. REST load + WS re-broadcast in the same render cycle).
     if (localIds.current.has(ev.id)) return
     localIds.current.add(ev.id)
+
+    // Suppress toasts from the currently active view — the user
+    // already sees the messages in the active chat/otdel.
+    const ctx = viewContextRef.current
+    if (ctx?.viewType === 'chat' && ctx.activeAgentSlug && ev.source_ref === ctx.activeAgentSlug && (ev.source === 'agent' || ev.source === 'main_agent')) {
+      return
+    }
+    if (ctx?.viewType === 'otdel' && ctx.otdelId && ev.source_ref === ctx.otdelId && ev.source === 'otdel') {
+      return
+    }
+
     setToasts(prev => {
       const next = [...prev, ev]
       return next.slice(-settingsRef.current.max_visible)

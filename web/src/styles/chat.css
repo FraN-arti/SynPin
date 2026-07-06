@@ -457,11 +457,12 @@
 /* === Animated border flow — @property Houdini === */
 
 
-/* Message wrapper — base (no border by default) */
+/* Message wrapper — base (subtle static border for all messages) */
 .message-wrapper {
   display: inline-block;
   max-width: 80%;
   border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
   /* Smooth fade-out of the streaming glow when .streaming is removed.
      Without this, border-color + box-shadow vanish in a single frame
      when chat:done arrives — the user sees the pulsing glow disappear

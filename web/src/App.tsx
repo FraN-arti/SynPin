@@ -155,6 +155,12 @@ function App() {
   // Click on a toast opens the source agent/otdel chat. If the source is
   // already the active agent (and we're in their chat), keep the loaded
   // history — don't wipe with setMessages([]).
+  // View context is passed to suppress toasts from the currently active chat.
+  const viewContext = {
+    activeAgentSlug: view.type === 'chat' ? activeAgent?.slug ?? null : null,
+    viewType: view.type === 'chat' || view.type === 'otdel' ? view.type : null,
+    otdelId: view.type === 'otdel' ? view.id : null,
+  }
   const events = useEvents({
     wsOn,
     onToastClick: (ev) => {
@@ -173,6 +179,7 @@ function App() {
         setView({ type: 'otdel', id: ev.source_ref ?? '' })
       }
     },
+    viewContext,
   })
 
   // Global tooltip — intercepts all title attributes, shows mouse-following tooltip
@@ -548,7 +555,7 @@ function App() {
 
   // Load chat history when active agent changes OR when returning to chat view
   // Load chat history on agent switch — extracted to hooks/useChatHistory.ts
-  useChatHistory({ activeAgent, viewType: view.type, setMessages, setIsTyping })
+  useChatHistory({ activeAgent, viewType: view.type, setMessages, isStreamingRef })
   // Auto-scroll handled by useChatScroll hook (sentinel pattern)
 
   // ── Compaction indicator ─────────────────────────────────────────
@@ -565,7 +572,7 @@ function App() {
   // Chat submit/streaming — extracted to hooks/useChatSubmit.ts
   const { handleSubmit, handleKeyDown } = useChatSubmit({
     input, attachments, isTyping, activeAgent,
-    textareaRef, messagesRef, isStreamingRef,
+    textareaRef, isStreamingRef,
     setInput, setAttachments, setMessages, setIsTyping, setCompactionNotice,
         wsSend, wsOn,
   })

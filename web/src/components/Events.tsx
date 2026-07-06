@@ -3,24 +3,20 @@
  *
  * Lifecycle:
  *  - Mount: CSS animation `event-toast-in` plays (180ms slide+fade).
- *  - After `autoFadeSeconds`, the toast gets the `event-toast-fading`
- *    class which starts the opacity transition.
- *  - On `transitionend` (opacity), we call onDismiss which removes it
- *    from the stack and posts a read receipt.
+ *  - After `autoFadeMs`, the `event-toast-fading` class is added which
+ *    starts the 0.25s opacity transition (defined in events.css).
+ *  - 300ms later (just past the CSS transition) we call onDismiss to
+ *    remove the toast from state and post a read receipt.
  *
- * Why setTimeout-in-useEffect instead of onAnimationEnd:
- *  - The previous CSS-driven approach had a race: onAnimationEnd fires
- *    after the 180ms slide-in, but the classList change had to be
- *    scheduled via setTimeout, and onTransitionEnd could leak across
- *    remounts (the same `ev.id` re-mounting after a WS reconnect would
- *    catch a stale transitionend event from the previous DOM node).
- *  - The useEffect approach gives us a real cleanup function so the
- *    timer is cancelled if the toast is dismissed early (manual ×) or
- *    unmounts for any other reason.
- *
- * Manual × calls onDismiss immediately + marks read.
+ * Why setTimeout-in-useEffect instead of onTransitionEnd:
+ *  - onTransitionEnd was unreliable: when React re-mounts a toast card
+ *    with the same id (e.g. after WS reconnect), the previous DOM node's
+ *    transitionend could fire and dismiss a brand new toast.
+ *  - Two setTimeouts give us predictable cleanup: if the component
+ *    unmounts (manual ×, parent re-render, StrictMode double-mount),
+ *    both timers cancel cleanly.
  */
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import type { AppEvent } from '../types/events'
 
 interface EventsProps {
@@ -35,34 +31,31 @@ function ToastCard({ ev, onDismiss, autoFadeMs, onClick }: {
   autoFadeMs: number
   onClick?: (ev: AppEvent) => void
 }) {
-  // Schedule fade-out after autoFadeMs. If the component unmounts (manual
-  // dismiss, parent re-render that drops this toast, or strict-mode double
-  // mount), the cleanup cancels the timer and the classList add — no
-  // leak, no stale DOM access.
+  const toastRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
-    const node = document.querySelector(`[data-event-id="${ev.id}"]`)
+    const node = toastRef.current
     if (!node) return
-    const t = window.setTimeout(() => {
+    let dismissTimer: number | undefined
+    const showTimer = window.setTimeout(() => {
       node.classList.add('event-toast-fading')
+      dismissTimer = window.setTimeout(() => onDismiss(ev.id), 300)
     }, autoFadeMs)
-    return () => window.clearTimeout(t)
-  }, [ev.id, autoFadeMs])
+    return () => {
+      window.clearTimeout(showTimer)
+      if (dismissTimer !== undefined) window.clearTimeout(dismissTimer)
+    }
+  }, [ev.id, autoFadeMs, onDismiss])
 
   return (
     <div
+      ref={toastRef}
       data-event-id={ev.id}
       className="event-toast event-toast-in"
       style={{ animationDelay: '0ms', animationDuration: '180ms' }}
       role="status"
       aria-live="polite"
       onClick={() => onClick?.(ev)}
-      onTransitionEnd={(e) => {
-        // Only react to our own opacity transition. Bubbles from children
-        // are filtered by currentTarget !== target.
-        if (e.currentTarget !== e.target) return
-        if (e.propertyName !== 'opacity') return
-        onDismiss(ev.id)
-      }}
     >
       <div className="event-toast-body">
         <div className="event-toast-title">{ev.title}</div>

@@ -85,3 +85,7 @@ graphify-out/
 web/src/**/*.test.*
 web/src/test/
 web/vitest.config.ts
+
+
+# User customization (local-only)
+core/synpin/config/themes/

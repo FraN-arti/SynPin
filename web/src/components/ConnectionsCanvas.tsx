@@ -79,7 +79,7 @@ function DepartmentNode({ data }: { data: GraphNode['data'] }) {
       </div>
       <div className="connection-node-meta">
         {data.head && <span className="connection-node-head">Глава: {data.head}</span>}
-        <span className="connection-node-workers">Worker'ов: {data.workers_count}</span>
+        {data.workers_count > 0 && <span className="connection-node-workers">Сотрудников: {data.workers_count}</span>}
       </div>
       {data.active_tasks > 0 && (
         <div className="connection-node-tasks">
@@ -153,12 +153,6 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
   const [loading, setLoading] = useState(true)
   const [connections, setConnections] = useState<Connection[]>([])
   const [otdelNames, setOtdelNames] = useState<Record<string, string>>({})
-  
-  // Project filtering
-  const [projects, setProjects] = useState<{id: string; name: string; departments: {id: string}[]}[]>([])
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('')
-  const [allNodes, setAllNodes] = useState<Node[]>([])
-  const [allEdges, setAllEdges] = useState<Edge[]>([])
 
   // Activity toast — shows when approval starts/completes
   const [activityToast, setActivityToast] = useState<{ message: string; type: 'start' | 'complete' } | null>(null)
@@ -194,8 +188,6 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
       }))
 
       console.log('[connections] setting nodes:', flowNodes.length, 'edges:', flowEdges.length)
-      setAllNodes(flowNodes)
-      setAllEdges(flowEdges)
       setNodes(flowNodes)
       setEdges(flowEdges)
     } catch (e) {
@@ -205,15 +197,6 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
     }
   }, [setNodes, setEdges])
   
-  // Load projects for filtering
-  const loadProjects = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/projects`)
-      if (!res.ok) return
-      const data = await res.json()
-      setProjects(data.projects || [])
-    } catch {}
-  }, [])
 
   // Load connections list
   const loadConnections = useCallback(async () => {
@@ -235,6 +218,7 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
         const names: Record<string, string> = {}
         for (const o of (data.otdels || [])) {
           names[o.otdelid] = o.name
+          names[`otdel:${o.otdelid}`] = o.name
         }
         setOtdelNames(names)
       }
@@ -246,27 +230,7 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
     loadGraph()
     loadConnections()
     loadOtdelNames()
-    loadProjects()
-  }, [loadGraph, loadConnections, loadOtdelNames, loadProjects])
-  
-  // Filter by project
-  useEffect(() => {
-    if (!selectedProjectId) {
-      setNodes(allNodes)
-      setEdges(allEdges)
-      return
-    }
-    
-    const project = projects.find(p => p.id === selectedProjectId)
-    if (!project) return
-    
-    const deptIds = new Set(project.departments.map(d => d.id))
-    const filteredNodes = allNodes.filter(n => deptIds.has(n.id))
-    const filteredEdges = allEdges.filter(e => deptIds.has(e.source) && deptIds.has(e.target))
-    
-    setNodes(filteredNodes)
-    setEdges(filteredEdges)
-  }, [selectedProjectId, projects, allNodes, allEdges, setNodes, setEdges])
+  }, [loadGraph, loadConnections, loadOtdelNames])
 
   // WebSocket live updates
   useEffect(() => {
@@ -333,21 +297,6 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
     }
   }, [connections])
 
-  // Delete connection
-  const handleDeleteConnection = useCallback(async (connId: string) => {
-    if (!confirm('Удалить связь? Все связанные данные будут удалены.')) return
-    try {
-      await fetch(`${API_BASE}/api/connections/${connId}`, { method: 'DELETE' })
-      // Refresh edge panel
-      setSelectedEdge(prev => {
-        if (!prev) return null
-        const remaining = prev.connections.filter(c => c.id !== connId)
-        return remaining.length > 0 ? { ...prev, connections: remaining } : null
-      })
-      loadConnections()
-    } catch {}
-  }, [loadConnections])
-
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", minHeight: "calc(100vh - 100px)" }}>
@@ -383,21 +332,8 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
 
         {/* Toolbar */}
         <div className="connections-toolbar">
-          {/* Project filter */}
-          {projects.length > 0 && (
-            <select
-              className="connections-project-filter"
-              value={selectedProjectId}
-              onChange={e => setSelectedProjectId(e.target.value)}
-            >
-              <option value="">Все проекты</option>
-              {projects.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          )}
           <button className="connections-toolbar-btn" onClick={handleAutoLayout}>
-            Сравнять
+            Сравнить
           </button>
         </div>
       </div>
@@ -410,39 +346,29 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
             <button className="modal-close" onClick={() => setSelectedEdge(null)}>×</button>
           </div>
           <div className="connections-panel-body">
-            <div className="expanded-field">
-              <label>Между</label>
-              <span style={{ fontWeight: 600 }}>
-                {otdelNames[selectedEdge.source] || selectedEdge.source}
-                {' → '}
-                {otdelNames[selectedEdge.target] || selectedEdge.target}
-              </span>
+            <div>
+              <span className="connections-panel-label">Между</span>
+              <div className="connections-panel-flow">
+                <span>{(selectedEdge.source === 'agent:primary' ? 'Главный агент' : otdelNames[selectedEdge.source]) || selectedEdge.source}</span>
+                <span className="connections-panel-flow-arrow">→</span>
+                <span>{(selectedEdge.target === 'agent:primary' ? 'Главный агент' : otdelNames[selectedEdge.target]) || selectedEdge.target}</span>
+              </div>
             </div>
             <div className="settings-divider-thin" />
             {selectedEdge.connections.map(conn => (
               <div key={conn.id} className="connection-detail-card">
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '14px', marginBottom: '2px' }}>
-                      {conn.label || '(без названия)'}
-                    </div>
-                    {conn.description && (
-                      <div style={{ fontSize: '12px', color: 'var(--text-dim)', lineHeight: 1.4, marginBottom: '4px' }}>
-                        {conn.description}
-                      </div>
-                    )}
-                    <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
-                      {conn.from === 'agent:primary' ? 'Главный агент' : (otdelNames[conn.from] || conn.from)}
-                      {' → '}
-                      {conn.to === 'agent:primary' ? 'Главный агент' : (otdelNames[conn.to] || conn.to)}
-                    </div>
+                <div className="connection-detail-label">
+                  {conn.label || '(без названия)'}
+                </div>
+                {conn.description && (
+                  <div className="connection-detail-description">
+                    {conn.description}
                   </div>
-                  <button
-                    className="btn-action btn-action-delete"
-                    style={{ flexShrink: 0 }}
-                    onClick={() => handleDeleteConnection(conn.id)}
-                    title="Удалить"
-                  >×</button>
+                )}
+                <div className="connection-detail-flow">
+                  <span>{conn.from === 'agent:primary' ? 'Главный агент' : (otdelNames[conn.from] || conn.from)}</span>
+                  <span className="connection-detail-flow-arrow">→</span>
+                  <span>{conn.to === 'agent:primary' ? 'Главный агент' : (otdelNames[conn.to] || conn.to)}</span>
                 </div>
               </div>
             ))}

@@ -106,7 +106,7 @@ async def connection_create(params: dict[str, Any]) -> ToolResult:
                 if t == conn_type:
                     return make_error(f"Connection already exists: {from_otdel} → {to_otdel} ({conn_type})")
 
-        type_map = {"approval": ConnectionType.APPROVAL, "delegation": ConnectionType.DELEGATION, "peer": ConnectionType.PEER}
+        type_map = {"approval": ConnectionType.APPROVAL, "peer": ConnectionType.PEER}
 
         new_conn = Connection(
             id=f"conn-{uuid.uuid4().hex[:8]}",

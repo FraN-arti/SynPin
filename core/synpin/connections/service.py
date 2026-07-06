@@ -332,8 +332,8 @@ def build_graph() -> Graph:
         labels = [c.label or c.type.value for c in conns]
         merged_label = " · ".join(labels)
 
-        # Use the "highest priority" color (escalation > delegation > peer)
-        priority = {ConnectionType.APPROVAL: 3, ConnectionType.DELEGATION: 2, ConnectionType.PEER: 1}
+        # Use the "highest priority" color (approval > peer)
+        priority = {ConnectionType.APPROVAL: 3, ConnectionType.PEER: 1}
         top_conn = max(conns, key=lambda c: priority.get(c.type, 0))
         color = color_map.get(top_conn.type, "#6b7280")
 

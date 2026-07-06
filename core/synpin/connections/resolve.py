@@ -35,12 +35,13 @@ def _current_primary_agent() -> str | None:
     """Look up the slug of whichever agent is currently primary."""
     try:
         from synpin.agents.manager import load_agents
-        agents = load_agents() or []
+        data = load_agents() or {}
+        agents = data.get("agents", []) if isinstance(data, dict) else data
     except Exception as e:  # noqa: BLE001
         logger.debug("resolve: could not load agents: %s", e)
         return None
     for a in agents:
-        if a.get("is_primary"):
+        if isinstance(a, dict) and a.get("is_primary"):
             return a.get("slug") or a.get("agentid") or None
     return None
 
@@ -48,8 +49,10 @@ def _current_primary_agent() -> str | None:
 def _otdel_name(otdel_id: str) -> str:
     try:
         from synpin.agents.manager import load_otdels
-        for o in load_otdels() or []:
-            if o.get("otdelid") == otdel_id:
+        raw = load_otdels() or []
+        otdels = raw.get("otdels", []) if isinstance(raw, dict) else raw
+        for o in otdels:
+            if isinstance(o, dict) and o.get("otdelid") == otdel_id:
                 return o.get("name", otdel_id)
     except Exception as e:  # noqa: BLE001
         logger.debug("resolve: could not load otdels: %s", e)

@@ -264,6 +264,16 @@
   color: var(--red, #ef4444);
   background: rgba(239, 68, 68, 0.08);
 }
+.btn-action-delete.holding {
+  border-color: var(--red, #ef4444);
+  color: var(--red, #ef4444);
+  background: rgba(239, 68, 68, 0.15);
+  pointer-events: none;
+}
+.btn-action-delete.holding svg {
+  pointer-events: all;
+  pointer-events: auto;
+}
 .btn-action-group {
   display: flex;
   gap: 4px;

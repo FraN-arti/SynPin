@@ -89,3 +89,9 @@ web/vitest.config.ts
 
 # User customization (local-only)
 core/synpin/config/themes/
+
+# Ruff linter cache (local-only)
+.ruff_cache/
+core/.ruff_cache/
+.mypy_cache/
+core/.mypy_cache/

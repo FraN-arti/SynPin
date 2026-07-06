@@ -32,6 +32,8 @@ export interface PickerOption {
   searchText?: string
   /** When true, option is shown but not selectable. */
   disabled?: boolean
+  /** Optional dot color (hex/var) rendered left of the label. */
+  dotColor?: string
 }
 
 type SingleProps = {
@@ -261,6 +263,9 @@ export function PickerMenu(props: PickerMenuProps) {
                   <span className={`picker-check ${isSelected ? 'checked' : ''}`} aria-hidden="true">
                     {isSelected ? '✓' : ''}
                   </span>
+                )}
+                {opt.dotColor && (
+                  <span className="picker-option-dot" style={{ backgroundColor: opt.dotColor }} aria-hidden="true" />
                 )}
                 <span className="picker-option-label">{opt.label}</span>
                 {opt.badge != null && <span className="picker-option-badge">{opt.badge}</span>}

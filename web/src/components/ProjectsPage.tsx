@@ -135,6 +135,16 @@ function getPriorityTagClass(priority: string): string {
   }
 }
 
+function getPriorityColor(priority: string): string {
+  switch (priority) {
+    case 'critical': return 'var(--red)'
+    case 'high': return 'var(--orange)'
+    case 'medium': return 'var(--yellow)'
+    case 'low': return 'var(--green)'
+    default: return 'var(--text-dim)'
+  }
+}
+
 function getTaskStatusColor(status: string): string {
   switch (status) {
     case 'done': return 'var(--green)'
@@ -465,7 +475,7 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
               <path d="M12 4L6 10L12 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
-          <div className="projects-header">
+          <div className="projects-header projects-header--detail">
             <div className="projects-title-row">
               <h1 className="projects-title">{p.name}</h1>
               <div className="project-status-wrapper">
@@ -687,20 +697,22 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
                 <h2>Редактировать проект</h2>
                 <button className="modal-close" onClick={() => setShowEditModal(false)}>×</button>
               </div>
-              <div className="projects-form">
-                <div className="projects-form-group">
-                  <label>Название <span className="required">*</span></label>
+              <div className="modal-form">
+                <div className="modal-form-row">
+                  <label className="modal-form-label">Название <span className="modal-form-required">*</span></label>
                   <input
                     type="text"
+                    className="modal-form-input"
                     value={editForm.name}
                     onChange={e => setEditForm({ ...editForm, name: e.target.value })}
                     placeholder="Название проекта"
                     autoFocus
                   />
                 </div>
-                <div className="projects-form-group">
-                  <label>Описание</label>
+                <div className="modal-form-row">
+                  <label className="modal-form-label">Описание</label>
                   <textarea
+                    className="modal-form-input"
                     value={editForm.description}
                     onChange={e => setEditForm({ ...editForm, description: e.target.value })}
                     placeholder="Описание проекта"
@@ -708,65 +720,72 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
                   />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div className="projects-form-group">
-                    <label>Статус</label>
-                    <select
-                      className="settings-select"
+                  <div className="modal-form-row">
+                    <label className="modal-form-label">Статус</label>
+                    <PickerMenu
                       value={editForm.status}
-                      onChange={e => setEditForm({ ...editForm, status: e.target.value })}
-                    >
-                      <option value="active">Активен</option>
-                      <option value="paused">Приостановлен</option>
-                      <option value="completed">Завершён</option>
-                      <option value="archived">В архиве</option>
-                    </select>
+                      onSelect={(id) => setEditForm({ ...editForm, status: id })}
+                      options={[
+                        { id: 'active', label: 'Активен', dotColor: getStatusColor('active') },
+                        { id: 'paused', label: 'Приостановлен', dotColor: getStatusColor('paused') },
+                        { id: 'completed', label: 'Завершён', dotColor: getStatusColor('completed') },
+                        { id: 'archived', label: 'В архиве', dotColor: getStatusColor('archived') },
+                      ]}
+                      triggerWidth="100%"
+                      placeholder="Выберите статус"
+                    />
                   </div>
-                  <div className="projects-form-group">
-                    <label>Приоритет</label>
-                    <select
-                      className="settings-select"
+                  <div className="modal-form-row">
+                    <label className="modal-form-label">Приоритет</label>
+                    <PickerMenu
                       value={editForm.priority}
-                      onChange={e => setEditForm({ ...editForm, priority: e.target.value })}
-                    >
-                      <option value="low">Низкий</option>
-                      <option value="medium">Средний</option>
-                      <option value="high">Высокий</option>
-                      <option value="critical">Критический</option>
-                    </select>
+                      onSelect={(id) => setEditForm({ ...editForm, priority: id })}
+                      options={[
+                        { id: 'low', label: 'Низкий', dotColor: getPriorityColor('low') },
+                        { id: 'medium', label: 'Средний', dotColor: getPriorityColor('medium') },
+                        { id: 'high', label: 'Высокий', dotColor: getPriorityColor('high') },
+                        { id: 'critical', label: 'Критический', dotColor: getPriorityColor('critical') },
+                      ]}
+                      triggerWidth="100%"
+                      placeholder="Выберите приоритет"
+                    />
                   </div>
                 </div>
-                <div className="projects-form-group">
-                  <label>Дедлайн</label>
+                <div className="modal-form-row">
+                  <label className="modal-form-label">Дедлайн</label>
                   <input
                     type="date"
+                    className="modal-form-input"
                     value={editForm.deadline}
                     onChange={e => setEditForm({ ...editForm, deadline: e.target.value })}
                   />
                 </div>
-                <div className="projects-form-group">
-                  <label>Рабочий каталог</label>
+                <div className="modal-form-row">
+                  <label className="modal-form-label">Рабочий каталог</label>
                   <input
                     type="text"
+                    className="modal-form-input"
                     value={editForm.work_dir}
                     onChange={e => setEditForm({ ...editForm, work_dir: e.target.value })}
                     placeholder="D:\projects\my-project"
                   />
                 </div>
-                <div className="projects-form-group">
-                  <label>Теги</label>
+                <div className="modal-form-row">
+                  <label className="modal-form-label">Теги</label>
                   <input
                     type="text"
+                    className="modal-form-input"
                     value={editForm.tags}
                     onChange={e => setEditForm({ ...editForm, tags: e.target.value })}
                     placeholder="тег1, тег2, тег3"
                   />
-                  <span className="projects-form-hint">Через запятую</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Через запятую</span>
                 </div>
               </div>
               <div className="modal-footer">
-                <button className="projects-btn-cancel" onClick={() => setShowEditModal(false)}>Отмена</button>
+                <button className="btn-secondary" onClick={() => setShowEditModal(false)}>Отмена</button>
                 <button
-                  className="projects-btn-create"
+                  className="btn-primary"
                   onClick={handleUpdate}
                   disabled={!editForm.name.trim() || editSaving}
                 >
@@ -794,9 +813,9 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
                 </p>
               </div>
               <div className="modal-footer">
-                <button className="projects-btn-cancel" onClick={() => setShowDeleteConfirm(false)}>Отмена</button>
+                <button className="btn-secondary" onClick={() => setShowDeleteConfirm(false)}>Отмена</button>
                 <button
-                  className="projects-btn-create danger"
+                  className="btn-primary btn-warn"
                   onClick={handleDelete}
                 >
                   Удалить проект

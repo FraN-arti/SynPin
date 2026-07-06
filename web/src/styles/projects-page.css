@@ -20,10 +20,15 @@
   flex: 1;
   min-width: 0;
 }
+.projects-header--detail {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
 .projects-title {
   font-size: 18px;
   font-weight: 700;
-  color: var(--text);
+  color: var(--yellow);
   margin: 0;
 }
 .projects-create-btn {
@@ -129,7 +134,7 @@
   margin: 0;
   font-size: 15px;
   font-weight: 600;
-  color: var(--text);
+  color: var(--yellow);
 }
 .project-status-badge {
   font-size: 10px;
@@ -148,7 +153,8 @@
 }
 .project-card-description {
   font-size: 13px;
-  color: var(--text-secondary);
+  color: var(--text-dim);
+  font-style: italic;
   margin: 0 0 12px;
   line-height: 1.4;
 }
@@ -313,13 +319,15 @@
 .project-detail-section h3 {
   font-size: 14px;
   font-weight: 600;
-  color: var(--text);
+  color: var(--orange);
   margin: 0 0 12px;
 }
 .project-detail-section p {
   font-size: 13px;
-  color: var(--text-secondary);
+  color: var(--text-dim);
+  font-style: italic;
   line-height: 1.5;
+  margin: 0 0 12px;
 }
 .project-goals-list {
   display: flex;
@@ -640,14 +648,18 @@
 /* ── Modal Actions ────────────────────────────────────────────────── */
 .projects-detail-header {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  align-items: flex-start;
+  gap: 16px;
   margin-bottom: 24px;
+}
+.projects-detail-header > .projects-header {
+  flex: 1;
+  min-width: 0;
 }
 .project-actions {
   display: flex;
   gap: 8px;
-  margin-bottom: 24px;
+  flex-shrink: 0;
 }
 .project-action-btn {
   display: flex;
@@ -681,7 +693,6 @@
 }
 .projects-description-italic {
   display: block;
-  width: 100%;
   font-size: 13px;
   color: var(--text-dim);
   font-style: italic;

@@ -16,6 +16,7 @@ interface Connection {
   label: string
   description: string
   active: boolean
+  auto_trigger?: { on_status: string; timeout_s: number } | null
 }
 
 interface EscalationRecord {
@@ -32,13 +33,22 @@ interface EscalationRecord {
   resolution: string
 }
 
+interface KanbanStatus {
+  value: string
+  name: string
+}
+
 export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (data: any) => void) => () => void }) {
   const [connections, setConnections] = useState<Connection[]>([])
   const [history, setHistory] = useState<EscalationRecord[]>([])
   const [otdels, setOtdels] = useState<{ id: string; name: string }[]>([])
+  const [kanbanStatuses, setKanbanStatuses] = useState<KanbanStatus[]>([])
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Connection | null>(null)
-  const [form, setForm] = useState({ from: '', to: '', type: 'approval', label: '', description: '' })
+  const [form, setForm] = useState({
+    from: '', to: '', label: '', description: '',
+    autoOnStatus: 'blocked', autoTimeoutMin: '60',
+  })
   const [saving, setSaving] = useState(false)
 
   const loadConnections = useCallback(async () => {
@@ -65,9 +75,31 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
     } catch {}
   }, [])
 
+  const loadKanbanStatuses = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/kanban/statuses`)
+      if (res.ok) {
+        const data = await res.json()
+        setKanbanStatuses(data.statuses || [])
+      }
+    } catch {}
+  }, [])
+
+  // Endpoint options for the connection form: every otdel + the
+  // virtual "primary agent" slot (whose id is `agent:primary`).
+  const endpointOptions = [
+    { id: 'agent:primary', name: 'Главный агент' },
+    ...otdels,
+  ]
+
+  const endpointName = (id: string) =>
+    id === 'agent:primary'
+      ? 'Главный агент'
+      : otdels.find(o => o.id === id)?.name || id
+
   useEffect(() => {
-    loadConnections(); loadHistory(); loadOtdels()
-  }, [loadConnections, loadHistory, loadOtdels])
+    loadConnections(); loadHistory(); loadOtdels(); loadKanbanStatuses()
+  }, [loadConnections, loadHistory, loadOtdels, loadKanbanStatuses])
 
   useEffect(() => {
     if (!wsOn) return
@@ -81,22 +113,49 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
     return () => { unsubs.forEach(u => u()) }
   }, [wsOn, loadConnections, loadHistory])
 
-  const otdelName = (id: string) => otdels.find(o => o.id === id)?.name || id
+  const otdelName = (id: string) => endpointName(id)
 
   const openCreate = () => {
     setEditing(null)
-    setForm({ from: '', to: '', type: 'approval', label: '', description: '' })
+    setForm({
+      from: '', to: '', label: '', description: '',
+      autoOnStatus: 'blocked', autoTimeoutMin: '60',
+    })
     setShowModal(true)
   }
 
   const openEdit = (conn: Connection) => {
     setEditing(conn)
-    setForm({ from: conn.from, to: conn.to, type: conn.type, label: conn.label, description: conn.description })
+    setForm({
+      from: conn.from, to: conn.to,
+      label: conn.label, description: conn.description,
+      autoOnStatus: conn.auto_trigger?.on_status || 'blocked',
+      autoTimeoutMin: conn.auto_trigger
+        ? String(Math.round(conn.auto_trigger.timeout_s / 60))
+        : '60',
+    })
     setShowModal(true)
   }
 
   const handleSave = async () => {
     if (!form.from || !form.to) return
+    // Type is implementation detail: every connection defaults to
+    // `approval` so auto_trigger semantics apply. The user only
+    // chooses label + description + auto-escalation settings.
+    const payload: any = {
+      type: 'approval',
+      label: form.label, description: form.description,
+    }
+    const minutes = Number(form.autoTimeoutMin) || 0
+    if (minutes > 0) {
+      payload.auto_trigger = {
+        on_status: form.autoOnStatus,
+        timeout_s: minutes * 60,
+      }
+    } else {
+      payload.auto_trigger = null
+    }
+
     setSaving(true)
     try {
       if (editing) {
@@ -104,7 +163,7 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
         await fetch(`${API_BASE}/api/connections/${editing.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ label: form.label, description: form.description, type: form.type }),
+          body: JSON.stringify(payload),
         })
       } else {
         // Create new
@@ -112,8 +171,9 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            from_otdel: form.from, to_otdel: form.to,
-            type: form.type, label: form.label, description: form.description,
+            from_ref: form.from, to_ref: form.to,
+            label: form.label, description: form.description,
+            auto_trigger: payload.auto_trigger,
           }),
         })
       }
@@ -128,13 +188,12 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
     try { await fetch(`${API_BASE}/api/connections/${id}`, { method: 'DELETE' }); loadConnections() } catch {}
   }
 
-  const typeLabels: Record<string, string> = { peer: 'Равноправная', approval: 'Утверждение', delegation: 'Делегирование' }
   const statusLabels: Record<string, string> = { pending: 'В процессе', completed: 'Завершено', rejected: 'Отклонено' }
 
   return (
     <div className="settings-sections">
       <SettingsCard title="Связи между отделами">
-        <p className="settings-hint">Настройте структурные связи между отделами для утверждения и делегирования</p>
+        <p className="settings-hint">Настройте структурные связи между отделами для утверждения и совместной работы</p>
         <div className="settings-divider-thin" />
 
         {connections.length === 0 ? (
@@ -146,11 +205,18 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
           <div className="connections-list">
             {connections.map(conn => (
               <div key={conn.id} className="connection-row">
-                <span className="connection-type-badge" data-type={conn.type}>{typeLabels[conn.type] || conn.type}</span>
                 <span className="connection-from">{otdelName(conn.from)}</span>
                 <span className="connection-arrow">→</span>
                 <span className="connection-to">{otdelName(conn.to)}</span>
                 {conn.label && <span className="connection-label">{conn.label}</span>}
+                {conn.auto_trigger && (
+                  <span
+                    className="connection-auto-tag"
+                    title={`Авто-эскалация: задачи в статусе "${conn.auto_trigger.on_status}" дольше ${Math.round(conn.auto_trigger.timeout_s / 60)} мин → ${otdelName(conn.to)}`}
+                  >
+                    ⚡ {conn.auto_trigger.on_status} &gt; {Math.round(conn.auto_trigger.timeout_s / 60)} мин
+                  </span>
+                )}
                 <button className="btn-action btn-action-edit"
                   onClick={() => openEdit(conn)} title="Редактировать">✏️</button>
                 <button className="btn-action btn-action-delete" onClick={() => handleDelete(conn.id)} title="Удалить">×</button>
@@ -177,10 +243,10 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
                   value={form.from}
                   onChange={v => setForm(f => ({ ...f, from: v }))}
                   options={[
-                    { value: '', label: '— выбрать отдел —' },
-                    ...otdels.map(o => ({ value: o.id, label: o.name })),
+                    { value: '', label: '— выбрать —' },
+                    ...endpointOptions.map(o => ({ value: o.id, label: o.name })),
                   ]}
-                 
+
                   disabled={!!editing}
                 />
               </div>
@@ -190,21 +256,12 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
                   value={form.to}
                   onChange={v => setForm(f => ({ ...f, to: v }))}
                   options={[
-                    { value: '', label: '— выбрать отдел —' },
-                    ...otdels.filter(o => o.id !== form.from).map(o => ({ value: o.id, label: o.name })),
+                    { value: '', label: '— выбрать —' },
+                    ...endpointOptions.filter(o => o.id !== form.from).map(o => ({ value: o.id, label: o.name })),
                   ]}
-                 
+
                   disabled={!!editing}
                 />
-              </div>
-              <div className="settings-field">
-                <label>Тип связи</label>
-                <CustomDropdown value={form.type} onChange={v => setForm(f => ({ ...f, type: v }))}
-                  options={[
-                    { value: 'approval', label: 'Утверждение (вверх)' },
-                    { value: 'delegation', label: 'Делегирование (вниз)' },
-                    { value: 'peer', label: 'Равноправная' },
-                  ]} />
               </div>
               <div className="settings-field">
                 <label>Название</label>
@@ -216,6 +273,39 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
                 <input className="settings-input" placeholder="Описание связи..."
                   value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
               </div>
+
+              <div className="settings-divider-thin" style={{ margin: '14px 0' }} />
+              <div className="settings-field-group-title">
+                Авто-эскалация задач
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label className="settings-field-label">Статус задачи</label>
+                  <CustomDropdown
+                    value={form.autoOnStatus}
+                    onChange={v => setForm(f => ({ ...f, autoOnStatus: v }))}
+                    options={[
+                      ...kanbanStatuses.map(s => ({ value: s.value, label: s.name })),
+                    ]}
+                  />
+                </div>
+                <div>
+                  <label className="settings-field-label">Через (минут)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    className="settings-input"
+                    placeholder="60"
+                    value={form.autoTimeoutMin}
+                    onChange={e => setForm(f => ({ ...f, autoTimeoutMin: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <p className="settings-hint" style={{ marginTop: 6 }}>
+                Задача в указанном статусе, которая висит дольше заданного времени,
+                будет автоматически перенесена в целевой отдел.
+                Оставьте поле пустым или 0, чтобы отключить авто-эскалацию.
+              </p>
             </div>
             <div className="modal-footer">
               <button className="settings-btn-secondary" onClick={() => { setShowModal(false); setEditing(null) }}>Отмена</button>

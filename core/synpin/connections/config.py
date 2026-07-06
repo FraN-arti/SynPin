@@ -19,6 +19,7 @@ from .models import (
     ApprovalRecord,
     NodePosition,
 )
+from .refs import normalize_ref, parse_ref
 
 logger = logging.getLogger("synpin.connections.config")
 
@@ -76,11 +77,14 @@ def load_connections() -> list[Connection]:
     result = []
     for item in raw_list:
         try:
-            # Map YAML keys to model fields
+            # Map YAML keys to model fields. Refs are normalized so
+            # legacy bare IDs (e.g. "otdel-1749") become explicit
+            # "otdel:otdel-1749" — the rest of the code can rely on
+            # parse_ref() always getting a well-formed input.
             conn_data = {
                 "id": item.get("id", ""),
-                "from_otdel": item.get("from", ""),
-                "to_otdel": item.get("to", ""),
+                "from_otdel": normalize_ref(item.get("from", "")),
+                "to_otdel": normalize_ref(item.get("to", "")),
                 "type": item.get("type", "peer"),
                 "label": item.get("label", ""),
                 "description": item.get("description", ""),
@@ -126,18 +130,29 @@ def get_connection(conn_id: str) -> Connection | None:
 
 
 def create_connection(
-    from_otdel: str,
-    to_otdel: str,
+    from_ref: str,
+    to_ref: str,
     conn_type: str = "peer",
     label: str = "",
     description: str = "",
     auto_trigger: dict[str, Any] | None = None,
 ) -> Connection:
-    """Create a new connection and save."""
+    """Create a new connection and save.
+
+    Refs are normalized (legacy bare IDs gain an `otdel:` prefix) and
+    validated. A connection can target an otdel or the primary agent
+    (e.g. `agent:primary`).
+    """
+    try:
+        from_kind, _ = parse_ref(from_ref)
+        to_kind, _ = parse_ref(to_ref)
+    except ValueError as e:
+        raise ValueError(f"invalid connection endpoint: {e}") from None
+
     conn = Connection(
         id=_generate_id("conn"),
-        from_otdel=from_otdel,
-        to_otdel=to_otdel,
+        from_otdel=normalize_ref(from_ref),
+        to_otdel=normalize_ref(to_ref),
         type=ConnectionType(conn_type),
         label=label,
         description=description,
@@ -148,7 +163,10 @@ def create_connection(
     connections = load_connections()
     connections.append(conn)
     save_connections(connections)
-    logger.info("Created connection %s: %s →%s (%s)", conn.id, from_otdel, to_otdel, conn_type)
+    logger.info(
+        "Created connection %s: %s (%s) → %s (%s) [%s]",
+        conn.id, conn.from_otdel, from_kind, conn.to_otdel, to_kind, conn_type,
+    )
     return conn
 
 

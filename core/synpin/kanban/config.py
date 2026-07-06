@@ -90,7 +90,7 @@ class BoardSettings(BaseModel):
 # ── Defaults ─────────────────────────────────────────────────────────────────
 
 def _default_columns() -> list[ColumnConfig]:
-    """Seed defaults: 9 columns matching the standard SynPin kanban layout.
+    """Seed defaults: 8 columns matching the standard SynPin kanban layout.
 
     These are used when no columns.yaml exists yet (fresh install).
     Each column maps to a TaskStatus enum value so the backend can
@@ -108,41 +108,51 @@ def _default_columns() -> list[ColumnConfig]:
             description="Одобренные задачи, готовые к взятию в работу. Назначен исполнитель, понятен первый шаг.",
         ),
         ColumnConfig(
-            id=generate_id(), label="Готово к старту", status="ready",
-            color="#c084fc", order=2,
-            description="Все блокеры сняты, ждём только свободный слот исполнителя.",
-        ),
-        ColumnConfig(
             id=generate_id(), label="В работе", status="in_progress",
-            color="#fb923c", order=3,
+            color="#fb923c", order=2,
             description="Активная работа одного агента. Не больше 1-2 задач на отдел одновременно.",
         ),
         ColumnConfig(
             id=generate_id(), label="На проверке", status="review",
-            color="#fbbf24", order=4,
+            color="#fbbf24", order=3,
             description="Результат готов, ждёт проверки главы отдела или заказчика. Ожидаемое время ревью — 1-2 дня.",
         ),
         ColumnConfig(
             id=generate_id(), label="Доработка", status="revision",
-            color="#f472b6", order=5,
+            color="#f472b6", order=4,
             description="Проверяющий вернул на доработку. Конкретные правки в комментариях.",
         ),
         ColumnConfig(
             id=generate_id(), label="Заблокировано", status="blocked",
-            color="#f87171", order=6,
+            color="#f87171", order=5,
             description="Работа остановлена внешней причиной. Укажи блокер в комментариях.",
         ),
         ColumnConfig(
             id=generate_id(), label="Готово", status="done",
-            color="#4ade80", order=7,
-            description="Принято и закрыто. В архив переходит автоматически через N дней.",
+            color="#22c55e", order=6,
+            description="Завершено и принято.",
         ),
         ColumnConfig(
-            id=generate_id(), label="Архив", status="archive",
-            color="#6b7280", order=8,
-            description="Архивные задачи. Скрытые с основной доски, доступны через поиск.",
+            id=generate_id(), label="В архиве", status="archived",
+            color="#6b7280", order=7,
+            description="Устаревшие выполненные задачи. Скрыты с доски по умолчанию.",
         ),
     ]
+
+
+DEFAULT_AUTO_TRANSITIONS: dict[str, str] = {
+    # When kanban transitions happen automatically (cron watchers,
+    # head tools, manual moves), map to the column this status
+    # belongs to.
+    "backlog": "Бэклог",
+    "todo": "К работе",
+    "in_progress": "В работе",
+    "review": "На проверке",
+    "revision": "Доработка",
+    "blocked": "Заблокировано",
+    "done": "Готово",
+    "archived": "В архиве",
+}
 
 
 def _default_labels() -> list[LabelConfig]:

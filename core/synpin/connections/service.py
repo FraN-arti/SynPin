@@ -40,15 +40,15 @@ def get_connection(conn_id: str) -> Connection | None:
 
 
 def create_connection(
-    from_otdel: str,
-    to_otdel: str,
+    from_ref: str,
+    to_ref: str,
     conn_type: str = "peer",
     label: str = "",
     description: str = "",
     auto_trigger: dict[str, Any] | None = None,
 ) -> Connection:
     """Create a new connection and broadcast WS event."""
-    conn = config.create_connection(from_otdel, to_otdel, conn_type, label, description, auto_trigger)
+    conn = config.create_connection(from_ref, to_ref, conn_type, label, description, auto_trigger)
     _broadcast({"type": "connections:created", "connection": _conn_to_dict(conn)})
     return conn
 
@@ -225,61 +225,95 @@ def _move_task_to_otdel(task_id: str, target_otdel: str, reason: str = "") -> No
 # ── Graph Building ───────────────────────────────────────────────────────────
 
 def build_graph() -> Graph:
-    """Build a React Flow graph from connections + otdel data."""
+    """Build a React Flow graph from connections + otdel + agent data."""
     connections = config.load_connections()
     canvas = config.load_canvas()
 
-    # Load otdel data for node info
     otdels = _load_otdels()
     agents = _load_agents()
 
-    # Clean dead connections (referencing non-existent otdels)
-    valid_otdel_ids = set(otdels.keys())
-    dead_connections = [c for c in connections if c.from_otdel not in valid_otdel_ids or c.to_otdel not in valid_otdel_ids]
-    if dead_connections:
-        logger.info("Cleaning %d dead connections (referencing deleted otdels)", len(dead_connections))
-        live_connections = [c for c in connections if c.from_otdel in valid_otdel_ids and c.to_otdel in valid_otdel_ids]
+    # Collect all refs used by live connections; resolve them.
+    from .refs import parse_ref, is_primary_agent_ref
+    from .resolve import resolve_ref
+
+    # Determine which otdels and which kind of node (otdel / primary agent)
+    # we need. A connection may reference an otdel slug, or `agent:primary`.
+    referenced: set[str] = set()
+    for conn in connections:
+        referenced.add(conn.from_otdel)
+        referenced.add(conn.to_otdel)
+
+    # Clean dead connections: refs that point to missing otdels (or
+    # missing primary agent). We only consider otdel refs dead if the
+    # otdel slug doesn't exist; `agent:primary` is always live (it
+    # may resolve to "не назначен" but the connection is still valid).
+    live_connections = []
+    for c in connections:
+        if is_primary_agent_ref(c.from_otdel) or is_primary_agent_ref(c.to_otdel):
+            live_connections.append(c)
+            continue
+        # Otdel refs — both must resolve to known otdels.
+        from_kind, from_id = parse_ref(c.from_otdel)
+        to_kind, to_id = parse_ref(c.to_otdel)
+        if from_kind == "otdel" and to_kind == "otdel" and from_id in otdels and to_id in otdels:
+            live_connections.append(c)
+        else:
+            logger.info("Dropping dead connection %s: %s → %s", c.id, c.from_otdel, c.to_otdel)
+    if len(live_connections) != len(connections):
         config.save_connections(live_connections)
         connections = live_connections
 
     # Build nodes
     nodes: list[GraphNode] = []
-    involved_otdels: set[str] = set()
+    seen_ids: set[str] = set()
+    has_primary = False
+    for ref in referenced:
+        kind, _ = parse_ref(ref)
+        if kind == "agent":
+            has_primary = True
+        else:
+            # Otdel node — skip if already added.
+            slug = resolve_ref(ref).id
+            if slug in seen_ids:
+                continue
+            seen_ids.add(slug)
+            otdel = otdels.get(slug, {})
+            pos = canvas.nodes.get(slug, NodePosition(x=0, y=0))
+            active_tasks = _count_active_tasks(slug)
+            head_id = otdel.get("head", "")
+            head_name = agents.get(head_id, {}).get("name", head_id) if head_id else ""
+            nodes.append(GraphNode(
+                id=ref,
+                type="department",
+                position=pos,
+                data={
+                    "name": otdel.get("name", slug),
+                    "head": head_name,
+                    "level": otdel.get("level", 0),
+                    "workers_count": len(otdel.get("workers", [])),
+                    "active_tasks": active_tasks,
+                    "status": "active",
+                },
+            ))
 
-    for conn in connections:
-        involved_otdels.add(conn.from_otdel)
-        involved_otdels.add(conn.to_otdel)
-
-    for slug in involved_otdels:
-        otdel = otdels.get(slug, {})
-        pos = canvas.nodes.get(slug, NodePosition(x=0, y=0))
-
-        # Count active tasks
-        active_tasks = _count_active_tasks(slug)
-
-        # Resolve head agent name
-        head_id = otdel.get("head", "")
-        head_name = agents.get(head_id, {}).get("name", head_id) if head_id else ""
-
+    if has_primary:
+        pos = canvas.nodes.get("agent:primary", NodePosition(x=-300, y=0))
+        primary = resolve_ref("agent:primary")
         nodes.append(GraphNode(
-            id=slug,
-            type="department",
+            id="agent:primary",
+            type="primary_agent",
             position=pos,
             data={
-                "name": otdel.get("name", slug),
-                "head": head_name,
-                "level": otdel.get("level", 0),
-                "workers_count": len(otdel.get("workers", [])),
-                "active_tasks": active_tasks,
-                "status": "active",
+                "name": primary.display_name,
+                "kind": "agent",
+                "agent_id": primary.id,
             },
         ))
 
-    # Build edges — merge multiple connections between same pair into one edge
+    # Color map
     color_map = {
         ConnectionType.PEER: "#3b82f6",
         ConnectionType.APPROVAL: "#f97316",
-        ConnectionType.DELEGATION: "#22c55e",
     }
 
     # Group connections by (from, to) pair

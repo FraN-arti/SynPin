@@ -16,12 +16,23 @@ router = APIRouter(prefix="/api/connections", tags=["connections"])
 # ── Request models ───────────────────────────────────────────────────────────
 
 class ConnectionCreate(BaseRequest):
-    from_otdel: str
-    to_otdel: str
+    # Both `from_ref` and the legacy `from_otdel` are accepted. New
+    # clients send `from_ref` (refs can target the primary agent);
+    # older clients still posting `from_otdel` keep working.
+    from_ref: str | None = None
+    from_otdel: str | None = None
+    to_ref: str | None = None
+    to_otdel: str | None = None
     type: str = "peer"
     label: str = ""
     description: str = ""
     auto_trigger: dict[str, Any] | None = None
+
+    def get_from(self) -> str:
+        return self.from_ref or self.from_otdel or ""
+
+    def get_to(self) -> str:
+        return self.to_ref or self.to_otdel or ""
 
 
 class ConnectionUpdate(BaseRequest):
@@ -34,8 +45,18 @@ class ConnectionUpdate(BaseRequest):
 
 class ApprovalCreate(BaseRequest):
     task_id: str
-    from_otdel: str
+    # Both names accepted; the new `from_ref` is canonical, the
+    # legacy `from_otdel` is mapped on the way in for older clients.
+    from_ref: str | None = None
+    from_otdel: str | None = None
+    to_ref: str | None = None
     to_otdel: str | None = None
+
+    def get_from(self) -> str:
+        return self.from_ref or self.from_otdel or ""
+
+    def get_to(self) -> str | None:
+        return self.to_ref or self.to_otdel
     reason: str = ""
     report: str = ""
 
@@ -63,8 +84,8 @@ async def create_connection(req: ConnectionCreate):
     """Create a new connection."""
     try:
         conn = svc.create_connection(
-            from_otdel=req.from_otdel,
-            to_otdel=req.to_otdel,
+            from_ref=req.get_from(),
+            to_ref=req.get_to(),
             conn_type=req.type,
             label=req.label,
             description=req.description,
@@ -139,8 +160,8 @@ async def approve(req: ApprovalCreate):
     """Escalate a task to another department."""
     record = svc.escalate_task(
         task_id=req.task_id,
-        from_otdel=req.from_otdel,
-        to_otdel=req.to_otdel,
+        from_otdel=req.get_from(),
+        to_otdel=req.get_to(),
         reason=req.reason,
         report=req.report,
     )

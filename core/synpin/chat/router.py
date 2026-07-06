@@ -1275,6 +1275,20 @@ def _build_system_prompt_with_memory(req: ChatRequest) -> str:
         except Exception:
             pass
 
+        # Inject structured connections (approval / peer)
+        # so the agent knows its place in the org chart.
+        try:
+            from ..agents.manager import get_agent
+            from ..connections.prompt import build_connections_prompt_fragment
+
+            agent_data = get_agent(req.agent_slug) if req.agent_slug else None
+            is_primary = bool(agent_data and agent_data.get("is_primary"))
+            fragment = build_connections_prompt_fragment(req.agent_slug, is_primary)
+            if fragment:
+                system_prompt += fragment
+        except Exception:
+            pass
+
     # Safety rule: protect SynPin core
     system_prompt += """
 

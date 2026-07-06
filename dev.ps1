@@ -144,12 +144,23 @@ switch -Regex ($args[0]) {
             Write-Host "[dev] using Python: $pythonExe" -ForegroundColor $SynPinDim
         }
 
-        # Version check: compare installed synpin-core vs pyproject.toml.
+        # Version check: read VERSION file (single source of truth),
+        # sync into pyproject.toml + package.json, then reinstall.
         try {
-            $installed = & $pythonExe -c "from importlib.metadata import version; print(version('synpin-core'))" 2>$null
-            $tomlMatch = Select-String -Path "$ScriptDir\core\pyproject.toml" -Pattern 'version\s*=\s*"(.+)"'
-            if ($tomlMatch -and $installed) {
-                $target = $tomlMatch.Matches[0].Groups[1].Value
+            $versionFile = Join-Path $ScriptDir "VERSION"
+            if (Test-Path $versionFile) {
+                $target = (Get-Content $versionFile -Raw).Trim()
+                # Sync pyproject.toml version from VERSION
+                $tomlPath = Join-Path $ScriptDir "core\pyproject.toml"
+                if (Test-Path $tomlPath) {
+                    $tomlContent = Get-Content $tomlPath -Raw
+                    $newToml = $tomlContent -replace 'version\s*=\s*"[^"]*"', "version = `"$target`""
+                    if ($newToml -ne $tomlContent) {
+                        [System.IO.File]::WriteAllText($tomlPath, $newToml, [System.Text.UTF8Encoding]::new($false))
+                        Write-Host "[dev] synced pyproject.toml -> $target" -ForegroundColor $SynPinDim
+                    }
+                }
+                $installed = & $pythonExe -c "from importlib.metadata import version; print(version('synpin-core'))" 2>$null
                 if ($installed -ne $target) {
                     Write-Host "[dev] version mismatch: installed=$installed, target=$target" -ForegroundColor $SynPinInfo
                     Write-Host "[dev] reinstalling synpin-core $target ..." -ForegroundColor $SynPinInfo
@@ -158,6 +169,18 @@ switch -Regex ($args[0]) {
                         Write-Host "[dev] synpin-core $target installed." -ForegroundColor $SynPinOK
                     } else {
                         Write-Host "[dev] reinstall failed, continuing with $installed." -ForegroundColor $SynPinAccent
+                    }
+                }
+                # Sync package.json versions from VERSION
+                foreach ($pkg in @("package.json", "web\package.json")) {
+                    $pkgPath = Join-Path $ScriptDir $pkg
+                    if (Test-Path $pkgPath) {
+                        $content = Get-Content $pkgPath -Raw
+                        $newContent = $content -replace '"version"\s*:\s*"[^"]*"', "`"version`": `"$target`""
+                        if ($newContent -ne $content) {
+                            [System.IO.File]::WriteAllText($pkgPath, $newContent, [System.Text.UTF8Encoding]::new($false))
+                            Write-Host "[dev] synced $pkg -> $target" -ForegroundColor $SynPinDim
+                        }
                     }
                 }
             }

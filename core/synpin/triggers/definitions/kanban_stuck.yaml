@@ -1,0 +1,17 @@
+type: kanban_stuck
+name: "Зависшие задачи канбана"
+description: "Срабатывает если задача не двигалась больше порогового времени"
+category: state
+icon: alert-clock
+color: orange
+version: 1
+config_schema:
+  - name: idle_minutes
+    type: number
+    default: 120
+    min: 5
+    label: "Минут без движения"
+action_types:
+  - agent_prompt
+  - log
+  - notify_user

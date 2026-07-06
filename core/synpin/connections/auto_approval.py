@@ -38,8 +38,23 @@ async def _run_approval_pass() -> int:
         trigger_status = conn.auto_trigger.on_status
         timeout_s = conn.auto_trigger.timeout_s
 
+        # Auto-approval only makes sense when the source is an otdel
+        # (tasks have a `department` field, agents don't). If the
+        # connection source is the primary agent, skip — it would
+        # never match any task.
+        from .refs import parse_ref
+        from .resolve import resolve_ref
+        from_kind, _ = parse_ref(conn.from_otdel)
+        if from_kind == "agent":
+            logger.debug(
+                "[auto-approval] skip conn %s: source is primary agent, no tasks to escalate",
+                conn.id,
+            )
+            return 0
+        source_otdel = resolve_ref(conn.from_otdel).id
+
         # Find tasks in source department with matching status
-        tasks = _find_triggerable_tasks(conn.from_otdel, trigger_status, timeout_s)
+        tasks = _find_triggerable_tasks(source_otdel, trigger_status, timeout_s)
         for task in tasks:
             try:
                 record = escalate_task(

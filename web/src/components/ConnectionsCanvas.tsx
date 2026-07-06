@@ -411,7 +411,7 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
           </div>
           <div className="connections-panel-body">
             <div className="expanded-field">
-              <label>Между отделами</label>
+              <label>Между</label>
               <span style={{ fontWeight: 600 }}>
                 {otdelNames[selectedEdge.source] || selectedEdge.source}
                 {' → '}
@@ -421,19 +421,29 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
             <div className="settings-divider-thin" />
             {selectedEdge.connections.map(conn => (
               <div key={conn.id} className="connection-detail-card">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                  <span className="connection-type-badge" data-type={conn.type}>
-                    {conn.type === 'peer' ? 'Равноправная' : conn.type === 'approval' ? 'Утверждение' : 'Делегирование'}
-                  </span>
-                  <span style={{ fontWeight: 600, color: 'var(--text)', fontSize: '13px' }}>
-                    {conn.label || '—'}
-                  </span>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '14px', marginBottom: '2px' }}>
+                      {conn.label || '(без названия)'}
+                    </div>
+                    {conn.description && (
+                      <div style={{ fontSize: '12px', color: 'var(--text-dim)', lineHeight: 1.4, marginBottom: '4px' }}>
+                        {conn.description}
+                      </div>
+                    )}
+                    <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                      {conn.from === 'agent:primary' ? 'Главный агент' : (otdelNames[conn.from] || conn.from)}
+                      {' → '}
+                      {conn.to === 'agent:primary' ? 'Главный агент' : (otdelNames[conn.to] || conn.to)}
+                    </div>
+                  </div>
+                  <button
+                    className="btn-action btn-action-delete"
+                    style={{ flexShrink: 0 }}
+                    onClick={() => handleDeleteConnection(conn.id)}
+                    title="Удалить"
+                  >×</button>
                 </div>
-                {conn.description && (
-                  <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{conn.description}</span>
-                )}
-                <button className="btn-action btn-action-delete" style={{ position: 'absolute', top: '8px', right: '8px' }}
-                  onClick={() => handleDeleteConnection(conn.id)} title="Удалить">×</button>
               </div>
             ))}
           </div>

@@ -16,10 +16,16 @@ from pydantic import BaseModel, Field
 # ── Enums ────────────────────────────────────────────────────────────────────
 
 class ConnectionType(str, Enum):
-    """Types of connections between departments."""
-    PEER = "peer"              # Equal-level, bidirectional cooperation
-    APPROVAL = "approval"      # Upward — child reports to parent for approval
-    DELEGATION = "delegation"  # Downward — parent assigns to child
+    """Types of connections between departments.
+
+    Two values:
+    - APPROVAL: an upward link — the source task gets escalated to
+      the target after a timeout (auto-approval worker).
+    - PEER: equal-level, bidirectional cooperation. Visual + prompt
+      hint only — no automation.
+    """
+    PEER = "peer"              # Equal-level cooperation
+    APPROVAL = "approval"      # Upward — child reports to parent
 
 
 class ApprovalStatus(str, Enum):

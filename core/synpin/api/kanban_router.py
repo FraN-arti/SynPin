@@ -684,3 +684,14 @@ def bulk_action(req: BulkActionRequest) -> dict:
         "total_requested": len(req.task_ids),
         "errors": errors,
     }
+
+
+@router.get("/statuses")
+async def list_statuses():
+    """List all task statuses — useful for connection auto_trigger config."""
+    return {
+        "statuses": [
+            {"value": s.value, "name": s.name}
+            for s in TaskStatus
+        ]
+    }

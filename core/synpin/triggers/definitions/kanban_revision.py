@@ -1,11 +1,10 @@
 """
 Triggers — `kanban_revision` source plugin.
 
-Watches tasks in the `revision` stage for the bound otdel and emits
-an event for any task that has not been updated in `idle_minutes`.
-
-Rework cycles should be tight — if a task is in revision too long,
-the head needs a nudge to check on whoever is doing the rework.
+Watches tasks in the `revision` stage and emits an event for any
+task that has not been updated in `idle_minutes`. Rework cycles
+should be tight — if a task is in revision too long, the head needs
+a nudge.
 """
 from __future__ import annotations
 
@@ -38,23 +37,16 @@ class KanbanRevisionPlugin(TriggerPlugin):
         idle_min: int = int(ctx.config.get("idle_minutes", 60))
         events: list[Event] = []
 
-        otdel_id = ctx.otdel_id
-        if not otdel_id:
-            return events
-
         try:
             from synpin.kanban.service import KanbanService
-            tasks = KanbanService().list_tasks()
+            all_tasks = KanbanService().list_tasks()
         except Exception as e:  # noqa: BLE001
             logger.warning("kanban_revision: failed to list tasks: %s", e)
             return events
 
-        for task in tasks:
+        for task in all_tasks:
             stage = task.status.value if hasattr(task.status, "value") else str(task.status)
             if stage != "revision":
-                continue
-            dept = getattr(task, "department", "") or ""
-            if dept not in (otdel_id, f"otdel:{otdel_id}"):
                 continue
             age = _task_age_minutes(task, now=ctx.now)
             if age < idle_min:
@@ -65,10 +57,9 @@ class KanbanRevisionPlugin(TriggerPlugin):
                     "task_id": task.id,
                     "task_title": getattr(task, "title", "") or "",
                     "stage": stage,
-                    "department": otdel_id,
+                    "department": getattr(task, "department", "") or "",
                     "assigned_head": getattr(task, "assigned_head", "") or "",
                     "idle_minutes": age,
-                    "otdel_id": otdel_id,
                 },
             ))
         return events

@@ -5,7 +5,7 @@
 
 // ── Tab definitions ────────────────────────────────────────────────
 
-export type Tab = 'general' | 'agents' | 'providers' | 'memory' | 'channels' | 'departments' | 'skills' | 'connections' | 'kanban' | 'deadlines' | 'projects' | 'widgets' | 'cron' | 'tools' | 'events'
+export type Tab = 'general' | 'agents' | 'providers' | 'memory' | 'channels' | 'departments' | 'skills' | 'connections' | 'kanban' | 'deadlines' | 'projects' | 'widgets' | 'cron' | 'tools' | 'events' | 'triggers'
 
 export interface TabDef {
   id: Tab
@@ -18,6 +18,7 @@ export const SYSTEM_TABS: TabDef[] = [
   { id: 'providers', label: 'Провайдеры' },
   { id: 'memory', label: 'Память' },
   { id: 'tools', label: 'Инструменты' },
+  { id: 'triggers', label: 'Плагины' },
   { id: 'skills', label: 'Скиллы' },
   { id: 'cron', label: 'Крон' },
   { id: 'events', label: 'События' },
@@ -46,6 +47,7 @@ export const SECTION_INFO: Record<Tab, { title: string; description: string }> =
   cron: { title: 'Крон-задачи', description: 'Расписание, лимиты и проактивность' },
   tools: { title: 'Инструменты', description: 'Управление инструментами агентов: включение и области доступа' },
   events: { title: 'События', description: 'In-app уведомления и каналы доставки' },
+  triggers: { title: 'Плагины агентов', description: 'Автоматизация: реакция на события в отделах и канбане' },
 }
 
 // (Removed DRAGGABLE_TABS — widget drag was duplicated here and in

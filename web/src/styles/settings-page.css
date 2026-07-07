@@ -662,3 +662,224 @@
 .settings-fade-in {
   animation: fadeIn 0.3s ease;
 }
+
+/* ── Triggers (Плагины) ─────────────────────────────────── */
+.trigger-plugin-block {
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  transition: border-color 0.15s, background 0.15s;
+}
+.trigger-plugin-block:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--glow-border);
+}
+.trigger-plugin-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.trigger-plugin-info { flex: 1; min-width: 0; }
+.trigger-plugin-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--yellow, #f59e0b);
+  margin: 0 0 2px;
+}
+.trigger-plugin-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0 0 6px;
+  line-height: 1.4;
+}
+.trigger-plugin-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.trigger-plugin-tag {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  padding: 2px 7px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+}
+.trigger-plugin-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.trigger-plugin-count {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.trigger-instance-list {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--glass-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.trigger-instance-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+.trigger-instance-id {
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+.trigger-instance-conn {
+  font-size: 11px;
+  color: var(--orange);
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 140px;
+}
+.trigger-instance-cfg {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: ui-monospace, 'SF Mono', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trigger-instance-toggle {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-dim);
+  padding: 2px 6px;
+  transition: color 0.15s;
+}
+.trigger-instance-toggle.on { color: var(--orange, #f97316); }
+.trigger-instance-toggle.off { color: var(--text-dim); }
+.trigger-instance-toggle:hover { transform: scale(1.15); }
+
+.trigger-plugin-form {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--glass-border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.trigger-plugin-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* ── Triggers v2: auto-save status ─────────────────────────── */
+.trigger-plugin-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-size: 11px;
+  min-height: 24px;
+}
+.trigger-saving {
+  color: var(--text-dim);
+  font-style: italic;
+  animation: pulseDim 1.2s ease-in-out infinite;
+}
+/* Reset Toggle label height so it aligns with 11px status text */
+.trigger-plugin-status .settings-toggle {
+  padding: 0;
+  font-size: 11px;
+  line-height: 1;
+}
+.trigger-dirty {
+  color: var(--yellow, #f59e0b);
+}
+.trigger-saved {
+  color: var(--orange, #f97316);
+  font-weight: 500;
+}
+/* Wrap saved/dirty text + toggle together on one line */
+.trigger-status-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.trigger-status-toggle .settings-toggle {
+  padding: 0;
+  font-size: 11px;
+  line-height: 1;
+}
+@keyframes pulseDim {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* ── Triggers grid: 2 per row ────────────────────────────── */
+.triggers-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .triggers-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Triggers: enabled/disabled toggle ────────────────────── */
+.trigger-plugin-disabled {
+  opacity: 0.65;
+}
+/* iOS-style switch — single source of truth, used here and elsewhere */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.toggle-switch.on { background: var(--orange, #f97316); }
+.toggle-switch:focus-visible {
+  outline: 2px solid var(--glow-border);
+  outline-offset: 2px;
+}
+.toggle-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s ease;
+}
+.toggle-switch.on .toggle-switch-thumb { transform: translateX(16px); }

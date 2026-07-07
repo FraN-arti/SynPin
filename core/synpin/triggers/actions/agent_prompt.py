@@ -61,18 +61,6 @@ class AgentPromptAction(ActionPlugin):
                     "Пиши в чат отдела ТОЛЬКО когда есть реальная причина (застрявшая задача, долгое ревью, "
                     "нужно поторопить). Молчи — значит порядок."
                 ),
-                "kanban_stuck": (
-                    "Задача «{task_title}» в колонке «{stage}» отдела {department} без движения {idle_minutes} мин. "
-                    "Прими решение: продолжить, перевести в другую колонку, или закрыть."
-                ),
-                "kanban_in_review": (
-                    "Задача «{task_title}» ждёт твоего ревью уже {idle_minutes} мин. "
-                    "Прими решение: одобрить или вернуть на доработку."
-                ),
-                "kanban_revision": (
-                    "Задача «{task_title}» в доработке {idle_minutes} мин. "
-                    "Проверь прогресс и прими решение."
-                ),
             }
             prompt = defaults.get(event.type, f"Trigger {event.type}: {event.payload}")
 

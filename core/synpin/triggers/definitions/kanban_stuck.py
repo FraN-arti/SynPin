@@ -1,17 +1,22 @@
 """
 Triggers — `kanban_stuck` source plugin.
 
-Scans kanban tasks every `tick_interval` seconds and emits an event
-for each task that has not been updated in `idle_minutes`. The watcher
-only emits — it does NOT move tasks or change status. Movement is
-the head agent's job (via head_decide / head_approve / etc.). This
-plugin is a polite reminder: it tells the head "task X has been
-sitting in stage Y for too long, take a look."
+Scans tasks for the bound otdel every `tick_interval` seconds and emits
+an event for each task that has not been updated in `idle_minutes`.
+The watcher only emits — it does NOT move tasks or change status.
+Movement is the head agent's job (via head_decide / head_approve /
+etc.). This plugin is a polite reminder: it tells the head "task X
+has been sitting in stage Y for too long, take a look."
 
 By default it watches tasks in `in_progress`, `review`, and
 `revision` stages — the stages that benefit most from a nudge.
 Tasks in `done`, `archived`, `blocked` (handled by auto_approval),
 or `backlog` are ignored (low signal, high noise).
+
+Why this exists alongside `kanban_in_review` / `kanban_revision`:
+a broad "anything stuck" sweep is useful as an overall health probe,
+but per-stage thresholds differ. Splitting keeps both: this one as
+the catch-all, the others for tight per-stage tuning.
 """
 from __future__ import annotations
 
@@ -49,18 +54,26 @@ class KanbanStuckPlugin(TriggerPlugin):
         idle_min: int = int(ctx.config.get("idle_minutes", 120))
         events: list[Event] = []
 
+        otdel_id = ctx.otdel_id
+        if not otdel_id:
+            return events
+
         try:
             # Local import — patchable via monkeypatch in tests, and
             # avoids pulling kanban at module-load time.
             from synpin.kanban.service import KanbanService
-            all_tasks = KanbanService().list_tasks()
+            tasks = KanbanService().list_tasks()
         except Exception as e:  # noqa: BLE001 — log and skip
             logger.warning("kanban_stuck: failed to list tasks: %s", e)
             return events
 
-        for task in all_tasks:
+        for task in tasks:
             stage = task.status.value if hasattr(task.status, "value") else str(task.status)
             if stage not in WATCHED_STAGES:
+                continue
+            # Per-otdel scope — instance is bound to one otdel.
+            dept = getattr(task, "department", "") or ""
+            if dept not in (otdel_id, f"otdel:{otdel_id}"):
                 continue
             age = _task_age_minutes(task, now=ctx.now)
             if age < idle_min:
@@ -71,9 +84,10 @@ class KanbanStuckPlugin(TriggerPlugin):
                     "task_id": task.id,
                     "task_title": getattr(task, "title", "") or "",
                     "stage": stage,
-                    "department": getattr(task, "department", "") or "",
+                    "department": otdel_id,
                     "assigned_head": getattr(task, "assigned_head", "") or "",
                     "idle_minutes": age,
+                    "otdel_id": otdel_id,
                 },
             ))
         return events

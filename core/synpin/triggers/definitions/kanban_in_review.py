@@ -1,12 +1,13 @@
 """
 Triggers — `kanban_in_review` source plugin.
 
-Watches tasks in the `review` stage for the bound otdel and emits an
-event for any task that has not been updated in `idle_minutes`.
+Watches tasks in the `review` stage and emits an event for any task
+that has not been updated in `idle_minutes`. Same shape as
+`kanban_stuck` but narrower scope: only the review stage.
 
-Why a separate plugin from kanban_stuck: per-stage timeouts differ.
-Review should be tight (heads check quickly), in_progress is more
-forgiving. Splitting plugins lets each otdel tune its own thresholds.
+Why a separate plugin: per-stage timeouts differ. Review should be
+tight (heads check quickly), in_progress is more forgiving. Splitting
+plugins lets each otdel tune its own thresholds.
 """
 from __future__ import annotations
 
@@ -39,24 +40,16 @@ class KanbanInReviewPlugin(TriggerPlugin):
         idle_min: int = int(ctx.config.get("idle_minutes", 60))
         events: list[Event] = []
 
-        otdel_id = ctx.otdel_id
-        if not otdel_id:
-            return events
-
         try:
             from synpin.kanban.service import KanbanService
-            tasks = KanbanService().list_tasks()
+            all_tasks = KanbanService().list_tasks()
         except Exception as e:  # noqa: BLE001
             logger.warning("kanban_in_review: failed to list tasks: %s", e)
             return events
 
-        for task in tasks:
+        for task in all_tasks:
             stage = task.status.value if hasattr(task.status, "value") else str(task.status)
             if stage != "review":
-                continue
-            # Per-otdel scope — instance is bound to one otdel.
-            dept = getattr(task, "department", "") or ""
-            if dept not in (otdel_id, f"otdel:{otdel_id}"):
                 continue
             age = _task_age_minutes(task, now=ctx.now)
             if age < idle_min:
@@ -67,10 +60,9 @@ class KanbanInReviewPlugin(TriggerPlugin):
                     "task_id": task.id,
                     "task_title": getattr(task, "title", "") or "",
                     "stage": stage,
-                    "department": otdel_id,
+                    "department": getattr(task, "department", "") or "",
                     "assigned_head": getattr(task, "assigned_head", "") or "",
                     "idle_minutes": age,
-                    "otdel_id": otdel_id,
                 },
             ))
         return events

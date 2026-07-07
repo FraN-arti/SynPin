@@ -19,4 +19,3 @@ global_toggle:
 action_types:
   - agent_prompt
   - log
-  - notify_user

@@ -469,16 +469,12 @@ badge). Если tool вернул ошибку — скажи про ошибк
             # Classify by type
             approval_out = []  # THIS dept sends for approval TO others
             approval_in = []  # OTHER depts send for approval TO THIS dept
-            delegation_out = []  # THIS dept delegates TO others
-            delegation_in = []  # OTHER depts delegate TO THIS dept
             peer_connections = []  # Mutual cooperation
 
             for c in outgoing:
                 t = c.type.value if hasattr(c.type, "value") else c.type
                 if t == "approval":
                     approval_out.append(c)
-                elif t == "delegation":
-                    delegation_out.append(c)
                 elif t == "peer":
                     peer_connections.append(c)
 
@@ -486,8 +482,6 @@ badge). Если tool вернул ошибку — скажи про ошибк
                 t = c.type.value if hasattr(c.type, "value") else c.type
                 if t == "approval":
                     approval_in.append(c)
-                elif t == "delegation":
-                    delegation_in.append(c)
                 elif t == "peer":
                     # Avoid duplicates — peer is bidirectional
                     if not any(p.id == c.id for p in peer_connections):
@@ -526,36 +520,7 @@ badge). Если tool вернул ошибку — скажи про ошибк
 2. Отправь через head_approve(target_otdel="<id>", reason="опиши что сделано")
 3. Жди решения — задача вернётся с результатом""")
 
-                # Block 3: Delegation IN — tasks delegated to you
-                if delegation_in:
-                    items = []
-                    for c in delegation_in:
-                        name = otdel_names.get(c.from_otdel, c.from_otdel)
-                        label = f" — {c.label}" if c.label else ""
-                        items.append(f"- {name}{label}")
-                    conn_parts.append(f"""### Получаешь задачи по делегированию от:
-{chr(10).join(items)}
-Другой отдел передаёт тебе задачи — выполни:
-1. Прими задачу к работе
-2. Выполни в своём отделе
-3. Если задача не ясна или требует уточнений — РЕЛАЙН: head_reline(task_id, remarks="что уточнить")
-4. Отчитайся о результате""")
-
-                # Block 4: Delegation OUT — tasks you delegate to others
-                if delegation_out:
-                    items = []
-                    for c in delegation_out:
-                        name = otdel_names.get(c.to_otdel, c.to_otdel)
-                        label = f" — {c.label}" if c.label else ""
-                        items.append(f"- {name}{label}")
-                    conn_parts.append(f"""### Можешь делегировать в:
-{chr(10).join(items)}
-Если задача не в компетенции твоего отдела — передай:
-1. Определи в какой отдел передать
-2. Отправь через head_approve(target_otdel="<id>", reason="почему передаёшь")
-3. Задача уйдёт в другой отдел на выполнение""")
-
-                # Block 5: Peer — cooperation
+                # Block 3: Peer — cooperation
                 if peer_connections:
                     items = []
                     for c in peer_connections:

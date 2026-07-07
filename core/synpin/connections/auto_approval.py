@@ -50,7 +50,7 @@ async def _run_approval_pass() -> int:
                 "[auto-approval] skip conn %s: source is primary agent, no tasks to escalate",
                 conn.id,
             )
-            return 0
+            continue
         source_otdel = resolve_ref(conn.from_otdel).id
 
         # Find tasks in source department with matching status

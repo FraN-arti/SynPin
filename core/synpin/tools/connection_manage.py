@@ -72,7 +72,7 @@ async def connection_create(params: dict[str, Any]) -> ToolResult:
     Params:
         from_otdel: str (required) — source department ID
         to_otdel: str (required) — target department ID
-        type: str (required) — "approval" | "delegation" | "peer"
+        type: str (required) — "approval" | "peer"
         label: str (optional) — display name
         description: str (optional) — details
 
@@ -87,8 +87,8 @@ async def connection_create(params: dict[str, Any]) -> ToolResult:
 
     if not from_otdel or not to_otdel:
         return make_error("from_otdel and to_otdel required")
-    if conn_type not in ("approval", "delegation", "peer"):
-        return make_error("type must be 'approval', 'delegation', or 'peer'")
+    if conn_type not in ("approval", "peer"):
+        return make_error("type must be 'approval' or 'peer'")
     if from_otdel == to_otdel:
         return make_error("Cannot create connection to self")
 

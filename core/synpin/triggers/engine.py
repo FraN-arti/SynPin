@@ -156,7 +156,7 @@ class TriggerEngine:
                 for inst in matching_instances:
                     ctx.config = inst.get("config", {}) or {}
                     ctx.action_config = (inst.get("action") or {}).get("config", {}) or {}
-                    ctx.connection_id = inst.get("_connection_id", "") or inst.get("connection_id", "")
+                    ctx.otdel_id = inst.get("_otdel_id", "") or inst.get("otdel_id", "")
                     ctx.engine._current_trigger_id = inst.get("id", "")
                     try:
                         events.extend(await plugin.tick(ctx))

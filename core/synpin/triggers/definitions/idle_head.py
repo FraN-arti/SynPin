@@ -1,8 +1,8 @@
 """
 Triggers — `idle_head` source plugin.
 
-Scans otdels every `tick_interval` seconds and emits an event for each
-otdel whose head agent has not produced a chat response within
+Scans every `tick_interval` seconds and emits an event when the head
+agent of the bound otdel has not produced a chat response within
 `idle_minutes`. Reads the last assistant message timestamp from
 `core/synpin/data/agents/{head_slug}/sessions/web.json`.
 """
@@ -59,12 +59,9 @@ class IdleHeadPlugin(TriggerPlugin):
         threshold_seconds = idle_minutes * 60
         events: list[Event] = []
 
-        # We only check the otdel bound to the connection this instance
-        # is attached to. The frontend selector is the source of truth —
-        # if the user removed a connection from the picker, no instance
-        # exists, no tick runs for it, and no nudge is sent.
-        connection_id = ctx.connection_id
-        if not connection_id:
+        # Instance is bound directly to an otdel.
+        otdel_id = ctx.otdel_id
+        if not otdel_id:
             return events
 
         try:
@@ -73,16 +70,8 @@ class IdleHeadPlugin(TriggerPlugin):
             logger.warning("idle_head: failed to load otdels: %s", e)
             return events
 
-        # connection ref may be `otdel:<id>` or `agent:primary`. We only
-        # handle otdel-side checks here — primary-agent silence is a
-        # different concern (no connection points at it as a source).
-        if not connection_id.startswith("otdel:"):
-            return events
-        target_otdel_id = connection_id.removeprefix("otdel:")
-
-        # Find the otdel record and its head.
         target_otdel = next(
-            (o for o in otdels if o.get("otdelid") == target_otdel_id),
+            (o for o in otdels if o.get("otdelid") == otdel_id),
             None,
         )
         if not target_otdel:
@@ -102,23 +91,22 @@ class IdleHeadPlugin(TriggerPlugin):
 
         # Skip if the otdel has no active tasks — the head has nothing
         # to act on, so a nudge would just be noise. Silent no-op.
-        active_tasks = _count_active_tasks_for_otdel(target_otdel_id)
+        active_tasks = _count_active_tasks_for_otdel(otdel_id)
         if active_tasks == 0:
             logger.debug(
                 "idle_head: %s head idle %dm but no active tasks — silent",
-                target_otdel_id, int(idle_seconds // 60),
+                otdel_id, int(idle_seconds // 60),
             )
             return events
 
         events.append(Event(
             type="idle_head",
             payload={
-                "otdel_id": target_otdel_id,
+                "otdel_id": otdel_id,
                 "otdel_name": target_otdel.get("name", ""),
                 "head_slug": head_slug,
                 "idle_minutes": int(idle_seconds // 60),
                 "active_tasks": active_tasks,
-                "connection_id": connection_id,
             },
         ))
         return events

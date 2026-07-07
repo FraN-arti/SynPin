@@ -6,7 +6,7 @@ A trigger is a 3-part machine:
 
 Definitions in `core/synpin/triggers/definitions/` are the templates
 (user-editable metadata + execution logic). Instances in
-`data/triggers/{connection_id}.yaml` are the user's per-connection
+`data/triggers/{otdel_id}.yaml` are the user's per-otdel
 config — engine binds templates to instances at runtime.
 """
 from __future__ import annotations
@@ -42,7 +42,7 @@ class TriggerContext:
     now: datetime
     config: dict[str, Any]          # user config from instance
     action_config: dict[str, Any]    # user config for the action
-    connection_id: str = ""          # which connection this instance is bound to
+    otdel_id: str = ""              # which otdel this instance is bound to
 
 
 class TriggerPlugin:

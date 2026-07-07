@@ -77,7 +77,7 @@ def list_definitions() -> dict[str, Any]:
 
 @router.get("/instances")
 def list_instances(type: str | None = None) -> dict[str, Any]:
-    """All configured instances across all connections.
+    """All configured instances across all otdels.
 
     Optional `?type=foo` filters to a specific plugin type.
     """
@@ -89,20 +89,20 @@ def list_instances(type: str | None = None) -> dict[str, Any]:
 
 
 @router.post("/instances")
-def create_instance(payload: dict[str, Any]) -> dict[str, Any]:
+async def create_instance(payload: dict[str, Any]) -> dict[str, Any]:
     """Create a new trigger instance.
 
-    Body: { type, connection_id, config: {...}, action: {type, ...}, enabled? }
+    Body: { type, otdel_id, config: {...}, action: {type, ...}, enabled? }
     """
     type_name = payload.get("type", "")
-    connection_id = payload.get("connection_id", "")
-    if not type_name or not connection_id:
-        raise HTTPException(400, "type and connection_id are required")
+    otdel_id = payload.get("otdel_id", "")
+    if not type_name or not otdel_id:
+        raise HTTPException(400, "type and otdel_id are required")
     if type_name not in registry_mod.scan():
         raise HTTPException(404, f"unknown trigger type: {type_name}")
 
-    instance_id = payload.get("id") or f"trig-{type_name}-{connection_id}"
-    data = store.load(connection_id)
+    instance_id = payload.get("id") or f"trig-{type_name}-{otdel_id}"
+    data = store.load(otdel_id)
     # Avoid duplicates by id
     data["triggers"] = [t for t in data.get("triggers", []) if t.get("id") != instance_id]
     data["triggers"].append({
@@ -112,40 +112,40 @@ def create_instance(payload: dict[str, Any]) -> dict[str, Any]:
         "action": payload.get("action", {"type": "log"}),
         "enabled": payload.get("enabled", True),
     })
-    store.save(connection_id, data)
+    store.save(otdel_id, data)
     get_engine().reload_instances()
-    asyncio.create_task(_broadcast("triggers:instance_changed"))
-    return {"id": instance_id, "type": type_name, "connection_id": connection_id}
+    await _broadcast("triggers:instance_changed")
+    return {"id": instance_id, "type": type_name, "otdel_id": otdel_id}
 
 
 @router.patch("/instances/{instance_id}")
-def update_instance(instance_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+async def update_instance(instance_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     """Update config / action / enabled state of an instance."""
-    for cid in store.list_connections():
-        data = store.load(cid)
+    for oid in store.list_otdels():
+        data = store.load(oid)
         for i, t in enumerate(data.get("triggers", [])):
             if t.get("id") == instance_id:
                 for key in ("config", "action", "enabled"):
                     if key in payload:
                         t[key] = payload[key]
                 data["triggers"][i] = t
-                store.save(cid, data)
+                store.save(oid, data)
                 get_engine().reload_instances()
-                asyncio.create_task(_broadcast("triggers:instance_changed"))
+                await _broadcast("triggers:instance_changed")
                 return {"id": instance_id, "updated": True}
     raise HTTPException(404, f"instance not found: {instance_id}")
 
 
 @router.delete("/instances/{instance_id}")
-def delete_instance(instance_id: str) -> dict[str, Any]:
-    for cid in store.list_connections():
-        data = store.load(cid)
+async def delete_instance(instance_id: str) -> dict[str, Any]:
+    for oid in store.list_otdels():
+        data = store.load(oid)
         before = len(data.get("triggers", []))
         data["triggers"] = [t for t in data.get("triggers", []) if t.get("id") != instance_id]
         if len(data["triggers"]) < before:
-            store.save(cid, data)
+            store.save(oid, data)
             get_engine().reload_instances()
-            asyncio.create_task(_broadcast("triggers:instance_changed"))
+            await _broadcast("triggers:instance_changed")
             return {"id": instance_id, "deleted": True}
     raise HTTPException(404, f"instance not found: {instance_id}")
 

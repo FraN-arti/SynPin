@@ -5,8 +5,8 @@
  *   - NO buttons. Every change is auto-saved (debounced) — same UX as
  *     General settings.
  *   - Global config per plugin (one set of values, not per-instance).
- *   - Multiselect of connections = "which connections use this plugin".
- *     Toggling a connection on/off creates or deletes the corresponding
+ *   - Multiselect of otdels = "which otdels use this plugin".
+ *     Toggling an otdel on/off creates or deletes the corresponding
  *     instance on the backend; the global config is patched in place.
  *   - No "Action" picker — for idle_head the action is always
  *     `agent_prompt` (other types in schema are reserved for future
@@ -42,25 +42,22 @@ interface Definition {
 interface Instance {
   id: string
   type: string
-  connection_id?: string
-  _connection_id?: string
+  otdel_id?: string
+  _otdel_id?: string
   config: Record<string, any>
   enabled: boolean
 }
 
-interface Connection {
-  id: string
-  label?: string
-  from: string
-  to: string
-  active: boolean
+interface Otdel {
+  otdelid: string
+  name: string
+  head: string
 }
 
 export function TriggersSection({ wsOn }: { wsOn?: (type: string, handler: (data: any) => void) => () => void } = {}) {
   const [defs, setDefs] = useState<Definition[]>([])
   const [instances, setInstances] = useState<Instance[]>([])
-  const [connections, setConnections] = useState<Connection[]>([])
-  const [otdelNames, setOtdelNames] = useState<Record<string, string>>({})
+  const [otdels, setOtdels] = useState<Otdel[]>([])
   const [loaded, setLoaded] = useState(false)
 
   const loadDefs = useCallback(async () => {
@@ -83,31 +80,19 @@ export function TriggersSection({ wsOn }: { wsOn?: (type: string, handler: (data
     } catch {}
   }, [])
 
-  const loadConnections = useCallback(async () => {
+  const loadOtdels = useCallback(async () => {
     try {
-      const [cRes, oRes] = await Promise.all([
-        fetch(`${API_BASE}/api/connections`),
-        fetch(`${API_BASE}/api/otdels`),
-      ])
-      if (cRes.ok) {
-        const data = await cRes.json()
-        setConnections((data.connections || []).filter((c: Connection) => c.active))
-      }
-      if (oRes.ok) {
-        const data = await oRes.json()
-        const names: Record<string, string> = {}
-        for (const o of (data.otdels || [])) {
-          names[o.otdelid] = o.name
-          names[`otdel:${o.otdelid}`] = o.name
-        }
-        setOtdelNames(names)
+      const res = await fetch(`${API_BASE}/api/otdels`)
+      if (res.ok) {
+        const data = await res.json()
+        setOtdels(data.otdels || [])
       }
     } catch {}
   }, [])
 
   useEffect(() => {
-    Promise.all([loadDefs(), loadInstances(), loadConnections()]).then(() => setLoaded(true))
-  }, [loadDefs, loadInstances, loadConnections])
+    Promise.all([loadDefs(), loadInstances(), loadOtdels()]).then(() => setLoaded(true))
+  }, [loadDefs, loadInstances, loadOtdels])
 
   // Live updates: when any trigger instance changes on the server
   // (via WS broadcast), refetch the instance list so toggles / config
@@ -126,7 +111,7 @@ export function TriggersSection({ wsOn }: { wsOn?: (type: string, handler: (data
       <SettingsCard title="Плагины автоматизации">
         <p className="settings-hint">
           {defs.length} плагин{defs.length === 1 ? '' : defs.length < 5 ? 'а' : 'ов'} найдено автоматически.
-          Каждый плагин реагирует на событие (застой задачи, тишина отдела) и будит агента по выбранным связям.
+          Каждый плагин реагирует на событие (застой задачи, тишина отдела) и будит агента в выбранных отделах.
           Изменения сохраняются автоматически.
         </p>
         <div className="settings-divider-thin" />
@@ -140,8 +125,7 @@ export function TriggersSection({ wsOn }: { wsOn?: (type: string, handler: (data
                 key={def.type}
                 def={def}
                 instances={instances.filter(i => i.type === def.type)}
-                connections={connections}
-                otdelNames={otdelNames}
+                otdels={otdels}
                 onReload={loadInstances}
               />
             ))}
@@ -155,12 +139,11 @@ export function TriggersSection({ wsOn }: { wsOn?: (type: string, handler: (data
 // ── Single plugin block ────────────────────────────────────────────
 
 function PluginBlock({
-  def, instances, connections, otdelNames, onReload,
+  def, instances, otdels, onReload,
 }: {
   def: Definition
   instances: Instance[]
-  connections: Connection[]
-  otdelNames: Record<string, string>
+  otdels: Otdel[]
   onReload: () => Promise<void>
 }) {
   // ── Global config (one set of values for this plugin) ─────────
@@ -176,20 +159,16 @@ function PluginBlock({
   const cfgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSavedCfgRef = useRef(JSON.stringify(config))
 
-  // ── Connection multiselect ─────────────────────────────────────
-  const [selectedConnIds, setSelectedConnIds] = useState<string[]>(() => {
-    // Derive from existing instances: their _connection_id is the source of truth
+  // ── Otdel multiselect ─────────────────────────────────────────
+  const [selectedOtdelIds, setSelectedOtdelIds] = useState<string[]>(() => {
     return Array.from(new Set(
-      instances.map(i => i._connection_id || i.connection_id || '').filter(Boolean)
+      instances.map(i => i._otdel_id || i.otdel_id || '').filter(Boolean)
     ))
   })
-  const connTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lastSavedConnsRef = useRef<string[]>(selectedConnIds)
+  const otdelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastSavedOtdelsRef = useRef<string[]>(selectedOtdelIds)
 
   // ── Plugin enabled/disabled (global toggle) ───────────────────
-  // True if any instance exists AND all are enabled. False if all
-  // are disabled. If there are no instances yet, the plugin is
-  // "off" until the user picks at least one connection.
   const allEnabled = instances.length > 0 && instances.every(i => i.enabled)
 
   const handleToggleEnabled = async () => {
@@ -218,10 +197,6 @@ function PluginBlock({
   }, [instances.length])
 
   // ── Auto-save: config (debounced 800ms) ─────────────────────────
-  // If there are no instances yet, buffer the change in pendingConfigRef
-  // and let reconcileConnections pick it up when the first connection
-  // is added. This way the user can set idle_minutes before/after
-  // choosing connections without losing the value.
   const pendingConfigRef = useRef<Record<string, any> | null>(null)
 
   const saveConfig = useCallback(async (next: Record<string, any>) => {
@@ -255,25 +230,23 @@ function PluginBlock({
     }, 800)
   }
 
-  // ── Auto-save: connection multiselect (debounced 600ms) ────────
-  const reconcileConnections = useCallback(async (nextIds: string[]) => {
-    const currentIds = lastSavedConnsRef.current
+  // ── Auto-save: otdel multiselect (debounced 600ms) ────────────
+  const reconcileOtdels = useCallback(async (nextIds: string[]) => {
+    const currentIds = lastSavedOtdelsRef.current
     const toAdd = nextIds.filter(id => !currentIds.includes(id))
     const toRemove = currentIds.filter(id => !nextIds.includes(id))
 
-    // Use the most recent config the user has set, even if save was
-    // pending because there were no instances at the time.
     const configToWrite = pendingConfigRef.current ?? config
 
     try {
       await Promise.all([
-        ...toAdd.map(async cid => {
+        ...toAdd.map(async oid => {
           const res = await fetch(`${API_BASE}/api/triggers/instances`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               type: def.type,
-              connection_id: cid,
+              otdel_id: oid,
               config: configToWrite,
               action: { type: 'agent_prompt' },
               enabled: true,
@@ -281,49 +254,43 @@ function PluginBlock({
           })
           if (res.ok) {
             const created = await res.json()
-            // Clear pending once at least one instance exists
             pendingConfigRef.current = null
             return created
           }
           return null
         }),
-        ...toRemove.map(async cid => {
-          const inst = instances.find(i => (i._connection_id || i.connection_id) === cid)
+        ...toRemove.map(async oid => {
+          const inst = instances.find(i => (i._otdel_id || i.otdel_id) === oid)
           if (inst) {
             return fetch(`${API_BASE}/api/triggers/instances/${inst.id}`, { method: 'DELETE' })
           }
           return null
         }),
       ])
-      lastSavedConnsRef.current = nextIds
+      lastSavedOtdelsRef.current = nextIds
       lastSavedCfgRef.current = JSON.stringify(configToWrite)
       await onReload()
     } catch {}
   }, [def.type, config, instances, onReload])
 
-  const handleConnChange = (nextIds: string[]) => {
-    setSelectedConnIds(nextIds)
-    if (connTimerRef.current) clearTimeout(connTimerRef.current)
-    connTimerRef.current = setTimeout(() => {
-      const sortedCurrent = [...lastSavedConnsRef.current].sort()
+  const handleOtdelChange = (nextIds: string[]) => {
+    setSelectedOtdelIds(nextIds)
+    if (otdelTimerRef.current) clearTimeout(otdelTimerRef.current)
+    otdelTimerRef.current = setTimeout(() => {
+      const sortedCurrent = [...lastSavedOtdelsRef.current].sort()
       const sortedNext = [...nextIds].sort()
       if (JSON.stringify(sortedCurrent) !== JSON.stringify(sortedNext)) {
-        reconcileConnections(nextIds)
+        reconcileOtdels(nextIds)
       }
     }, 600)
   }
 
-  // ── Connection picker options ─────────────────────────────────
-  const connOptions: PickerOption[] = connections.map(c => {
-    const fromName = c.from === 'agent:primary' ? 'Главный агент' : (otdelNames[c.from] || c.from)
-    const toName = c.to === 'agent:primary' ? 'Главный агент' : (otdelNames[c.to] || c.to)
-    return {
-      id: c.id,
-      label: `${fromName} → ${toName}`,
-      searchText: `${fromName} ${toName} ${c.label || ''}`,
-      badge: c.label,
-    }
-  })
+  // ── Otdel picker options ───────────────────────────────────────
+  const otdelOptions: PickerOption[] = otdels.map(o => ({
+    id: o.otdelid,
+    label: o.name,
+    searchText: o.name,
+  }))
 
   const cfgDirty = JSON.stringify(config) !== lastSavedCfgRef.current
 
@@ -338,22 +305,18 @@ function PluginBlock({
           </div>
         </div>
         <div className="trigger-plugin-status">
-          {selectedConnIds.length === 0 && (
-            <span className="trigger-dirty">выбери связи</span>
-          )}
-          {!cfgDirty && selectedConnIds.length > 0 && allEnabled && (
-            <span className="trigger-saved">✓ {selectedConnIds.length} связ{selectedConnIds.length === 1 ? 'ь' : selectedConnIds.length < 5 ? 'и' : 'ей'}</span>
-          )}
-          {cfgDirty && selectedConnIds.length === 0 && (
-            <span className="trigger-dirty">применится при выборе связей</span>
-          )}
-          {cfgDirty && selectedConnIds.length > 0 && allEnabled && (
-            <span className="trigger-dirty">не сохранено</span>
-          )}
           {def.global_toggle && (
             <div className="trigger-status-toggle">
-              <span className="trigger-saved">
-                {cfgDirty ? 'не сохранено' : (selectedConnIds.length > 0 ? `✓ ${selectedConnIds.length} связ${selectedConnIds.length === 1 ? 'ь' : selectedConnIds.length < 5 ? 'и' : 'ей'}` : 'выбери связи')}
+              <span className={
+                cfgDirty
+                  ? 'trigger-dirty'
+                  : (selectedOtdelIds.length > 0 ? 'trigger-saved' : 'trigger-dirty')
+              }>
+                {cfgDirty
+                  ? 'не сохранено'
+                  : (selectedOtdelIds.length > 0
+                      ? `✓ ${selectedOtdelIds.length} отдел${selectedOtdelIds.length === 1 ? '' : selectedOtdelIds.length < 5 ? 'а' : 'ов'}`
+                      : 'выбери отдел')}
               </span>
               <Toggle
                 label=""
@@ -382,19 +345,19 @@ function PluginBlock({
         </div>
       ))}
 
-      {/* Connection multiselect */}
+      {/* Otdel multiselect */}
       <div className="settings-field">
-        <label>Связи ({selectedConnIds.length} выбрано)</label>
+        <label>Отделы ({selectedOtdelIds.length} выбрано)</label>
         <PickerMenu
           multi
-          options={connOptions}
-          value={selectedConnIds}
-          onChange={handleConnChange}
-          placeholder="Выбери связи, для которых работает плагин"
+          options={otdelOptions}
+          value={selectedOtdelIds}
+          onChange={handleOtdelChange}
+          placeholder="Выбери отделы, для которых работает плагин"
           searchable
-          searchPlaceholder="Поиск связи..."
+          searchPlaceholder="Поиск отдела..."
           triggerWidth="100%"
-          emptyMessage="Нет связей — создай их в настройках"
+          emptyMessage="Нет отделов — создай их в настройках"
         />
       </div>
     </div>

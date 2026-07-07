@@ -141,8 +141,8 @@
 }
 
 @keyframes tabFadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* Layout variants */
@@ -187,7 +187,7 @@
      Falls back gracefully on browsers that don't support backdrop-filter. */
   backdrop-filter: blur(8px) saturate(120%);
   -webkit-backdrop-filter: blur(8px) saturate(120%);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, backdrop-filter 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, backdrop-filter 0.2s ease;
 }
 
 .settings-card:hover {
@@ -816,10 +816,26 @@
 }
 .trigger-dirty {
   color: var(--yellow, #f59e0b);
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: var(--radius);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  font-size: 11px;
 }
 .trigger-saved {
   color: var(--orange, #f97316);
   font-weight: 500;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: var(--radius);
+  background: rgba(249, 115, 22, 0.1);
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  font-size: 11px;
 }
 /* Wrap saved/dirty text + toggle together on one line */
 .trigger-status-toggle {
@@ -827,10 +843,16 @@
   align-items: center;
   gap: 6px;
 }
+.trigger-status-toggle .settings-field-row {
+  margin-bottom: 0;
+}
 .trigger-status-toggle .settings-toggle {
   padding: 0;
   font-size: 11px;
   line-height: 1;
+}
+.trigger-status-toggle .settings-toggle span:empty {
+  display: none;
 }
 @keyframes pulseDim {
   0%, 100% { opacity: 0.6; }

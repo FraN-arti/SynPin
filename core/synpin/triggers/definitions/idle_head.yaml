@@ -1,21 +1,19 @@
 type: idle_head
 name: "Бездействие главы отдела"
-description: "Срабатывает если глава отдела не отвечал N минут"
+description: "Срабатывает если глава отдела не отвечала N минут"
 category: state
 icon: clock
 color: orange
-version: 1
+version: 3
 config_schema:
   - name: idle_minutes
     type: number
     default: 30
     min: 1
-    label: "Минут без ответа"
-  - name: otdel_filter
-    type: string
-    default: ""
-    label: "ID отдела (пусто = все)"
+    label: "Минут тишины"
+# Optional global toggle surfaced in the UI as a master switch.
+# Plugins without this field don't show the toggle in Settings.
+global_toggle:
+  enabled_by_default: true
 action_types:
   - agent_prompt
-  - log
-  - notify_user

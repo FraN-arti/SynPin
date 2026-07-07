@@ -42,6 +42,7 @@ class TriggerContext:
     now: datetime
     config: dict[str, Any]          # user config from instance
     action_config: dict[str, Any]    # user config for the action
+    connection_id: str = ""          # which connection this instance is bound to
 
 
 class TriggerPlugin:

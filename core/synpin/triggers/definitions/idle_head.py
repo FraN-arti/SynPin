@@ -56,38 +56,94 @@ class IdleHeadPlugin(TriggerPlugin):
 
     async def tick(self, ctx: TriggerContext) -> list[Event]:
         idle_minutes: int = int(ctx.config.get("idle_minutes", 30))
-        otdel_filter: str = ctx.config.get("otdel_filter", "")
         threshold_seconds = idle_minutes * 60
         events: list[Event] = []
 
+        # We only check the otdel bound to the connection this instance
+        # is attached to. The frontend selector is the source of truth —
+        # if the user removed a connection from the picker, no instance
+        # exists, no tick runs for it, and no nudge is sent.
+        connection_id = ctx.connection_id
+        if not connection_id:
+            return events
+
         try:
-            # Call via module attribute so tests can monkeypatch
-            # `synpin.agents.manager.load_otdels` directly.
             otdels = agents_manager.load_otdels()
-        except Exception as e:  # noqa: BLE001 — logged and skipped, not fatal
+        except Exception as e:  # noqa: BLE001
             logger.warning("idle_head: failed to load otdels: %s", e)
             return events
 
-        for otdel in otdels:
-            otdel_id = otdel.get("otdelid", "")
-            if otdel_filter and otdel_id != otdel_filter:
-                continue
-            head_slug = otdel.get("head", "")
-            if not head_slug:
-                continue
-            last = _last_response_at(head_slug)
-            if last is None:
-                # No history yet — treat as fresh activity, not idle.
-                continue
-            idle_seconds = (ctx.now - last).total_seconds()
-            if idle_seconds >= threshold_seconds:
-                events.append(Event(
-                    type="idle_head",
-                    payload={
-                        "otdel_id": otdel_id,
-                        "otdel_name": otdel.get("name", ""),
-                        "head_slug": head_slug,
-                        "idle_minutes": int(idle_seconds // 60),
-                    },
-                ))
+        # connection ref may be `otdel:<id>` or `agent:primary`. We only
+        # handle otdel-side checks here — primary-agent silence is a
+        # different concern (no connection points at it as a source).
+        if not connection_id.startswith("otdel:"):
+            return events
+        target_otdel_id = connection_id.removeprefix("otdel:")
+
+        # Find the otdel record and its head.
+        target_otdel = next(
+            (o for o in otdels if o.get("otdelid") == target_otdel_id),
+            None,
+        )
+        if not target_otdel:
+            return events
+
+        head_slug = target_otdel.get("head", "")
+        if not head_slug:
+            return events
+
+        last = _last_response_at(head_slug)
+        if last is None:
+            # No history yet — treat as fresh activity, not idle.
+            return events
+        idle_seconds = (ctx.now - last).total_seconds()
+        if idle_seconds < threshold_seconds:
+            return events
+
+        # Skip if the otdel has no active tasks — the head has nothing
+        # to act on, so a nudge would just be noise. Silent no-op.
+        active_tasks = _count_active_tasks_for_otdel(target_otdel_id)
+        if active_tasks == 0:
+            logger.debug(
+                "idle_head: %s head idle %dm but no active tasks — silent",
+                target_otdel_id, int(idle_seconds // 60),
+            )
+            return events
+
+        events.append(Event(
+            type="idle_head",
+            payload={
+                "otdel_id": target_otdel_id,
+                "otdel_name": target_otdel.get("name", ""),
+                "head_slug": head_slug,
+                "idle_minutes": int(idle_seconds // 60),
+                "active_tasks": active_tasks,
+                "connection_id": connection_id,
+            },
+        ))
         return events
+
+
+def _count_active_tasks_for_otdel(otdel_id: str) -> int:
+    """How many non-done, non-archived tasks the otdel currently has.
+
+    Pulled from the kanban service. We do this defensively — if the
+    service can't be imported or fails, we fall back to "assume work
+    exists" (i.e. don't suppress) rather than wrongly silencing.
+    """
+    try:
+        from synpin.kanban.service import KanbanService
+        tasks = KanbanService().list_tasks()
+    except Exception as e:  # noqa: BLE001
+        logger.debug("idle_head: cannot list tasks, assume active: %s", e)
+        return 1
+    active = 0
+    for t in tasks:
+        dept = getattr(t, "department", "") or ""
+        if dept not in (otdel_id, f"otdel:{otdel_id}"):
+            continue
+        status = t.status.value if hasattr(t.status, "value") else str(t.status)
+        if status in ("done", "archived"):
+            continue
+        active += 1
+    return active

@@ -1,16 +1,16 @@
-type: kanban_stuck
-name: "Зависшие задачи канбана"
-description: "Срабатывает если задача не двигалась больше порогового времени"
+type: kanban_revision
+name: "Застряли в доработке"
+description: "Срабатывает если задача в доработке дольше порогового времени"
 category: state
-icon: alert-clock
-color: orange
+icon: refresh-cw
+color: yellow
 version: 1
 config_schema:
   - name: idle_minutes
     type: number
-    default: 120
+    default: 60
     min: 5
-    label: "Минут без движения"
+    label: "Минут в доработке"
 # Optional global toggle surfaced in the UI as a master switch.
 # Plugins without this field don't show the toggle in Settings.
 global_toggle:

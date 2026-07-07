@@ -294,6 +294,10 @@ app.include_router(version_router)
 from .setup_router import router as setup_router
 app.include_router(setup_router)
 
+# Triggers (plugin-style automation engine)
+from .triggers_router import router as triggers_router
+app.include_router(triggers_router)
+
 # Widget layout endpoint
 from .widgets_router import router as widgets_router
 app.include_router(widgets_router)

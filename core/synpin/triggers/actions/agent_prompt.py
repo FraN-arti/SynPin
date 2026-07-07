@@ -31,18 +31,54 @@ class AgentPromptAction(ActionPlugin):
     type = "agent_prompt"
 
     async def run(self, ctx: TriggerContext, event: Event) -> None:
-        agent_slug: str = ctx.action_config.get("agent_slug", "")
+        # agent_slug resolution order:
+        #   1. explicit action_config.agent_slug
+        #   2. event.payload.head_slug (idle_head ships this)
+        #   3. event.payload.agent_slug (other plugins)
+        agent_slug: str = (
+            ctx.action_config.get("agent_slug", "")
+            or event.payload.get("head_slug", "")
+            or event.payload.get("agent_slug", "")
+        )
+
+        # prompt: explicit override OR per-event-type default
         prompt: str = ctx.action_config.get("prompt", "")
+        if not prompt:
+            defaults = {
+                "idle_head": (
+                    "Глава отдела «{otdel_name}», ты молчишь уже {idle_minutes} мин. "
+                    "В твоём отделе сейчас {active_tasks} активных задач. "
+                    "Действуй тихо, в скрытом канале (пользователь это НЕ увидит):\n"
+                    "1. Проверь активные задачи в канбане своего отдела.\n"
+                    "2. Если есть застрявшие > N мин — поторопи ответственных worker'ов в их чатах.\n"
+                    "3. Обнови свою память (FACTS) если появились новые решения.\n"
+                    "4. Если задачи идут штатно и ничего нового — НЕ ОТВЕЧАЙ в чат отдела, просто заверши. "
+                    "Это правило важно: только при реальных действиях ты пишешь в чат отдела, "
+                    "иначе пользователь увидит шум. Если есть что сказать — пиши конкретно и кратко."
+                ),
+                "kanban_stuck": (
+                    "Задача «{task_title}» в колонке «{stage}» отдела {department} без движения {idle_minutes} мин. "
+                    "Прими решение: продолжить, перевести в другую колонку, или закрыть."
+                ),
+                "kanban_in_review": (
+                    "Задача «{task_title}» ждёт твоего ревью уже {idle_minutes} мин. "
+                    "Прими решение: одобрить или вернуть на доработку."
+                ),
+                "kanban_revision": (
+                    "Задача «{task_title}» в доработке {idle_minutes} мин. "
+                    "Проверь прогресс и прими решение."
+                ),
+            }
+            prompt = defaults.get(event.type, f"Trigger {event.type}: {event.payload}")
+
         if not agent_slug or not prompt:
-            logger.warning("agent_prompt: missing agent_slug or prompt in config")
+            logger.warning("agent_prompt: missing agent_slug or prompt for event %s", event.type)
             return
 
         # Substitute {payload_key} placeholders with event payload values.
         rendered = prompt.format(**event.payload) if "{" in prompt else prompt
 
         # Stable trigger id for channel isolation.
-        # Use the running engine's "current_trigger" attribute if set,
-        # else fall back to a stable hash of (type, payload).
         trigger_id = getattr(ctx.engine, "_current_trigger_id", None) or event.payload.get(
             "_trigger_id", "anon"
         )

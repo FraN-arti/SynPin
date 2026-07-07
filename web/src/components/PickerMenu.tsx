@@ -116,9 +116,9 @@ export function PickerMenu(props: PickerMenuProps) {
     const estimatedMenuHeight = searchable ? 240 : Math.min(240, options.length * 36 + 8)
     const spaceBelow = vh - rect.bottom - VIEWPORT_PADDING
     const spaceAbove = rect.top - VIEWPORT_PADDING
-    const placement: 'bottom' | 'top' = spaceBelow >= estimatedMenuHeight || spaceBelow >= spaceAbove
+    const placement: 'bottom' | 'top' = spaceBelow >= 100
       ? 'bottom'
-      : 'top'
+      : (spaceAbove >= estimatedMenuHeight ? 'top' : 'bottom')
     const left = Math.max(VIEWPORT_PADDING, Math.min(rect.left, window.innerWidth - rect.width - VIEWPORT_PADDING))
     const top = placement === 'bottom'
       ? rect.bottom + MENU_GAP

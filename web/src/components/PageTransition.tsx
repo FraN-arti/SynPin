@@ -80,7 +80,12 @@ export function PageTransition({ pageKey, children }: PageTransitionProps) {
   // (e.g. open/closed state of a modal) are reflected immediately.
   // During 'out' phase, render the stale `renderedChildren` so the
   // fade-out animation shows the OLD content before swapping.
-  const displayChildren = phase === 'in' ? children : renderedChildren
+  //
+  // Critical: when pageKey !== renderedKey, a transition is PENDING
+  // but useEffect hasn't fired yet (still same render frame). Show
+  // old content to avoid a one-frame flash of the new page.
+  const isTransitionPending = pageKey !== renderedKey
+  const displayChildren = (phase === 'in' && !isTransitionPending) ? children : renderedChildren
 
   return (
     <div

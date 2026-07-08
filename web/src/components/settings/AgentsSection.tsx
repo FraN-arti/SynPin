@@ -344,7 +344,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
                 Связи и история чатов сохранятся в архиве.
               </p>
             </div>
-            <div className="modal-actions">
+            <div className="modal-footer">
               <button className="settings-btn-secondary" onClick={() => { setDeleteConfirm(null) }}>
                 Отмена
               </button>
@@ -512,7 +512,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
               ))}
             </div>
             <div className="roles-depts-add">
-              <input className="settings-input roles-depts-input" placeholder="Название отдела..." value={newDept.name} onChange={e => setNewDept({ ...newDept, name: e.target.value })} />
+              <input className="settings-input roles-depts-input" placeholder="Название департамента..." value={newDept.name} onChange={e => setNewDept({ ...newDept, name: e.target.value })} />
               <input className="settings-input roles-depts-input roles-depts-input-sm" placeholder="Описание..." value={newDept.description} onChange={e => setNewDept({ ...newDept, description: e.target.value })} />
               <ColorPicker
                 value={newDept.color}

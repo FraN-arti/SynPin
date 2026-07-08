@@ -322,7 +322,9 @@ def build_graph() -> Graph:
                 continue
             seen_ids.add(slug)
             otdel = otdels.get(slug, {})
-            pos = canvas.nodes.get(slug, NodePosition(x=0, y=0))
+            # Canvas positions are stored by ref (e.g. "otdel:51xev...")
+            # but we also fall back to bare slug for legacy data.
+            pos = canvas.nodes.get(ref, canvas.nodes.get(slug, NodePosition(x=0, y=0)))
             active_tasks = _count_active_tasks(slug)
             head_id = otdel.get("head", "")
             head_name = agents.get(head_id, {}).get("name", head_id) if head_id else ""

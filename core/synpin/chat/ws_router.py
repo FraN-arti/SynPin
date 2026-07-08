@@ -194,6 +194,24 @@ async def websocket_endpoint(ws: WebSocket):
     except Exception as e:
         logger.debug("Session reset on connect failed (non-critical): %s", e)
 
+    # Two-stage external-agent detect on every WS connect.
+    # Runs on connect (not on a separate timer) so when the user opens SynPin
+    # or reconnects, the Sidebar immediately reflects whether the external
+    # gateway is up — no F5 needed. Diff against previous state is broadcast
+    # once; identical reconnects cost one HTTP probe but no UI noise.
+    try:
+        from ..agents import external
+        prev_state = external.load_external_agents()
+        detections = await external.detect_external_agents()
+        for d in detections:
+            external.register_external_agent(d)
+        new_state = external.load_external_agents()
+        from ..ws_broadcast import broadcast
+        if external.diff_external_state(prev_state, new_state):
+            broadcast({"type": "external_agents:changed", "agents": new_state})
+    except Exception as e:
+        logger.debug("External-agent detect on connect failed (non-critical): %s", e)
+
     try:
         while True:
             raw = await ws.receive_text()

@@ -146,6 +146,12 @@ export function GeneralSection() {
     const root = document.documentElement
     root.classList.remove('light-theme', 'dark-theme', 'oled-theme')
 
+    // Snapshot user's border_radius BEFORE clearing inline vars.
+    // After theme apply we restore it — unless a TweakCN preset
+    // explicitly defines --radius in its vars (in which case the
+    // designer-chosen radius wins).
+    const userRadius = settings?.ui?.border_radius
+
     const existingVars = root.style
     for (let i = existingVars.length - 1; i >= 0; i--) {
       const prop = existingVars[i]
@@ -182,8 +188,19 @@ export function GeneralSection() {
       }
     }
 
+    // Restore user's border_radius — unless a TweakCN preset
+    // explicitly defined it. We check tweakcnVarsRef directly because
+    // after removeProperty the CSS fallback (8px) would always win
+    // and we'd never restore the user's value.
+    const isTweakcn = theme === 'tweakcn'
+    const tweakcnVars = tweakcnVarsRef.current
+    const presetHasRadius = isTweakcn && !!tweakcnVars && '--radius' in tweakcnVars
+    if (userRadius && !presetHasRadius) {
+      root.style.setProperty('--radius', `${userRadius}px`)
+    }
+
     localStorage.setItem('synpin_theme', JSON.stringify(themeCache))
-  }, [customThemes])
+  }, [customThemes, settings])
 
   const saveSettings = useCallback((patch: Partial<SettingsData>) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)

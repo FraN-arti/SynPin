@@ -211,6 +211,7 @@ export function AddFromCatalogModal({ provider, editProvider, onClose, onSaved }
 }) {
   const key = providerKey(provider)
   const isNoAuth = provider.authMethod === 'no-auth'
+  const isFreeNoAuth = isNoAuth && provider.category === 'free-tier'
   const isEdit = !!editProvider
   // Always start with empty input. The '••••••••' sentinel pattern was
   // dangerous: any keystroke (even just clicking into the field) would
@@ -230,11 +231,36 @@ export function AddFromCatalogModal({ provider, editProvider, onClose, onSaved }
   const [testMessage, setTestMessage] = useState('')
   const [fetchedModels, setFetchedModels] = useState<string[]>([])
 
+  // Auto-fetch models on mount when we don't have a default list.
+  // - no-auth: always (free fetch, no spam)
+  // - apikey: only if no defaultModels AND provider has a public /models
+  //   endpoint that works without auth. If 401, fetchedModels stays empty
+  //   and the user clicks "Тест" after typing their key.
+  useEffect(() => {
+    if (isEdit) return
+    if (isNoAuth || (!apiKey.trim() && (provider.defaultModels || []).length === 0)) {
+      handleTest()
+    }
+  }, [])  // eslint-disable-line react-hooks/exhaustive-deps
+
   const parseModels = () => modelsInput.split(',').map(m => m.trim()).filter(Boolean)
 
+  // Heuristic: free-only models on free-tier providers. The /v1/models
+  // endpoint returns the full catalog (paid + free); for no-auth providers
+  // we want to surface only the ones the user can actually use for free.
+  // Heuristic patterns observed in OpenCode Free catalog (2026-07-08):
+  //   - "-free" / "_free" suffix
+  //   - "big-pickle" (the one free model without the suffix)
+  // If the catalog grows new free models with different naming, update
+  // this set alongside adding the new model.
+  const FREE_MODEL_NAMES = new Set(['big-pickle'])
+  const FREE_MODEL_SUFFIX_RE = /[-_]free$/i
+  const isFreeModel = (m: string) =>
+    FREE_MODEL_SUFFIX_RE.test(m) || FREE_MODEL_NAMES.has(m)
+
   const allKnownModels = fetchedModels.length > 0
-    ? fetchedModels
-    : (isEdit ? (provider.defaultModels || []) : [])
+    ? (isFreeNoAuth ? fetchedModels.filter(isFreeModel) : fetchedModels)
+    : (isEdit ? (provider.defaultModels || []) : (isNoAuth && !isFreeNoAuth ? [] : (provider.defaultModels || [])))
   const customModels = parseModels().filter(m => !allKnownModels.includes(m))
   const chipModels = [...new Set([...allKnownModels, ...customModels])]
   const currentModels = parseModels()
@@ -252,19 +278,25 @@ export function AddFromCatalogModal({ provider, editProvider, onClose, onSaved }
     setTesting(true); setTestResult(null); setTestMessage(''); setError(''); setFetchedModels([])
     const modelList = parseModels()
 
+    // Pure connectivity probe — no temp provider records. Backend reads
+    // providers.yaml for `name` and applies optional body overrides.
     const tryTest = async (useKey: boolean): Promise<{ status: string; message?: string; models?: string[] }> => {
-      const tempName = key + '-test-temp'
-      const body: Record<string, unknown> = {
-        name: tempName, type: provider.type, base_url: provider.baseUrl,
-        api_key: useKey ? apiKey : '', models: modelList,
-      }
-      await fetch(`${API_BASE}/api/providers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       try {
-        const res = await fetch(`${API_BASE}/api/providers/${encodeURIComponent(tempName)}/test`, { method: 'POST' })
+        const res = await fetch(`${API_BASE}/api/providers/${encodeURIComponent(key)}/test`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            // Provide config so /test works whether or not the provider is saved yet.
+            type: provider.type,
+            base_url: provider.baseUrl,
+            api_key: useKey ? apiKey : '',
+            models: modelList,
+          }),
+        })
         const text = await res.text()
         try { return JSON.parse(text) } catch { return { status: 'error', message: `Сервер вернул не JSON: ${text.slice(0, 100)}` } }
-      } finally {
-        await fetch(`${API_BASE}/api/providers/${encodeURIComponent(tempName)}`, { method: 'DELETE' }).catch((e) => console.error('[providers] save provider failed:', e))
+      } catch (e: any) {
+        return { status: 'error', message: e?.message || 'Сеть' }
       }
     }
 

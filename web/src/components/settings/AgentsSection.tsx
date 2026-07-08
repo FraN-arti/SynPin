@@ -35,7 +35,6 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
   const [showSetup, setShowSetup] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<{ slug: string; name: string } | null>(null)
-  const [deleteInput, setDeleteInput] = useState('')
   const [createForm, setCreateForm] = useState({
     name: '', role: '', department: '', model: '',
     description: '', system_prompt: '', temperature: 0.7,
@@ -281,13 +280,11 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
 
   const confirmDeleteAgent = async () => {
     if (!deleteConfirm) return
-    if (deleteInput !== deleteConfirm.name) return
     try {
       const res = await fetch(`${API_BASE}/api/agents/${deleteConfirm.slug}`, { method: 'DELETE' })
       if (res.ok) { setHoveredAgent(null); fetchAgents(); onAgentsChange?.() }
     } catch (e) { console.error('[agents] delete error:', e) }
     setDeleteConfirm(null)
-    setDeleteInput('')
   }
 
   const handleExternalToggle = async (agent: ExternalAgentData) => {
@@ -330,37 +327,29 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
 
   return (
     <div>
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal — matches project-delete style: explanatory
+          text + single dangerous button (red filled), no input trap. */}
       {deleteConfirm && (
-        <div className="modal-overlay" onClick={() => { setDeleteConfirm(null); setDeleteInput('') }}>
+        <div className="modal-overlay" onClick={() => { setDeleteConfirm(null) }}>
           <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
             <div className="modal-header">
               <h2>Удалить агента?</h2>
-              <button className="modal-close" onClick={() => { setDeleteConfirm(null); setDeleteInput('') }}>×</button>
+              <button className="modal-close" onClick={() => { setDeleteConfirm(null) }}>×</button>
             </div>
             <div className="modal-body">
-              <p style={{ marginBottom: 12, color: 'var(--text-secondary)' }}>
-                Введите <strong style={{ color: 'var(--text)' }}>{deleteConfirm.name}</strong> для подтверждения:
+              <p style={{ marginBottom: 8, color: 'var(--text-secondary)' }}>
+                Агент <strong style={{ color: 'var(--text)' }}>{deleteConfirm.name}</strong> будет удалён навсегда.
               </p>
-              <input
-                className="settings-input"
-                value={deleteInput}
-                onChange={e => setDeleteInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && deleteInput === deleteConfirm.name) confirmDeleteAgent() }}
-                placeholder={deleteConfirm.name}
-                autoFocus
-              />
+              <p style={{ marginBottom: 0, color: 'var(--text-secondary)', fontSize: 12 }}>
+                Связи и история чатов сохранятся в архиве.
+              </p>
             </div>
             <div className="modal-actions">
-              <button className="settings-btn-secondary" onClick={() => { setDeleteConfirm(null); setDeleteInput('') }}>
+              <button className="settings-btn-secondary" onClick={() => { setDeleteConfirm(null) }}>
                 Отмена
               </button>
-              <button
-                className="settings-btn-danger"
-                disabled={deleteInput !== deleteConfirm.name}
-                onClick={confirmDeleteAgent}
-              >
-                Удалить
+              <button className="settings-btn-danger" onClick={confirmDeleteAgent}>
+                Удалить агента
               </button>
             </div>
           </div>

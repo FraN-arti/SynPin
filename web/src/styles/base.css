@@ -279,3 +279,14 @@ input[type="checkbox"]:not([class]):disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
+/* Opt-out for toggle switches — the universal ::after (rotated 4×8
+   glyph) renders on top of the switch's round knob, producing a
+   "curved comma" inside the orange track. We only need to clear
+   the universal ::after glyph; .settings-toggle in settings-page.css
+   already supplies its own ::after for the round knob.
+   Bumping specificity with :where() in the selector would not help
+   (it zeroes specificity), so we use a body-prefixed selector to
+   outrank .settings-toggle (0,2,1 > 0,1,1) regardless of source order. */
+body .settings-toggle input[type="checkbox"]::after {
+  content: none;
+}

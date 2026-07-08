@@ -50,6 +50,62 @@ input[type="number"] {
   to   { opacity: 0; }
 }
 
+/* === HoldToDeleteButton — generic confirm via 1.5s hold === */
+/* Same fingerprint-scanner pattern as .cron-hold-btn but reusable
+   for any destructive action (departments, agents, projects, etc.). */
+.hold-to-delete-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 6px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition: background 150ms ease, border-color 150ms ease, transform 100ms ease;
+  font-family: inherit;
+}
+.hold-to-delete-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+.hold-to-delete-btn:active:not(:disabled),
+.hold-to-delete-btn.holding {
+  transform: scale(0.98);
+  background: rgba(239, 68, 68, 0.22);
+}
+.hold-to-delete-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.hold-to-delete-ring {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  transform: rotate(-90deg); /* start at 12 o'clock */
+}
+.hold-to-delete-ring-bg {
+  fill: none;
+  stroke: rgba(239, 68, 68, 0.2);
+  stroke-width: 2.5;
+}
+.hold-to-delete-ring-progress {
+  fill: none;
+  stroke: #ef4444;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  /* No CSS transition — driven by rAF at 60fps for smooth fill. */
+}
+.hold-to-delete-label {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 /* === Chat Skeleton (loading state) === */
 /* Reserves the chat's layout (messages-area + bottom-input) so the
    real content swap doesn't shift the page. Empty on purpose: no

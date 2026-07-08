@@ -13,6 +13,7 @@ import { DropdownMenu } from '../DropdownMenu'
 import { LoadingSpinner } from '../LoadingSpinner'
 import { ColorPicker } from '../ColorPicker'
 import { SettingsCard } from '../SettingsCard'
+import { HoldToDeleteButton } from '../HoldToDeleteButton'
 import { Toggle } from './Toggle'
 
 interface Otdel {
@@ -201,7 +202,7 @@ export function DepartmentsSection({ onDepartmentsChange }: { onDepartmentsChang
             </div>
             <div className="department-actions">
               <button className="settings-btn-secondary" onClick={() => openEdit(otdel)}>Настройки</button>
-              <button className="settings-btn-danger" onClick={() => handleDelete(otdel.otdelid)}>Удалить</button>
+                            <HoldToDeleteButton onConfirm={() => handleDelete(otdel.otdelid)} />
             </div>
           </div>
           {otdel.description && <p className="department-desc">{otdel.description}</p>}

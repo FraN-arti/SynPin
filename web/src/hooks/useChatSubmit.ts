@@ -4,6 +4,7 @@ import type { ToolCall } from '../components/ToolTimeline'
 import type { AgentConfig } from '../components/Sidebar'
 import type { ImageAttachment } from '../components/ImageAttachment'
 import { HIDDEN_TOOLS } from '../components/ToolTimeline'
+import { api } from '../lib/api'
 
 type WsSend = (type: string, payload: Record<string, any>) => boolean
 type WsOn = (type: string, handler: (data: any) => void) => () => void
@@ -22,6 +23,7 @@ export interface UseChatSubmitParams {
   setCompactionNotice: (n: string | null) => void
   wsSend: WsSend
   wsOn: WsOn
+  systemPrompt?: string | null  // Forwarded for external (Hermes) agent requests
 }
 
 export interface UseChatSubmitReturn {
@@ -67,7 +69,7 @@ export function useChatSubmit(params: UseChatSubmitParams): UseChatSubmitReturn 
     input, attachments, isTyping, activeAgent,
     textareaRef, isStreamingRef,
     setInput, setAttachments, setMessages, setIsTyping, setCompactionNotice,
-    wsSend, wsOn,
+    wsSend, wsOn, systemPrompt,
   } = params
 
   const handleSubmit = useCallback(async (e: FormEvent) => {
@@ -193,13 +195,80 @@ export function useChatSubmit(params: UseChatSubmitParams): UseChatSubmitReturn 
 
     cleanupFns.push(onChunk, onToolStart, onToolEnd, onDone, onError)
 
+    // External agents (e.g. Hermes Agent) run their own gateway at /api/chat/hermes/stream.
+    // They have their own provider, model, ACP connection — none of which involve
+    // SynPin's chat router or its 9router/mistral/minimax pool. The WebSocket
+    // 'chat:send' path only knows about agents in agents.yaml and routes through
+    // the SynPin provider registry, so for an external agent it would fall through
+    // to whatever default provider is configured and return wrong responses.
+    if (activeAgent?.is_external) {
+      void (async () => {
+        try {
+          const resp = await api.chat.stream({
+            message: userInput,
+            history: [],
+            system_prompt: systemPrompt ?? null,
+            agent_slug: activeAgent.slug,
+            channel_id: 'web',
+            agent_name: activeAgent.name,
+          })
+          if (!resp.ok || !resp.body) {
+            const text = await resp.text().catch(() => '')
+            setMessages(prev => (prev ?? []).map(m => m.id === assistantId
+              ? { ...m, content: `⚠️ Hermes API недоступен (${resp.status}${text ? `: ${text.slice(0, 200)}` : ''})` }
+              : m))
+            cleanup()
+            return
+          }
+          const reader = resp.body.getReader()
+          const decoder = new TextDecoder()
+          let buffer = ''
+          let acc = ''
+          while (true) {
+            const { value, done } = await reader.read()
+            if (done) break
+            buffer += decoder.decode(value, { stream: true })
+            const events = buffer.split('\n\n')
+            buffer = events.pop() ?? ''
+            for (const evt of events) {
+              for (const line of evt.split('\n')) {
+                if (!line.startsWith('data: ')) continue
+                const dataStr = line.slice(6).trim()
+                if (!dataStr || dataStr === '[DONE]') continue
+                try {
+                  const payload = JSON.parse(dataStr)
+                  if (payload.type === 'chunk' && typeof payload.content === 'string') {
+                    acc += payload.content
+                    setMessages(prev => (prev ?? []).map(m => m.id === assistantId
+                      ? { ...m, content: acc }
+                      : m))
+                  } else if (payload.type === 'error') {
+                    setMessages(prev => (prev ?? []).map(m => m.id === assistantId
+                      ? { ...m, content: `⚠️ ${payload.message || 'Stream error'}` }
+                      : m))
+                  }
+                } catch { /* ignore parse errors */ }
+              }
+            }
+          }
+        } catch (err: any) {
+          setMessages(prev => (prev ?? []).map(m => m.id === assistantId
+            ? { ...m, content: `⚠️ Hermes connection error: ${err?.message || err}` }
+            : m))
+        } finally {
+          cleanup()
+        }
+      })()
+      return
+    }
+
     wsSend('chat:send', {
       agent_slug: activeAgent?.slug || '',
       message: userInput,
       channel_id: 'web',
       images: userImages.length > 0 ? userImages : undefined,
     })
-  }, [input, attachments, isTyping, activeAgent, wsSend, wsOn])
+  }, [input, attachments, isTyping, activeAgent, wsSend, wsOn, systemPrompt])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {

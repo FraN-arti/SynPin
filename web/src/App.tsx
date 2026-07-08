@@ -333,6 +333,56 @@ function App() {
     return off
   }, [wsOn])
 
+  // External-agent liveness via WS — when the gateway goes up/down (or the
+  // binary gets installed/uninstalled) the backend broadcasts
+  // 'external_agents:changed' with the new state. We merge it into
+  // availableAgents so the Sidebar reflects two-stage detection in real
+  // time without F5.
+  useEffect(() => {
+    const off = wsOn('external_agents:changed', (msg: { agents?: any[] }) => {
+      const incoming = msg?.agents || []
+      setAvailableAgents(prev => {
+        const bySlug = new Map(prev.map(a => [a.slug, a]))
+        // Upsert every external agent in `incoming`, drop any previously-
+        // present external agent that's no longer listed.
+        const incomingSlugs = new Set<string>()
+        for (const a of incoming) {
+          incomingSlugs.add(a.slug)
+          // Always honour the latest two-stage flags from the backend.
+          // If `available` flipped false → keep the agent in state but mark
+          // it unavailable; the Sidebar filter is the source of truth for
+          // visibility. Drop nothing here — UI gates on `available`.
+          bySlug.set(a.slug, {
+            ...bySlug.get(a.slug),
+            slug: a.slug,
+            agentid: a.agentid || bySlug.get(a.slug)?.agentid || a.slug,
+            name: a.name,
+            type: a.type,
+            role: a.role || 'worker',
+            role_name: a.role_name,
+            department: a.department,
+            department_name: a.department_name,
+            description: a.description,
+            available: a.available ?? false,
+            installed: a.installed ?? false,
+            install_path: a.install_path,
+            install_version: a.install_version,
+            models: a.models || [],
+            chat_url: a.chat_url,
+            icon_letter: a.icon_letter,
+            color: a.color,
+            is_external: true,
+            is_primary: a.is_primary ?? false,
+            enabled: a.enabled ?? true,
+          } as AgentConfig)
+        }
+        // Drop any external agents that disappeared from the broadcast.
+        return prev.filter(a => !(a.is_external && !incomingSlugs.has(a.slug)))
+      })
+    })
+    return off
+  }, [wsOn])
+
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
 
   const refreshDepartments = useCallback(async () => {
@@ -528,10 +578,13 @@ function App() {
         const agentsData = await agentsRes.json()
         const synpinAgents = (agentsData.agents || []).map((a: AgentConfig) => ({ ...a, is_external: false }))
 
-        // Load external agents
+        // Load external agents — only those available (gateway running).
+        // External agents without an active gateway must NOT appear in the
+        // sidebar: opening their chat would silently fall through to the
+        // default SynPin provider (e.g. 9router) and confuse the user.
         const extRes = await fetch(`${API_BASE}/api/external-agents`)
         const extData = await extRes.json()
-        const extAgents = (extData.agents || []).filter((a: AgentConfig) => a.enabled)
+        const extAgents = (extData.agents || []).filter((a: AgentConfig) => a.enabled && a.available)
 
         const allAgents = [...synpinAgents, ...extAgents]
         setAvailableAgents(allAgents)
@@ -581,6 +634,7 @@ function App() {
     textareaRef, isStreamingRef,
     setInput, setAttachments, setMessages, setIsTyping, setCompactionNotice,
         wsSend, wsOn,
+        systemPrompt: null,  // SynPin agents use backend-built system prompt; external gets none here.
   })
 
   return (

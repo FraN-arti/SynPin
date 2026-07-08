@@ -45,6 +45,15 @@ def resolve_model(provider_name: str | None, model: str | None) -> tuple[str | N
     if not provider_name and model and "/" in model:
         provider_name, model = model.split("/", 1)
 
+    # Strip matching provider prefix from model.
+    # E.g. model="9router/site-agent" with provider="9router" → "site-agent".
+    # Safe for multi-segment names: "9router/kc/kilo-auto/free" → "kc/kilo-auto/free".
+    # Only strips when the prefix BEFORE the first "/" exactly matches provider_name.
+    if provider_name and model and "/" in model:
+        prefix = model.split("/", 1)[0]
+        if prefix == provider_name:
+            model = model.split("/", 1)[1]
+
     # If model is empty or "default", use provider's first model
     if not model or model == "default":
         if registry:
@@ -1319,10 +1328,8 @@ async def chat_stream(req: ChatRequest, request: Request):
     model = req.model or "default"
     provider_name = req.provider
 
-    # Strip provider prefix from model name (e.g. "mistral/codestral-latest" → "codestral-latest")
-    # Agents store models as "provider/model" for SynPin routing, but APIs expect bare model names
-    if provider_name and model.startswith(f"{provider_name}/"):
-        model = model[len(provider_name) + 1:]
+    # Resolve model (strips provider prefix, falls back to default)
+    provider_name, model = resolve_model(provider_name, model)
 
     # If new_session requested, clear the active session for this channel FIRST
     if req.new_session and req.agent_slug and req.channel_id:
@@ -1530,7 +1537,7 @@ async def chat_complete(req: ChatRequest):
         messages = [ChatMessage(role="system", content=system_prompt)] + messages
 
     content = ""
-    model = req.model or "default"
+    provider_name, model = resolve_model(req.provider, req.model or "default")
     usage = None
 
     try:

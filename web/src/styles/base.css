@@ -255,10 +255,20 @@ input[type="checkbox"]:not([class]) {
 }
 input[type="checkbox"]:not([class]):hover {
   border-color: var(--orange, #f97316);
+  box-shadow: 0 0 0 4px var(--accent-dim, rgba(249, 115, 22, 0.15));
 }
 input[type="checkbox"]:not([class]):checked {
   background: var(--orange, #f97316);
   border-color: var(--orange, #f97316);
+  box-shadow: 0 0 12px var(--orange, #f97316);
+  /* Bounce on activation — same spring easing as #5 Bounce concept.
+     The animation re-runs each click because :checked toggles. */
+  animation: synpin-checkbox-bounce 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes synpin-checkbox-bounce {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.2); }
+  100% { transform: scale(1); }
 }
 input[type="checkbox"]:not([class]):checked::after {
   content: '';

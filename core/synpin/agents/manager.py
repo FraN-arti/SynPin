@@ -1102,6 +1102,29 @@ def delete_otdel(otdel_id: str) -> bool:
         import logging
         logging.getLogger(__name__).warning("Failed to clean connections for otdel %s: %s", otdel_id, e)
 
+    # CLEAN DELETE: remove trigger instances for this otdel
+    try:
+        from ..paths import get_data_dir as _gdd
+        _dd = _gdd()
+        if _dd:
+            trig_dir = _dd / "triggers"
+            trig_file = trig_dir / f"{otdel_id}.yaml"
+            if trig_file.exists():
+                trig_file.unlink()
+            # Also clean any trigger instance referencing this otdel by
+            # connection ID (the conn-*.yaml files that pair with connections)
+            if trig_dir.exists():
+                for f in trig_dir.iterdir():
+                    if f.suffix == ".yaml":
+                        try:
+                            tdata = _load_yaml(f)
+                            if tdata.get("otdel_id") == otdel_id or tdata.get("connection_id") == otdel_id:
+                                f.unlink()
+                        except Exception:
+                            pass
+    except Exception:
+        pass  # best-effort
+
     _broadcast_otdel_change()
 
     return True

@@ -28,10 +28,12 @@ def _broadcast(event: dict) -> None:
 
 
 # ── Connections CRUD ─────────────────────────────────────────────────────────
-
 def list_connections() -> list[Connection]:
-    """List all connections."""
-    return config.load_connections()
+    """List all connections, auto-pruning orphans on the way."""
+    conns = config.load_connections()
+    if conns:
+        conns = _validate_connections(conns)
+    return conns
 
 
 def get_connection(conn_id: str) -> Connection | None:
@@ -222,6 +224,43 @@ def _move_task_to_otdel(task_id: str, target_otdel: str, reason: str = "") -> No
         logger.error("Failed to move task %s to %s: %s", task_id, target_otdel, e)
 
 
+# ── Connections Validation ────────────────────────────────────────────────────
+
+def _validate_connections(connections: list[Connection]) -> list[Connection]:
+    """Prune connections whose otdel refs no longer resolve.
+
+    Called on every `list_connections()` so stale data never reaches the UI.
+    Returns the (possibly shortened) list and persists the cleaned set.
+    """
+    otdels = _load_otdels()
+    from .refs import parse_ref
+
+    live = []
+    removed = 0
+    for c in connections:
+        from_kind, from_id = parse_ref(c.from_otdel)
+        to_kind, to_id = parse_ref(c.to_otdel)
+
+        def _is_alive(kind: str, ref_id: str) -> bool:
+            if kind == "agent":
+                return True
+            return ref_id in otdels
+
+        if _is_alive(from_kind, from_id) and _is_alive(to_kind, to_id):
+            live.append(c)
+        else:
+            removed += 1
+
+    if removed:
+        logger.info(
+            "Connections validation: pruned %d orphan(s), %d live remain",
+            removed, len(live),
+        )
+        config.save_connections(live)
+
+    return live
+
+
 # ── Graph Building ───────────────────────────────────────────────────────────
 
 def build_graph() -> Graph:
@@ -233,7 +272,7 @@ def build_graph() -> Graph:
     agents = _load_agents()
 
     # Collect all refs used by live connections; resolve them.
-    from .refs import parse_ref, is_primary_agent_ref
+    from .refs import parse_ref
     from .resolve import resolve_ref
 
     # Determine which otdels and which kind of node (otdel / primary agent)
@@ -247,15 +286,20 @@ def build_graph() -> Graph:
     # missing primary agent). We only consider otdel refs dead if the
     # otdel slug doesn't exist; `agent:primary` is always live (it
     # may resolve to "не назначен" but the connection is still valid).
+    # However, the OTHER end must also be live — if one side is
+    # agent:primary and the other is a deleted otdel, drop it.
     live_connections = []
     for c in connections:
-        if is_primary_agent_ref(c.from_otdel) or is_primary_agent_ref(c.to_otdel):
-            live_connections.append(c)
-            continue
-        # Otdel refs — both must resolve to known otdels.
         from_kind, from_id = parse_ref(c.from_otdel)
         to_kind, to_id = parse_ref(c.to_otdel)
-        if from_kind == "otdel" and to_kind == "otdel" and from_id in otdels and to_id in otdels:
+
+        def _is_alive(kind: str, ref_id: str) -> bool:
+            """Return True if this ref still resolves to something valid."""
+            if kind == "agent":
+                return True  # agent:primary is always valid
+            return ref_id in otdels
+
+        if _is_alive(from_kind, from_id) and _is_alive(to_kind, to_id):
             live_connections.append(c)
         else:
             logger.info("Dropping dead connection %s: %s → %s", c.id, c.from_otdel, c.to_otdel)
@@ -466,14 +510,38 @@ def list_history(
 # ── Clean Delete ─────────────────────────────────────────────────────────────
 
 def clean_for_otdel(otdel_slug: str) -> None:
-    """Clean Delete: remove all connections and history for an otdel."""
-    # Remove connections
+    """Clean Delete: remove all connections and history for an otdel.
+
+    Accepts both raw IDs (``duvh8t644b7f``) and normalized refs
+    (``otdel:duvh8t644b7f``) — compares against the normalised form
+    so the match always succeeds regardless of caller convention.
+    """
+    from .refs import parse_ref, make_ref
+
+    # Normalise: bare IDs become "otdel:<id>"
+    kind, slug = parse_ref(otdel_slug)
+    normalised = make_ref(kind, slug)
+
     connections = config.load_connections()
-    to_remove = [c.id for c in connections if c.from_otdel == otdel_slug or c.to_otdel == otdel_slug]
+    to_remove = [
+        c.id for c in connections
+        if c.from_otdel == normalised or c.to_otdel == normalised
+    ]
     for conn_id in to_remove:
         config.delete_connection(conn_id)
 
+    # Also match against raw slug for legacy connections stored
+    # without the otdel: prefix (before normalise_ref was introduced).
+    still = config.load_connections()
+    to_remove_legacy = [
+        c.id for c in still
+        if c.from_otdel == otdel_slug or c.to_otdel == otdel_slug
+    ]
+    for conn_id in to_remove_legacy:
+        config.delete_connection(conn_id)
+
     # Clean history
+    config.clean_history_for_otdel(normalised)
     config.clean_history_for_otdel(otdel_slug)
 
     logger.info("Cleaned all connections data for otdel %s", otdel_slug)

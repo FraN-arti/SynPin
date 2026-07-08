@@ -349,64 +349,92 @@
   font-size: 13px;
   color: var(--text-secondary);
   user-select: none;
-  padding: 4px 0;
+  /* Top/bottom 4px so we don't clip the track's neumorphic shadow.
+     Left 40px reserves room for the 30px track + 10px gap to text. */
+  padding: 4px 0 4px 40px;
+  min-height: 18px;
+  position: relative;
 }
 
+/* Track + knob drawn entirely on the label via pseudo-elements.
+   The real <input> is hidden but still clickable — the label's
+   `for`/implicit association toggles it. We give the label a fixed
+   30px-wide invisible slot for the input so the layout is stable. */
 .settings-toggle input[type="checkbox"] {
   appearance: none;
+  -webkit-appearance: none;
+  position: absolute;
+  width: 30px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+
+/* Visual track on label::before — sits at the label's left, fixed
+   size. Order: -1 would make it a flex item; we want it positioned,
+   so absolute with left:0 of the label. */
+.settings-toggle::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
   width: 30px;
   height: 18px;
   background: rgba(50, 48, 45, 0.6);
   border: 1px solid var(--glass-border);
   border-radius: 9px;
-  position: relative;
-  cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease;
-  flex-shrink: 0;
-  /* Neumorphic — soft inner shadow gives the track depth */
   box-shadow:
     inset 2px 2px 4px rgba(0, 0, 0, 0.4),
     inset -1px -1px 2px rgba(255, 255, 255, 0.04);
+  transition: background 0.2s ease, border-color 0.2s ease;
+  z-index: 1;
+  pointer-events: none;
 }
 
-.settings-toggle input[type="checkbox"]::after {
+/* Knob on label::after. Sits at the track's left edge by default. */
+.settings-toggle::after {
   content: '';
   position: absolute;
+  left: 4px;
   top: 50%;
-  left: 5px;
   width: 10px;
   height: 10px;
   background: transparent;
   border: 2px solid var(--gray-400);
   border-radius: 50%;
-  transform: translate(-50%, -50%) scaleX(1) scaleY(1);
+  transform: translateY(-50%) scaleX(1) scaleY(1);
   transition: left 0.45s cubic-bezier(0.68, -0.55, 0.27, 1.55),
               background 0.3s ease,
               border-color 0.3s ease,
               box-shadow 0.3s ease,
               transform 0.45s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  pointer-events: none;
+  z-index: 3;
 }
 
-.settings-toggle input[type="checkbox"]:checked {
+/* On state — `:has()` styles the label based on the input state */
+.settings-toggle:has(input[type="checkbox"]:checked)::before {
   background: var(--orange);
   border-color: var(--orange);
 }
-
-.settings-toggle input[type="checkbox"]:checked::after {
-  left: 25px;
+.settings-toggle:has(input[type="checkbox"]:checked)::after {
+  left: 16px;
   background: #fff;
   border-color: #fff;
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
-  /* Spring squash & stretch — knob briefly compresses then bounces
-     into the on position. Animation lives on .on so re-clicks restart it. */
   animation: synpin-toggle-squash 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
 }
 
 @keyframes synpin-toggle-squash {
-  0%   { transform: translate(-50%, -50%) scaleX(1)   scaleY(1);   left: 5px; }
-  35%  { transform: translate(-50%, -50%) scaleX(1.4) scaleY(0.6); left: 9px; }
-  65%  { transform: translate(-50%, -50%) scaleX(0.85) scaleY(1.1); left: 23px; }
-  100% { transform: translate(-50%, -50%) scaleX(1)   scaleY(1);   left: 25px; }
+  0%   { transform: translateY(-50%) scaleX(1)    scaleY(1);   left: 4px; }
+  35%  { transform: translateY(-50%) scaleX(1.4)  scaleY(0.6); left: 7px; }
+  65%  { transform: translateY(-50%) scaleX(0.85) scaleY(1.1); left: 14px; }
+  100% { transform: translateY(-50%) scaleX(1)    scaleY(1);   left: 16px; }
 }
 
 .settings-toggle-desc {

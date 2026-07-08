@@ -1021,6 +1021,20 @@
 .trigger-plugin-block select {
   user-select: text;
 }
+/* Highlight the otdel picker when the user clicks an empty
+   plugin block — tells them "select an otdel to enable". */
+.trigger-otdels-highlight {
+  animation: trigger-otdels-shine 1.5s ease-out;
+}
+@keyframes trigger-otdels-shine {
+  0%, 100% { background: transparent; }
+  20%, 60% {
+    background: rgba(249, 115, 22, 0.12);
+    border-radius: 6px;
+    padding: 6px;
+    margin: -6px;
+  }
+}
 /* iOS-style switch — single source of truth, used here and elsewhere */
 .toggle-switch {
   position: relative;

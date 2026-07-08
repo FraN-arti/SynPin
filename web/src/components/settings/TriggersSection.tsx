@@ -171,7 +171,18 @@ function PluginBlock({
   const allEnabled = instances.length > 0 && instances.every(i => i.enabled)
 
   const handleToggleEnabled = async () => {
-    if (instances.length === 0) return
+    if (instances.length === 0) {
+      // No instances yet — the plugin needs at least one otdel
+      // selected before it can run. Highlight the otdel picker so
+      // the user knows where to go next.
+      setHighlightOtdels(true)
+      setTimeout(() => setHighlightOtdels(false), 1500)
+      // Scroll the picker into view if it's below the fold.
+      const block = document.querySelector('.trigger-plugin-block')
+      const picker = block?.querySelector('.settings-field:last-of-type .settings-input, .settings-field:last-of-type [class*="picker"]')
+      picker?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return
+    }
     const next = !allEnabled
     try {
       await Promise.all(
@@ -292,6 +303,7 @@ function PluginBlock({
   }))
 
   const cfgDirty = JSON.stringify(config) !== lastSavedCfgRef.current
+  const [highlightOtdels, setHighlightOtdels] = useState(false)
 
   // Pulse the block outline briefly when the enabled state flips —
   // gives the click the same kind of "ring" feedback as the
@@ -380,7 +392,7 @@ function PluginBlock({
       ))}
 
       {/* Otdel multiselect */}
-      <div className="settings-field">
+      <div className={`settings-field ${highlightOtdels ? 'trigger-otdels-highlight' : ''}`}>
         <label>Отделы ({selectedOtdelIds.length} выбрано)</label>
         <PickerMenu
           multi

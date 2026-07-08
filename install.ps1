@@ -18,6 +18,12 @@
 
 $ErrorActionPreference = 'Stop'
 
+# Clear PYTHONPATH so the parent environment (e.g. Hermes Agent's
+# terminal) doesn't leak its own site-packages into our .venv.
+if ($env:PYTHONPATH) {
+    Remove-Item Env:\PYTHONPATH -ErrorAction SilentlyContinue
+}
+
 # Anchor to repo root (where this script lives)
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $ScriptDir
@@ -41,6 +47,48 @@ function Step($msg) { Write-Host ""; Write-Host "==> $msg" -ForegroundColor $Syn
 function Ok($msg)   { Write-Host "[OK] $msg" -ForegroundColor $SynPinOK }
 function Warn($msg) { Write-Host "[WARN] $msg" -ForegroundColor $SynPinWarn }
 function Fail($msg) { Write-Host "[FAIL] $msg" -ForegroundColor $SynPinFail }
+
+# Find a Python that is actually usable: has pip (or at least
+# ensurepip), and is NOT a shared venv belonging to another tool
+# (Hermes Agent's venv has no pip) or the Windows Store stub
+# (launches the Store instead of running). Returns the full path
+# to python.exe, or $null if none found.
+$script:PythonExe = $null
+function Find-UsablePython {
+    $candidates = @()
+    foreach ($p in ($env:PATH -split ';')) {
+        if ($p -and (Test-Path (Join-Path $p 'python.exe'))) {
+            $candidates += (Join-Path $p 'python.exe')
+        }
+    }
+    $localApp = $env:LOCALAPPDATA
+    $candidates += @(
+        "$localApp\Programs\Python\Python311\python.exe",
+        "$localApp\Programs\Python\Python312\python.exe",
+        "$localApp\Programs\Python\Python313\python.exe",
+        "$localApp\Programs\Python\Python314\python.exe",
+        "$localApp\Python\python.exe",
+        "$localApp\Python\bin\python.exe",
+        'C:\Python311\python.exe',
+        'C:\Python312\python.exe',
+        'C:\Python313\python.exe',
+        'C:\Python314\python.exe'
+    ) | Where-Object { Test-Path $_ }
+
+    foreach ($py in ($candidates | Select-Object -Unique)) {
+        # Skip Hermes Agent venv (no pip, belongs to another tool)
+        if ($py -match 'hermes') { continue }
+        # Skip Windows Store stub (launches Store, not a real Python)
+        if ($py -match 'WindowsApps') { continue }
+        # Does it have pip?
+        $null = & $py -m pip --version 2>$null
+        if ($LASTEXITCODE -eq 0) { return $py }
+        # Can we bootstrap pip via ensurepip?
+        $null = & $py -c "import ensurepip" 2>$null
+        if ($LASTEXITCODE -eq 0) { return $py }
+    }
+    return $null
+}
 
 # ----------------------------------------------------------------------------
 # Auto-install helpers
@@ -107,29 +155,23 @@ function Offer-Install {
 
 function Check-Python {
     Step "Checking Python >= $RequiredPythonMajor.$RequiredPythonMinor"
-    $pyOut = ""
-    try {
-        $pyOut = & python --version 2>&1 | Out-String
-        $pyOut = $pyOut.Trim()
-    } catch {
-        # Python missing. Try to install it via winget.
+    # Use Find-UsablePython instead of bare 'python' so we skip the
+    # Hermes venv (no pip) and the Windows Store stub.
+    $script:PythonExe = Find-UsablePython
+    if (-not $script:PythonExe) {
         $ok = Offer-Install -What "Python $RequiredPythonMajor.$RequiredPythonMinor+" -WingetId "Python.Python.3.11"
         if (-not $ok) {
-            Fail "python not found in PATH. Install Python $RequiredPythonMajor.$RequiredPythonMinor+"
+            Fail "No usable Python found on PATH (skipped Hermes venv and Store stub)."
             Write-Host "  Download: https://www.python.org/downloads/"
             exit 1
         }
-        # winget puts python on PATH but the new process may not see it
-        # yet. Try once more - if still missing, tell the user to open
-        # a fresh PowerShell.
-        try {
-            $pyOut = & python --version 2>&1 | Out-String
-            $pyOut = $pyOut.Trim()
-        } catch {
-            Fail "python still not on PATH after install. Open a NEW PowerShell window and re-run."
+        $script:PythonExe = Find-UsablePython
+        if (-not $script:PythonExe) {
+            Fail "python still not found after install. Open a NEW PowerShell window and re-run."
             exit 1
         }
     }
+    $pyOut = (& $script:PythonExe --version 2>&1 | Out-String).Trim()
     if ($pyOut -notmatch 'Python (\d+)\.(\d+)\.(\d+)') {
         Fail "Could not parse Python version: $pyOut"
         exit 1
@@ -142,22 +184,31 @@ function Check-Python {
         Write-Host "  Or install Python $RequiredPythonMajor.$RequiredPythonMinor+ manually."
         exit 1
     }
-    Ok "Python $pyOut"
+    Ok "Python $pyOut ($script:PythonExe)"
 }
 
 function Check-Pip {
     Step "Checking pip"
-    $pipOut = ""
-    try {
-        $pipOut = & python -m pip --version 2>&1 | Out-String
-        $LASTEXITCODE_VALUE = $LASTEXITCODE
-    } catch {
-        Fail "pip not available. Run: python -m ensurepip --upgrade"
+    # Use the Python found by Check-Python, not bare 'python'.
+    $py = if ($script:PythonExe) { $script:PythonExe } else { Find-UsablePython }
+    if (-not $py) {
+        Fail "No usable Python found. Run Check-Python first."
         exit 1
     }
+    $pipOut = (& $py -m pip --version 2>&1 | Out-String).Trim()
     if ($LASTEXITCODE -ne 0) {
-        Fail "pip not available. Run: python -m ensurepip --upgrade"
-        exit 1
+        # Try ensurepip to bootstrap pip
+        Write-Host "  Bootstrapping pip via ensurepip..." -ForegroundColor $SynPinWarn
+        & $py -m ensurepip --upgrade 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Fail "pip not available and ensurepip failed for: $py"
+            exit 1
+        }
+        $pipOut = (& $py -m pip --version 2>&1 | Out-String).Trim()
+        if ($LASTEXITCODE -ne 0) {
+            Fail "pip still not available after ensurepip."
+            exit 1
+        }
     }
     Ok "pip $($pipOut.Trim().Split()[1])"
 }
@@ -237,13 +288,18 @@ function Install-PythonDeps {
     # Use the repo's own .venv, NOT the first 'python' on PATH.
     # Plain 'python' often resolves to a shared venv (Hermes-agent,
     # system Python with prior installs) which would put synpin-core
-    # in the wrong place — and would surprise anyone who has multiple
-    # tools installed. A dedicated .venv per repo is the standard.
+    # in the wrong place. A dedicated .venv per repo is the standard.
     $scriptDir = Split-Path -Parent $PSCommandPath
     $venvPython = Join-Path $scriptDir ".venv\Scripts\python.exe"
     if (-not (Test-Path $venvPython)) {
         Step "Creating .venv in $scriptDir\.venv"
-        & python -m venv (Join-Path $scriptDir ".venv")
+        # Use the validated Python, not bare 'python'
+        $basePy = if ($script:PythonExe) { $script:PythonExe } else { Find-UsablePython }
+        if (-not $basePy) {
+            Fail "No usable Python found. Run doctor or install Python first."
+            exit 1
+        }
+        & $basePy -m venv (Join-Path $scriptDir ".venv")
         if ($LASTEXITCODE -ne 0) { Fail "venv creation failed"; exit 1 }
     }
 

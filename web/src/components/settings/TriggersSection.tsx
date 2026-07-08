@@ -152,7 +152,7 @@ function PluginBlock({
     for (const f of def.config_schema) out[f.name] = f.default
     // If instances exist, seed from the first one (they all share config)
     if (instances.length > 0) {
-      Object.assign(out, instances[0].config || {})
+      Object.assign(out, instances[0]?.config || {})
     }
     return out
   })
@@ -191,7 +191,7 @@ function PluginBlock({
   // ── Sync config when instances load (initial mount) ────────────
   useEffect(() => {
     if (instances.length > 0) {
-      setConfig(prev => ({ ...prev, ...instances[0].config }))
+      setConfig(prev => ({ ...prev, ...(instances[0]?.config || {}) }))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instances.length])

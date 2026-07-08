@@ -23,6 +23,16 @@
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
+# Clear PYTHONPATH so the parent environment (e.g. Hermes Agent's
+# terminal) doesn't leak its own site-packages into our .venv. The
+# .venv has its own self-contained site-packages; an external
+# PYTHONPATH pointing at another tool's venv causes hard-to-debug
+# import failures (mismatched compiled extensions like
+# pydantic_core._pydantic_core).
+if ($env:PYTHONPATH) {
+    Remove-Item Env:\PYTHONPATH -ErrorAction SilentlyContinue
+}
+
 # Load the shared SynPin brand colors. colors.ps1 maps each brand
 # color to the closest PowerShell-named color (PowerShell 5.1 can't
 # take hex codes in Write-Host). Keep that file in sync with
@@ -100,13 +110,20 @@ function Find-SynPinPython {
         "$localApp\Programs\Python\Python311\python.exe"
         "$localApp\Programs\Python\Python312\python.exe"
         "$localApp\Programs\Python\Python313\python.exe"
+        "$localApp\Programs\Python\Python314\python.exe"
         "$localApp\Python\python.exe"
         "$localApp\Python\bin\python.exe"
         'C:\Python311\python.exe'
         'C:\Python312\python.exe'
+        'C:\Python313\python.exe'
+        'C:\Python314\python.exe'
     ) | Where-Object { Test-Path $_ }
 
     foreach ($py in ($candidates | Select-Object -Unique)) {
+        # Skip Hermes Agent venv (no pip, belongs to another tool)
+        if ($py -match 'hermes') { continue }
+        # Skip Windows Store stub (launches Store, not a real Python)
+        if ($py -match 'WindowsApps') { continue }
         $out = & $py -c "import synpin; print(synpin.__file__)" 2>$null
         if ($LASTEXITCODE -eq 0 -and $out) {
             # Reject site-packages installs — they point at a copy, not
@@ -123,16 +140,52 @@ function Find-SynPinPython {
     return $null
 }
 
+# Find a usable Python (has pip, not Hermes venv, not Store stub)
+# for auto-install when synpin-core isn't found yet.
+function Find-UsablePython {
+    $candidates = @()
+    foreach ($p in ($env:PATH -split ';')) {
+        if ($p -and (Test-Path (Join-Path $p 'python.exe'))) {
+            $candidates += (Join-Path $p 'python.exe')
+        }
+    }
+    $localApp = $env:LOCALAPPDATA
+    $candidates += @(
+        "$localApp\Programs\Python\Python311\python.exe"
+        "$localApp\Programs\Python\Python312\python.exe"
+        "$localApp\Programs\Python\Python313\python.exe"
+        "$localApp\Programs\Python\Python314\python.exe"
+        "$localApp\Python\python.exe"
+        "$localApp\Python\bin\python.exe"
+        'C:\Python311\python.exe'
+        'C:\Python312\python.exe'
+        'C:\Python313\python.exe'
+        'C:\Python314\python.exe'
+    ) | Where-Object { Test-Path $_ }
+
+    foreach ($py in ($candidates | Select-Object -Unique)) {
+        if ($py -match 'hermes') { continue }
+        if ($py -match 'WindowsApps') { continue }
+        $null = & $py -m pip --version 2>$null
+        if ($LASTEXITCODE -eq 0) { return $py }
+    }
+    return $null
+}
+
 switch -Regex ($args[0]) {
     '^$|^start$|^dev$' {
         $pythonExe = Find-SynPinPython
         if (-not $pythonExe) {
             # No Python on PATH has synpin-core. Auto-install into
-            # the first Python we can find.
+            # the first USABLE Python we can find (skip Hermes venv
+            # and Store stub — they have no pip).
             Write-Host "[!] synpin-core is not pip-installed in any Python on PATH." -ForegroundColor $SynPinInfo
-            Write-Host "    Attempting to install into the first Python on PATH..." -ForegroundColor $SynPinInfo
-            $firstPy = (& where.exe python.exe 2>$null | Select-Object -First 1)
-            if (-not $firstPy) { $firstPy = "python" }
+            Write-Host "    Attempting to install into the first usable Python..." -ForegroundColor $SynPinInfo
+            $firstPy = Find-UsablePython
+            if (-not $firstPy) {
+                Write-Host "[FAIL] No usable Python found. Run .\install.ps1 first." -ForegroundColor $SynPinFail
+                exit 1
+            }
             & $firstPy -m pip install -e "$ScriptDir\core" --quiet
             if ($LASTEXITCODE -ne 0) {
                 Write-Host "[FAIL] auto-install failed. Run .\install.ps1 first." -ForegroundColor $SynPinFail
@@ -212,7 +265,12 @@ switch -Regex ($args[0]) {
         Write-Host "Done." -ForegroundColor $SynPinOK
     }
     '^doctor$' {
-        & python -m synpin doctor
+        $py = Find-UsablePython
+        if (-not $py) {
+            Write-Host "[FAIL] No usable Python found. Run .\install.ps1 first." -ForegroundColor $SynPinFail
+            exit 1
+        }
+        & $py -m synpin doctor
     }
     '^help$|^--help$|^/?$' {
         Show-Help

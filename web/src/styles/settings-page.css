@@ -781,6 +781,11 @@
 }
 .trigger-plugin-block:hover {
   background: rgba(255, 255, 255, 0.04);
+}
+/* Hover on enabled blocks does NOT change the glow — the block
+   stays in its 'lit up' state regardless of mouse position.
+   Only disabled blocks light up on hover to invite interaction. */
+.trigger-plugin-disabled:hover {
   border-color: var(--glow-border);
 }
 .trigger-plugin-header {
@@ -983,6 +988,10 @@
 .trigger-plugin-enabled {
   opacity: 1;
   border-color: var(--orange);
+  /* Soft outer glow that softens the orange border edge.
+     Same idea as the toggle's halo but applied to the whole
+     card so the enabled state reads as 'lit up'. */
+  box-shadow: 0 0 12px rgba(249, 115, 22, 0.25);
 }
 /* Glow ring on state flip — same idea as checkbox #10. The
    keyframe runs once because the parent component remounts the

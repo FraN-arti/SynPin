@@ -86,8 +86,12 @@
 }
 
 .tool-card-toggle {
-  /* тот же .settings-toggle, но без поля вокруг — компактный для карточки */
-  padding: 0;
+  /* Compact toggle inside a tool card — same .settings-toggle
+     structure (track + knob on label pseudo-elements) but
+     without the 4px top/bottom padding the standalone settings
+     toggle has. Left padding keeps the 30px track reserved. */
+  padding: 0 0 0 40px;
+  margin: 0;
   flex-shrink: 0;
 }
 

@@ -24,13 +24,12 @@ class ConnectionCreate(BaseRequest):
     to_ref: str | None = None
     to_otdel: str | None = None
     type: str = "peer"
-    label: str = ""
-    description: str = ""
+    label: str
+    description: str
     auto_trigger: dict[str, Any] | None = None
 
     def get_from(self) -> str:
         return self.from_ref or self.from_otdel or ""
-
     def get_to(self) -> str:
         return self.to_ref or self.to_otdel or ""
 

@@ -274,9 +274,9 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
   }, [nodes, edges, setNodes])
 
   // Save positions on drag end
-  const handleNodeDragStop = useCallback(async () => {
+  const handleNodeDragStop = useCallback(async (_: any, __: any, updatedNodes: Node[]) => {
     const positions: Record<string, { x: number; y: number }> = {}
-    nodes.forEach(n => { positions[n.id] = n.position })
+    updatedNodes.forEach(n => { positions[n.id] = n.position })
     try {
       await fetch(`${API_BASE}/api/connections/positions`, {
         method: 'PUT',
@@ -284,7 +284,7 @@ export function ConnectionsCanvas({ wsOn }: ConnectionsCanvasProps) {
         body: JSON.stringify({ positions }),
       })
     } catch {}
-  }, [nodes])
+  }, [])
 
   // Click on edge → show all connections between those departments
   const handleEdgeClick = useCallback((_: any, edge: Edge) => {

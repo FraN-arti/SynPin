@@ -217,7 +217,7 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
             </div>
             <div className="modal-body">
               <div className="settings-field">
-                <label>Откуда</label>
+                <label>Откуда <span style={{color:'var(--orange)'}}>*</span></label>
                 <CustomDropdown
                   value={form.from}
                   onChange={v => setForm(f => ({ ...f, from: v }))}
@@ -230,7 +230,7 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
                 />
               </div>
               <div className="settings-field">
-                <label>Куда</label>
+                <label>Куда <span style={{color:'var(--orange)'}}>*</span></label>
                 <CustomDropdown
                   value={form.to}
                   onChange={v => setForm(f => ({ ...f, to: v }))}
@@ -238,18 +238,17 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
                     { value: '', label: '— выбрать —' },
                     ...endpointOptions.filter(o => o.id !== form.from).map(o => ({ value: o.id, label: o.name })),
                   ]}
-
                   disabled={!!editing}
                 />
               </div>
               <div className="settings-field">
-                <label>Название</label>
-                <input className="settings-input" placeholder="Ревью кода, Кооперация..."
+                <label>Название <span style={{color:'var(--orange)'}}>*</span></label>
+                <input className="settings-input" placeholder="Ревью кода, Кооперация..." required
                   value={form.label} onChange={e => setForm(f => ({ ...f, label: e.target.value }))} />
               </div>
               <div className="settings-field">
-                <label>Описание</label>
-                <textarea className="settings-input" placeholder="Описание связи..."
+                <label>Описание <span style={{color:'var(--orange)'}}>*</span></label>
+                <textarea className="settings-input" placeholder="Описание связи..." required
                   rows={2} style={{ resize: 'none', overflow: 'hidden', minHeight: 40, maxHeight: 120 }}
                   value={form.description}
                   onChange={e => {
@@ -263,7 +262,7 @@ export function ConnectionsSection({ wsOn }: { wsOn?: (type: string, handler: (d
             </div>
             <div className="modal-footer">
               <button className="settings-btn-secondary" onClick={() => { setShowModal(false); setEditing(null) }}>Отмена</button>
-              <button className="settings-btn-primary" disabled={saving || !form.from || !form.to} onClick={handleSave}>
+              <button className="settings-btn-primary" disabled={saving || !form.from || !form.to || !form.label.trim() || !form.description.trim()} onClick={handleSave}>
                 {saving ? 'Сохранение...' : editing ? 'Сохранить' : 'Создать'}
               </button>
             </div>

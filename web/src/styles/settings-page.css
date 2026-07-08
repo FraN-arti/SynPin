@@ -384,19 +384,34 @@
 /* Track + knob drawn entirely on the label via pseudo-elements.
    The real <input> is hidden but still clickable — the label's
    `for`/implicit association toggles it. We give the label a fixed
-   30px-wide invisible slot for the input so the layout is stable. */
-.settings-toggle input[type="checkbox"] {
+   30px-wide invisible slot for the input so the layout is stable.
+   `body .settings-toggle` bumps specificity to (0,3,2) — beats the
+   universal checkbox rules in base.css at (0,2,2). Without this
+   the universal `[type="checkbox"]:not([class]):checked` would
+   paint an orange background on the input itself, producing the
+   "ghost toggle" artifact on cards. visibility:hidden keeps the
+   element clickable (unlike display:none) but invisible. */
+body .settings-toggle input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
   position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
   width: 30px;
   height: 18px;
   margin: 0;
   padding: 0;
   border: none;
+  background: transparent;
   opacity: 0;
+  visibility: hidden;
   cursor: pointer;
   z-index: 2;
+}
+body .settings-toggle input[type="checkbox"]:checked {
+  background: transparent;
+  border-color: transparent;
 }
 
 /* Visual track on label::before — sits at the label's left, fixed

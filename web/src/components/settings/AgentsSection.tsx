@@ -234,10 +234,12 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
   }
 
   const handleModelChange = async (agent: AgentData, newModel: string) => {
+    // Model dropdown values are "provider/model" — update provider too
+    const provider = newModel.includes('/') ? newModel.split('/')[0] : agent.provider
     try {
       const res = await fetch(`${API_BASE}/api/agents/${agent.slug}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: newModel }),
+        body: JSON.stringify({ model: newModel, provider }),
       })
       if (res.ok) { fetchAgents(); onAgentsChange?.() }
     } catch (e) { console.error('[agents] model change error:', e) }

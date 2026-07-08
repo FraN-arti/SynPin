@@ -132,6 +132,14 @@ export function useChatSubmit(params: UseChatSubmitParams): UseChatSubmitReturn 
       if (msg.agent_slug !== activeAgent?.slug) return
       const toolName = String(msg.tool || '')
       if (HIDDEN_TOOLS.has(toolName)) { toolIndex++; return }
+      // Dedup: same tool name already started in this turn → ignore.
+      // Background: handleSubmit is invoked from React StrictMode double-mount,
+      // so two identical chat:tool_start closures may run for one WS frame
+      // and push the same tool into activeTools twice. Without this guard
+      // users saw two "✓ get_current_time" badges on one assistant message.
+      if (activeTools.some(t => t.name === toolName && t.status === 'running')) {
+        return
+      }
       const tc: ToolCall = { id: `${assistantId}-tool-${toolIndex++}`, name: toolName, params: (msg.params as Record<string, unknown>) || {}, status: 'running' }
       activeTools.push(tc)
       setMessages(prev => (prev ?? []).map(m => m.id === assistantId ? { ...m, tools: [...activeTools] } : m))

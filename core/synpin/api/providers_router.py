@@ -123,7 +123,7 @@ async def remove_model_from_provider(name: str, model_name: str):
     return {"status": "ok", "models": models}
 
 
-@router.get("/{name}/fetch-models")
+@router.get("/{name}/models")
 async def fetch_models(name: str, base_url: str = "", ptype: str = "openai-compatible", api_key: str = ""):
     """Fetch available models from a provider's API."""
     import httpx
@@ -256,6 +256,25 @@ async def test_provider(name: str):
                         except Exception:
                             pass  # chat test is supplementary, don't fail on it
                     return {"status": "ok", "message": f"Connected — {len(model_list)} models available", "models": model_ids}
+                elif resp.status_code in (401, 403) and api_key:
+                    # /models endpoint unavailable — try chat directly
+                    provider = manager.get_provider(name)
+                    fallback_models = (provider or {}).get("models", [])
+                    if fallback_models:
+                        try:
+                            verify_resp = await client.post(
+                                f"{base_url}/chat/completions",
+                                headers={**headers, "Content-Type": "application/json"},
+                                json={"model": fallback_models[0], "messages": [{"role": "user", "content": "ping"}], "max_tokens": 1},
+                                timeout=15.0,
+                            )
+                            if verify_resp.status_code in (401, 403):
+                                return {"status": "error", "message": "Неверный API ключ или нет доступа"}
+                            if verify_resp.status_code == 200:
+                                return {"status": "ok", "message": f"Connected — /models unavailable, verified via chat ({fallback_models[0]})", "models": fallback_models}
+                        except Exception:
+                            pass
+                    return {"status": "error", "message": human_error(resp.status_code, resp.text[:200], test_url)}
                 else:
                     return {"status": "error", "message": human_error(resp.status_code, resp.text[:200], test_url)}
         except httpx.ConnectError:

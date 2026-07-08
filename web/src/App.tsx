@@ -286,10 +286,15 @@ function App() {
         .then(r => r.ok ? r.json() : null)
         .then(data => {
           if (!data?.agents) return
-          const allAgents = (Object.entries(data.agents) as [string, any][]).map(([slug, cfg]): AgentConfig => ({
-            slug,
-            agentid: cfg.agentid || slug,
-            name: cfg.name || slug,
+          // Backend returns {agents: [...]} (array). The previous code did
+          // Object.entries(data.agents).map(...) which would set slug = "0","1"
+          // for an array — this made is_primary and primarySlug lookups fail
+          // and the sidebar star disappeared until F5.
+          const rawAgents: any[] = Array.isArray(data.agents) ? data.agents : Object.values(data.agents || {})
+          const allAgents = rawAgents.map((cfg): AgentConfig => ({
+            slug: cfg.slug || cfg.agentid || '',
+            agentid: cfg.agentid || cfg.slug || '',
+            name: cfg.name || cfg.slug || '',
             role: cfg.role || '',
             role_name: cfg.role_name || '',
             department: cfg.department || '',
@@ -318,10 +323,11 @@ function App() {
           }
         })
         .catch((e) => console.error('[app] load projects failed:', e))
-      // Re-fetch primary agent slug (may have changed after create/delete)
+      // Re-fetch primary agent slug. Always set even if empty so we clear
+      // any stale value if backend says primary is unset.
       fetch(`${API_BASE}/api/config/primary-agent`)
         .then(r => r.ok ? r.json() : null)
-        .then(data => { if (data?.slug) setPrimarySlug(data.slug) })
+        .then(data => { setPrimarySlug(data?.slug || '') })
         .catch((e) => console.error('[app] load projects failed:', e))
     })
     return off

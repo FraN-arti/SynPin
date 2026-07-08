@@ -1,7 +1,7 @@
 # Python core for SynPin - Multi-Agent Framework
 [project]
 name = "synpin-core"
-version = "0.6.5"
+version = "0.6.6"
 description = "Agent-driven organization platform"
 requires-python = ">=3.11"
 
@@ -29,12 +29,12 @@ include = ["synpin*"]
 
 [tool.ruff]
 line-length = 100
-target-version = "0.6.5"
+target-version = "0.6.6"
 
 # Note: no [project.scripts] entry for 'synpin'.
 #
 # pip would generate a bundled launcher at venv/Scripts/synpin.exe (or
-# venv/bin/synpin on Unix) Р В Р вЂ Р В РІР‚С™Р Р†Р вЂљРЎСљ a Python zipapp that hardcodes the Python
+# venv/bin/synpin on Unix) Р В Р’В Р В РІР‚В Р В Р’В Р Р†Р вЂљРЎв„ўР В Р вЂ Р В РІР‚С™Р РЋРЎС™ a Python zipapp that hardcodes the Python
 # interpreter from the venv where pip ran. That launcher then leaks into
 # any PATH that lists that venv's Scripts/ directory (commonly the
 # case for tool venvs like Hermes-agent). Users end up running the

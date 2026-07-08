@@ -375,8 +375,9 @@
 }
 
 /* Visual track on label::before — sits at the label's left, fixed
-   size. Order: -1 would make it a flex item; we want it positioned,
-   so absolute with left:0 of the label. */
+   size. Uses --bg-elevated (dark surface on dark themes, light
+   surface on light themes) so the track always reads as a
+   "recessed channel" against the page background. */
 .settings-toggle::before {
   content: '';
   position: absolute;
@@ -385,6 +386,8 @@
   transform: translateY(-50%);
   width: 30px;
   height: 18px;
+  /* Background: dark theme default; light-theme override below
+     gives it a paper-cream tint with subtle dark inner shadow. */
   background: rgba(50, 48, 45, 0.6);
   border: 1px solid var(--glass-border);
   border-radius: 9px;
@@ -396,7 +399,21 @@
   pointer-events: none;
 }
 
-/* Knob on label::after. Sits at the track's left edge by default. */
+/* Light theme — track uses page-toned surface (cream/paper) so
+   the neumorphic "recessed channel" reads correctly against a
+   bright page. Inner shadow flips: highlight from upper-left,
+   shadow from lower-right. */
+.light-theme .settings-toggle::before {
+  background: var(--bg-elevated);
+  box-shadow:
+    inset 1px 1px 3px rgba(0, 0, 0, 0.08),
+    inset -1px -1px 1px rgba(255, 255, 255, 0.6);
+}
+
+/* Knob on label::after. Sits at the track's left edge by default.
+   Uses --gray-400 for the ring border — in dark theme it's light
+   gray (visible against dark track), in light theme it's dark
+   gray (visible against light track). */
 .settings-toggle::after {
   content: '';
   position: absolute;
@@ -417,17 +434,31 @@
   z-index: 3;
 }
 
-/* On state — `:has()` styles the label based on the input state */
+/* On state — `:has()` styles the label based on the input state.
+   On both themes: track fills --orange, knob slides right + fills
+   with --white (which is true white in dark theme, near-black in
+   light theme — the contrast against the orange track is what
+   matters here). */
 .settings-toggle:has(input[type="checkbox"]:checked)::before {
   background: var(--orange);
   border-color: var(--orange);
 }
 .settings-toggle:has(input[type="checkbox"]:checked)::after {
   left: 16px;
-  background: #fff;
-  border-color: #fff;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
+  background: var(--white);
+  border-color: var(--white);
+  /* Halo glow follows the knob's fill colour. In dark theme this
+     is a subtle white halo; in light theme --white is dark, so the
+     halo becomes a dark shadow ring instead. */
+  box-shadow: 0 0 0 3px rgba(127, 127, 127, 0.25);
   animation: synpin-toggle-squash 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+}
+
+/* Light theme — knob "on" state needs a darker halo since
+   --white resolves to near-black. Slightly stronger halo for
+   visual weight. */
+.light-theme .settings-toggle:has(input[type="checkbox"]:checked)::after {
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.15);
 }
 
 @keyframes synpin-toggle-squash {

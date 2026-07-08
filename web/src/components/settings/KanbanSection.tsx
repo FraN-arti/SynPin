@@ -938,28 +938,28 @@ function KanbanWidgetConfig() {
           </span>
         )}
         {columns.map(col => (
-          <label
-            key={col.id}
-            className="kanban-widget-col-chip"
-            style={{
-              background: config.show_columns.includes(col.id) ? (col.color ? col.color + '33' : 'var(--glass-bg)') : 'transparent',
-              borderColor: config.show_columns.includes(col.id) ? (col.color || 'var(--orange)') : 'var(--glass-border)',
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={config.show_columns.includes(col.id)}
-              onChange={() => toggleShowColumn(col.id)}
-            />
-            <span
-              style={{
-                display: 'inline-block', width: '7px', height: '7px',
-                borderRadius: '50%', background: col.color || '#6b7280',
-              }}
-            />
-            <span>{col.label}</span>
-          </label>
-        ))}
+                  <label
+                    key={col.id}
+                    className="kanban-widget-col-chip"
+                    style={{
+                      background: config.show_columns.includes(col.id) ? (col.color ? col.color + '33' : 'var(--glass-bg)') : 'transparent',
+                      borderColor: config.show_columns.includes(col.id) ? (col.color || 'var(--orange)') : 'var(--glass-border)',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={config.show_columns.includes(col.id)}
+                      onChange={() => toggleShowColumn(col.id)}
+                    />
+                    <span
+                      style={{
+                        display: 'inline-block', width: '7px', height: '7px',
+                        borderRadius: '50%', background: col.color || '#6b7280',
+                      }}
+                    />
+                    <span className="kanban-widget-col-chip-label">{col.label}</span>
+                  </label>
+                ))}
       </div>
 
       <div className="settings-divider-thin" />

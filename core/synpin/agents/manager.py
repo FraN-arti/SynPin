@@ -338,6 +338,17 @@ def delete_agent(slug: str) -> bool:
     # Clean up agent from all departments and otdels
     _remove_agent_from_groups(slug)
 
+    # Broadcast — the orphan cleanup may have changed otdel agent_count,
+    # and the agents list itself shrank. Front-end sidebar widget for
+    # "Departments" reads agent_count via refreshDepartments(); a
+    # refetch on otdels:list_changed keeps it real-time without F5.
+    try:
+        from ..ws_broadcast import broadcast
+        broadcast({"type": "agent:list_changed"})
+        broadcast({"type": "otdels:list_changed"})
+    except Exception:
+        pass  # broadcast is best-effort; failure should not block deletion
+
     return True
 
 
@@ -597,6 +608,18 @@ def save_agent(slug: str, updates: dict[str, Any]) -> dict[str, Any]:
             agent_data["memory"] = personalization.pop("memory")
 
         _save_yaml(agent_yaml_path, agent_data)
+
+    # Broadcast agent + otdel changes so the sidebar "Departments" widget
+    # refreshes its agent_count without a page refresh. The orphan cleanup
+    # in _remove_agent_from_groups already touches otdels.yaml on delete;
+    # here we cover the update path so changing an agent's department or
+    # other personal fields also notifies connected clients.
+    try:
+        from ..ws_broadcast import broadcast
+        broadcast({"type": "agent:list_changed"})
+        broadcast({"type": "otdels:list_changed"})
+    except Exception:
+        pass
 
     return get_agent(slug) or {}
 

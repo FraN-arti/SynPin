@@ -205,7 +205,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--text-dim);
+  color: var(--accent);
 }
 .widget-remove-btn {
   background: none;

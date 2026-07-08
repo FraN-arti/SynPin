@@ -234,3 +234,48 @@ button:not(:disabled):hover {
 button:not(:disabled):active {
   transform: translateY(0);
 }
+/* ── Universal checkbox — SynPin orange accent ─────────────────
+   Targets every <input type="checkbox"> unless it has an explicit
+   className (in which case the component owns its own styling, e.g.
+   Toggle, settings-toggle, kanban-widget-col-chip). Override at the
+   component level if a checkbox needs a different visual.
+*/
+input[type="checkbox"]:not([class]) {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  border-radius: 3px;
+  position: relative;
+  transition: all 0.15s;
+  vertical-align: middle;
+}
+input[type="checkbox"]:not([class]):hover {
+  border-color: var(--orange, #f97316);
+}
+input[type="checkbox"]:not([class]):checked {
+  background: var(--orange, #f97316);
+  border-color: var(--orange, #f97316);
+}
+input[type="checkbox"]:not([class]):checked::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--bg, #0f0f1c);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+input[type="checkbox"]:not([class]):focus-visible {
+  outline: 2px solid var(--orange-muted, rgba(249, 115, 22, 0.4));
+  outline-offset: 1px;
+}
+input[type="checkbox"]:not([class]):disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

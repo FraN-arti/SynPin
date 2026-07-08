@@ -25,9 +25,9 @@ export interface ToolTimelineProps {
 export function ToolTimeline({ tools, toolNames }: ToolTimelineProps) {
   return (
     <div className="tool-badges-row">
-      {tools.map((tc) => (
+      {tools.map((tc, idx) => (
         <span
-          key={tc.id}
+          key={tc.id || `tc-${idx}`}
           className={`tool-mini-badge ${tc.status}`}
           title={`${tc.name}: ${tc.result || tc.error || ''}`}
         >

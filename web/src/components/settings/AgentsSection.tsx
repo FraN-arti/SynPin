@@ -795,7 +795,7 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
                           {agent.provider && <div className="expanded-field"><label>Провайдер</label><span>{agent.provider}</span></div>}
                           <div className="expanded-field">
                             <label>Контекстное окно (токены)</label>
-                            <input type="number" className="settings-input" value={agent.context_window || ''} placeholder="128000"
+                            <input type="number" className="settings-input" defaultValue={agent.context_window || ''} placeholder="128000"
                               onBlur={e => { const val = Number(e.target.value); if (val > 0 && val !== agent.context_window) handleAgentFieldChange(agent, 'context_window', val) }} />
                           </div>
                           {agent.skills && agent.skills.length > 0 && (

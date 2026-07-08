@@ -45,7 +45,15 @@ export function useWebSocket() {
   }, [])
 
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return
+    // Skip if there's already a live socket (open or connecting). Without
+    // the CONNECTING check, React StrictMode double-mount + Vite HMR would
+    // create a second WebSocket while the first is still in CONNECTING
+    // state, leaving it to die with "closed before the connection is
+    // established" and a race for which onopen fires first.
+    const existing = wsRef.current
+    if (existing && (existing.readyState === WebSocket.OPEN || existing.readyState === WebSocket.CONNECTING)) {
+      return
+    }
 
     try {
       const ws = new WebSocket(WS_URL)

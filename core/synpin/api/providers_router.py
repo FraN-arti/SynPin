@@ -184,10 +184,21 @@ async def fetch_models(name: str, base_url: str = "", ptype: str = "openai-compa
 
 
 @router.post("/{name}/test")
-async def test_provider(name: str):
-    """Test provider connectivity by calling their API."""
+async def test_provider(name: str, req: ProviderUpdate | None = None):
+    """Test provider connectivity by calling their API.
+
+    If the provider exists in providers.yaml, uses its stored config.
+    Otherwise (e.g. testing before save), uses the optional `req` body.
+    No temp records are created or deleted — this is a pure connectivity probe.
+    """
     import httpx
     provider = manager.get_provider(name)
+    # Override config from request body if provided (lets the UI test
+    # the form before saving the provider). Empty/None means "use stored".
+    if req is not None:
+        req_data = req.model_dump(exclude_none=True)
+        if req_data:
+            provider = {**(provider or {}), **req_data}
     if not provider:
         raise HTTPException(404, f"Provider not found: {name}")
     ptype = provider.get("type", "openai-compatible")
@@ -235,10 +246,10 @@ async def test_provider(name: str):
                         return {"status": "error", "message": human_error(resp.status_code, resp.text[:200], test_url)}
                     if is_ollama:
                         model_list = data.get("models", [])
-                        model_ids = [m.get("name", m) if isinstance(m, dict) else m for m in model_list[:10]]
+                        model_ids = [m.get("name", m) if isinstance(m, dict) else m for m in model_list]
                     else:
                         model_list = data.get("data", [])
-                        model_ids = [m.get("id", m) if isinstance(m, dict) else m for m in model_list[:10]]
+                        model_ids = [m.get("id", m) if isinstance(m, dict) else m for m in model_list]  # full list; client decides
                     # Second: verify API key with a minimal chat completion
                     if api_key and model_ids:
                         try:

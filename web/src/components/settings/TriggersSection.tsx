@@ -17,7 +17,6 @@ import { API_BASE } from '../../config'
 import { SettingsCard } from '../SettingsCard'
 import { LoadingSpinner } from '../LoadingSpinner'
 import { PickerMenu, PickerOption } from '../PickerMenu'
-import { Toggle } from './Toggle'
 
 interface ConfigField {
   name: string
@@ -294,8 +293,48 @@ function PluginBlock({
 
   const cfgDirty = JSON.stringify(config) !== lastSavedCfgRef.current
 
+  // Pulse the block outline briefly when the enabled state flips —
+  // gives the click the same kind of "ring" feedback as the
+  // #10 Glow Ring checkbox concept. The animation is added/removed
+  // via a key remount: every time allEnabled changes, we toggle
+  // a CSS class that runs a one-shot keyframe animation.
+  const [pulseKey, setPulseKey] = useState(0)
+  const prevEnabledRef = useRef(allEnabled)
+  useEffect(() => {
+    if (prevEnabledRef.current !== allEnabled) {
+      prevEnabledRef.current = allEnabled
+      setPulseKey(k => k + 1)
+    }
+  }, [allEnabled])
+
+  // Click anywhere in the block (except on form controls / buttons)
+  // toggles all instances. Inner inputs and selects stop propagation
+  // so typing in a field doesn't accidentally flip the plugin state.
+  const handleBlockClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement
+    if (target.closest('input, select, textarea, button, [role="button"][data-no-toggle]')) {
+      return
+    }
+    handleToggleEnabled()
+  }
+  const handleBlockKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      handleToggleEnabled()
+    }
+  }
+
   return (
-    <div className={`trigger-plugin-block ${allEnabled ? '' : 'trigger-plugin-disabled'}`}>
+    <div
+      key={pulseKey}
+      className={`trigger-plugin-block ${allEnabled ? 'trigger-plugin-enabled' : 'trigger-plugin-disabled'} trigger-pulse`}
+      role="button"
+      tabIndex={0}
+      onClick={handleBlockClick}
+      onKeyDown={handleBlockKeyDown}
+      aria-pressed={allEnabled}
+      title={allEnabled ? 'Нажми чтобы выключить плагин' : 'Нажми чтобы включить плагин'}
+    >
       <div className="trigger-plugin-header">
         <div className="trigger-plugin-info">
           <h4 className="trigger-plugin-name">{def.name}</h4>
@@ -318,11 +357,6 @@ function PluginBlock({
                       ? `✓ ${selectedOtdelIds.length} отдел${selectedOtdelIds.length === 1 ? '' : selectedOtdelIds.length < 5 ? 'а' : 'ов'}`
                       : 'выбери отдел')}
               </span>
-              <Toggle
-                label=""
-                checked={allEnabled}
-                onChange={handleToggleEnabled}
-              />
             </div>
           )}
         </div>

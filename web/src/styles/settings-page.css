@@ -978,7 +978,48 @@
 
 /* ── Triggers: enabled/disabled toggle ────────────────────── */
 .trigger-plugin-disabled {
-  opacity: 0.65;
+  opacity: 0.55;
+}
+.trigger-plugin-enabled {
+  opacity: 1;
+  border-color: var(--orange);
+}
+/* Glow ring on state flip — same idea as checkbox #10. The
+   keyframe runs once because the parent component remounts the
+   block (changes `key`) every time allEnabled flips. */
+.trigger-pulse {
+  animation: trigger-pulse-ring 0.6s ease-out;
+}
+@keyframes trigger-pulse-ring {
+  0% {
+    box-shadow:
+      0 0 0 0 rgba(249, 115, 22, 0.7),
+      0 0 0 0 rgba(249, 115, 22, 0.5);
+  }
+  60% {
+    box-shadow:
+      0 0 0 8px rgba(249, 115, 22, 0),
+      0 0 0 16px rgba(249, 115, 22, 0);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+.trigger-plugin-block {
+  cursor: pointer;
+  user-select: none;
+}
+.trigger-plugin-block:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
+}
+/* Keep form controls inside the block usable. Inputs and selects
+   should still allow text selection and click without firing the
+   block toggle — JSX handles that via closest('input,select…'). */
+.trigger-plugin-block input,
+.trigger-plugin-block textarea,
+.trigger-plugin-block select {
+  user-select: text;
 }
 /* iOS-style switch — single source of truth, used here and elsewhere */
 .toggle-switch {

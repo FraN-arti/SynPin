@@ -307,4 +307,15 @@ body .settings-toggle input[type="checkbox"]::after {
 body .settings-toggle input[type="checkbox"]:checked::after {
   left: 13px;
   background: var(--white);
+  /* Reset the universal glyph properties that survive at higher
+     specificity from settings-page.css. Without this, the universal
+     4×8 rotated border renders on top of the round knob as a
+     "curved comma" inside the orange track. */
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  transform: none;
+  position: absolute;
+  top: 1px;
 }

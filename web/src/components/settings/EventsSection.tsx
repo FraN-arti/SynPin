@@ -117,7 +117,7 @@ export function EventsSection() {
         </div>
       </SettingsCard>
 
-      <SettingsCard title="Уведомления о задачах">
+      <SettingsCard title="Уведомления о задачах" badge="скоро">
         <p className="settings-card-desc">
           Автоматические уведомления при изменении статуса задач.
         </p>

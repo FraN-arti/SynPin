@@ -158,15 +158,6 @@ export function KanbanSection() {
         <KanbanWidgetConfig />
         <KanbanBulkCleanup />
       </div>
-
-      {/* Automation — Coming Soon */}
-      <SettingsCard title="Автоматизация" style={{ opacity: 0.5, pointerEvents: 'none' }}>
-        <p className="settings-hint">Автоматическое назначение, утверждение и передача задач между отделами</p>
-        <Toggle label="Авто назначение главы" defaultChecked={true} onChange={() => {}} />
-        <Toggle label="Summon при завершении" defaultChecked={false} onChange={() => {}} />
-        <Toggle label="Утверждение при простое" defaultChecked={false} onChange={() => {}} />
-        <Toggle label="Запрос человека при блоке" defaultChecked={false} onChange={() => {}} />
-      </SettingsCard>
     </div>
   )
 }

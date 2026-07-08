@@ -127,7 +127,7 @@ export function OtdelSettingsPanel({ otdel, open, onClose, onSaved }: OtdelSetti
 
   // Get department name by id
   const getDeptName = (id: string) => {
-    if (!id) return 'Без отдела'
+    if (!id) return 'Без Департамента'
     return departments.find(d => d.departmentsid === id)?.name || id
   }
 

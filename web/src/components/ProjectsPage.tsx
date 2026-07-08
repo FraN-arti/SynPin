@@ -640,7 +640,7 @@ export function ProjectsPage({ wsOn }: ProjectsPageProps) {
                   <div className="project-task-item">
                     <span className="project-task-id">{task.id}</span>
                     <span className="project-task-title">{task.title}</span>
-                    <span className="project-task-dept">{deptMap[task.department] || task.department || 'Без отдела'}</span>
+                    <span className="project-task-dept">{deptMap[task.department] || task.department || 'Без Департамента'}</span>
                     <span className="project-task-status" style={{ color: getTaskStatusColor(task.status) }}>
                       {task.status}
                     </span>

@@ -251,7 +251,7 @@ export function KanbanWidget({ onNavigateToBoard, wsOn }: KanbanWidgetProps) {
           />
           <span className="kanban-widget-task-title">{task.title}</span>
           {config.show_department && task.department && (
-            <span className="kanban-widget-task-dept">{deptMap[task.department] || task.department || 'Без отдела'}</span>
+            <span className="kanban-widget-task-dept">{deptMap[task.department] || task.department || 'Без Департамента'}</span>
           )}
           {config.show_deadline && task.deadline && (
             <span className="kanban-widget-task-deadline">

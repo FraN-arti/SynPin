@@ -1,92 +1,155 @@
-# SynPin — Installation & Quick Start
+# SynPin — Installation
 
-## First-time install
+One command per platform. The bootstrap script clones the repo to `~/synpin/`, creates `.venv`, installs Python dependencies, builds the frontend. Everything lives inside that single folder.
 
-### Windows
+## Quick install
+
+### macOS / Linux
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/FraN-arti/SynPin/main/install | bash
+```
+
+### Windows (PowerShell)
+
 ```powershell
-# From the repo root:
-.\install.ps1
+irm https://raw.githubusercontent.com/FraN-arti/SynPin/main/bootstrap.ps1 | iex
 ```
 
-### Linux / macOS
+The installer opens a new shell where `synpin` is on PATH. After it finishes:
+
+```
+synpin start
+```
+
+UI: <http://localhost:2088>
+
+The wizard walks you through picking an LLM provider and creating your first agent.
+
+## Manual install
+
+If the bootstrap doesn't fit your environment — corporate proxy, air-gapped machine, custom mirror.
+
 ```bash
-./install.sh
+git clone https://github.com/FraN-arti/SynPin.git ~/synpin
+cd ~/synpin
+./install.sh           # Linux / macOS
+# or
+.\install.ps1          # Windows PowerShell
 ```
 
-The installer verifies Python ≥ 3.11, git, and (optionally) Node.js ≥ 18.
-It installs `synpin-core` in editable mode and runs `npm install` for the
-web frontend.
+The installer checks Python ≥ 3.11, pip, git, and (optionally) Node.js ≥ 18. It installs `synpin-core` editable into `.venv/` and runs `npm install && npm run build` for the frontend.
 
-## Running
+## Development mode
 
-### Web (full dev server with unified output)
-
-**Windows:**
-```
-dev.bat
-```
-
-**Unix / any platform:**
 ```bash
-./bin/synpin dev
-# or, if you've added bin/ to PATH:
+cd ~/synpin
 synpin dev
 ```
 
-This starts Core (FastAPI on :2088) and Web (Vite on :2099) with a
-unified console output — green [CORE] lines and cyan [WEB] lines,
-Ctrl+C stops both.
+Brings up:
+- Core on `:2088` (FastAPI + uvicorn reload)
+- Web on `:2099` (Vite + HMR)
+- Unified colored output in one terminal (Ctrl+C stops both)
 
-### Backend only (production-style)
-```bash
-synpin start       # foreground
-synpin stop        # kills via pidfile
-synpin status      # checks /api/health
-synpin doctor      # full prerequisites check
-synpin version     # reads from pyproject.toml or installed metadata
-synpin update      # git pull + reinstall
-synpin setup       # first-run wizard (creates config dir, asks for keys)
-synpin logs        # tail of last 50 log lines
-synpin config      # show config location
+For a production-style server (no reload, no Vite, just Python):
+
 ```
+synpin start
+synpin stop
+synpin status
+synpin doctor
+synpin version
+synpin update    # git pull --rebase + reinstall
+synpin logs      # last 50 server log lines
+```
+
+## Update
+
+```
+synpin update
+```
+
+Equivalent to `git pull --rebase` plus re-running the install steps. Safe to run multiple times.
 
 ## Directory layout
 
+After install, `~/synpin/` contains everything:
+
 ```
-D:\synpin\
-├── pyproject.toml         # package definition (name: synpin-core)
-├── dev.bat                # Windows dev launcher
-├── install.sh / .ps1      # installers
-├── package.json           # npm wrapper (npm run dev, npm run build:web)
-├── bin/
-│   ├── synpin             # Unix launcher
-│   └── synpin.cmd         # Windows launcher
-├── web/                   # React/Vite frontend
-└── core/
-    ├── pyproject.toml     # (legacy — re-export of root one)
-    ├── data/              # (legacy — empty; data moved to synpin/data/)
-    └── synpin/
-        ├── __main__.py    # synpin CLI entry
-        ├── cli/            # synpin commands (start, stop, dev, doctor, ...)
-        ├── data/           # per-entity data (tasks, departments, otdels)
-        │   ├── departments/<id>/department.yaml
-        │   ├── otdels/<id>/otdel.yaml
-        │   └── tasks/<id>.yaml
-        ├── api/            # FastAPI routers
-        ├── agents/         # agent + department + otdel managers
-        ├── kanban/         # kanban service + models
-        ├── chat/           # chat routers
-        ├── tools/          # agent tool implementations
-        ├── paths.py        # path resolver (XDG/platformdirs)
+~/synpin/
+├── core/                       ← Python (FastAPI backend)
+│   └── synpin/
+│       ├── agents/             ← agents, profiles, managers
+│       ├── chat/               ← WebSocket routing
+│       ├── cron/               ← scheduled tasks
+│       ├── memory/             ← USER.md, MEMORY.md, FACTS
+│       ├── otdels/             ← departments
+│       ├── kanban/             ← board engine
+│       ├── tools/              ← built-in tools
+│       ├── triggers/           ← event handlers
+│       ├── providers/          ← LLM providers
+│       ├── cli/                ← `synpin` command
+│       └── api/                ← REST + WebSocket
+│
+├── web/                        ← React + Vite + TypeScript
+│   ├── src/
+│   └── dist/                   ← built by install
+│
+├── .venv/                      ← Python virtualenv (created by install)
+├── .synpin.pid                 ← runtime pid file
+│
+├── install / bootstrap.ps1     ← one-line bootstraps
+├── install.sh / install.ps1    ← native installers
+├── dev.bat / dev.ps1           ← development mode
+├── bin/synpin.cmd / bin/synpin ← CLI launchers
+│
+└── core/synpin/config/         ← YAMLs (settings, providers, agents, ...)
 ```
 
-## Updating
+The install dir IS the data dir. No `.synpin/` user-home directory, no scattered state.
 
-```bash
-synpin update    # git pull + pip install -e core/ + (if web changed) cd web && npm install
+## Uninstall
+
+```
+rm -rf ~/synpin       # macOS / Linux
+# or
+Remove-Item -Recurse ~/synpin   # Windows
 ```
 
-## Uninstalling
+This removes code, venv, configs, logs — everything. Your `bin/` is also gone, so `synpin` won't be on PATH anymore.
 
-Remove `core/.synpin/` (dev) or `~/.synpin/` (prod) to wipe local data.
-The package itself can be removed with `pip uninstall synpin-core`.
+If you only want to start fresh while keeping the source:
+
+```
+rm -rf ~/synpin/.venv ~/synpin/web/dist
+cd ~/synpin && ./install.sh
+```
+
+## Troubleshooting
+
+### `python` not found / wrong version
+
+Installer requires Python 3.11+. Get it from <https://python.org/downloads/> or via your package manager. On Windows, check **Add Python to PATH** during install.
+
+### Port 2088 already in use
+
+`synpin start` automatically kills whatever holds the port — see the log output for which PID was stopped.
+
+### Front-end shows blank screen
+
+`web/dist` is probably stale. Re-run `install.sh` / `install.ps1`.
+
+### `synpin` not recognised after install
+
+Open a NEW PowerShell / shell — PATH updates apply to new sessions only.
+
+## Environment variables
+
+| Variable | Default | Notes |
+|---|---|---|
+| `SYNPIN_HOST` | `0.0.0.0` | Bind address for `synpin start` |
+| `SYNPIN_PORT` | `2088` | Bind port |
+| `SYNPIN_DEV` | unset | Set to `1` in dev mode (HMR, debug output) |
+| `WIZARD_S` | unset | `1` forces the setup wizard visible (dev only) |
+| `SYNPIN_DATA_DIR` | unset | Override config/data location (advanced) |

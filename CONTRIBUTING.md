@@ -29,20 +29,25 @@
 
 ```bash
 # Клонировать
-git clone https://github.com/FraN-arti/SynPin.git
-cd SynPin
+git clone https://github.com/FraN-arti/SynPin.git ~/synpin
+cd ~/synpin
 
-# Бэкенд
-cd core
+# Production-like установка (создаёт .venv, ставит пакеты, билдит фронт)
+./install.sh           # Linux / macOS
+.\install.ps1          # Windows PowerShell
+
+# Разработка
+synpin dev             # backend :2088 + frontend :2099 с hot-reload
+```
+
+Или быстрее (только нужное):
+
+```bash
 python -m venv .venv
 .venv\Scripts\activate        # Windows
-# source .venv/bin/activate   # macOS / Linux
-pip install -e ".[dev]"
-
-# Фронтенд
-cd ../web
-npm install
-npm run dev
+# source .venv/bin/activate  # macOS / Linux
+pip install -e "core/[dev]"
+cd web && npm install && npm run dev
 ```
 
 Полный production-like пайплайн установки — в [INSTALL.md](INSTALL.md).

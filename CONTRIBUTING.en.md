@@ -29,20 +29,25 @@ A quick search before you build keeps the queue clean — duplicates are common.
 
 ```bash
 # Clone
-git clone https://github.com/FraN-arti/SynPin.git
-cd SynPin
+git clone https://github.com/FraN-arti/SynPin.git ~/synpin
+cd ~/synpin
 
-# Backend
-cd core
+# Production-like install (creates .venv, installs deps, builds frontend)
+./install.sh           # macOS / Linux
+.\install.ps1          # Windows PowerShell
+
+# Development
+synpin dev             # backend :2088 + frontend :2099 with hot-reload
+```
+
+Or, faster (just what's needed):
+
+```bash
 python -m venv .venv
 .venv\Scripts\activate        # Windows
-# source .venv/bin/activate   # macOS / Linux
-pip install -e ".[dev]"
-
-# Frontend
-cd ../web
-npm install
-npm run dev
+# source .venv/bin/activate  # macOS / Linux
+pip install -e "core/[dev]"
+cd web && npm install && npm run dev
 ```
 
 See [INSTALL.md](INSTALL.md) for the production-like installation pipeline.

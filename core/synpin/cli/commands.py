@@ -363,6 +363,17 @@ def cmd_update(args):
                     console.print(f"[error]ERROR: npm install failed:\n{rc.stderr}[/error]")
                 else:
                     console.print("  [success]OK: Web dependencies updated[/success]")
+
+                console.print("[info]Building frontend (npm run build)...[/info]")
+                rc = subprocess.run(
+                    ["npm", "run", "build"],
+                    cwd=str(web_dir), capture_output=True, text=True,
+                    shell=(os.name == "nt"),
+                )
+                if rc.returncode != 0:
+                    console.print(f"[error]ERROR: npm run build failed:\n{rc.stderr}[/error]")
+                else:
+                    console.print("  [success]OK: Frontend built[/success]")
             else:
                 console.print(
                     "[info]Web changed but web/node_modules is missing. "

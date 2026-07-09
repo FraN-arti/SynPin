@@ -126,11 +126,18 @@ function Find-SynPinPython {
         if ($py -match 'WindowsApps') { continue }
         $out = & $py -c "import synpin; print(synpin.__file__)" 2>$null
         if ($LASTEXITCODE -eq 0 -and $out) {
-            # Reject site-packages installs — they point at a copy, not
-            # the repo. Without this filter, any shared venv (Hermes,
-            # system Python that previously saw synpin-core) gets picked
-            # over the repo's own .venv and _project_root() breaks.
-            if ($out -match '[\\/](site-packages|Lib)[\\/]synpin[\\/]__init__\.py$') {
+            # Accept the repo's own .venv: its `Lib/site-packages/synpin/`
+            # path is expected (every venv has that layout), so we can't
+            # distinguish a repo venv from a shared install by the path
+            # itself. The signal we DO have is whether the Python that
+            # reported this path lives under our script dir's .venv —
+            # if it does, the whole thing is self-contained and safe.
+            $isRepoVenv = $py -match '[\\/]\.venv[\\/]Scripts[\\/]python\.exe$'
+            # Reject site-packages installs that point OUTSIDE the repo.
+            # Without this filter, any shared venv (Hermes, system Python
+            # that previously saw synpin-core) gets picked over the repo's
+            # own .venv and _project_root() breaks.
+            if (-not $isRepoVenv -and $out -match '[\\/](site-packages|Lib)[\\/]synpin[\\/]__init__\.py$') {
                 Write-Host "[dev] skipping shared-venv install: $py" -ForegroundColor $SynPinDim
                 continue
             }

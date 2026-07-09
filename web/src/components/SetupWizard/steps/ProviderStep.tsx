@@ -15,13 +15,6 @@ interface ProviderStepProps {
 export function ProviderStep({ onNext, onBack }: ProviderStepProps) {
   return (
     <div className="wizard-card">
-      <button className="wizard-back" onClick={onBack}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M19 12H5M12 19l-7-7 7-7" />
-        </svg>
-        Назад
-      </button>
-
       <h1 className="wizard-title">Провайдеры</h1>
       <p className="wizard-subtitle">
         Подключите LLM API для работы агентов.
@@ -36,6 +29,10 @@ export function ProviderStep({ onNext, onBack }: ProviderStepProps) {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M5 12h14M12 5l7 7-7 7" />
         </svg>
+      </button>
+
+      <button className="wizard-skip" onClick={onBack}>
+        ← Назад
       </button>
     </div>
   )

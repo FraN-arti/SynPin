@@ -247,6 +247,9 @@ switch -Regex ($args[0]) {
         # (synpin/config/, synpin/data/) instead of the prod
         # ~/.synpin/ one.
         $env:SYNPIN_DEV = "1"
+        # WIZARD_S forces the setup wizard to always show in dev mode
+        # so we can iterate on it without clearing providers.yaml.
+        $env:WIZARD_S = "1"
 
         & $pythonExe -m synpin dev
     }

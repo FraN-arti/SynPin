@@ -25,16 +25,32 @@ router = APIRouter(prefix="/api/setup", tags=["setup"])
 def setup_status() -> dict:
     """Check if SynPin needs initial setup.
 
+    Two triggers:
+      1. WIZARD_S=1 env var — forces wizard visible (dev mode).
+      2. providers.yaml missing/empty — virgin detection (production).
+
     Returns:
-        needs_setup: true if providers are empty/missing (virgin system)
+        needs_setup: true if wizard should be shown
         message: human-readable status
+        dev_mode: true if triggered by WIZARD_S (frontend can show a "dev" badge)
     """
+    import os
+
+    # Dev override — always show wizard when WIZARD_S=1
+    if os.environ.get("WIZARD_S") == "1":
+        return {
+            "needs_setup": True,
+            "dev_mode": True,
+            "message": "WIZARD_S=1 — визард открыт в режиме разработки.",
+        }
+
     config_dir = get_config_dir()
     providers_file = config_dir / "providers.yaml"
 
     if not providers_file.exists():
         return {
             "needs_setup": True,
+            "dev_mode": False,
             "message": "Провайдеры не настроены — требуется первоначальная настройка.",
         }
 
@@ -43,17 +59,20 @@ def setup_status() -> dict:
         if not data or not data.get("providers"):
             return {
                 "needs_setup": True,
+                "dev_mode": False,
                 "message": "Провайдеры не настроены — требуется указать API-ключ.",
             }
     except Exception as e:
         logger.warning("Failed to load providers.yaml: %s", e)
         return {
             "needs_setup": True,
+            "dev_mode": False,
             "message": "Файл провайдеров повреждён — требуется повторная настройка.",
         }
 
     return {
         "needs_setup": False,
+        "dev_mode": False,
         "message": "SynPin настроен и готов к работе.",
     }
 

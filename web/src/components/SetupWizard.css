@@ -40,6 +40,10 @@
   flex-direction: column;
   align-items: center;
   gap: 20px;
+  /* Soft outer shadow — card floats above the ambient glow */
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.02);
   animation: wizard-fade-in 0.4s ease-out;
 }
 
@@ -70,7 +74,7 @@
 .wizard-title {
   font-size: 22px;
   font-weight: 600;
-  color: var(--white);
+  color: var(--accent);
   text-align: center;
   margin: 0;
 }
@@ -98,9 +102,22 @@
   align-items: center;
   gap: 14px;
   padding: 14px 16px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  background: rgba(50, 48, 45, 0.4);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius);
+  /* Neumorphic depth — same language as toggle track and inputs */
+  box-shadow:
+    inset 2px 2px 4px rgba(0, 0, 0, 0.4),
+    inset -1px -1px 2px rgba(255, 255, 255, 0.04);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.wizard-feature:hover {
+  border-color: var(--glow-border);
+  box-shadow:
+    inset 2px 2px 4px rgba(0, 0, 0, 0.4),
+    inset -1px -1px 2px rgba(255, 255, 255, 0.04),
+    var(--glow-orange);
 }
 
 .wizard-feature-icon {
@@ -113,6 +130,10 @@
   background: var(--accent-bg);
   color: var(--orange);
   flex-shrink: 0;
+  /* Inner glow + ring — same language as checkbox #10 */
+  box-shadow:
+    inset 0 0 0 1px rgba(249, 115, 22, 0.2),
+    0 0 12px rgba(249, 115, 22, 0.15);
 }
 
 .wizard-feature-title {
@@ -145,15 +166,25 @@
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s, box-shadow 0.15s;
+  /* Neumorphic depth — subtle inner shadow on the button surface */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 2px 8px rgba(249, 115, 22, 0.3);
 }
 
 .wizard-btn-primary:hover {
   background: var(--orange-hover);
-  box-shadow: var(--glow-orange);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 4px 16px rgba(249, 115, 22, 0.4),
+    var(--glow-orange);
 }
 
 .wizard-btn-primary:active {
   transform: scale(0.98);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.3),
+    0 1px 4px rgba(249, 115, 22, 0.2);
 }
 
 .wizard-skip {
@@ -186,7 +217,7 @@
 }
 
 .wizard-back:hover {
-  color: var(--white);
+  color: var(--accent);
 }
 
 /* ── Placeholder (future steps) ───────────────────────── */
@@ -213,4 +244,32 @@
   background: rgba(34, 197, 94, 0.1);
   color: var(--green);
   margin: 8px 0;
+  box-shadow:
+    inset 0 0 0 1px rgba(34, 197, 94, 0.2),
+    0 0 24px rgba(34, 197, 94, 0.15);
+}
+
+/* ── Light theme overrides ────────────────────────────── */
+
+.light-theme .wizard-card {
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+.light-theme .wizard-feature {
+  background: var(--bg-elevated);
+  box-shadow:
+    inset 1px 1px 3px rgba(0, 0, 0, 0.08),
+    inset -1px -1px 1px rgba(255, 255, 255, 0.6);
+}
+.light-theme .wizard-feature:hover {
+  box-shadow:
+    inset 1px 1px 3px rgba(0, 0, 0, 0.08),
+    inset -1px -1px 1px rgba(255, 255, 255, 0.6),
+    var(--glow-orange);
+}
+.light-theme .wizard-feature-icon {
+  box-shadow:
+    inset 0 0 0 1px rgba(234, 88, 12, 0.15),
+    0 0 12px rgba(234, 88, 12, 0.1);
 }

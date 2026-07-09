@@ -8,7 +8,18 @@ from pathlib import Path
 from .console import console
 
 VERSION = "0.2.2"
-SYNPIN_HOME = Path.home() / ".synpin"
+
+
+def _runtime_dir() -> Path:
+    """Where to write SynPin runtime files (pid, logs).
+
+    Resolves through paths.py so dev and prod share the same
+    folder layout (the install dir IS the dev dir). Falls back
+    to ~/.synpin for legacy compatibility but new code should
+    never write outside the install dir.
+    """
+    from ..paths import get_user_data_dir
+    return get_user_data_dir()
 
 
 def _get_version() -> str:
@@ -48,50 +59,8 @@ def cmd_start(args):
     # --verbose / -v : show full uvicorn output. Default is compact.
     verbose = any(a in ("--verbose", "-v") for a in args)
 
-    # Auto-cleanup source repo on first production start.
-    # install.ps1 writes ~/.synpin/.installed_from when it runs. If we
-    # see that sentinel AND the source repo still exists AND we're not
-    # in dev mode (SYNPIN_DEV not set), the repo has done its job and
-    # can be removed. This replaces the old [y/N] prompt at install
-    # time — that question belonged at runtime, when we know the server
-    # is about to run and source is no longer needed.
-    #
-    # Override: SYNPIN_KEEP_REPO=1 keeps source regardless of sentinel.
-    # Override: --keep-repo CLI flag for one-off "let me inspect first".
-    keep_repo = (
-        os.environ.get("SYNPIN_KEEP_REPO") == "1"
-        or "--keep-repo" in args
-    )
-    if not keep_repo:
-        sentinel = SYNPIN_HOME / ".installed_from"
-        if sentinel.exists():
-            try:
-                repo_dir = Path(sentinel.read_text(encoding="utf-8").strip())
-                # Safety: only remove if it still looks like a SynPin repo
-                # (contains bin/, .venv/, or core/). This prevents a
-                # corrupted sentinel from nuking unrelated dirs.
-                if repo_dir.exists() and (
-                    (repo_dir / "bin").exists()
-                    or (repo_dir / ".venv").exists()
-                    or (repo_dir / "core").exists()
-                ):
-                    console.print(
-                        f"[info]Cleaning up source repo:[/info] [dim]{repo_dir}[/dim]"
-                    )
-                    import shutil
-                    shutil.rmtree(repo_dir)
-                    sentinel.unlink()
-                    console.print(
-                        "[success]Source repo removed.[/success] "
-                        "[dim](set SYNPIN_KEEP_REPO=1 before install to skip this)[/dim]"
-                    )
-            except Exception as e:
-                console.print(
-                    f"[warning]Could not auto-cleanup source: {e}[/warning]"
-                )
-
     # Kill existing process on port
-    pid_file = SYNPIN_HOME / "synpin.pid"
+    pid_file = _runtime_dir() / "synpin.pid"
     if os.name == "nt":
         result = subprocess.run(
             ["netstat", "-ano"], capture_output=True, text=True, errors="replace"
@@ -113,9 +82,26 @@ def cmd_start(args):
     pid_file.parent.mkdir(parents=True, exist_ok=True)
     pid_file.write_text(json.dumps({"pid": os.getpid(), "port": port}))
 
+    # Structured startup banner. Boxes group related info: a header
+    # box (server identity) and a footer box (how to reach the UI).
+    # Section rules separate the UI/CLI/auth URL lists.
+    from rich import box as rich_box
+    from rich.panel import Panel
+
     console.print()
-    console.print(f"[brand]  SynPin v{version}[/brand]")
-    console.print(f"  [dim]API :{port}  Web:{port}  Docs:{port}/docs[/dim]")
+    console.print(
+        Panel(
+            f"[brand]SynPin v{version}[/brand]  [dim]·  Multi-agent workspace[/dim]\n\n"
+            f"  [dim]API[/dim]   http://localhost:{port}\n"
+            f"  [dim]Web[/dim]   http://localhost:{port}\n"
+            f"  [dim]Docs[/dim]  http://localhost:{port}/docs",
+            title="[brand]SynPin[/brand]",
+            subtitle=f"[dim]v{version}[/dim]",
+            border_style="brand",
+            box=rich_box.ROUNDED,
+            padding=(1, 3),
+        )
+    )
     console.print()
 
     # Per-logger levels. By default we want a quiet startup:
@@ -174,7 +160,7 @@ def cmd_stop(args):
     """Stop running SynPin instance."""
     console.print("[dim]⏳  Stopping SynPin...[/dim]")
 
-    pid_file = SYNPIN_HOME / "synpin.pid"
+    pid_file = _runtime_dir() / "synpin.pid"
 
     if pid_file.exists():
         try:
@@ -231,7 +217,7 @@ def cmd_version(args):
 
 def cmd_config(args):
     """Show configuration."""
-    config_dir = SYNPIN_HOME
+    config_dir = _runtime_dir()
     config_file = config_dir / "config.yaml"
 
     console.print(f"[dim]Config directory:[/dim] {config_dir}")
@@ -249,7 +235,7 @@ def cmd_setup(args):
     from rich.panel import Panel
     from rich.prompt import Prompt
 
-    config_dir = SYNPIN_HOME
+    config_dir = _runtime_dir()
     config_dir.mkdir(parents=True, exist_ok=True)
     config_file = config_dir / "config.yaml"
 
@@ -404,7 +390,7 @@ def cmd_update(args):
 
 def cmd_logs(args):
     """Show server logs."""
-    log_dir = SYNPIN_HOME / "logs"
+    log_dir = _runtime_dir() / "logs"
     log_file = log_dir / "synpin.log"
 
     if not log_file.exists():
@@ -474,7 +460,7 @@ def cmd_doctor(args):
         table.add_row("Frontend", "[warning]⚠️  OFF[/warning]", "Port 2099 not responding")
 
     # Config files
-    config_dir = SYNPIN_HOME / "config"
+    config_dir = _runtime_dir() / "config"
     configs = ["agents.yaml", "otdels.yaml", "providers.yaml", "settings.yaml"]
     found = sum(1 for c in configs if (config_dir / c).exists())
     total = len(configs)

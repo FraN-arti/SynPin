@@ -335,14 +335,10 @@ function Install-WebDeps {
     if ($LASTEXITCODE -ne 0) { Fail "npm run build failed"; exit 1 }
     Ok "web/dist built"
 
-    # Copy dist to ~/.synpin/web/dist/ for production
-    Step "Copying web/dist to ~/.synpin/web/dist/"
-    $homeDist = Join-Path $env:USERPROFILE ".synpin\web"
-    if (-not (Test-Path $homeDist)) { New-Item -ItemType Directory -Path $homeDist -Force | Out-Null }
-    $destDist = Join-Path $homeDist "dist"
-    if (Test-Path $destDist) { Remove-Item -Recurse -Force $destDist }
-    Copy-Item -Path "web\dist" -Destination $destDist -Recurse
-    Ok "web/dist installed to ~/.synpin/web/dist/"
+    # dist/ stays where it was built — at <repo>/web/dist. The
+    # production server (synpin start) reads from there directly;
+    # no need to copy into a separate user-home directory.
+    Ok "web/dist built at $PSScriptRoot\web\dist (served in-place)"
 }
 
 # ----------------------------------------------------------------------------
@@ -367,39 +363,17 @@ function Cmd-Install {
     Install-PythonDeps
     Install-WebDeps
 
-    # Ask to remove source repo (everything is in site-packages + ~/.synpin now)
-    # Use $PSScriptRoot (always resolves to the script's directory even when
-    # called from within a function) instead of $MyInvocation.MyCommand.Path,
-    # which is NULL inside Cmd-Install because $MyInvocation refers to the
-    # function call site, not the script root.
+    # All runtime state stays inside the repo (config/, .venv/,
+    # web/dist/). Nothing is scattered into ~/.synpin/ — that's
+    # the whole point of the install.ps1 rewrite: one folder,
+    # ~/.synpin-style user-home data is gone. Remote users share
+    # the repo tree across installs.
     $repoDir = $PSScriptRoot
-    Step "Installation complete. Source repo: $repoDir"
 
-    # Mark the install as 'prod-style' by writing a sentinel to ~/.synpin.
-    # The first 'synpin start' (production server, not 'synpin dev') will
-    # see this sentinel + a present source repo and auto-cleanup the
-    # repo, since after install it's no longer needed. This replaces the
-    # previous manual [y/N] prompt, which was the wrong place — users
-    # hit it right after install when they had no idea whether to keep
-    # the repo. Defer to runtime when the question is meaningful:
-    # 'this prod server is running; do we still need source?' No.
-    #
-    # If SYNPIN_KEEP_REPO=1 is set at install time, we skip the
-    # sentinel — the user has explicitly opted in to keep source.
-    if (-not (Test-Path (Join-Path $env:USERPROFILE '.synpin'))) {
-        New-Item -ItemType Directory -Path (Join-Path $env:USERPROFILE '.synpin') -Force | Out-Null
-    }
-    if (-not $env:SYNPIN_KEEP_REPO) {
-        Set-Content -Path (Join-Path $env:USERPROFILE '.synpin\.installed_from') -Value $repoDir -Encoding UTF8
-        Ok "Marked install source. Will auto-cleanup on first 'synpin start'."
-    } else {
-        Ok "SYNPIN_KEEP_REPO=1 set: source will not be auto-removed."
-    }
+    Step "Installation complete."
+    Ok "SynPin installed at: $repoDir"
 
-    Step "Done."
-    Ok "SynPin installed. Run 'synpin start' or 'synpin dev' to begin."
-
-    # ── Add <repo>/bin to user PATH (idempotent) ───────────────────────────
+    # ── Add <repo>/bin to user PATH (idempotent) ───────────────
     # The hand-written bin/synpin and bin/synpin.cmd are the canonical
     # launchers. Without them on PATH, typing 'synpin' from anywhere
     # else fails with 'Имя synpin не распознано'. We append the bin dir
@@ -419,7 +393,7 @@ function Cmd-Install {
 
     Step "Quick start"
     Ok "  Open a NEW PowerShell, then:"
-    Ok "    synpin start     # production server (uses $repoDir\.venv)"
+    Ok "    synpin start     # production server"
     Ok "    synpin dev       # development with live reload"
     Ok "  Or call the launcher explicitly:"
     Ok "    $binDir\synpin.cmd"

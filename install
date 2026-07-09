@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+# SynPin bootstrap installer.
+#
+# Single-command installer. Clones SynPin into ~/synpin/
+# and runs the platform-native installer (install.sh on Unix,
+# install.ps1 on Windows via PowerShell). One folder, no
+# hidden runtime directories outside of it.
+#
+# Usage:
+#   curl -fsSL https://raw.githubusercontent.com/FraN-arti/SynPin/main/install | bash
+#
+# What this does:
+#   1. git clones the repo into ~/synpin/ (or $SYNPIN_HOME if set)
+#   2. cd into it
+#   3. runs install.sh (Unix) or install.ps1 (Windows)
+#   4. prints next steps
+#
+# Customisation:
+#   SYNPIN_HOME=/some/path       install to a different directory
+#   SYNPIN_BRANCH=main           pick a branch (default: main)
+#   SYNPIN_KEEP_REPO=1           don't auto-cleanup the clone
+#   SYNPIN_INSTALL_REPO=https://...   pick a fork (mostly for devs)
+
+set -euo pipefail
+
+DEFAULT_REPO="https://github.com/FraN-arti/SynPin.git"
+DEFAULT_BRANCH="main"
+
+REPO="${SYNPIN_INSTALL_REPO:-$DEFAULT_REPO}"
+BRANCH="${SYNPIN_BRANCH:-$DEFAULT_BRANCH}"
+
+if [ -n "${SYNPIN_HOME:-}" ]; then
+    HOME_DIR="$SYNPIN_HOME"
+else
+    HOME_DIR="${USERPROFILE:-${HOME:-}}"
+fi
+INSTALL_DIR="${HOME_DIR%/}/synpin"
+
+# ── Output helpers ────────────────────────────────────────────────────
+
+if [ -t 1 ] && command -v tput >/dev/null 2>&1 && tput setaf 1 >/dev/null 2>&1; then
+    BOLD=$(tput bold); DIM=$(tput dim); RESET=$(tput sgr0)
+    BRAND=$(tput setaf 208)     # orange
+    OK=$(tput setaf 114)        # green
+    WARN=$(tput setaf 215)      # amber
+    INFO=$(tput setaf 75)       # blue
+else
+    BOLD=""; DIM=""; RESET=""
+    BRAND=""; OK=""; WARN=""; INFO=""
+fi
+
+step() { printf "\n${BOLD}${BRAND}==>${RESET} ${BOLD}%s${RESET}\n" "$1"; }
+ok()   { printf "    ${OK}[OK]${RESET} %s\n" "$1"; }
+warn() { printf "    ${WARN}[!!]${RESET} %s\n" "$1"; }
+info() { printf "    ${INFO}[..]${RESET} %s\n" "$1"; }
+
+# ── Step 0: pick installer variant ────────────────────────────────────
+
+# Strip CR if present (Windows-bootstrapped bash often has them).
+SCRIPT_PATH="${BASH_SOURCE[0]:-$0}"
+case "$SCRIPT_PATH" in
+    *.ps1|*install.ps1*) VARIANT="windows" ;;
+    *)                   VARIANT="unix"    ;;
+esac
+
+# If invoked as `curl ... | bash`, we won't know the platform from $0. Use uname.
+if [ -z "${BASH_SOURCE[0]:-}" ] || [ "$BASH_SOURCE" = "/dev/stdin" ] || [ "$BASH_SOURCE" = "/dev/fd/0" ] || [ "$BASH_SOURCE" = "bash" ]; then
+    case "$(uname -s 2>/dev/null || echo unknown)" in
+        CYGWIN*|MINGW*|MSYS*|Windows*) VARIANT="windows" ;;
+        *)                              VARIANT="unix"    ;;
+    esac
+fi
+
+step "SynPin installer"
+info "Target: $INSTALL_DIR"
+info "Variant: $VARIANT"
+info "Repo: $REPO @ $BRANCH"
+
+# ── Step 1: clone ─────────────────────────────────────────────────────
+
+if [ -d "$INSTALL_DIR/.git" ]; then
+    warn "Existing SynPin repository detected at $INSTALL_DIR; updating instead."
+    cd "$INSTALL_DIR"
+    git fetch --depth=1 origin "$BRANCH" >/dev/null 2>&1 || true
+    git checkout "$BRANCH" >/dev/null 2>&1 || true
+    git pull --ff-only origin "$BRANCH" 2>/dev/null || true
+else
+    if [ -d "$INSTALL_DIR" ]; then
+        warn "Directory $INSTALL_DIR exists but isn't a git repo; backing up."
+        mv "$INSTALL_DIR" "${INSTALL_DIR}.bak.$(date +%s)" 2>/dev/null || true
+    fi
+    info "Cloning SynPin to $INSTALL_DIR"
+    if ! git clone --depth=1 --branch "$BRANCH" "$REPO" "$INSTALL_DIR"; then
+        warn "Branch '$BRANCH' not found; cloning default branch."
+        git clone --depth=1 "$REPO" "$INSTALL_DIR"
+        cd "$INSTALL_DIR"
+        git checkout "$BRANCH" 2>/dev/null || true
+    fi
+fi
+
+cd "$INSTALL_DIR"
+
+# ── Step 2: run native installer ──────────────────────────────────────
+
+if [ "$VARIANT" = "windows" ]; then
+    if ! command -v powershell >/dev/null 2>&1; then
+        warn "PowerShell not found on PATH. Open a new PowerShell window and run:"
+        warn "  cd '$INSTALL_DIR'"
+        warn "  Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Bypass"
+        warn "  .\\install.ps1"
+        exit 1
+    fi
+    step "Running Windows installer"
+    SYNPIN_BRANCH="$BRANCH" powershell -NoProfile -ExecutionPolicy Bypass -File "./install.ps1" "$@"
+else
+    if [ ! -x "./install.sh" ]; then
+        warn "install.sh missing in the cloned repo (corrupt download). Re-clone."
+        exit 1
+    fi
+    step "Running Unix installer"
+    SYNPIN_BRANCH="$BRANCH" bash "./install.sh" "$@"
+fi
+
+# ── Step 3: print next steps ──────────────────────────────────────────
+
+BIN_DIR="$INSTALL_DIR/bin"
+
+step "Done"
+printf "\n"
+printf "${BOLD}SynPin installed at:${RESET} %s\n" "$INSTALL_DIR"
+printf "\n"
+printf "  ${BOLD}To start the server:${RESET}\n"
+printf "    ${INFO}cd %q${RESET}\n" "$INSTALL_DIR"
+printf "    ${INFO}synpin start${RESET}\n"
+printf "\n"
+printf "  ${BOLD}To access the UI:${RESET}\n"
+printf "    ${INFO}http://localhost:2088${RESET}\n"
+printf "\n"
+printf "  ${BOLD}If 'synpin' isn't recognised:${RESET} add %q to PATH and\n" "$BIN_DIR"
+printf "  open a new terminal. The installer already added it; just open a new\n"
+printf "  PowerShell window.\n"
+printf "\n"
+
+ok "SynPin ready."

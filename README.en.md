@@ -6,7 +6,7 @@
 
 ### Operating system for AI agents.
 
-**An organization that works while you sleep.**
+**An organisation that lives between your conversations.**
 
 <br/>
 
@@ -24,87 +24,135 @@
 
 <br/>
 
-## One question
+## What SynPin is
 
-What happens when you turn off your computer?
+SynPin is a working environment in which **multiple AI agents solve tasks under your supervision**. A head agent coordinates specialisation departments, assigns work, delegates, and tracks progress. Every agent has long-term memory, a role, and a place in the hierarchy.
 
-Today's AI tools have one answer: **nothing**. They sleep. Close the tab, and everything they knew evaporates. No action taken while you were away.
+The system is built for continuity **across sessions**: agents set their own reminders, escalate stuck work, return to unfinished things. This isn't a chat framework or a plugin bundle. It is an organisation that lives as long as you let it.
 
-But it doesn't have to be that way.
-
-You have work that can happen without you. Reports that are better written at night. Reminders that shouldn't depend on your memory. Checks that need to run every half hour. Ideas that happen in the background.
-
-**SynPin is agents living by those rules.**
+SynPin is useful when tasks spill out of one conversation — multi-week projects, reports that are better written overnight, ideas that need to be carried forward. Anywhere you don't want to re-explain context every time.
 
 <br/>
 
----
+## Principles
+
+**Agents are citizens, not tools.** Every agent has a role, a department, a long-term memory. They can set their own reminders, take work from neighbours, escalate up the chain. Not "one agent does everything" and not "a bundle of assistants that don't share any memory."
+
+**Memory is private knowledge.** Each agent has three scopes: `USER` (who you are), `MEMORY` (what it has learned), `FACTS` (what has been decided). The agent itself decides where a fact belongs and finds it later. Not a vector search — structured knowledge with history.
+
+**Proactivity, not reactivity.** Agents create cron jobs, sweep memory, react to channel events. SynPin runs a Linux-style daemon manager — schedule, retention, automated actions — while the computer is on.
+
+**Dark palette, glass panels.** The UI is designed for long late-night sessions. Low contrast, low detail, warm dark grey background, orange accent. Only what you need right now.
 
 <br/>
 
-## What it is
+## Capabilities
 
-SynPin is not another chat framework. It's **an operating system for agents**, where:
-
-- **Agents set their own reminders.** You said *"tomorrow evening let's talk about X"* — the agent already remembers and will remind you itself, no prompting needed.
-- **The head agent delegates to departments** — and watches the progress itself, extends timers, escalates blocked work.
-- **Memory survives the session.** What an agent learned today, it remembers a month from now. Not as "vector DB search", but as **its own knowledge**.
-- **Cron, like Linux — but for agents.** Schedule, sweep, retention, daemon manager. All real.
-- **Three kinds of memory:** who you are (USER), what matters (MEMORY), what was decided (FACTS). Every fact goes where it belongs.
-
-This is infrastructure for AI agents. **Process management. Persistent state. Proactive autonomy.**
-
-<br/>
-
----
+- **Head agent with coordination.** Delegates tasks to departments, aggregates summaries, speaks to the user on behalf of the system.
+- **Specialisation departments.** Each department has its own agents and contracts. Example: "Communication", "Ideas", "Code", "Kanban".
+- **Connections between departments.** Reference `otdel:<id>` → `agent:primary` from code; configure task flows.
+- **Long-term memory.** Per agent: `USER.md`, `MEMORY.md`, `FACTS`. With retention and archival.
+- **Cron for agents.** Any agent can schedule with `target`, `action_target`, `delivery`, schedule.
+- **Channels.** Configuration for messengers (Telegram, WhatsApp, Feishu, Slack, Discord, Email) in `channels.yaml`.
+- **Kanban.** Task boards with stages, assignees, deadlines.
+- **Projects, sessions, facts, triggers, plugins, skills.** All pluggable.
 
 <br/>
 
-## Why this way
+## Architecture
 
-In the LLM world today there are two extremes. **One agent doing everything** — even with 10M context it's still one agent. Can't delegate, can't parallelize, can't specialize.
+```
+SynPin/
+├── core/                      ← Python (FastAPI backend)
+│   ├── synpin/                ← code
+│   │   ├── agents/            ← agents, their files, profiles
+│   │   ├── chat/              ← WebSocket routing
+│   │   ├── cron/              ← task scheduling
+│   │   ├── memory/            ← USER.md, MEMORY.md, FACTS
+│   │   ├── otdels/            ← departments
+│   │   ├── kanban/            ← board engine
+│   │   ├── tools/             ← built-in tools
+│   │   ├── triggers/          ← event reactions
+│   │   ├── providers/         ← LLM providers (OpenAI-compatible)
+│   │   ├── cli/               ← `synpin` command
+│   │   └── api/               ← REST + WebSocket endpoints
+│   └── pyproject.toml         ← pip install synpin-core
+│
+├── web/                       ← React + Vite + TypeScript
+│   ├── src/                   ← components
+│   └── dist/                  ← production build (after install)
+│
+├── install                    ← POSIX bootstrap (curl | bash)
+├── bootstrap.ps1              ← PowerShell bootstrap (irm | iex)
+├── install.sh                 ← Unix installer
+├── install.ps1                ← Windows installer
+├── dev.bat / dev.ps1          ← development mode
+├── bin/synpin.cmd             ← CLI launcher (Windows)
+├── bin/synpin                 ← CLI launcher (Unix)
+│
+├── core/synpin/config/        ← configs (yaml)
+├── .venv/                     ← Python virtualenv (created by install)
+└── .installed_from            ← CLI marker
+```
 
-**One agent per role** — assistant for code, assistant for design, assistant for something else. Each on its own. No memory between them.
-
-SynPin is **the third path**. A system where agents are **citizens**, not tools.
-
-- Each has a role.
-- Each has a place in the hierarchy.
-- Each has long-term memory.
-- Each has the right to set reminders and take work.
-- Each has duties to the department.
-
-And most importantly — **they're not perfect workers, they're part of your life**. They remember what worried you a week ago. They ask "how are you". Not because they were told to — because they live in your context and they care.
+One repository is everything you need. No external registries, no paid services except the LLM provider you choose yourself.
 
 <br/>
 
----
+## Installation
+
+One command on each platform. The script clones the repo into `~/synpin/`, creates `.venv`, installs Python dependencies, builds the frontend. One folder.
+
+**macOS / Linux:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/FraN-arti/SynPin/main/install | bash
+```
+
+**Windows (PowerShell):**
+
+```powershell
+irm https://raw.githubusercontent.com/FraN-arti/SynPin/main/bootstrap.ps1 | iex
+```
+
+After installation, open a new terminal and run:
+
+```
+synpin start
+```
+
+UI on `http://localhost:2088`. The wizard walks you through provider selection and creating your first agent.
 
 <br/>
 
-## What's here now
+## Development
 
-SynPin is a living system. Agents with a hierarchy and long-term memory. Cron like in Linux. WebSocket without polling. Dark UI with glass panels.
-
-For the details — read the code, [CONTRIBUTING.md](CONTRIBUTING.en.md) and [INSTALL.md](INSTALL.md). This README is about the idea.
-
-<br/>
-
----
-
-<br/>
-
-## Quick start
+If you want to contribute or fork:
 
 ```bash
 git clone https://github.com/FraN-arti/SynPin.git
 cd SynPin
-.\install.ps1          # Windows
-./install.sh           # Linux / macOS
-synpin dev             # development mode
+./install.sh           # or install.ps1 on Windows
+synpin dev              # backend + frontend with hot-reload
 ```
 
-Open `http://localhost:2099`.
+`dev` brings up the API on `:2088` and Vite on `:2099`. Changes in `core/synpin/` are picked up by uvicorn reload, changes in `web/src/` — by Vite HMR.
+
+Contributors: see [CONTRIBUTING.md](CONTRIBUTING.md) for architecture, conventions, and the `AGENTS.md` rules.
+
+<br/>
+
+## License
+
+[AGPL v3](LICENSE). You may use, fork, deploy SynPin for yourself — but if you build a SaaS on top of it, the source code of any derivative product must also be open. For a commercial non-copyleft license, contact the author.
+
+<br/>
+
+## Status
+
+**Active development.** The project is young (~2 months). Concepts and architecture have settled; many features are still in progress. The roadmap lives in `AGENTS.md` and GitHub issues. Channels and forum are under development.
+
+SynPin is an open platform. Pull requests, ideas, and bug reports are welcome.
 
 <br/>
 
@@ -112,26 +160,4 @@ Open `http://localhost:2099`.
 
 <br/>
 
-## The road
-
-This isn't an MVP. It's **a foundation**. Every day something gets added — but not for features. For **agents to feel at home**.
-
-A year ago models couldn't hold long context. Today they can. Tomorrow they'll hold everything. But context without **purpose** is just text in a buffer.
-
-SynPin gives agents **purpose**. Place, work, memory, colleagues.
-
-**This isn't about AI that answers questions. It's about AI that lives.**
-
-<br/>
-
----
-
-<div align="center">
-
-<br/>
-
-*SynPin — because one AI agent shouldn't be lonely.*
-
-<br/>
-
-</div>
+SynPin is built by one person on a single conviction: AI agents should live, learn and work together — not exist one by one in isolation. If that resonates with you — `synpin install` and welcome.

@@ -1,77 +1,230 @@
-/* WelcomeStep — feature grid styles. */
+/* WelcomeStep — multi-screen onboarding with stagger fade-in.
+   The 2026-07-08 visual language: orange/gold accents, neumorphic
+   inner shadows, glow on focus/hover, italic hand-written comments
+   in the body text. */
 
-.wizard-features {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin: 8px 0;
+/* ── Card ─────────────────────────────────────────────── */
+
+.wizard-onboarding {
+  position: relative;
+  overflow: hidden;
+  min-height: 540px;
+  width: 540px;
+  /* Use the same width as the standard card but a bit taller to give
+     the longer story room to breathe. */
 }
 
-.wizard-feature {
+/* Ambient glow — bigger and more diffuse than the regular
+   wizard-glow, with a slow pulse to give the screen a "living"
+   quality. The pulse is on a 6s cycle so it's barely noticeable
+   as motion but the screen never feels static. */
+.onboarding-glow {
+  position: absolute;
+  top: -30%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 700px;
+  height: 500px;
+  background: radial-gradient(
+    ellipse,
+    var(--accent-glow) 0%,
+    rgba(249, 115, 22, 0.04) 40%,
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 0;
+  animation: onboarding-glow-pulse 6s ease-in-out infinite;
+}
+
+@keyframes onboarding-glow-pulse {
+  0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
+  50%      { opacity: 0.85; transform: translateX(-50%) scale(1.05); }
+}
+
+/* ── Logo ─────────────────────────────────────────────── */
+
+.onboarding-logo {
+  position: relative;
+  z-index: 1;
+  /* Logo sits above the glow but below the text. transform-origin
+     so the scale-up on the last screen animates from the center. */
+  transform-origin: center;
+  transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1),
+              opacity 0.5s ease-out;
+  opacity: 0;
+  transform: scale(0.92);
+}
+.onboarding-logo.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* ── Title ────────────────────────────────────────────── */
+
+.onboarding-title {
+  position: relative;
+  z-index: 1;
+  font-size: 28px;
+  line-height: 1.25;
+  /* The title gets a subtle letter-spacing tightening on the first
+     screen and a tiny scale-up. Each step transitions both the
+     text and the style for a moment of "newness" without a flash. */
+  letter-spacing: -0.5px;
+  transition: transform 0.4s ease-out,
+              opacity 0.4s ease-out;
+  opacity: 0;
+  transform: translateY(8px);
+}
+.onboarding-title.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Body ─────────────────────────────────────────────── */
+
+.onboarding-body {
+  position: relative;
+  z-index: 1;
+  font-size: 15px;
+  line-height: 1.65;
+  text-align: center;
+  max-width: 420px;
+  color: var(--text-secondary);
+  transition: transform 0.4s ease-out,
+              opacity 0.4s ease-out;
+  opacity: 0;
+  transform: translateY(8px);
+}
+.onboarding-body.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Yellow/gold accent words inside the body — used to highlight
+   the key concept of each screen. */
+.onboarding-body em.hl {
+  font-style: normal;
+  color: var(--gold);
+  font-weight: 600;
+}
+
+/* Hand-written italic comment — the designer's voice. Sits at the
+   bottom-right of the body block, smaller, dimmer. Each screen has
+   a unique one. */
+.onboarding-body .comment {
+  display: block;
+  margin-top: 16px;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-dim);
+  opacity: 0.85;
+}
+
+/* ── Controls (back + primary CTA) ─────────────────────── */
+
+.onboarding-controls {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  background: rgba(50, 48, 45, 0.4);
-  border: 1px solid var(--glass-border);
+  gap: 12px;
+  width: 100%;
+  margin-top: 8px;
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+  opacity: 0;
+  transform: translateY(8px);
+}
+.onboarding-controls.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Back button — text-only, no border, dimmer than primary. */
+.wizard-btn-back {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 12px 16px;
   border-radius: var(--radius);
-  box-shadow:
-    inset 2px 2px 4px rgba(0, 0, 0, 0.4),
-    inset -1px -1px 2px rgba(255, 255, 255, 0.04);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: color 0.15s, background 0.15s;
+}
+.wizard-btn-back:hover {
+  color: var(--text);
+  background: var(--bg-hover, rgba(255, 255, 255, 0.04));
 }
 
-.wizard-feature:hover {
-  border-color: var(--glow-border);
-  box-shadow:
-    inset 2px 2px 4px rgba(0, 0, 0, 0.4),
-    inset -1px -1px 2px rgba(255, 255, 255, 0.04),
-    var(--glow-orange);
+/* The CTA is shared with the rest of the wizard. We just override
+   the size and ensure it grows to fill when back is hidden. */
+.onboarding-cta {
+  flex: 1;
 }
 
-.wizard-feature-icon {
-  width: 40px;
-  height: 40px;
+/* ── Progress dots ────────────────────────────────────── */
+
+.onboarding-dots {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  background: var(--accent-bg);
-  color: var(--orange);
-  flex-shrink: 0;
-  box-shadow:
-    inset 0 0 0 1px rgba(249, 115, 22, 0.2),
-    0 0 12px rgba(249, 115, 22, 0.15);
+  gap: 10px;
+  margin-top: 12px;
+  transition: opacity 0.4s ease-out;
+  opacity: 0;
+}
+.onboarding-dots.visible {
+  opacity: 1;
 }
 
-.wizard-feature-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--white);
+.onboarding-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--border, rgba(255, 255, 255, 0.15));
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: background 0.25s, transform 0.25s, box-shadow 0.25s;
+}
+.onboarding-dot:hover {
+  background: var(--text-dim);
+  transform: scale(1.2);
+}
+.onboarding-dot.past {
+  background: var(--orange);
+  opacity: 0.5;
+}
+.onboarding-dot.active {
+  background: var(--orange);
+  width: 22px;
+  border-radius: 4px;
+  box-shadow: 0 0 12px var(--accent-glow);
 }
 
-.wizard-feature-desc {
-  font-size: 12px;
-  color: var(--text-dim);
-  margin-top: 2px;
+/* ── Skip ─────────────────────────────────────────────── */
+
+.onboarding-skip {
+  margin-top: 4px;
+  transition: opacity 0.4s ease-out;
+  opacity: 0;
+}
+.onboarding-skip.visible {
+  opacity: 1;
 }
 
-/* Light theme */
-.light-theme .wizard-feature {
-  background: var(--bg-elevated);
-  box-shadow:
-    inset 1px 1px 3px rgba(0, 0, 0, 0.08),
-    inset -1px -1px 1px rgba(255, 255, 255, 0.6);
+/* ── Light theme overrides ────────────────────────────── */
+
+.light-theme .onboarding-body em.hl {
+  color: #b45309; /* darker gold for light bg contrast */
 }
-.light-theme .wizard-feature:hover {
-  box-shadow:
-    inset 1px 1px 3px rgba(0, 0, 0, 0.08),
-    inset -1px -1px 1px rgba(255, 255, 255, 0.6),
-    var(--glow-orange);
+.light-theme .onboarding-dot {
+  background: rgba(0, 0, 0, 0.15);
 }
-.light-theme .wizard-feature-icon {
-  box-shadow:
-    inset 0 0 0 1px rgba(234, 88, 12, 0.15),
-    0 0 12px rgba(234, 88, 12, 0.1);
+.light-theme .onboarding-dot:hover {
+  background: rgba(0, 0, 0, 0.3);
 }

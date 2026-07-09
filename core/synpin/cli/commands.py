@@ -96,7 +96,7 @@ def cmd_start(args):
             border_style="brand",
             box=rich_box.ROUNDED,
             padding=(1, 2),
-            width=44,
+            width=48,
         )
     )
     console.print()
@@ -288,6 +288,17 @@ def cmd_update(args):
 
     console.print("[success]Updates downloaded![/success]")
     console.print()
+
+    # Show what changed — commit subjects since the previous HEAD.
+    log_result = subprocess.run(
+        ["git", "log", "--oneline", "--no-decorate", "HEAD@{1}..HEAD"],
+        cwd=str(repo_dir), capture_output=True, text=True,
+    )
+    if log_result.returncode == 0 and log_result.stdout.strip():
+        console.print("[dim]Что нового:[/dim]")
+        for line in log_result.stdout.strip().splitlines()[:10]:
+            console.print(f"  [accent]{line}[/accent]")
+        console.print()
 
     # Detect what changed since the last fetch position.
     core_changed = False

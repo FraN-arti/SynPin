@@ -1,0 +1,99 @@
+/* ProviderStep — auto-configures OpenCode Free on mount.
+   The provider card is the visual centre of the step: a small
+   status panel with spinner / check / error states. */
+
+.provider-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 24px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow:
+    inset 2px 2px 4px rgba(0, 0, 0, 0.3),
+    inset -1px -1px 2px rgba(255, 255, 255, 0.04);
+  /* Subtle entrance: fades in with the rest of the card. */
+  animation: provider-card-in 0.4s ease-out 0.4s both;
+}
+
+@keyframes provider-card-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.provider-spinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border, rgba(255, 255, 255, 0.15));
+  border-top-color: var(--orange);
+  border-radius: 50%;
+  animation: provider-spin 0.8s linear infinite;
+}
+@keyframes provider-spin {
+  to { transform: rotate(360deg); }
+}
+
+.provider-check {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  font-size: 18px;
+  font-weight: 700;
+  box-shadow: 0 0 16px rgba(34, 197, 94, 0.3);
+}
+
+.provider-error {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.provider-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 4px;
+}
+
+.provider-meta {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.provider-status {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.provider-footnote {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  text-align: center;
+  font-style: italic;
+  max-width: 360px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Light theme */
+.light-theme .provider-card {
+  background: var(--bg-elevated);
+  box-shadow:
+    inset 1px 1px 3px rgba(0, 0, 0, 0.08),
+    inset -1px -1px 1px rgba(255, 255, 255, 0.6);
+}

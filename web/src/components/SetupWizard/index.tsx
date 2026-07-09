@@ -18,10 +18,11 @@ import { useState } from 'react'
 import { BootLoader } from '../BootLoader'
 import { WelcomeStep } from './steps/WelcomeStep'
 import { ProviderStep } from './steps/ProviderStep'
+import { AgentStep } from './steps/AgentStep'
 import { DoneStep } from './steps/DoneStep'
 import './shared.css'
 
-type WizardStep = 'welcome' | 'provider' | 'theme' | 'agent' | 'done'
+type WizardStep = 'welcome' | 'provider' | 'agent' | 'done'
 
 interface SetupWizardProps {
   /** Called when wizard finishes or user exits via skip/back. */
@@ -44,8 +45,15 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
 
       {step === 'provider' && (
         <ProviderStep
-          onNext={() => setStep('done')}
+          onNext={() => setStep('agent')}
           onBack={() => setStep('welcome')}
+        />
+      )}
+
+      {step === 'agent' && (
+        <AgentStep
+          onNext={() => setStep('done')}
+          onBack={() => setStep('provider')}
         />
       )}
 
@@ -56,7 +64,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
       {/* If we ever land in a step with no component (e.g. during
           dev while adding new ones), show the boot loader so the
           user doesn't see a blank card. */}
-      {!['welcome', 'provider', 'done'].includes(step) && (
+      {!['welcome', 'provider', 'agent', 'done'].includes(step) && (
         <BootLoader status={`Шаг: ${step}`} />
       )}
     </div>

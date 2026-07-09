@@ -83,27 +83,48 @@ def save_setup(data: dict) -> dict:
 
     Accepts:
         data: {
-            providers: [ { name, base_url, api_key, models, type }, ... ]
+            providers: [ { name, base_url, api_key, models, type }, ... ] (optional)
+            skip_provider_setup: bool (optional, default false) — if true
+                and providers is empty, no provider is configured at all.
+                Useful for the "I'll set up later" path.
         }
 
-    Creates providers.yaml with the given providers. Other configs
-    (agents.yaml, departments.yaml, etc.) are generated from templates
-    if they don't exist yet.
+    When providers is empty AND skip_provider_setup is false, the
+    default OpenCode Free provider is registered so the user can
+    start using SynPin with free models immediately without having
+    to paste an API key on first run. They can add a real provider
+    later in Settings → Providers.
+
+    Creates providers.yaml with the given providers (or default).
+    Other configs (agents.yaml, departments.yaml, etc.) are
+    generated from templates if they don't exist yet.
     """
     config_dir = get_config_dir()
     config_dir.mkdir(parents=True, exist_ok=True)
 
-    providers = data.get("providers", [])
-    if not providers:
-        raise HTTPException(400, "At least one provider is required.")
+    providers_input = data.get("providers", [])
+    skip = bool(data.get("skip_provider_setup", False))
+
+    if not providers_input and not skip:
+        # Default path: register OpenCode Free so the system is
+        # immediately usable. The user can swap in a paid provider
+        # later via Settings → Providers.
+        providers_input = [_default_opencode_free_provider()]
+    elif not providers_input and skip:
+        # User explicitly chose to skip. No provider is created.
+        # The system will report needs_setup=true again on next
+        # load (since providers.yaml will be empty or missing),
+        # but we DO need to write a marker so the wizard doesn't
+        # loop forever. The simplest thing: write an empty
+        # providers.yaml and rely on the user adding one later.
+        providers_input = []
 
     # Build providers dict
     providers_dict: dict = {}
-    for prov in providers:
+    for prov in providers_input:
         name = prov.get("name")
         if not name:
             raise HTTPException(400, "Each provider must have a 'name' field.")
-
         providers_dict[name] = {
             "api_key": prov["api_key"],
             "base_url": prov.get("base_url", "http://localhost:1234/v1"),
@@ -117,7 +138,10 @@ def save_setup(data: dict) -> dict:
         yaml.dump({"providers": providers_dict}, default_flow_style=False, allow_unicode=True),
         encoding="utf-8",
     )
-    logger.info("Setup saved providers: %s", ", ".join(providers_dict.keys()))
+    if providers_dict:
+        logger.info("Setup saved providers: %s", ", ".join(providers_dict.keys()))
+    else:
+        logger.info("Setup completed without providers (user will configure later)")
 
     # Copy templates for other configs if missing
     _copy_template("agents.yaml")
@@ -133,6 +157,36 @@ def save_setup(data: dict) -> dict:
     _copy_template("web_search.yaml")
 
     return {"status": "ok", "message": "SynPin настроен!"}
+
+
+# OpenCode Free — a no-auth public endpoint that proxies free-tier
+# models from various providers. Used as the default provider for
+# new SynPin installations so users can hit the ground running
+# without pasting an API key. They can swap in a paid provider
+# later via Settings → Providers.
+OPENCODE_FREE_URL = "https://opencode.ai/zen/v1"
+OPENCODE_FREE_MODELS = [
+    "gpt-5-nano",
+    "claude-haiku-4-5",
+    "gemini-2.5-flash",
+]
+
+
+def _default_opencode_free_provider() -> dict:
+    """Return the spec for the default OpenCode Free provider.
+
+    Used when the wizard's first run is triggered with no providers
+    in the payload. No api_key needed — OpenCode Free's authMethod
+    is 'no-auth' so the request goes through unauthenticated.
+    """
+    return {
+        "name": "opencode-free",
+        "base_url": OPENCODE_FREE_URL,
+        "api_key": "no-auth",
+        "models": list(OPENCODE_FREE_MODELS),
+        "type": "openai-compatible",
+        "auth_method": "no-auth",
+    }
 
 
 def _copy_template(filename: str) -> None:

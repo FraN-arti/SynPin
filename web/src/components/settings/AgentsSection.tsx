@@ -275,7 +275,6 @@ export function AgentsSection({ onAgentsChange, wsOn }: AgentsSectionProps) {
   const handleDeleteAgent = async (slug: string) => {
     const agent = agents.find(a => a.slug === slug)
     setDeleteConfirm({ slug, name: agent?.name || slug })
-    setDeleteInput('')
   }
 
   const confirmDeleteAgent = async () => {

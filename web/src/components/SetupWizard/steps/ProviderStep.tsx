@@ -10,7 +10,7 @@
  * button. No auto-advance — the user clicks when ready.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { API_BASE } from '../../../config'
 import '../shared.css'
 import './ProviderStep.css'

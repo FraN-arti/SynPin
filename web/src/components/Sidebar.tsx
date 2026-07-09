@@ -41,6 +41,7 @@ export interface AgentConfig {
   temperature: number
   max_tokens: number
   enabled: boolean
+  available?: boolean
   is_primary?: boolean
   is_external?: boolean
   type?: string

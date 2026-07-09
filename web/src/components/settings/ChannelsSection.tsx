@@ -4,13 +4,6 @@
  */
 
 import { DropdownMenu as CustomDropdown } from '../DropdownMenu'
-import { Toggle } from './Toggle'
-
-const sampleChannels = [
-  { id: 'feishu-main', name: 'Feishu — Основной', type: 'feishu', status: 'connected', binding: 'Основной агент', mode: 'websocket' },
-  { id: 'whatsapp-board', name: 'WhatsApp — Совет директоров', type: 'whatsapp', status: 'disconnected', binding: 'Совет директоров', mode: 'webhook' },
-  { id: 'telegram-qa', name: 'Telegram — QA команда', type: 'telegram', status: 'disconnected', binding: 'QA департамент', mode: 'polling' },
-]
 
 /**
  * Channels settings section — в разработке.
@@ -19,6 +12,7 @@ const sampleChannels = [
  */
 
 export function ChannelsSection({ onAddChannel }: { onAddChannel: () => void }) {
+  void onAddChannel  // reserved for future "Add channel" button
   return (
     <div className="settings-sections">
       <div className="settings-card" style={{ textAlign: 'center', padding: '48px 24px' }}>

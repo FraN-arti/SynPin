@@ -86,20 +86,15 @@ function App() {
       .then(r => r.json())
       .then(data => {
         const needSetup = data.needs_setup === true
-
-        if (isStartRoute) {
-          // /start/ forces wizard regardless of virgin state
-          setView({ type: 'setup' })
-        } else {
-          setNeedsSetup(needSetup)
-        }
+        const finalNeedsSetup = isStartRoute ? true : needSetup
+        setNeedsSetup(finalNeedsSetup)
+        // The early re...[truncated]
       })
       .catch(() => {
-        if (isStartRoute) {
-          setView({ type: 'setup' })
-        } else {
-          setNeedsSetup(false)
-        }
+        // On network error, if /start/ route, still show wizard
+        // (user explicitly navigated here). Otherwise assume
+        // the system is fine (set false so the app loads).
+        setNeedsSetup(isStartRoute ? true : false)
       })
   }, [])
 

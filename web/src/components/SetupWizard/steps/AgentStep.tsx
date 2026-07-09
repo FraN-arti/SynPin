@@ -4,10 +4,11 @@
  * Flow:
  *   1. Fetch free models from OpenCode Free via GET /api/providers/opencode-free/models
  *      (filtered to models ending with '-free' or named 'big-pickle')
- *   2. User picks: name, tone (preset chips), model (custom SynPin select)
+ *   2. User picks: name, model (custom SynPin select)
  *   3. POST /api/agents → created
  *   4. PUT /api/agents/{slug} with { is_primary: true } → primary
- *   5. Transition to DoneStep
+ *   5. POST /api/memory/{slug}/add → welcome note
+ *   6. Transition to DoneStep
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -26,13 +27,6 @@ type Status =
   | { kind: 'done'; agentName: string }
   | { kind: 'error'; message: string }
 
-const TONES = [
-  { value: 'professional', label: 'Профессиональный', desc: 'Чётко, по делу, без лишнего.' },
-  { value: 'friendly', label: 'Дружелюбный', desc: 'Тепло, с заботой, без сухости.' },
-  { value: 'creative', label: 'Творческий', desc: 'Метафоры, неожиданные повороты.' },
-  { value: 'neutral', label: 'Нейтральный', desc: 'Баланс между формальным и свободным.' },
-] as const
-
 // Fallback when API call fails — must match OPENCODE_FREE_MODELS
 // in setup_router.py (actual free models from OpenCode Free catalog)
 const FALLBACK_MODELS = [
@@ -46,7 +40,6 @@ const FALLBACK_MODELS = [
 
 export function AgentStep({ onNext, onBack }: AgentStepProps) {
   const [name, setName] = useState('')
-  const [tone, setTone] = useState<string>('professional')
   const [model, setModel] = useState(FALLBACK_MODELS[0])
   const [models, setModels] = useState<string[]>(FALLBACK_MODELS)
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
@@ -106,7 +99,6 @@ export function AgentStep({ onNext, onBack }: AgentStepProps) {
           name: name.trim(),
           model,
           provider: 'opencode-free',
-          tone,
           role: 'main',
         }),
       })
@@ -172,27 +164,6 @@ export function AgentStep({ onNext, onBack }: AgentStepProps) {
           autoComplete="off"
           spellCheck={false}
         />
-      </div>
-
-      {/* Tone picker */}
-      <div className="agent-field">
-        <label className="agent-label">Тон</label>
-        <div className="agent-tones">
-          {TONES.map(t => (
-            <button
-              key={t.value}
-              className={`agent-tone-chip ${tone === t.value ? 'active' : ''}`}
-              onClick={() => setTone(t.value)}
-              disabled={status.kind !== 'idle'}
-              type="button"
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <div className="agent-tone-desc">
-          {TONES.find(t => t.value === tone)?.desc}
-        </div>
       </div>
 
       {/* Model picker — custom SynPin select */}

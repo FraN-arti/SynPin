@@ -1,230 +1,116 @@
-/* WelcomeStep — multi-screen onboarding with stagger fade-in.
-   The 2026-07-08 visual language: orange/gold accents, neumorphic
-   inner shadows, glow on focus/hover, italic hand-written comments
-   in the body text. */
+/* WelcomeStep — single-screen welcome with slow reveal. */
 
-/* ── Card ─────────────────────────────────────────────── */
-
-.wizard-onboarding {
+.wizard-welcome {
   position: relative;
+  /* The card has its own ambient glow. The wizard's
+     .wizard-glow sits behind it; this one is a tighter,
+     orange-tinged radial inside the card. */
   overflow: hidden;
-  min-height: 540px;
-  width: 540px;
-  /* Use the same width as the standard card but a bit taller to give
-     the longer story room to breathe. */
-}
-
-/* Ambient glow — bigger and more diffuse than the regular
-   wizard-glow, with a slow pulse to give the screen a "living"
-   quality. The pulse is on a 6s cycle so it's barely noticeable
-   as motion but the screen never feels static. */
-.onboarding-glow {
-  position: absolute;
-  top: -30%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 700px;
-  height: 500px;
-  background: radial-gradient(
-    ellipse,
-    var(--accent-glow) 0%,
-    rgba(249, 115, 22, 0.04) 40%,
-    transparent 70%
-  );
-  pointer-events: none;
-  z-index: 0;
-  animation: onboarding-glow-pulse 6s ease-in-out infinite;
-}
-
-@keyframes onboarding-glow-pulse {
-  0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
-  50%      { opacity: 0.85; transform: translateX(-50%) scale(1.05); }
-}
-
-/* ── Logo ─────────────────────────────────────────────── */
-
-.onboarding-logo {
-  position: relative;
-  z-index: 1;
-  /* Logo sits above the glow but below the text. transform-origin
-     so the scale-up on the last screen animates from the center. */
-  transform-origin: center;
-  transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1),
-              opacity 0.5s ease-out;
-  opacity: 0;
-  transform: scale(0.92);
-}
-.onboarding-logo.visible {
-  opacity: 1;
-  transform: scale(1);
-}
-
-/* ── Title ────────────────────────────────────────────── */
-
-.onboarding-title {
-  position: relative;
-  z-index: 1;
-  font-size: 28px;
-  line-height: 1.25;
-  /* The title gets a subtle letter-spacing tightening on the first
-     screen and a tiny scale-up. Each step transitions both the
-     text and the style for a moment of "newness" without a flash. */
-  letter-spacing: -0.5px;
-  transition: transform 0.4s ease-out,
-              opacity 0.4s ease-out;
-  opacity: 0;
-  transform: translateY(8px);
-}
-.onboarding-title.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* ── Body ─────────────────────────────────────────────── */
-
-.onboarding-body {
-  position: relative;
-  z-index: 1;
-  font-size: 15px;
-  line-height: 1.65;
-  text-align: center;
-  max-width: 420px;
-  color: var(--text-secondary);
-  transition: transform 0.4s ease-out,
-              opacity 0.4s ease-out;
-  opacity: 0;
-  transform: translateY(8px);
-}
-.onboarding-body.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* Yellow/gold accent words inside the body — used to highlight
-   the key concept of each screen. */
-.onboarding-body em.hl {
-  font-style: normal;
-  color: var(--gold);
-  font-weight: 600;
-}
-
-/* Hand-written italic comment — the designer's voice. Sits at the
-   bottom-right of the body block, smaller, dimmer. Each screen has
-   a unique one. */
-.onboarding-body .comment {
-  display: block;
-  margin-top: 16px;
-  font-size: 12px;
-  font-style: italic;
-  color: var(--text-dim);
-  opacity: 0.85;
-}
-
-/* ── Controls (back + primary CTA) ─────────────────────── */
-
-.onboarding-controls {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  margin-top: 8px;
-  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
-  opacity: 0;
-  transform: translateY(8px);
-}
-.onboarding-controls.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* Back button — text-only, no border, dimmer than primary. */
-.wizard-btn-back {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-  color: var(--text-dim);
-  font-size: 13px;
-  cursor: pointer;
-  padding: 12px 16px;
-  border-radius: var(--radius);
-  transition: color 0.15s, background 0.15s;
-}
-.wizard-btn-back:hover {
-  color: var(--text);
-  background: var(--bg-hover, rgba(255, 255, 255, 0.04));
-}
-
-/* The CTA is shared with the rest of the wizard. We just override
-   the size and ensure it grows to fill when back is hidden. */
-.onboarding-cta {
-  flex: 1;
-}
-
-/* ── Progress dots ────────────────────────────────────── */
-
-.onboarding-dots {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
+  min-height: 380px;
   justify-content: center;
+  gap: 18px;
+}
+
+.welcome-logo {
+  position: relative;
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  user-select: none;
+  z-index: 1;
+  /* Logo gets its own slow fade in. It lands before the body
+     so the user sees "SynPin" first, then reads. */
+  animation: welcome-logo-in 0.9s ease-out 0.2s both;
+}
+.welcome-logo .syn { color: var(--text); }
+.welcome-logo .pin { color: var(--orange); }
+
+@keyframes welcome-logo-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.welcome-title {
+  position: relative;
+  z-index: 1;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--accent);
+  text-align: center;
+  margin: 0;
+  /* Title comes in 0.4s after the logo so the user reads the mark
+     first, then the headline. */
+  animation: welcome-title-in 0.9s ease-out 0.6s both;
+}
+
+@keyframes welcome-title-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.welcome-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  /* Body waits for the explicit `revealed` flag from the
+     1.5s setTimeout in the component — the user has time to
+     read the logo and title before the body text appears. */
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+}
+.welcome-body.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.welcome-body p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.welcome-tagline {
+  font-size: 13px !important;
+  color: var(--text-dim) !important;
+  font-style: italic;
+  max-width: 360px;
+}
+
+.welcome-controls {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 10px;
-  margin-top: 12px;
-  transition: opacity 0.4s ease-out;
-  opacity: 0;
-}
-.onboarding-dots.visible {
-  opacity: 1;
-}
-
-.onboarding-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--border, rgba(255, 255, 255, 0.15));
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  transition: background 0.25s, transform 0.25s, box-shadow 0.25s;
-}
-.onboarding-dot:hover {
-  background: var(--text-dim);
-  transform: scale(1.2);
-}
-.onboarding-dot.past {
-  background: var(--orange);
-  opacity: 0.5;
-}
-.onboarding-dot.active {
-  background: var(--orange);
-  width: 22px;
-  border-radius: 4px;
-  box-shadow: 0 0 12px var(--accent-glow);
-}
-
-/* ── Skip ─────────────────────────────────────────────── */
-
-.onboarding-skip {
+  width: 100%;
   margin-top: 4px;
-  transition: opacity 0.4s ease-out;
   opacity: 0;
+  transform: translateY(4px);
+  /* Controls come in 0.6s after the body is visible. The cascade
+     is: logo → title → body → controls. Roughly 2s total. */
+  transition: opacity 0.8s ease-out 0.4s, transform 0.8s ease-out 0.4s;
 }
-.onboarding-skip.visible {
+.welcome-controls.visible {
   opacity: 1;
+  transform: translateY(0);
 }
 
-/* ── Light theme overrides ────────────────────────────── */
+.welcome-cta {
+  width: 100%;
+}
 
-.light-theme .onboarding-body em.hl {
-  color: #b45309; /* darker gold for light bg contrast */
+.welcome-skip {
+  font-size: 12px;
 }
-.light-theme .onboarding-dot {
-  background: rgba(0, 0, 0, 0.15);
-}
-.light-theme .onboarding-dot:hover {
-  background: rgba(0, 0, 0, 0.3);
+
+/* Light theme — italic tagline reads slightly different on cream bg. */
+.light-theme .welcome-tagline {
+  color: rgba(0, 0, 0, 0.45) !important;
 }

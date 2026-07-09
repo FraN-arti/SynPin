@@ -10,7 +10,7 @@
 
 <br/>
 
-[![Version](https://img.shields.io/badge/version-0.6.6-orange.svg)](https://github.com/FraN-arti/SynPin)
+[![Version](https://img.shields.io/github/v/tag/FraN-arti/SynPin?sort=semver)](https://github.com/FraN-arti/SynPin)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg)](https://react.dev)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.133-009688.svg)](https://fastapi.tiangolo.com)

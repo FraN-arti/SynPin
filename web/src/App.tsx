@@ -647,6 +647,19 @@ function App() {
     return <BootLoader status="Проверяю настройки..." />
   }
 
+  if (needsSetup === true) {
+    // Setup required. The second useEffect below will set view='setup'
+    // on the NEXT render, but rendering the main App shell in between
+    // produces a 1-frame flash of chat. Skip directly to the wizard
+    // body here — the useEffect is only there to keep the (legacy)
+    // isStartRoute path working.
+    return (
+      <div className="app-container">
+        <SetupWizard onComplete={() => { window.location.reload() }} />
+      </div>
+    )
+  }
+
   return (
     <div className="app-container">
       {globalTooltip}

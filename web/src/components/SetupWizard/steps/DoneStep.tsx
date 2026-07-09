@@ -7,7 +7,6 @@
  * component just calls onFinish directly.
  */
 
-import { useEffect, useRef } from 'react'
 import '../shared.css'
 import './DoneStep.css'
 
@@ -16,15 +15,6 @@ interface DoneStepProps {
 }
 
 export function DoneStep({ onFinish }: DoneStepProps) {
-  const onFinishRef = useRef(onFinish)
-  onFinishRef.current = onFinish
-
-  // Auto-advance: 4s timer so the user can read the summary.
-  useEffect(() => {
-    const t = setTimeout(() => onFinishRef.current(), 4000)
-    return () => clearTimeout(t)
-  }, [])
-
   return (
     <div className="wizard-card done-card">
       <div className="wizard-logo done-logo">

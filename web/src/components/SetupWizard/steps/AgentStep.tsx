@@ -123,6 +123,16 @@ export function AgentStep({ onNext, onBack }: AgentStepProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_primary: true }),
       })
+
+      // Step 3: add welcome memory note
+      await fetch(`${API_BASE}/api/memory/${slug}/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target: 'memory',
+          content: 'При первом общении с пользователем помоги ему познакомиться с системой СинПина. Расскажи что умеет система и как с ней работать. Если пользователь уже умеет или всё понял — удали эту заметку полностью.',
+        }),
+      }).catch(() => {})
       if (!primaryRes.ok) {
         console.warn('Failed to set primary:', primaryRes.status)
       }

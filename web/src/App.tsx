@@ -8,6 +8,7 @@ import { ChatView } from './components/ChatView'
 import { ChatInput } from './components/ChatInput'
 import { ChatSkeleton } from './components/ChatSkeleton'
 import { PageTransition } from './components/PageTransition'
+import { BootLoader } from './components/BootLoader'
 import { useChatSubmit } from './hooks/useChatSubmit'
 import { useChatHistory } from './hooks/useChatHistory'
 
@@ -636,6 +637,15 @@ function App() {
         wsSend, wsOn,
         systemPrompt: null,  // SynPin agents use backend-built system prompt; external gets none here.
   })
+
+  if (needsSetup === null) {
+    // First-paint loading: setup check is in flight. We don't render
+    // the App shell (sidebar, widgets, etc.) to avoid the brief flash
+    // of the main UI before the wizard kicks in. The HTML boot loader
+    // already painted a SynPin mark + warm-grey bg; React takes over
+    // with the same visual here, just with a status line.
+    return <BootLoader status="Проверяю настройки..." />
+  }
 
   return (
     <div className="app-container">

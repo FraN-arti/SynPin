@@ -247,13 +247,12 @@ switch -Regex ($args[0]) {
         # (synpin/config/, synpin/data/) instead of the prod
         # ~/.synpin/ one.
         $env:SYNPIN_DEV = "1"
-        # WIZARD_S forces the setup wizard to always show in dev mode
-        # so we can iterate on it without clearing providers.yaml.
-        # Honour the value set in dev.bat — if the user explicitly
-        # set WIZARD_S=0 there, don't override it back to 1.
-        if (-not $env:WIZARD_S) {
-            $env:WIZARD_S = "1"
-        }
+        # WIZARD_S is a user-controlled production variable. It is
+        # NOT set automatically here — users set it in their shell
+        # (export WIZARD_S=1; ./dev.ps1) or in their deployment
+        # config (systemd unit, pm2 ecosystem, .env, etc). The dev
+        # batch file does not touch it.
+        # See: core/synpin/api/setup_router.py — reads os.environ['WIZARD_S']
 
         & $pythonExe -m synpin dev
     }

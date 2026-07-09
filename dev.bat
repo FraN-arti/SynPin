@@ -12,7 +12,6 @@ if /i "%~1"=="/?" goto :help
 :run
 title SynPin Dev
 set SYNPIN_DEV=1
-set WIZARD_S=1
 echo.
 echo   Starting SynPin Development...
 echo.

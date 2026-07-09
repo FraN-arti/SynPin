@@ -150,6 +150,22 @@ def save_setup(data: dict) -> dict:
     else:
         logger.info("Setup completed without providers (user will configure later)")
 
+    # Refresh the in-memory chat provider registry so the user can
+    # start chatting immediately, without restarting the server.
+    # The registry was populated once at import time in api/server.py
+    # (before providers.yaml existed on a fresh install), so it is
+    # empty until something reloads it. Without this, the wizard
+    # writes the file but the chat still says "Provider not found".
+    try:
+        from ..chat import router as chat_router
+        from ..chat import otdel_chat_router
+        chat_router.registry.reload()
+        otdel_chat_router.registry.reload()
+    except Exception as e:
+        # Non-fatal: the user will hit the same error and reload
+        # the registry via the providers settings page if needed.
+        logger.warning("Could not hot-reload chat registry: %s", e)
+
     # Copy templates for other configs if missing.
     # Note: channels.yaml is intentionally NOT copied — it is a
     # per-developer secrets file (app_id, bot tokens, etc.) and

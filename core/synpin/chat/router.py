@@ -880,13 +880,13 @@ async def execute_tool(tool_name: str, params: dict, agent_slug: str | None = No
 
 
 def _parse_text_tool_calls(text: str) -> list[dict]:
-    """Parse tool calls from plain text output (fallback for models without native function calling).
-    
+    r"""Parse tool calls from plain text output (fallback for models without native function calling).
+
     Looks for patterns:
     - ```tool_call\n{"name": "...", "params": {...}}\n``` (old format)
     - {"name": "...", "params": {"command": "ls"}} (JSON format)
     - <function=name><parameter=path>D:\path</parameter> (Llama.cpp / GGUF XML format)
-    
+
     Returns list of OpenAI-format tool_call dicts.
     """
     if not text:

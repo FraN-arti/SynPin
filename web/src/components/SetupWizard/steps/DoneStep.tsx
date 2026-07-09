@@ -5,8 +5,7 @@
  * wizard on next mount).
  */
 
-import { useEffect } from 'react'
-import { API_BASE } from '../../../config'
+import { useEffect, useRef } from 'react'
 import '../shared.css'
 import './DoneStep.css'
 
@@ -15,13 +14,18 @@ interface DoneStepProps {
 }
 
 export function DoneStep({ onFinish }: DoneStepProps) {
+  // Use a ref for onFinish so the effect always calls the latest
+  // version without depending on its identity in the deps array.
+  const onFinishRef = useRef(onFinish)
+  onFinishRef.current = onFinish
+
   // Brief auto-advance on mount — 4s timer so the user can read
   // the summary before clicking. Clicking the button at any time
   // still works immediately.
   useEffect(() => {
-    const t = setTimeout(onFinish, 4000)
+    const t = setTimeout(() => onFinishRef.current(), 4000)
     return () => clearTimeout(t)
-  }, [onFinish])
+  }, [])
 
   return (
     <div className="wizard-card done-card">

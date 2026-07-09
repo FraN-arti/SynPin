@@ -13,7 +13,7 @@
  * to AgentStep.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { API_BASE } from '../../../config'
 import '../shared.css'
 import './ProviderStep.css'
@@ -30,6 +30,11 @@ type Status =
 
 export function ProviderStep({ onNext, onBack }: ProviderStepProps) {
   const [status, setStatus] = useState<Status>({ kind: 'saving' })
+  // Use a ref for onNext so the mount effect never depends on the
+  // callback identity. This prevents stale-closure flashes where
+  // the old onNext fires before the new one is captured.
+  const onNextRef = useRef(onNext)
+  onNextRef.current = onNext
 
   // Auto-POST on mount. Empty providers list → backend registers
   // OpenCode Free by default (see setup_router.py).
@@ -51,7 +56,7 @@ export function ProviderStep({ onNext, onBack }: ProviderStepProps) {
           // the next card slides in. 600ms is enough to register
           // the change without feeling like a wait.
           setTimeout(() => {
-            if (!cancelled) onNext()
+            if (!cancelled) onNextRef.current()
           }, 600)
         }
       })
@@ -61,7 +66,9 @@ export function ProviderStep({ onNext, onBack }: ProviderStepProps) {
         }
       })
     return () => { cancelled = true }
-  }, [onNext])
+    // Empty deps: runs once on mount, never re-runs.
+    // onNextRef always points to the latest callback.
+  }, [])
 
   return (
     <div className="wizard-card">

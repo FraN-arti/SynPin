@@ -52,6 +52,9 @@ export function AgentStep({ onNext, onBack }: AgentStepProps) {
   const [models, setModels] = useState<string[]>(DEFAULT_MODELS)
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const nameRef = useRef<HTMLInputElement>(null)
+  // Ref for onNext to avoid stale closures in setTimeout.
+  const onNextRef = useRef(onNext)
+  onNextRef.current = onNext
 
   // Focus the name field on mount so the user starts typing immediately.
   useEffect(() => {
@@ -115,7 +118,7 @@ export function AgentStep({ onNext, onBack }: AgentStepProps) {
       setStatus({ kind: 'done', agentName: name.trim() })
       // Brief pause so the user sees the success state before
       // advancing to DoneStep.
-      setTimeout(() => onNext(), 800)
+      setTimeout(() => onNextRef.current(), 800)
     } catch (err) {
       setStatus({ kind: 'error', message: String(err) })
     }

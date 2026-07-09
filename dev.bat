@@ -12,8 +12,11 @@ if /i "%~1"=="/?" goto :help
 :run
 title SynPin Dev
 set SYNPIN_DEV=1
+rem WIZARD_S=1 forces the setup wizard visible. Optional. Unset or 0 = auto-detect (show wizard only if providers are missing).
+if not defined WIZARD_S set WIZARD_S=1
 echo.
 echo   Starting SynPin Development...
+echo   WIZARD_S=%WIZARD_S%
 echo.
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0dev.ps1" %*
 exit /b %ERRORLEVEL%

@@ -249,7 +249,11 @@ switch -Regex ($args[0]) {
         $env:SYNPIN_DEV = "1"
         # WIZARD_S forces the setup wizard to always show in dev mode
         # so we can iterate on it without clearing providers.yaml.
-        $env:WIZARD_S = "1"
+        # Honour the value set in dev.bat — if the user explicitly
+        # set WIZARD_S=0 there, don't override it back to 1.
+        if (-not $env:WIZARD_S) {
+            $env:WIZARD_S = "1"
+        }
 
         & $pythonExe -m synpin dev
     }

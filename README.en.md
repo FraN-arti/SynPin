@@ -10,10 +10,14 @@
 
 <br/>
 
+[![Version](https://img.shields.io/badge/version-0.6.6-orange.svg)](https://github.com/FraN-arti/SynPin)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg)](https://react.dev)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg)](https://fastapi.tiangolo.com)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.133-009688.svg)](https://fastapi.tiangolo.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6.svg)](https://typescriptlang.org)
+[![Vite](https://img.shields.io/badge/Vite-6-646CFF.svg)](https://vitejs.dev)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38B2AC.svg)](https://tailwindcss.com)
+[![Cockpit](https://img.shields.io/badge/Cockpit-private-lightgrey.svg)](https://github.com/FraN-arti/SynPin-Cockpit)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
 [English](README.en.md) · [Русский](README.md)
@@ -53,49 +57,8 @@ SynPin is useful when tasks spill out of one conversation — multi-week project
 - **Connections between departments.** Reference `otdel:<id>` → `agent:primary` from code; configure task flows.
 - **Long-term memory.** Per agent: `USER.md`, `MEMORY.md`, `FACTS`. With retention and archival.
 - **Cron for agents.** Any agent can schedule with `target`, `action_target`, `delivery`, schedule.
-- **Channels.** Configuration for messengers (Telegram, WhatsApp, Feishu, Slack, Discord, Email) in `channels.yaml`.
 - **Kanban.** Task boards with stages, assignees, deadlines.
 - **Projects, sessions, facts, triggers, plugins, skills.** All pluggable.
-
-<br/>
-
-## Architecture
-
-```
-SynPin/
-├── core/                      ← Python (FastAPI backend)
-│   ├── synpin/                ← code
-│   │   ├── agents/            ← agents, their files, profiles
-│   │   ├── chat/              ← WebSocket routing
-│   │   ├── cron/              ← task scheduling
-│   │   ├── memory/            ← USER.md, MEMORY.md, FACTS
-│   │   ├── otdels/            ← departments
-│   │   ├── kanban/            ← board engine
-│   │   ├── tools/             ← built-in tools
-│   │   ├── triggers/          ← event reactions
-│   │   ├── providers/         ← LLM providers (OpenAI-compatible)
-│   │   ├── cli/               ← `synpin` command
-│   │   └── api/               ← REST + WebSocket endpoints
-│   └── pyproject.toml         ← pip install synpin-core
-│
-├── web/                       ← React + Vite + TypeScript
-│   ├── src/                   ← components
-│   └── dist/                  ← production build (after install)
-│
-├── install                    ← POSIX bootstrap (curl | bash)
-├── bootstrap.ps1              ← PowerShell bootstrap (irm | iex)
-├── install.sh                 ← Unix installer
-├── install.ps1                ← Windows installer
-├── dev.bat / dev.ps1          ← development mode
-├── bin/synpin.cmd             ← CLI launcher (Windows)
-├── bin/synpin                 ← CLI launcher (Unix)
-│
-├── core/synpin/config/        ← configs (yaml)
-├── .venv/                     ← Python virtualenv (created by install)
-└── .installed_from            ← CLI marker
-```
-
-One repository is everything you need. No external registries, no paid services except the LLM provider you choose yourself.
 
 <br/>
 
@@ -150,14 +113,10 @@ Contributors: see [CONTRIBUTING.md](CONTRIBUTING.md) for architecture, conventio
 
 ## Status
 
-**Active development.** The project is young (~2 months). Concepts and architecture have settled; many features are still in progress. The roadmap lives in `AGENTS.md` and GitHub issues. Channels and forum are under development.
+**Active development.** The project is young (~2 months). Concepts and architecture have settled; many features are still in progress. Channels and forum are under development.
 
 SynPin is an open platform. Pull requests, ideas, and bug reports are welcome.
 
 <br/>
 
 ---
-
-<br/>
-
-SynPin is built by one person on a single conviction: AI agents should live, learn and work together — not exist one by one in isolation. If that resonates with you — `synpin install` and welcome.

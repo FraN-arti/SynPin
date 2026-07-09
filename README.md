@@ -6,14 +6,18 @@
 
 ### Операционная система для ИИ-агентов.
 
-**Организация, которая живёт между твоими сообщениями.**
+**<span style="color:#f59e0b">Организация, которая живёт между твоими сообщениями.</span>**
 
 <br/>
 
+[![Version](https://img.shields.io/badge/version-0.6.6-orange.svg)](https://github.com/FraN-arti/SynPin)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![React](https://img.shields.io/badge/React-19-61DAFB.svg)](https://react.dev)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg)](https://fastapi.tiangolo.com)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.133-009688.svg)](https://fastapi.tiangolo.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6.svg)](https://typescriptlang.org)
+[![Vite](https://img.shields.io/badge/Vite-6-646CFF.svg)](https://vitejs.dev)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38B2AC.svg)](https://tailwindcss.com)
+[![Cockpit](https://img.shields.io/badge/Cockpit-private-lightgrey.svg)](https://github.com/FraN-arti/SynPin-Cockpit)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 
 [English](README.en.md) · [Русский](README.md)
@@ -36,13 +40,13 @@ SynPin полезен тогда, когда задачи выходят за р
 
 ## Принципы
 
-**Агенты — это граждане, а не инструменты.** У каждого есть роль, отдел, долгосрочная память. Они могут ставить себе напоминания, брать работу у соседей, эскалировать вверх. Это не «один агент делает всё» и не «набор ассистентов без памяти между собой».
+<span style="color:#f97316">**Агенты — это граждане, а не инструменты.**</span> У каждого есть роль, отдел, долгосрочная память. Они могут ставить себе напоминания, брать работу у соседей, эскалировать вверх. Это не «один агент делает всё» и не «набор ассистентов без памяти между собой».
 
-**Память — это собственное знание.** У каждого агента три области: `USER` (кто ты), `MEMORY` (что он узнал), `FACTS` (что решили). Агент сам решает, куда положить факт, и сам его потом находит. Не search по векторной БД — это структурированное знание с историей.
+<span style="color:#f97316">**Память — это собственное знание.**</span> У каждого агента три области: `USER` (кто ты), `MEMORY` (что он узнал), `FACTS` (что решили). Агент сам решает, куда положить факт, и сам его потом находит. Не search по векторной БД — это структурированное знание с историей.
 
-**Proactivity, а не реактивность.** Агенты могут сами создавать cron-задачи, sweep'ить память, реагировать на события в каналах. SynPin запускает фоновый daemon manager, как в Linux — расписание, retention, автоматические действия. Это работает, пока компьютер не выключен.
+<span style="color:#f97316">**Proactivity, а не реактивность.**</span> Агенты могут сами создавать cron-задачи, sweep'ить память, реагировать на события в каналах. SynPin запускает фоновый daemon manager, как в Linux — расписание, retention, автоматические действия. Это работает, пока компьютер не выключен.
 
-**Тёмная палитра и стеклянные панели.** Интерфейс спроектирован для долгих сессий ночью — минимум контраста, минимум деталей. Тёплый фон, оранжевый акцент, только то что нужно прямо сейчас.
+<span style="color:#f97316">**Тёмная палитра и стеклянные панели.**</span> Интерфейс спроектирован для долгих сессий ночью — минимум контраста, минимум деталей. Тёплый фон, оранжевый акцент, только то что нужно прямо сейчас.
 
 <br/>
 
@@ -53,52 +57,8 @@ SynPin полезен тогда, когда задачи выходят за р
 - **Соединения между отделами.** Как `otdel:<id>` → `agent:primary` в коде; можно настраивать потоки задач между ними.
 - **Долгосрочная память.** По каждому агенту — `USER.md`, `MEMORY.md`, `FACTS`. С retention и архивацией.
 - **Cron для агентов.** Любой агент может поставить задачу с `target`, `action_target`, `delivery`, расписанием.
-- **Каналы связи.** Конфигурация для мессенджеров (Telegram, WhatsApp, Feishu, Slack, Discord, Email) в `channels.yaml`.
 - **Канбан.** Доски задач с этапами, исполнителями, дедлайнами.
 - **Проекты, сессии, факты, триггеры, плагины, скиллы.** Всё подключаемое.
-
-<br/>
-
-## Архитектура
-
-```
-SynPin/
-├── core/                      ← Python (FastAPI backend)
-│   ├── synpin/                ← код
-│   │   ├── agents/            ← агенты, их файлы, профили
-│   │   ├── chat/              ← WebSocket маршрутизация диалогов
-│   │   ├── cron/              ← расписание задач
-│   │   ├── memory/            ← USER.md, MEMORY.md, FACTS
-│   │   ├── otdels/            ← отделы
-│   │   ├── kanban/            ← канбан-движок
-│   │   ├── tools/             ← встроенные инструменты
-│   │   ├── triggers/          ← реакция на события
-│   │   ├── providers/         ← LLM провайдеры (OpenAI-compatible)
-│   │   ├── cli/               ← команда `synpin`
-│   │   └── api/               ← REST + WebSocket endpoints
-│   └── pyproject.toml         ← pip install synpin-core
-│
-├── web/                       ← React + Vite + TypeScript
-│   ├── src/                   ← компоненты
-│   │   ├── components/        ← UI
-│   │   ├── hooks/             ← React hooks
-│   │   └── styles/            ← CSS
-│   └── dist/                  ← production build (после install)
-│
-├── install                    ← POSIX bootstrap (curl | bash)
-├── bootstrap.ps1              ← PowerShell bootstrap (irm | iex)
-├── install.sh                 ← Unix installer
-├── install.ps1                ← Windows installer
-├── dev.bat / dev.ps1          ← режим разработки
-├── bin/synpin.cmd             ← CLI launcher (Windows)
-├── bin/synpin                 ← CLI launcher (Unix)
-│
-├── core/synpin/config/        ← конфиги (yaml)
-├── .venv/                     ← виртуальное окружение Python (создаётся install)
-└── .installed_from            ← пометка для CLI
-```
-
-Один репозиторий — это всё, что нужно. Никаких внешних реестров или платных сервисов кроме LLM-провайдера, которого ты выбираешь сам.
 
 <br/>
 
@@ -153,14 +113,10 @@ synpin dev              # backend + frontend с hot-reload
 
 ## Статус
 
-**Активная разработка.** Проект молодой, ~2 месяца, концепции и архитектура уже устоялись, многие фичи ещё в работе. Список ближайших планов — в `AGENTS.md` и issues на GitHub. Канал связи и форум — в разработке.
+**Активная разработка.** Проект молодой, ~2 месяца, концепции и архитектура уже устоялись, многие фичи ещё в работе. Канал связи и форум — в разработке.
 
-SynPin — открытая платформа. PR'ы, идеи, найденные баги — приветствуются.
+**<span style="color:#f97316">SynPin — открытая платформа.</span>** PR'ы, идеи, найденные баги — приветствуются.
 
 <br/>
 
 ---
-
-<br/>
-
-SynPin — разрабатывается одним человеком во имя идеи, что ИИ-агенты должны жить, учиться и работать вместе, а не существовать по одному в изоляции. Если тебе близок этот подход — `synpin install` и добро пожаловать.

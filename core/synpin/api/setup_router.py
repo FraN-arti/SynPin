@@ -150,12 +150,14 @@ def save_setup(data: dict) -> dict:
     else:
         logger.info("Setup completed without providers (user will configure later)")
 
-    # Copy templates for other configs if missing
+    # Copy templates for other configs if missing.
+    # Note: channels.yaml is intentionally NOT copied — it is a
+    # per-developer secrets file (app_id, bot tokens, etc.) and
+    # must be created manually for any developer who needs it.
     _copy_template("agents.yaml")
     _copy_template("departments.yaml")
     _copy_template("otdels.yaml")
     _copy_template("settings.yaml")
-    _copy_template("channels.yaml")
     _copy_template("roles.yaml")
     _copy_template("security.yaml")
     _copy_template("tools.yaml")

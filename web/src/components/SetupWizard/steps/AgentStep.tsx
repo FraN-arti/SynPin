@@ -7,8 +7,12 @@
  *   2. User picks: name, model (custom SynPin select)
  *   3. POST /api/agents → created
  *   4. PUT /api/agents/{slug} with { is_primary: true } → primary
- *   5. POST /api/memory/{slug}/add → welcome note
- *   6. Transition to DoneStep
+ *   5. Transition to DoneStep
+ *
+ * No welcome memory note — the agent already knows its system:
+ * skills, tools, departments are all loaded into the system prompt
+ * via _build_system_prompt_with_memory. The user can ask anything
+ * and the agent will orient itself.
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -114,16 +118,6 @@ export function AgentStep({ onNext, onBack }: AgentStepProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_primary: true }),
       })
-
-      // Step 3: add welcome memory note
-      await fetch(`${API_BASE}/api/memory/${slug}/add`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          target: 'memory',
-          content: 'При первом общении с пользователем помоги ему познакомиться с системой СинПина. Расскажи что умеет система и как с ней работать. Если пользователь уже умеет или всё понял — удали эту заметку полностью.',
-        }),
-      }).catch(() => {})
       if (!primaryRes.ok) {
         console.warn('Failed to set primary:', primaryRes.status)
       }

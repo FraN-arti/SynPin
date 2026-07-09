@@ -103,12 +103,10 @@ function App() {
       })
   }, [])
 
-  // Switch to setup wizard when virgin system is detected
-  useEffect(() => {
-    if (needsSetup === true) {
-      setView({ type: 'setup' })
-    }
-  }, [needsSetup])
+  // (The legacy 'useEffect on needsSetup' that set view='setup' was
+  // removed: the early return for needsSetup === true now renders
+  // the wizard directly, no need to also flip view. /start/ is
+  // handled in the same fetch handler.)
 
   const [otdelSettingsOpen, setOtdelSettingsOpen] = useState(false)
   // null = not loaded yet (show skeleton), [] = loaded but empty chat

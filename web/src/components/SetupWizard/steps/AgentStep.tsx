@@ -99,7 +99,6 @@ export function AgentStep({ onNext, onBack }: AgentStepProps) {
           name: name.trim(),
           model,
           provider: 'opencode-free',
-          role: 'main',
         }),
       })
       if (!createRes.ok) {

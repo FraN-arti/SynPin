@@ -144,19 +144,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("[triggers] Failed to start engine: %s", e)
 
-    # Single compact summary instead of 12 individual lines.
-    if started:
-        joined = ", ".join(started)
-        _startup_console.print(f"   [info]Background:[/info] [dim]{joined}[/dim]")
-
-    # ConfigWatcher reports its file count here too — keeps startup output
-    # to a single block instead of one console.print per concern.
-    watcher_count = getattr(app.state, "_config_watcher_count", None)
-    if watcher_count is not None:
-        _startup_console.print(
-            f"   [info]ConfigWatcher:[/info] [dim]{watcher_count} files, polling every 5s[/dim]"
-        )
-
     yield  # ← app runs here
 
     # ── Shutdown (if needed) ──────────────────────────────────────────────

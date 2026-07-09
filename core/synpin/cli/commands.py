@@ -104,6 +104,16 @@ def cmd_start(args):
     )
     console.print()
 
+    # "Готов к работе" line — printed before uvicorn starts so the user
+    # sees it immediately under the banner. Uvicorn output is suppressed
+    # in non-verbose mode (WARNING level), so this is the last visible line.
+    if not verbose:
+        console.print(
+            f"  [success]●[/success] [dim]Готов к работе."
+            f"  Нажмите Ctrl+C для остановки.[/dim]"
+        )
+        console.print()
+
     # Per-logger levels. By default we want a quiet startup:
     #   - uvicorn.access WARNING: no per-WS-connect spam
     #   - synpin logger WARNING: only the important things bubble up
@@ -113,6 +123,7 @@ def cmd_start(args):
     # still gives you the full picture.
     access_level = "INFO" if verbose else "WARNING"
     synpin_level = "INFO" if verbose else "WARNING"
+    uvicorn_level = "INFO" if verbose else "WARNING"
 
     log_config = {
         "version": 1,
@@ -136,8 +147,8 @@ def cmd_start(args):
             }
         },
         "loggers": {
-            "uvicorn":        {"handlers": ["rich"], "level": "INFO",     "propagate": False},
-            "uvicorn.error":  {"handlers": ["rich"], "level": "INFO",     "propagate": False},
+            "uvicorn":        {"handlers": ["rich"], "level": uvicorn_level, "propagate": False},
+            "uvicorn.error":  {"handlers": ["rich"], "level": uvicorn_level, "propagate": False},
             "uvicorn.access": {"handlers": ["rich"], "level": access_level, "propagate": False},
             "synpin":         {"handlers": ["rich"], "level": synpin_level, "propagate": False},
         },
@@ -227,41 +238,7 @@ def cmd_config(args):
         console.print()
         console.print(config_file.read_text())
     else:
-        console.print("[warning]No config file found. Run 'synpin setup' to create one.[/warning]")
-
-
-def cmd_setup(args):
-    """Initial setup wizard."""
-    from rich.panel import Panel
-    from rich.prompt import Prompt
-
-    config_dir = _runtime_dir()
-    config_dir.mkdir(parents=True, exist_ok=True)
-    config_file = config_dir / "config.yaml"
-
-    if config_file.exists():
-        console.print("[warning]⚠️   Config already exists. Delete it first to re-run setup.[/warning]")
-        return
-
-    version = _get_version()
-    console.print(Panel.fit(
-        f"[brand]🔧 SynPin Setup Wizard v{version}[/brand]",
-        border_style="green"
-    ))
-    console.print()
-
-    api_url = Prompt.ask("LLM API URL", default="http://localhost:1234/v1")
-    model = Prompt.ask("Model name", default="default")
-    port = Prompt.ask("Server port", default="2088")
-
-    import yaml
-    config = {
-        "api_url": api_url,
-        "model": model,
-        "port": int(port),
-    }
-    config_file.write_text(yaml.dump(config, default_flow_style=False))
-    console.print(f"\n[success]✅  Config saved to {config_file}[/success]")
+        console.print("No config file found. Start the server to launch the setup wizard.")
 
 
 def cmd_update(args):

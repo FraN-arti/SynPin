@@ -7,7 +7,6 @@ Usage:
     synpin config     Show/edit configuration
     synpin logs       Show server logs
     synpin version    Show version
-    synpin setup      Initial setup wizard
     synpin update     Update from GitHub
     synpin doctor     Health check
     synpin dev        Run Core + Web in dev mode (with unified output)
@@ -15,7 +14,7 @@ Usage:
 import sys
 from .cli.commands import (
     cmd_start, cmd_stop, cmd_status, cmd_version,
-    cmd_config, cmd_setup, cmd_update, cmd_logs, cmd_doctor,
+    cmd_config, cmd_update, cmd_logs, cmd_doctor,
     cmd_dev,
 )
 from .cli.console import console
@@ -28,7 +27,6 @@ def main():
         "status": cmd_status,
         "version": cmd_version,
         "config": cmd_config,
-        "setup": cmd_setup,
         "update": cmd_update,
         "logs": cmd_logs,
         "doctor": cmd_doctor,

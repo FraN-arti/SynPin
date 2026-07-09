@@ -266,6 +266,23 @@
   margin-top: 4px;
 }
 
+.agent-cta:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.agent-cta:disabled:hover {
+  background: var(--orange);
+}
+
+.agent-hint-required {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-style: italic;
+  text-align: center;
+  padding: 2px 0;
+}
+
 /* ── Light theme ────────────────────────────────────── */
 
 .light-theme .agent-input {

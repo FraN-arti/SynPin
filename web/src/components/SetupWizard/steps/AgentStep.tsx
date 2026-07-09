@@ -225,12 +225,17 @@ export function AgentStep({ onNext, onBack }: AgentStepProps) {
 
       {/* CTA + status */}
       {status.kind === 'idle' && (
-        <button className="wizard-btn-primary agent-cta" onClick={handleCreate} disabled={!canCreate}>
-          Создать и сделать главным
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M5 12h14M12 5l7 7-7 7" />
-          </svg>
-        </button>
+        <>
+          {!name.trim() && (
+            <div className="agent-hint-required">Введите имя агента, чтобы продолжить</div>
+          )}
+          <button className="wizard-btn-primary agent-cta" onClick={handleCreate} disabled={!canCreate}>
+            Создать и сделать главным
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </button>
+        </>
       )}
 
       {status.kind === 'creating' && (

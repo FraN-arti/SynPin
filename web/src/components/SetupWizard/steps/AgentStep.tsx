@@ -7,12 +7,15 @@
  *   2. User picks: name, model (custom SynPin select)
  *   3. POST /api/agents → created
  *   4. PUT /api/agents/{slug} with { is_primary: true } → primary
- *   5. Transition to DoneStep
+ *   5. POST /api/memory/{slug}/add → onboarding instruction
+ *   6. Transition to DoneStep
  *
- * No welcome memory note — the agent already knows its system:
- * skills, tools, departments are all loaded into the system prompt
- * via _build_system_prompt_with_memory. The user can ask anything
- * and the agent will orient itself.
+ * The onboarding instruction tells the agent: if USER.md is empty,
+ * introduce yourself, ask the user about themselves, offer help
+ * with SynPin. If USER.md has entries already, delete this note.
+ *
+ * This lets a brand-new user get oriented naturally on first chat
+ * without making the wizard force a one-time tutorial later.
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -121,6 +124,20 @@ export function AgentStep({ onNext, onBack }: AgentStepProps) {
       if (!primaryRes.ok) {
         console.warn('Failed to set primary:', primaryRes.status)
       }
+
+      // Step 3: onboarding instruction.
+      // When the user writes their first message, the agent checks
+      // USER.md: if empty, it introduces itself and asks about the
+      // user + offers help with SynPin. If USER has entries, it
+      // removes this note via memory_remove.
+      await fetch(`${API_BASE}/api/memory/${slug}/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target: 'memory',
+          content: 'При первом общении с пользователем проверь блок USER. Если USER пустой (нет записей) — представься как главный агент SynPin, кратко спроси пользователя о нём и предложи помощь по работе в системе. Если в USER уже есть записи — удали эту инструкцию из MEMORY через memory_remove.',
+        }),
+      }).catch(() => {})
 
       setStatus({ kind: 'done', agentName: name.trim() })
       setTimeout(() => onNextRef.current(), 800)

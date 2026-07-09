@@ -285,9 +285,46 @@ async def search_exa(query: str, limit: int = 10) -> list[dict]:
         return results
 
 
+async def search_brave(query: str, limit: int = 10) -> list[dict]:
+    """Brave Search API — free 2000 queries/month, no card needed.
+
+    Sign up: https://brave.com/search/api/
+    """
+    cfg = get_provider_config("brave")
+    if not cfg or not cfg.get("api_key"):
+        return []
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(
+            "https://api.search.brave.com/res/v1/web/search",
+            params={"q": query, "count": min(limit, 20)},
+            headers={
+                "X-Subscription-Token": cfg["api_key"],
+                "Accept": "application/json",
+            },
+        )
+        if resp.status_code == 401:
+            logger.warning("[search] Brave: invalid or missing API key")
+            return []
+        if resp.status_code != 200:
+            logger.warning("[search] Brave error: %s", resp.status_code)
+            return []
+
+        data = resp.json()
+        results = []
+        for item in data.get("web", {}).get("results", []):
+            results.append({
+                "title": item.get("title", ""),
+                "url": item.get("url", ""),
+                "snippet": item.get("description", "")[:300],
+            })
+        return results
+
+
 # ── Provider registry ─────────────────────────────────────────────────────
 
 PROVIDERS = {
+    "brave": search_brave,
     "duckduckgo": search_ddg,
     "tavily": search_tavily,
     "perplexity": search_perplexity,
@@ -297,20 +334,47 @@ PROVIDERS = {
     "google": search_google,
 }
 
+# Providers that need an API key (used for error messages).
+_KEY_PROVIDERS = {"brave", "tavily", "perplexity", "exa", "bing", "serpapi", "google"}
 
-async def web_search_unified(query: str, provider: str = "", limit: int = 10) -> tuple[list[dict], str]:
-    """Unified web search — tries configured provider, falls back to DDG.
-    
+
+def _provider_status() -> str:
+    """Return a human-readable status of configured search providers."""
+    enabled = get_enabled_providers()
+    if enabled:
+        return ""
+
+    # No provider enabled — enumerate what's available.
+    lines = ["Поиск в интернете не настроен."]
+    any_has_key = False
+    for name, fn in PROVIDERS.items():
+        cfg = get_provider_config(name)
+        if cfg and cfg.get("api_key"):
+            any_has_key = True
+    if any_has_key:
+        lines.append("Найден провайдер с ключом, но он отключён — включите его в Настройки → Поиск.")
+    else:
+        lines.append(
+            "Рекомендуется Brave Search API (бесплатно, 2000 запросов/мес, работает в России). "
+            "Зарегистрируйтесь на https://brave.com/search/api/ и вставьте ключ в "
+            "config/web_search.yaml → providers.brave.api_key."
+        )
+    return "\n".join(lines)
+
+
+async def web_search_unified(query: str, provider: str = "", limit: int = 10) -> tuple[list[dict], str, str]:
+    """Unified web search — tries configured provider, then fallbacks.
+
     Args:
         query: Search query
         provider: Provider name (empty = auto-detect from settings)
         limit: Max results
-    
-    Returns:
-        Tuple of (results_list, provider_name_used)
-    """
-    used_provider = "duckduckgo"  # default
 
+    Returns:
+        Tuple of (results_list, provider_name_used, error_message).
+        error_message is non-empty when no results were found and
+        explains WHY (missing key, blocked, etc.).
+    """
     # Get preferred provider from settings
     if not provider:
         try:
@@ -330,14 +394,28 @@ async def web_search_unified(query: str, provider: str = "", limit: int = 10) ->
             try:
                 results = await PROVIDERS[provider](query, limit)
                 if results:
-                    return results, provider
+                    return results, provider, ""
             except Exception as e:
                 logger.warning("[search] Provider %s failed: %s", provider, e)
+                return [], provider, f"Провайдер {provider} вернул ошибку: {e}"
 
-    # Fallback to DuckDuckGo
+    # Try Brave (free, best for Russia) if it has a key
+    brave_cfg = get_provider_config("brave")
+    if brave_cfg and brave_cfg.get("enabled") and brave_cfg.get("api_key"):
+        try:
+            results = await search_brave(query, limit)
+            if results:
+                return results, "brave", ""
+        except Exception as e:
+            logger.warning("[search] Brave fallback failed: %s", e)
+
+    # Try DuckDuckGo (free, but blocked in Russia)
     try:
         results = await search_ddg(query, limit)
-        return results, "duckduckgo"
-    except Exception as e:
-        logger.error("[search] All providers failed: %s", e)
-        return [], "none"
+        if results:
+            return results, "duckduckgo", ""
+    except Exception:
+        pass
+
+    # All failed — return a meaningful explanation
+    return [], "none", _provider_status()

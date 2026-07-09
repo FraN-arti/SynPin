@@ -43,7 +43,7 @@ async def web_search(params: dict) -> ToolResult:
     # Use unified provider system
     try:
         from .web_search_providers import web_search_unified
-        results, used_provider = await web_search_unified(query, provider=provider_override, limit=limit)
+        results, used_provider, error_msg = await web_search_unified(query, provider=provider_override, limit=limit)
         if results:
             # Format results as text
             output_lines = [f"[Провайдер: {used_provider}]"]
@@ -53,6 +53,8 @@ async def web_search(params: dict) -> ToolResult:
                 output_lines.append(f"Snippet: {r.get('snippet', '')}")
                 output_lines.append("")
             return make_success("\n".join(output_lines))
+        if error_msg:
+            return make_error(error_msg)
     except Exception:
         pass  # Fall through to legacy DDG
 
@@ -80,7 +82,7 @@ async def _ddg_instant(query: str, limit: int) -> str | None:
     import httpx
 
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=5) as client:
             resp = await client.get(
                 "https://api.duckduckgo.com/",
                 params={
@@ -155,9 +157,8 @@ async def _ddg_instant(query: str, limit: int) -> str | None:
 async def _ddg_lite(query: str, limit: int) -> str | None:
     """Search via DuckDuckGo lite HTML page and parse results."""
     import httpx
-
     try:
-        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=5, follow_redirects=True) as client:
             resp = await client.get(
                 "https://lite.duckduckgo.com/lite/",
                 params={"q": query},
@@ -178,7 +179,7 @@ async def _ddg_html(query: str, limit: int) -> str | None:
 
     try:
         async with httpx.AsyncClient(
-            timeout=10,
+            timeout=5,
             follow_redirects=True,
             headers={"User-Agent": "Mozilla/5.0 (compatible; SynPin/1.0)"},
         ) as client:

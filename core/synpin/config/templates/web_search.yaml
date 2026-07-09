@@ -1,0 +1,25 @@
+# Web search provider configuration.
+#
+# Brave Search API is the recommended default — it works in Russia
+# and offers 2 000 free queries/month. Sign up at:
+#   https://brave.com/search/api/
+#
+# Other providers (Tavily, EXA, Bing, etc.) require their own API keys.
+# Set "enabled: true" and paste your key below to activate a provider.
+
+providers:
+  brave:
+    enabled: false
+    api_key: ""          # paste your Brave Search API key here
+
+  # tavily:
+  #   enabled: false
+  #   api_key: ""
+  #
+  # exa:
+  #   enabled: false
+  #   api_key: ""
+  #
+  # bing:
+  #   enabled: false
+  #   api_key: ""

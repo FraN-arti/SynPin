@@ -1,13 +1,14 @@
 # Web search provider configuration.
 #
-# Brave Search API is the recommended default — free 2 000 queries/month.
-# Sign up at:
-#   https://brave.com/search/api/
-#
-# Other providers (Tavily, EXA, Bing, etc.) require their own API keys.
-# Set "enabled: true" and paste your key below to activate a provider.
+# DuckDuckGo works as the default — free, no key needed. Brave Search
+# is a good alternative when DDG is blocked (free 2000 queries/month).
+# Sign up at: https://brave.com/search/api/
 
 providers:
+  # DDG works without configuration. Listed here for completeness.
+  duckduckgo:
+    enabled: true
+
   brave:
     enabled: false
     api_key: ""          # paste your Brave Search API key here

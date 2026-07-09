@@ -433,14 +433,14 @@ const updateUI = useCallback((path: string, value: string | boolean | number) =>
               onChange={v => updateModels('web_search', v)}
               searchable
               options={[
-                { value: '', label: 'DuckDuckGo (бесплатно)' },
+                { value: '', label: 'DuckDuckGo (бесплатно, по умолчанию)' },
                 ...Object.entries(webSearchProviders)
                   .filter(([name, cfg]) => name !== 'duckduckgo' && cfg.enabled && cfg.api_key)
                   .map(([name]) => ({ value: name, label: name.charAt(0).toUpperCase() + name.slice(1) })),
               ]}
             />
             <span className="settings-field-hint" style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-              DuckDuckGo доступен всегда. Другие провайдеры — в блоке ниже.
+              DuckDuckGo доступен без ключа. Другие провайдеры — в блоке ниже.
             </span>
           </div>
           <div className="settings-field" style={{ opacity: 0.5, pointerEvents: 'none' }}>

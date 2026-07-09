@@ -399,7 +399,16 @@ async def web_search_unified(query: str, provider: str = "", limit: int = 10) ->
                 logger.warning("[search] Provider %s failed: %s", provider, e)
                 return [], provider, f"Провайдер {provider} вернул ошибку: {e}"
 
-    # Try Brave (free, best for Russia) if it has a key
+    # Try DuckDuckGo (free, no key). Reachable from Russia via Cloudflare
+    # unwrap or a proxy on the user's side.
+    try:
+        results = await search_ddg(query, limit)
+        if results:
+            return results, "duckduckgo", ""
+    except Exception as e:
+        logger.warning("[search] DDG fallback failed: %s", e)
+
+    # Try Brave (free 2000/month) if it has a key
     brave_cfg = get_provider_config("brave")
     if brave_cfg and brave_cfg.get("enabled") and brave_cfg.get("api_key"):
         try:
@@ -408,14 +417,6 @@ async def web_search_unified(query: str, provider: str = "", limit: int = 10) ->
                 return results, "brave", ""
         except Exception as e:
             logger.warning("[search] Brave fallback failed: %s", e)
-
-    # Try DuckDuckGo (free, but blocked in Russia)
-    try:
-        results = await search_ddg(query, limit)
-        if results:
-            return results, "duckduckgo", ""
-    except Exception:
-        pass
 
     # All failed — return a meaningful explanation
     return [], "none", _provider_status()

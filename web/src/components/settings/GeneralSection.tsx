@@ -457,6 +457,7 @@ const updateUI = useCallback((path: string, value: string | boolean | number) =>
 
         <SettingsCard title="Провайдеры поиска">
           {[
+            { name: 'brave', label: 'Brave Search', hint: '2000 запросов/мес бесплатно', needsKey: true },
             { name: 'tavily', label: 'Tavily', hint: '1000 запросов/мес бесплатно', needsKey: true },
             { name: 'perplexity', label: 'Perplexity', hint: 'AI-поиск с цитатами', needsKey: true },
             { name: 'exa', label: 'EXA', hint: '1000 запросов/мес, AI-оптимизированный', needsKey: true },

@@ -2,15 +2,12 @@
  * AgentStep — create the first agent during onboarding.
  *
  * Flow:
- *   1. Fetch models from OpenCode Free via GET /api/providers/opencode-free/models
- *      (or use the hardcoded fallback if the endpoint fails)
- *   2. User picks: name, tone (preset chips), model (dropdown from OpenCode Free)
+ *   1. Fetch free models from OpenCode Free via GET /api/providers/opencode-free/models
+ *      (filtered to models ending with '-free' or named 'big-pickle')
+ *   2. User picks: name, tone (preset chips), model (custom SynPin select)
  *   3. POST /api/agents → created
  *   4. PUT /api/agents/{slug} with { is_primary: true } → primary
  *   5. Transition to DoneStep
- *
- * The "Сделать главным" toggle is explained inline — "Голова думает, руки делают"
- * connects back to the onboarding narrative (screen 2).
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -29,9 +26,6 @@ type Status =
   | { kind: 'done'; agentName: string }
   | { kind: 'error'; message: string }
 
-// Tone presets — each has a label and a short description. The user
-// picks one chip. The description is shown below the name field
-// as a preview of what the tone looks like.
 const TONES = [
   { value: 'professional', label: 'Профессиональный', desc: 'Чётко, по делу, без лишнего.' },
   { value: 'friendly', label: 'Дружелюбный', desc: 'Тепло, с заботой, без сухости.' },
@@ -39,43 +33,58 @@ const TONES = [
   { value: 'neutral', label: 'Нейтральный', desc: 'Баланс между формальным и свободным.' },
 ] as const
 
-const DEFAULT_MODELS = [
+const FALLBACK_MODELS = [
   'gpt-5-nano',
   'claude-haiku-4-5',
-  'gemini-2.5-flash',
+  'gemini-3-flash',
 ]
 
 export function AgentStep({ onNext, onBack }: AgentStepProps) {
   const [name, setName] = useState('')
   const [tone, setTone] = useState<string>('professional')
-  const [model, setModel] = useState(DEFAULT_MODELS[0])
-  const [models, setModels] = useState<string[]>(DEFAULT_MODELS)
+  const [model, setModel] = useState(FALLBACK_MODELS[0])
+  const [models, setModels] = useState<string[]>(FALLBACK_MODELS)
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
+  const [modelsOpen, setModelsOpen] = useState(false)
   const nameRef = useRef<HTMLInputElement>(null)
-  // Ref for onNext to avoid stale closures in setTimeout.
+  const selectRef = useRef<HTMLDivElement>(null)
   const onNextRef = useRef(onNext)
   onNextRef.current = onNext
 
-  // Focus the name field on mount so the user starts typing immediately.
+  // Focus the name field on mount.
   useEffect(() => {
     setTimeout(() => nameRef.current?.focus(), 400)
   }, [])
 
-  // Fetch available models from OpenCode Free on mount. If the
-  // endpoint fails (e.g. network), we keep the DEFAULT_MODELS
-  // fallback — the agent still gets created.
+  // Fetch free models from OpenCode Free on mount.
   useEffect(() => {
     fetch(`${API_BASE}/api/providers/opencode-free/models`)
       .then(r => r.ok ? r.json() : Promise.reject(`HTTP ${r.status}`))
       .then(data => {
         const list: string[] = data.models || data
         if (Array.isArray(list) && list.length > 0) {
-          setModels(list)
-          setModel(list[0])
+          // Filter to free models only: suffix -free or name "big-pickle"
+          const free = list.filter(m => m.endsWith('-free') || m === 'big-pickle')
+          if (free.length > 0) {
+            setModels(free)
+            setModel(free[0])
+          }
         }
       })
       .catch(() => { /* use defaults */ })
   }, [])
+
+  // Close custom select on outside click.
+  useEffect(() => {
+    if (!modelsOpen) return
+    const handle = (e: MouseEvent) => {
+      if (selectRef.current && !selectRef.current.contains(e.target as Node)) {
+        setModelsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [modelsOpen])
 
   const canCreate = name.trim().length > 0 && status.kind === 'idle'
 
@@ -109,17 +118,13 @@ export function AgentStep({ onNext, onBack }: AgentStepProps) {
         body: JSON.stringify({ is_primary: true }),
       })
       if (!primaryRes.ok) {
-        // Agent was created but not marked as primary. This is not
-        // fatal — the user can set primary manually in Settings.
-        // We still show success but note the issue.
         console.warn('Failed to set primary:', primaryRes.status)
       }
 
       setStatus({ kind: 'done', agentName: name.trim() })
-      // Brief pause so the user sees the success state before
-      // advancing to DoneStep.
       setTimeout(() => onNextRef.current(), 800)
     } catch (err) {
+      console.error('[AgentStep] create failed:', err)
       setStatus({ kind: 'error', message: String(err) })
     }
   }
@@ -142,7 +147,7 @@ export function AgentStep({ onNext, onBack }: AgentStepProps) {
           ref={nameRef}
           className="agent-input"
           type="text"
-          placeholder="Например: Алиса, Ассистент, Умка..."
+          placeholder="Например: Ассистент, Умка, Оракул..."
           value={name}
           onChange={e => setName(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -174,25 +179,42 @@ export function AgentStep({ onNext, onBack }: AgentStepProps) {
         </div>
       </div>
 
-      {/* Model picker */}
+      {/* Model picker — custom SynPin select */}
       <div className="agent-field">
         <label className="agent-label">Модель</label>
-        <select
-          className="agent-select"
-          value={model}
-          onChange={e => setModel(e.target.value)}
-          disabled={status.kind !== 'idle'}
-        >
-          {models.map(m => (
-            <option key={m} value={m}>{m}</option>
-          ))}
-        </select>
+        <div className="agent-select-wrapper" ref={selectRef}>
+          <button
+            className={`agent-select-btn ${modelsOpen ? 'open' : ''}`}
+            onClick={() => setModelsOpen(!modelsOpen)}
+            disabled={status.kind !== 'idle'}
+            type="button"
+          >
+            <span className="agent-select-value">{model}</span>
+            <svg className="agent-select-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+          {modelsOpen && (
+            <div className="agent-select-dropdown">
+              {models.map(m => (
+                <button
+                  key={m}
+                  className={`agent-select-option ${m === model ? 'active' : ''}`}
+                  onClick={() => { setModel(m); setModelsOpen(false) }}
+                  type="button"
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="agent-model-hint">
-          Выберите любую модель. Позже можно сменить в Настройки → Агенты.
+          Бесплатные модели OpenCode Free. Позже можно сменить в Настройки → Агенты.
         </div>
       </div>
 
-      {/* Primary badge — explains what "главный" means */}
+      {/* Primary badge */}
       <div className="agent-primary-badge">
         <div className="agent-primary-icon">★</div>
         <div className="agent-primary-text">

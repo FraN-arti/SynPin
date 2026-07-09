@@ -4,13 +4,10 @@
  * First-run design: instead of asking the user to paste an API key
  * before they can try SynPin, we register OpenCode Free (a no-auth
  * public endpoint) by default. The user can swap in a paid
- * provider later via Settings → Providers. This way the first
- * 60 seconds of onboarding are: wizard loads → system has a working
- * LLM → first agent step.
+ * provider later via Settings → Providers.
  *
- * The UI shows what's happening (a tiny status line) so the user
- * isn't confused. After save_setup returns, the wizard advances
- * to AgentStep.
+ * Auto-POST fires on mount. After success, shows a check + "Дальше"
+ * button. No auto-advance — the user clicks when ready.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -30,11 +27,6 @@ type Status =
 
 export function ProviderStep({ onNext, onBack }: ProviderStepProps) {
   const [status, setStatus] = useState<Status>({ kind: 'saving' })
-  // Use a ref for onNext so the mount effect never depends on the
-  // callback identity. This prevents stale-closure flashes where
-  // the old onNext fires before the new one is captured.
-  const onNextRef = useRef(onNext)
-  onNextRef.current = onNext
 
   // Auto-POST on mount. Empty providers list → backend registers
   // OpenCode Free by default (see setup_router.py).
@@ -50,24 +42,12 @@ export function ProviderStep({ onNext, onBack }: ProviderStepProps) {
         return r.json()
       })
       .then(() => {
-        if (!cancelled) {
-          setStatus({ kind: 'idle' })
-          // Brief pause so the user sees the success state before
-          // the next card slides in. 600ms is enough to register
-          // the change without feeling like a wait.
-          setTimeout(() => {
-            if (!cancelled) onNextRef.current()
-          }, 600)
-        }
+        if (!cancelled) setStatus({ kind: 'idle' })
       })
       .catch(err => {
-        if (!cancelled) {
-          setStatus({ kind: 'error', message: String(err) })
-        }
+        if (!cancelled) setStatus({ kind: 'error', message: String(err) })
       })
     return () => { cancelled = true }
-    // Empty deps: runs once on mount, never re-runs.
-    // onNextRef always points to the latest callback.
   }, [])
 
   return (
@@ -88,7 +68,7 @@ export function ProviderStep({ onNext, onBack }: ProviderStepProps) {
           <>
             <div className="provider-check">✓</div>
             <div className="provider-name">OpenCode Free</div>
-            <div className="provider-meta">3 модели · без ключа</div>
+            <div className="provider-meta">Бесплатные модели · без ключа</div>
           </>
         )}
         {status.kind === 'error' && (

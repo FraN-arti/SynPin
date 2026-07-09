@@ -1,5 +1,4 @@
-/* AgentStep — first agent creation during onboarding.
-   Matches the existing card layout with consistent field styling. */
+/* AgentStep — first agent creation during onboarding. */
 
 .agent-wizard-card {
   min-height: 440px;
@@ -16,10 +15,12 @@
   gap: 6px;
 }
 
+/* Labels are yellow/gold — matching the SynPin accent. The user
+   sees these as section headings, not form labels. */
 .agent-label {
   font-size: 12px;
   font-weight: 500;
-  color: var(--text-dim);
+  color: var(--accent);
   letter-spacing: 0.3px;
   text-transform: uppercase;
 }
@@ -90,34 +91,102 @@
   font-style: italic;
 }
 
-/* ── Model select ───────────────────────────────────── */
+/* ── Custom select (SynPin glassmorphism) ───────────── */
 
-.agent-select {
+.agent-select-wrapper {
+  position: relative;
   width: 100%;
+}
+
+.agent-select-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 10px 14px;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius);
   color: var(--text);
   font-size: 13px;
-  outline: none;
   cursor: pointer;
+  outline: none;
   box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.25);
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
   -webkit-appearance: none;
   appearance: none;
-  /* Custom dropdown arrow */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center;
-  padding-right: 32px;
 }
-.agent-select:focus {
+.agent-select-btn:hover,
+.agent-select-btn.open {
   border-color: var(--orange);
 }
-.agent-select:disabled {
+.agent-select-btn.open {
+  box-shadow:
+    inset 2px 2px 4px rgba(0, 0, 0, 0.25),
+    0 0 0 2px rgba(249, 115, 22, 0.15);
+}
+.agent-select-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.agent-select-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-select-arrow {
+  flex-shrink: 0;
+  color: var(--text-dim);
+  transition: transform 0.2s;
+}
+.agent-select-btn.open .agent-select-arrow {
+  transform: rotate(180deg);
+}
+
+.agent-select-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--bg-elevated, #1a1a17);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  /* Custom scrollbar for the dropdown */
+  scrollbar-width: thin;
+  scrollbar-color: var(--glass-border, rgba(255,255,255,0.1)) transparent;
+}
+.agent-select-dropdown::-webkit-scrollbar {
+  width: 4px;
+}
+.agent-select-dropdown::-webkit-scrollbar-thumb {
+  background: var(--glass-border, rgba(255,255,255,0.1));
+  border-radius: 2px;
+}
+
+.agent-select-option {
+  width: 100%;
+  padding: 8px 14px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.agent-select-option:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+.agent-select-option.active {
+  color: var(--orange);
+  background: rgba(249, 115, 22, 0.08);
 }
 
 .agent-model-hint {
@@ -205,11 +274,15 @@
     inset 1px 1px 3px rgba(0, 0, 0, 0.06),
     inset -1px -1px 1px rgba(255, 255, 255, 0.5);
 }
-.light-theme .agent-select {
-  background-color: var(--bg-elevated);
+.light-theme .agent-select-btn {
+  background: var(--bg-elevated);
   box-shadow:
     inset 1px 1px 3px rgba(0, 0, 0, 0.06),
     inset -1px -1px 1px rgba(255, 255, 255, 0.5);
+}
+.light-theme .agent-select-dropdown {
+  background: var(--bg-elevated);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 .light-theme .agent-tone-chip.active {
   background: rgba(249, 115, 22, 0.08);

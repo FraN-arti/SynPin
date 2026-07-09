@@ -1,16 +1,90 @@
-/* DoneStep — success check icon styling. */
+/* DoneStep — summary and completion state. */
 
-.wizard-check {
-  width: 72px;
-  height: 72px;
+.done-card {
+  min-height: 360px;
+  gap: 14px;
+}
+
+.done-logo {
+  animation: welcome-logo-in 0.9s ease-out 0.2s both;
+}
+
+.done-title {
+  animation: welcome-title-in 0.9s ease-out 0.6s both;
+}
+
+/* Summary — two rows showing what was set up. Each row is a
+   neumorphic card with an icon on the left and label+value
+   on the right. The summary fades in with a delay so the
+   user first reads the title, then sees what was configured. */
+.done-summary {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: done-summary-in 0.5s ease-out 1s both;
+}
+@keyframes done-summary-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.done-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow:
+    inset 2px 2px 4px rgba(0, 0, 0, 0.25),
+    inset -1px -1px 2px rgba(255, 255, 255, 0.04);
+}
+
+.done-icon {
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: rgba(34, 197, 94, 0.1);
-  color: var(--green);
-  margin: 8px 0;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.done-icon--provider {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+.done-icon--agent {
+  background: rgba(249, 115, 22, 0.15);
+  color: var(--orange);
+}
+
+.done-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.done-value {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* CTA */
+.done-cta {
+  width: auto;
+  min-width: 200px;
+  animation: done-summary-in 0.5s ease-out 1.4s both;
+}
+
+/* Light theme */
+.light-theme .done-row {
+  background: var(--bg-elevated);
   box-shadow:
-    inset 0 0 0 1px rgba(34, 197, 94, 0.2),
-    0 0 24px rgba(34, 197, 94, 0.15);
+    inset 1px 1px 3px rgba(0, 0, 0, 0.06),
+    inset -1px -1px 1px rgba(255, 255, 255, 0.5);
 }

@@ -1,0 +1,220 @@
+/* AgentStep — first agent creation during onboarding.
+   Matches the existing card layout with consistent field styling. */
+
+.agent-wizard-card {
+  min-height: 440px;
+  justify-content: flex-start;
+  gap: 14px;
+}
+
+/* ── Fields ─────────────────────────────────────────── */
+
+.agent-field {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.agent-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.agent-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.25);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.agent-input::placeholder {
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+.agent-input:focus {
+  border-color: var(--orange);
+  box-shadow:
+    inset 2px 2px 4px rgba(0, 0, 0, 0.25),
+    0 0 0 2px rgba(249, 115, 22, 0.15);
+}
+.agent-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Tone chips ─────────────────────────────────────── */
+
+.agent-tones {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.agent-tone-chip {
+  padding: 6px 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.agent-tone-chip:hover {
+  border-color: var(--text-dim);
+  color: var(--text);
+}
+.agent-tone-chip.active {
+  background: rgba(249, 115, 22, 0.12);
+  border-color: var(--orange);
+  color: var(--orange);
+  box-shadow: 0 0 10px rgba(249, 115, 22, 0.15);
+}
+.agent-tone-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.agent-tone-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* ── Model select ───────────────────────────────────── */
+
+.agent-select {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.25);
+  transition: border-color 0.15s;
+  -webkit-appearance: none;
+  appearance: none;
+  /* Custom dropdown arrow */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+.agent-select:focus {
+  border-color: var(--orange);
+}
+.agent-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.agent-model-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  opacity: 0.8;
+}
+
+/* ── Primary badge ──────────────────────────────────── */
+
+.agent-primary-badge {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(249, 115, 22, 0.06);
+  border: 1px solid rgba(249, 115, 22, 0.15);
+  border-radius: var(--radius);
+  margin-top: 2px;
+}
+
+.agent-primary-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(249, 115, 22, 0.15);
+  color: var(--orange);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.agent-primary-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.agent-primary-text strong {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 600;
+}
+.agent-primary-text span {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+/* ── Status row ─────────────────────────────────────── */
+
+.agent-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+.agent-status-row.success {
+  color: #22c55e;
+}
+.agent-status-row.error {
+  color: #ef4444;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+/* ── CTA ─────────────────────────────────────────────── */
+
+.agent-cta {
+  width: auto;
+  min-width: 200px;
+  margin-top: 4px;
+}
+
+/* ── Light theme ────────────────────────────────────── */
+
+.light-theme .agent-input {
+  background: var(--bg-elevated);
+  box-shadow:
+    inset 1px 1px 3px rgba(0, 0, 0, 0.06),
+    inset -1px -1px 1px rgba(255, 255, 255, 0.5);
+}
+.light-theme .agent-select {
+  background-color: var(--bg-elevated);
+  box-shadow:
+    inset 1px 1px 3px rgba(0, 0, 0, 0.06),
+    inset -1px -1px 1px rgba(255, 255, 255, 0.5);
+}
+.light-theme .agent-tone-chip.active {
+  background: rgba(249, 115, 22, 0.08);
+}
+.light-theme .agent-primary-badge {
+  background: rgba(249, 115, 22, 0.04);
+  border-color: rgba(249, 115, 22, 0.12);
+}

@@ -22,7 +22,7 @@ If you're unsure where your idea fits, open an Issue. A 5-minute conversation no
 A quick search before you build keeps the queue clean — duplicates are common.
 
 - Search **both open and closed** issues and PRs.
-- The README, INSTALL.md, and CHANGELOG (when published) describe the current state of the project. Read them first.
+- The README and INSTALL.md describe the current state of the project. Read them first.
 - Signal intent on non-trivial changes so effort isn't duplicated.
 
 ## Development setup

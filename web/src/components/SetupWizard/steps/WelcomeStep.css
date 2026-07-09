@@ -103,7 +103,7 @@
 }
 
 .welcome-cta {
-  width: auto;
+  /* Inherits auto width from .wizard-btn-primary. */
   min-width: 160px;
   padding: 12px 28px;
 }

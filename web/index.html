@@ -3,29 +3,114 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f0f1c" />
     <title>SynPin — Multi-Agent Framework</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+      /* Boot background — applied before any JS or CSS variables are
+         loaded. Prevents white flash on first paint. The theme-aware
+         class is added by the script below to switch to a light
+         background if the user picked light theme. */
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #0f0f1c;
+        color: #f5f5f5;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+      body.t-light {
+        background: #f5f0e8;
+        color: #1a1a1a;
+      }
+      /* Boot loader — visible until React mounts. Shows the SynPin
+         mark + a tiny progress bar. Matches the wizard's glass card
+         visual language so the transition into the app is seamless. */
+      #boot-loader {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
+        background: inherit;
+        z-index: 10000;
+      }
+      #boot-loader.gone {
+        display: none;
+      }
+      .boot-mark {
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        user-select: none;
+      }
+      .boot-mark .syn { color: inherit; }
+      .boot-mark .pin { color: #f97316; }
+      body.t-light .boot-mark .pin { color: #ea580c; }
+      .boot-bar {
+        width: 96px;
+        height: 2px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
+        overflow: hidden;
+        position: relative;
+      }
+      body.t-light .boot-bar {
+        background: rgba(0, 0, 0, 0.08);
+      }
+      .boot-bar::after {
+        content: '';
+        position: absolute;
+        top: 0; left: -40%;
+        width: 40%; height: 100%;
+        background: #f97316;
+        border-radius: 2px;
+        animation: boot-shimmer 1.2s ease-in-out infinite;
+      }
+      body.t-light .boot-bar::after { background: #ea580c; }
+      @keyframes boot-shimmer {
+        0%   { left: -40%; }
+        100% { left: 100%; }
+      }
+    </style>
     <script>
-      // Apply theme BEFORE React renders to prevent flash-of-dark-theme
+      // Apply theme + boot loader BEFORE React renders to prevent
+      // flash-of-wrong-theme. Two steps:
+      //   1. Theme class on <html> (existing logic) + body for boot bg.
+      //   2. Inject boot-loader DOM so first paint shows the mark
+      //      instead of an empty white page.
       (function() {
         try {
           var raw = localStorage.getItem('synpin_theme');
-          if (!raw) return;
-          var data = JSON.parse(raw);
-          var root = document.documentElement;
-          // Apply theme class
-          if (data.name === 'light') {
-            root.classList.add('light-theme');
-          } else if (data.name === 'dark-oled') {
-            root.classList.add('oled-theme');
-          } else if (data.name === 'tweakcn') {
-            root.classList.add('dark-theme');
+          if (raw) {
+            var data = JSON.parse(raw);
+            var root = document.documentElement;
+            var body = document.body;
+            if (data.name === 'light') {
+              root.classList.add('light-theme');
+              if (body) body.classList.add('t-light');
+            } else if (data.name === 'dark-oled') {
+              root.classList.add('oled-theme');
+            } else if (data.name === 'tweakcn') {
+              root.classList.add('dark-theme');
+            }
+            if (data.vars) {
+              Object.keys(data.vars).forEach(function(key) {
+                root.style.setProperty(key, data.vars[key]);
+              });
+            }
           }
-          // Apply TweakCN custom vars
-          if (data.vars) {
-            Object.keys(data.vars).forEach(function(key) {
-              root.style.setProperty(key, data.vars[key]);
-            });
+          // Inject boot loader synchronously so it's in the DOM
+          // before first paint. React removes it on mount.
+          if (document.body && !document.getElementById('boot-loader')) {
+            var loader = document.createElement('div');
+            loader.id = 'boot-loader';
+            loader.innerHTML =
+              '<div class="boot-mark"><span class="syn">Syn</span><span class="pin">Pin</span></div>' +
+              '<div class="boot-bar"></div>';
+            document.body.appendChild(loader);
           }
         } catch(e) {}
       })();

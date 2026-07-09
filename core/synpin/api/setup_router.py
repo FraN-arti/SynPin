@@ -1,14 +1,20 @@
 """Setup router — first-run wizard status and configuration.
 
 Provides:
-- GET /api/setup/status — check if SynPin needs initial setup (virgin detection)
-- POST /api/setup — save wizard form data (agents, providers, etc.)
+- GET  /api/setup/status   — check if SynPin needs initial setup
+- POST /api/setup          — save wizard form data (providers, etc.)
+- POST /api/setup/complete — mark wizard as completed
 
-Virgin detection: returns { needs_setup: true } if providers.yaml is
-empty (providers: {}) or doesn't exist. The frontend uses this to
-auto-navigate to the wizard on first run.
+State management: a single wizard.json flag replaces the old
+providers.yaml check.
+
+  wizard.json { "completed": true }  → wizard done, never show again
+  wizard.json missing or completed=false → wizard needed
+
+  WIZARD_S=1 env var → override: always show wizard (dev mode).
 """
 
+import json
 import logging
 
 import yaml
@@ -17,22 +23,52 @@ from fastapi import APIRouter, HTTPException
 from ..paths import get_config_dir
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter(prefix="/api/setup", tags=["setup"])
+
+
+# ── Helpers ────────────────────────────────────────────────────────
+
+
+def _wizard_file():
+    """Return path to wizard.json in the config directory."""
+    return get_config_dir() / "wizard.json"
+
+
+def _read_wizard_state() -> dict:
+    """Read wizard.json. Returns {} if missing or corrupt."""
+    path = _wizard_file()
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _write_wizard_state(state: dict) -> None:
+    """Write wizard.json atomically."""
+    config_dir = get_config_dir()
+    config_dir.mkdir(parents=True, exist_ok=True)
+    _wizard_file().write_text(
+        json.dumps(state, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+# ── Routes ─────────────────────────────────────────────────────────
 
 
 @router.get("/status")
 def setup_status() -> dict:
     """Check if SynPin needs initial setup.
 
-    Two triggers:
-      1. WIZARD_S=1 env var — forces wizard visible (dev mode).
-      2. providers.yaml missing/empty — virgin detection (production).
+    Priority:
+      1. WIZARD_S=1 env → always show wizard (dev override)
+      2. wizard.json.completed === true → wizard done
+      3. wizard.json missing or completed=false → show wizard
 
-    Returns:
-        needs_setup: true if wizard should be shown
-        message: human-readable status
-        dev_mode: true if triggered by WIZARD_S (frontend can show a "dev" badge)
+    The old providers.yaml check is removed. The wizard is the
+    single source of truth for first-run state.
     """
     import os
 
@@ -44,36 +80,18 @@ def setup_status() -> dict:
             "message": "WIZARD_S=1 — визард открыт в режиме разработки.",
         }
 
-    config_dir = get_config_dir()
-    providers_file = config_dir / "providers.yaml"
-
-    if not providers_file.exists():
+    state = _read_wizard_state()
+    if state.get("completed") is True:
         return {
-            "needs_setup": True,
+            "needs_setup": False,
             "dev_mode": False,
-            "message": "Провайдеры не настроены — требуется первоначальная настройка.",
-        }
-
-    try:
-        data = yaml.safe_load(providers_file.read_text(encoding="utf-8"))
-        if not data or not data.get("providers"):
-            return {
-                "needs_setup": True,
-                "dev_mode": False,
-                "message": "Провайдеры не настроены — требуется указать API-ключ.",
-            }
-    except Exception as e:
-        logger.warning("Failed to load providers.yaml: %s", e)
-        return {
-            "needs_setup": True,
-            "dev_mode": False,
-            "message": "Файл провайдеров повреждён — требуется повторная настройка.",
+            "message": "SynPin настроен и готов к работе.",
         }
 
     return {
-        "needs_setup": False,
+        "needs_setup": True,
         "dev_mode": False,
-        "message": "SynPin настроен и готов к работе.",
+        "message": "Требуется первоначальная настройка.",
     }
 
 
@@ -84,20 +102,16 @@ def save_setup(data: dict) -> dict:
     Accepts:
         data: {
             providers: [ { name, base_url, api_key, models, type }, ... ] (optional)
-            skip_provider_setup: bool (optional, default false) — if true
-                and providers is empty, no provider is configured at all.
-                Useful for the "I'll set up later" path.
+            skip_provider_setup: bool (optional, default false)
         }
 
-    When providers is empty AND skip_provider_setup is false, the
-    default OpenCode Free provider is registered so the user can
-    start using SynPin with free models immediately without having
-    to paste an API key on first run. They can add a real provider
-    later in Settings → Providers.
+    When providers is empty AND skip is false, registers OpenCode
+    Free by default so the system is immediately usable.
 
-    Creates providers.yaml with the given providers (or default).
-    Other configs (agents.yaml, departments.yaml, etc.) are
-    generated from templates if they don't exist yet.
+    NOTE: This endpoint does NOT mark the wizard as completed.
+    The frontend calls POST /api/setup/complete separately when
+    the user clicks "Перейти к SynPin". This two-step design
+    keeps the setup and completion semantically distinct.
     """
     config_dir = get_config_dir()
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -106,17 +120,8 @@ def save_setup(data: dict) -> dict:
     skip = bool(data.get("skip_provider_setup", False))
 
     if not providers_input and not skip:
-        # Default path: register OpenCode Free so the system is
-        # immediately usable. The user can swap in a paid provider
-        # later via Settings → Providers.
         providers_input = [_default_opencode_free_provider()]
     elif not providers_input and skip:
-        # User explicitly chose to skip. No provider is created.
-        # The system will report needs_setup=true again on next
-        # load (since providers.yaml will be empty or missing),
-        # but we DO need to write a marker so the wizard doesn't
-        # loop forever. The simplest thing: write an empty
-        # providers.yaml and rely on the user adding one later.
         providers_input = []
 
     # Build providers dict
@@ -159,11 +164,23 @@ def save_setup(data: dict) -> dict:
     return {"status": "ok", "message": "SynPin настроен!"}
 
 
-# OpenCode Free — a no-auth public endpoint that proxies free-tier
-# models from various providers. Used as the default provider for
-# new SynPin installations so users can hit the ground running
-# without pasting an API key. They can swap in a paid provider
-# later via Settings → Providers.
+@router.post("/complete")
+def complete_setup() -> dict:
+    """Mark the setup wizard as completed.
+
+    Called by the frontend when the user clicks "Перейти к SynPin"
+    on the final DoneStep. Writes wizard.json { "completed": true }
+    so the wizard never shows again (unless WIZARD_S=1 overrides).
+
+    This is idempotent — calling it multiple times is safe.
+    """
+    _write_wizard_state({"completed": True})
+    logger.info("Setup wizard completed")
+    return {"status": "ok", "message": "Визард завершён."}
+
+
+# ── OpenCode Free ──────────────────────────────────────────────────
+
 OPENCODE_FREE_URL = "https://opencode.ai/zen/v1"
 OPENCODE_FREE_MODELS = [
     "gpt-5-nano",
@@ -173,12 +190,7 @@ OPENCODE_FREE_MODELS = [
 
 
 def _default_opencode_free_provider() -> dict:
-    """Return the spec for the default OpenCode Free provider.
-
-    Used when the wizard's first run is triggered with no providers
-    in the payload. No api_key needed — OpenCode Free's authMethod
-    is 'no-auth' so the request goes through unauthenticated.
-    """
+    """Return the spec for the default OpenCode Free provider."""
     return {
         "name": "opencode-free",
         "base_url": OPENCODE_FREE_URL,
@@ -189,14 +201,15 @@ def _default_opencode_free_provider() -> dict:
     }
 
 
+# ── Templates ──────────────────────────────────────────────────────
+
+
 def _copy_template(filename: str) -> None:
     """Copy a template file from templates/ to config dir if target doesn't exist."""
     config_dir = get_config_dir()
     target = config_dir / filename
     if target.exists():
         return
-
-    # Template lives in the templates/ subdirectory
     alt = config_dir / "templates" / filename
     if alt.exists():
         content = alt.read_text(encoding="utf-8")

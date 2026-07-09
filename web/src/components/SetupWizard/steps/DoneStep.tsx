@@ -1,8 +1,10 @@
 /**
  * DoneStep — final screen. Shows a brief summary of what was set
- * up during the wizard and a "Перейти к SynPin" button that
- * reloads the page (App re-reads setup status and skips the
- * wizard on next mount).
+ * up during the wizard and a "Перейти к SynPin" button.
+ *
+ * The wizard root component (index.tsx) handles calling
+ * POST /api/setup/complete when onFinish is invoked, so this
+ * component just calls onFinish directly.
  */
 
 import { useEffect, useRef } from 'react'
@@ -14,14 +16,10 @@ interface DoneStepProps {
 }
 
 export function DoneStep({ onFinish }: DoneStepProps) {
-  // Use a ref for onFinish so the effect always calls the latest
-  // version without depending on its identity in the deps array.
   const onFinishRef = useRef(onFinish)
   onFinishRef.current = onFinish
 
-  // Brief auto-advance on mount — 4s timer so the user can read
-  // the summary before clicking. Clicking the button at any time
-  // still works immediately.
+  // Auto-advance: 4s timer so the user can read the summary.
   useEffect(() => {
     const t = setTimeout(() => onFinishRef.current(), 4000)
     return () => clearTimeout(t)

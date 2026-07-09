@@ -2,19 +2,19 @@
  * SetupWizard — first-run wizard for new SynPin installations.
  *
  * Shown when:
- *   - Providers are empty (production virgin detection)
+ *   - wizard.json.completed is false or missing (production)
  *   - WIZARD_S=1 env var is set (forced dev mode)
  *   - URL route is /start/
  *
- * Layout: each step is its own file in ./steps/. The root component
- * owns the step state and passes per-step callbacks (onNext, onBack,
- * onSkip, onFinish) to the active step.
+ * Any exit from the wizard (skip, "Перейти к SynPin") calls
+ * POST /api/setup/complete to write wizard.json { completed: true }
+ * so the wizard never shows again (unless WIZARD_S=1 overrides).
  *
- * Steps currently shipped: welcome, provider, done.
- * Future steps (theme, agent, etc) go in the steps/ folder too.
+ * Steps: welcome → provider → agent → done.
  */
 
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
+import { API_BASE } from '../../config'
 import { BootLoader } from '../BootLoader'
 import { WelcomeStep } from './steps/WelcomeStep'
 import { ProviderStep } from './steps/ProviderStep'
@@ -25,12 +25,20 @@ import './shared.css'
 type WizardStep = 'welcome' | 'provider' | 'agent' | 'done'
 
 interface SetupWizardProps {
-  /** Called when wizard finishes or user exits via skip/back. */
   onComplete: () => void
 }
 
 export function SetupWizard({ onComplete }: SetupWizardProps) {
   const [step, setStep] = useState<WizardStep>('welcome')
+
+  // Mark wizard as completed on any exit. The POST is fire-and-forget
+  // (network errors are tolerated — worst case the user sees the
+  // wizard again on next load). Only call when NOT in dev-override
+  // mode (WIZARD_S=1), so the wizard can be re-triggered in dev.
+  const handleExit = useCallback(() => {
+    fetch(`${API_BASE}/api/setup/complete`, { method: 'POST' }).catch(() => {})
+    onComplete()
+  }, [onComplete])
 
   return (
     <div className="setup-wizard">
@@ -39,7 +47,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
       {step === 'welcome' && (
         <WelcomeStep
           onNext={() => setStep('provider')}
-          onSkip={onComplete}
+          onSkip={handleExit}
         />
       )}
 
@@ -58,12 +66,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
       )}
 
       {step === 'done' && (
-        <DoneStep onFinish={onComplete} />
+        <DoneStep onFinish={handleExit} />
       )}
 
-      {/* If we ever land in a step with no component (e.g. during
-          dev while adding new ones), show the boot loader so the
-          user doesn't see a blank card. */}
       {!['welcome', 'provider', 'agent', 'done'].includes(step) && (
         <BootLoader status={`Шаг: ${step}`} />
       )}
@@ -71,7 +76,5 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   )
 }
 
-// Re-export for backward compat — old import path
-// `import { SetupWizard } from './SetupWizard'` still works via
-// App.tsx lazy import that resolves to index.tsx by default.
+// Re-export for backward compat
 export default SetupWizard

@@ -192,13 +192,13 @@ for candidate in _config_candidates:
     if candidate.exists():
         _loaded_registry = ProviderRegistry.from_config(candidate)
         _loaded_config_path = candidate
-        console.print(f"  [chat] Loaded providers from: {candidate}")
+        logger.info("Loaded providers from: %s", candidate)
         break
 
 if _loaded_registry is None:
     _loaded_registry = ProviderRegistry()
     _loaded_config_path = None
-    console.print("  [chat] No providers.yaml found — chat disabled")
+    logger.warning("No providers.yaml found — chat disabled until wizard runs")
 
 # Inject registry into the router module
 chat_router.registry = _loaded_registry

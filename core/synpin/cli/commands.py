@@ -82,9 +82,7 @@ def cmd_start(args):
     pid_file.parent.mkdir(parents=True, exist_ok=True)
     pid_file.write_text(json.dumps({"pid": os.getpid(), "port": port}))
 
-    # Structured startup banner. Boxes group related info: a header
-    # box (server identity) and a footer box (how to reach the UI).
-    # Section rules separate the UI/CLI/auth URL lists.
+    # Structured startup banner — compact width matching content.
     from rich import box as rich_box
     from rich.panel import Panel
 
@@ -92,14 +90,13 @@ def cmd_start(args):
     console.print(
         Panel(
             f"[brand]SynPin v{version}[/brand]  [dim]·  Multi-agent workspace[/dim]\n\n"
-            f"  [dim]API[/dim]   http://localhost:{port}\n"
-            f"  [dim]Web[/dim]   http://localhost:{port}\n"
-            f"  [dim]Docs[/dim]  http://localhost:{port}/docs",
-            title="[brand]SynPin[/brand]",
-            subtitle=f"[dim]v{version}[/dim]",
+            f"  [accent]API[/accent]   http://localhost:{port}\n"
+            f"  [accent]Web[/accent]   http://localhost:{port}\n"
+            f"  [accent]Docs[/accent]  http://localhost:{port}/docs",
             border_style="brand",
             box=rich_box.ROUNDED,
-            padding=(1, 3),
+            padding=(1, 2),
+            width=44,
         )
     )
     console.print()
@@ -109,8 +106,8 @@ def cmd_start(args):
     # in non-verbose mode (WARNING level), so this is the last visible line.
     if not verbose:
         console.print(
-            f"  [success]●[/success] [dim]Готов к работе."
-            f"  Нажмите Ctrl+C для остановки.[/dim]"
+            f"  [accent]● Готов к работе.[/accent]"
+            f"  [dim]Нажмите Ctrl+C для остановки.[/dim]"
         )
         console.print()
 

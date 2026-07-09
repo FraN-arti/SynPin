@@ -1,6 +1,6 @@
 {
   "name": "synpin",
-  "version": "0.6.7",
+  "version": "0.6.8",
   "private": true,
   "description": "SynPin Р В Р’В Р В РІР‚В Р В Р’В Р Р†Р вЂљРЎв„ўР В Р вЂ Р В РІР‚С™Р РЋРЎС™ multi-agent framework. Root npm wrapper that orchestrates the Python backend and the React frontend via npm scripts. Install with `npm install` (which runs `./install.sh` on Unix or `./install.ps1` on Windows) and then run `npm run dev` to start the dev server.",
   "scripts": {
@@ -8,7 +8,7 @@
     "start": "synpin start",
     "stop": "synpin stop",
     "status": "synpin status",
-    "version": "0.6.7",
+    "version": "0.6.8",
     "update": "synpin update",
     "doctor": "synpin doctor",
     "setup": "synpin setup",

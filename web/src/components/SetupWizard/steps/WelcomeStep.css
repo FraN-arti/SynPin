@@ -103,7 +103,9 @@
 }
 
 .welcome-cta {
-  width: 100%;
+  width: auto;
+  min-width: 160px;
+  padding: 12px 28px;
 }
 
 .welcome-skip {

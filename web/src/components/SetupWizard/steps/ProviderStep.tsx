@@ -68,7 +68,7 @@ export function ProviderStep({ onNext, onBack }: ProviderStepProps) {
           <>
             <div className="provider-check">✓</div>
             <div className="provider-name">OpenCode Free</div>
-            <div className="provider-meta">Бесплатные модели · без ключа</div>
+            <div className="provider-meta">6 бесплатных моделей · без ключа</div>
           </>
         )}
         {status.kind === 'error' && (

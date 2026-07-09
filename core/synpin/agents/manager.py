@@ -239,7 +239,7 @@ def get_agent(slug: str) -> dict[str, Any] | None:
 
 
 def create_agent(name: str, role: str = "", department: str = "",
-                 model: str = "", description: str = "", system_prompt: str = "",
+                 model: str = "", provider: str = "", description: str = "", system_prompt: str = "",
                  tone: str = "", style: str = "", traits: list[str] | None = None,
                  temperature: float = 0.7, max_tokens: int | None = None) -> dict[str, Any]:
     """Create a new agent from scratch. Returns the created agent."""
@@ -303,6 +303,7 @@ def create_agent(name: str, role: str = "", department: str = "",
         data["agents"] = {}
     data["agents"][slug] = {
         "model": model,
+        "provider": provider or None,
         "enabled": True,
     }
     _save_yaml(config_path, data)

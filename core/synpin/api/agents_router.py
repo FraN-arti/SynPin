@@ -34,6 +34,7 @@ class AgentCreate(BaseRequest):
     role: str = ""
     department: str = ""
     model: str = ""
+    provider: str = ""
     description: str = ""
     system_prompt: str = ""
     tone: str = ""
@@ -65,6 +66,7 @@ async def create_agent(req: AgentCreate):
             role=req.role,
             department=req.department,
             model=req.model,
+            provider=req.provider,
             description=req.description,
             system_prompt=req.system_prompt,
             tone=req.tone,

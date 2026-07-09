@@ -33,10 +33,15 @@ const TONES = [
   { value: 'neutral', label: 'Нейтральный', desc: 'Баланс между формальным и свободным.' },
 ] as const
 
+// Fallback when API call fails — must match OPENCODE_FREE_MODELS
+// in setup_router.py (actual free models from OpenCode Free catalog)
 const FALLBACK_MODELS = [
-  'gpt-5-nano',
-  'claude-haiku-4-5',
-  'gemini-3-flash',
+  'big-pickle',
+  'deepseek-v4-flash-free',
+  'mimo-v2.5-free',
+  'hy3-free',
+  'nemotron-3-ultra-free',
+  'north-mini-code-free',
 ]
 
 export function AgentStep({ onNext, onBack }: AgentStepProps) {
@@ -100,6 +105,7 @@ export function AgentStep({ onNext, onBack }: AgentStepProps) {
         body: JSON.stringify({
           name: name.trim(),
           model,
+          provider: 'opencode-free',
           tone,
           role: 'main',
         }),

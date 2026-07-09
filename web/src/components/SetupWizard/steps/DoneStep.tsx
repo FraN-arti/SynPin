@@ -39,7 +39,7 @@ export function DoneStep({ onFinish }: DoneStepProps) {
           <div className="done-icon done-icon--provider">✓</div>
           <div>
             <div className="done-label">Провайдер</div>
-            <div className="done-value">OpenCode Free · 3 модели</div>
+            <div className="done-value">OpenCode Free · 6 моделей</div>
           </div>
         </div>
         <div className="done-row">

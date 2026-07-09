@@ -71,8 +71,7 @@ def setup_status() -> dict:
     import os
 
     # Check completion first — if the user finished the wizard,
-    # don't override with the env var. This prevents the wizard
-    # from re-appearing after "Перейти к SynPin" in dev mode.
+    # don't override with the env var.
     state = _read_wizard_state()
     if state.get("completed") is True:
         return {
@@ -100,19 +99,18 @@ def setup_status() -> dict:
 def save_setup(data: dict) -> dict:
     """Save initial configuration from setup wizard.
 
+    This endpoint handles providers setup. It writes providers.yaml
+    directly using the same format as the providers page.
+
     Accepts:
         data: {
             providers: [ { name, base_url, api_key, models, type }, ... ] (optional)
             skip_provider_setup: bool (optional, default false)
         }
 
-    When providers is empty AND skip is false, registers OpenCode
-    Free by default so the system is immediately usable.
-
     NOTE: This endpoint does NOT mark the wizard as completed.
     The frontend calls POST /api/setup/complete separately when
-    the user clicks "Перейти к SynPin". This two-step design
-    keeps the setup and completion semantically distinct.
+    the user clicks "Перейти к SynPin".
     """
     config_dir = get_config_dir()
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -121,21 +119,24 @@ def save_setup(data: dict) -> dict:
     skip = bool(data.get("skip_provider_setup", False))
 
     if not providers_input and not skip:
+        # Default path: register OpenCode Free so the system is
+        # immediately usable. The user can swap in a paid provider
+        # later via Settings → Providers.
         providers_input = [_default_opencode_free_provider()]
     elif not providers_input and skip:
         providers_input = []
 
-    # Build providers dict
+    # Build providers dict — same format as providers_router.py
     providers_dict: dict = {}
     for prov in providers_input:
         name = prov.get("name")
         if not name:
             raise HTTPException(400, "Each provider must have a 'name' field.")
         providers_dict[name] = {
-            "api_key": prov["api_key"],
-            "base_url": prov.get("base_url", "http://localhost:1234/v1"),
-            "models": prov.get("models", ["default"]),
             "type": prov.get("type", "openai-compatible"),
+            "base_url": prov.get("base_url", ""),
+            "api_key": prov.get("api_key", ""),
+            "models": prov.get("models", []),
         }
 
     # Save providers.yaml
@@ -183,22 +184,35 @@ def complete_setup() -> dict:
 # ── OpenCode Free ──────────────────────────────────────────────────
 
 OPENCODE_FREE_URL = "https://opencode.ai/zen/v1"
+
+# These are the ACTUAL free models from OpenCode Free's catalog.
+# Models ending in "-free" or named "big-pickle" don't require
+# an API key. This list must be kept in sync with the catalog at
+# D:\synpin\web\src\data\providers.ts (opencode-free entry).
 OPENCODE_FREE_MODELS = [
-    "gpt-5-nano",
-    "claude-haiku-4-5",
-    "gemini-2.5-flash",
+    "big-pickle",
+    "deepseek-v4-flash-free",
+    "mimo-v2.5-free",
+    "hy3-free",
+    "nemotron-3-ultra-free",
+    "north-mini-code-free",
 ]
 
 
 def _default_opencode_free_provider() -> dict:
-    """Return the spec for the default OpenCode Free provider."""
+    """Return the spec for the default OpenCode Free provider.
+
+    This is the no-auth provider that gets registered during the
+    wizard so the user can start using SynPin immediately. The
+    models list contains only the actual free-tier models (no
+    paid models mixed in).
+    """
     return {
         "name": "opencode-free",
-        "base_url": OPENCODE_FREE_URL,
-        "api_key": "no-auth",
-        "models": list(OPENCODE_FREE_MODELS),
         "type": "openai-compatible",
-        "auth_method": "no-auth",
+        "base_url": OPENCODE_FREE_URL,
+        "api_key": "",  # no-auth — empty key is intentional
+        "models": list(OPENCODE_FREE_MODELS),
     }
 
 

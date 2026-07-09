@@ -150,6 +150,34 @@ def save_setup(data: dict) -> dict:
     else:
         logger.info("Setup completed without providers (user will configure later)")
 
+    # Refresh the in-memory chat provider registry so the user can
+    # start chatting immediately, without restarting the server.
+    # On a FRESH install providers.yaml does not yet exist at server
+    # import time, so _loaded_registry was created empty (Path=None)
+    # and a plain reload() is a no-op. We rebuild it here and inject
+    # both the registry and the config path so future reloads work.
+    try:
+        from ..api import server as server_mod
+        from ..chat import router as chat_router
+        from ..chat import otdel_chat_router
+        from ..chat.providers import ProviderRegistry
+
+        providers_path = providers_file
+        if server_mod._loaded_registry is None or not server_mod._loaded_config_path:
+            fresh = ProviderRegistry.from_config(providers_path)
+            server_mod._loaded_registry = fresh
+            server_mod._loaded_config_path = providers_path
+            chat_router.registry = fresh
+            otdel_chat_router.registry = fresh
+            logger.info("Hot-loaded fresh chat provider registry from %s", providers_path)
+        else:
+            chat_router.registry.reload()
+            otdel_chat_router.registry.reload()
+    except Exception as e:
+        # Non-fatal: the user will hit the same error and can
+        # recover via the providers settings page.
+        logger.warning("Could not hot-reload chat registry: %s", e)
+
     # Copy templates for other configs if missing.
     # Note: channels.yaml is intentionally NOT copied — it is a
     # per-developer secrets file (app_id, bot tokens, etc.) and

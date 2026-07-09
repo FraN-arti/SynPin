@@ -1,7 +1,7 @@
 # Python core for SynPin - Multi-Agent Framework
 [project]
 name = "synpin-core"
-version = "0.6.6"
+version = "0.6.7"
 description = "Agent-driven organization platform"
 requires-python = ">=3.11"
 
@@ -29,7 +29,7 @@ include = ["synpin*"]
 
 [tool.ruff]
 line-length = 100
-target-version = "0.6.6"
+target-version = "0.6.7"
 
 # Note: no [project.scripts] entry for 'synpin'.
 #

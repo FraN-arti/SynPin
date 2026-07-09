@@ -63,29 +63,30 @@ def setup_status() -> dict:
     """Check if SynPin needs initial setup.
 
     Priority:
-      1. WIZARD_S=1 env → always show wizard (dev override)
-      2. wizard.json.completed === true → wizard done
+      1. wizard.json.completed === true → wizard done (never show,
+         even if WIZARD_S=1 — the user completed it, respect that)
+      2. WIZARD_S=1 env → show wizard (dev override)
       3. wizard.json missing or completed=false → show wizard
-
-    The old providers.yaml check is removed. The wizard is the
-    single source of truth for first-run state.
     """
     import os
 
-    # Dev override — always show wizard when WIZARD_S=1
-    if os.environ.get("WIZARD_S") == "1":
-        return {
-            "needs_setup": True,
-            "dev_mode": True,
-            "message": "WIZARD_S=1 — визард открыт в режиме разработки.",
-        }
-
+    # Check completion first — if the user finished the wizard,
+    # don't override with the env var. This prevents the wizard
+    # from re-appearing after "Перейти к SynPin" in dev mode.
     state = _read_wizard_state()
     if state.get("completed") is True:
         return {
             "needs_setup": False,
             "dev_mode": False,
             "message": "SynPin настроен и готов к работе.",
+        }
+
+    # Dev override — show wizard when WIZARD_S=1
+    if os.environ.get("WIZARD_S") == "1":
+        return {
+            "needs_setup": True,
+            "dev_mode": True,
+            "message": "WIZARD_S=1 — визард открыт в режиме разработки.",
         }
 
     return {

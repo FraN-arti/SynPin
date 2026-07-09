@@ -35,8 +35,12 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   // (network errors are tolerated — worst case the user sees the
   // wizard again on next load). Only call when NOT in dev-override
   // mode (WIZARD_S=1), so the wizard can be re-triggered in dev.
-  const handleExit = useCallback(() => {
-    fetch(`${API_BASE}/api/setup/complete`, { method: 'POST' }).catch(() => {})
+  const handleExit = useCallback(async () => {
+    try {
+      await fetch(`${API_BASE}/api/setup/complete`, { method: 'POST' })
+    } catch {
+      // Network error — proceed with reload anyway.
+    }
     onComplete()
   }, [onComplete])
 

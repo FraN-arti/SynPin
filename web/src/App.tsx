@@ -77,24 +77,23 @@ function App() {
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null)
   const [view, setView] = useState<View>({ type: 'chat' })
 
-  // Virgin detection: if providers are empty, show setup wizard
+  // Virgin detection: check wizard.json via backend.
   useEffect(() => {
-    const isStartRoute = window.location.pathname === '/start/'
-      || window.location.pathname.startsWith('/start')
-
     fetch('/api/setup/status')
       .then(r => r.json())
       .then(data => {
         const needSetup = data.needs_setup === true
-        const finalNeedsSetup = isStartRoute ? true : needSetup
-        setNeedsSetup(finalNeedsSetup)
+        // /start/ shows the wizard, but only if the backend agrees
+        // (needs_setup=true). If wizard.json says completed, the
+        // backend returns false and we respect that — no force.
+        setNeedsSetup(needSetup)
         // The early re...[truncated]
       })
       .catch(() => {
-        // On network error, if /start/ route, still show wizard
-        // (user explicitly navigated here). Otherwise assume
-        // the system is fine (set false so the app loads).
-        setNeedsSetup(isStartRoute ? true : false)
+        // On network error, assume the system is fine.
+        // The wizard is only shown when the backend explicitly
+        // says needs_setup=true.
+        setNeedsSetup(false)
       })
   }, [])
 
